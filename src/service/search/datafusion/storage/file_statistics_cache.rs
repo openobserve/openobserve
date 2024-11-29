@@ -39,9 +39,11 @@ impl FileStatisticsCache {
             max_entries,
         }
     }
+
     pub fn len(&self) -> usize {
         self.statistics.len()
     }
+
     fn format_key(&self, k: &Path) -> String {
         if let Some(mut p) = k.as_ref().find("/$$/") {
             if let Some(pp) = k.as_ref()[..p].find("/schema=") {
@@ -123,7 +125,7 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
 
     fn remove(&mut self, k: &Path) -> Option<Arc<Statistics>> {
         let k = self.format_key(k);
-        self.statistics.remove(&k).map(|x| x.1.1)
+        self.statistics.remove(&k).map(|x| x.1 .1)
     }
 
     fn contains_key(&self, k: &Path) -> bool {

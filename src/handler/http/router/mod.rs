@@ -30,7 +30,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::ingestion::INGESTION_EP, service::usage::audit},
+    crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
     actix_web::{web::BytesMut, HttpMessage},
     base64::{engine::general_purpose, Engine as _},
@@ -353,10 +353,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::es::org_index)
             .service(organization::es::org_license)
             .service(organization::es::org_xpack)
+            .service(organization::es::org_ilm_policy)
             .service(organization::es::org_index_template)
             .service(organization::es::org_index_template_create)
             .service(organization::es::org_data_stream)
             .service(organization::es::org_data_stream_create)
+            .service(organization::es::org_pipeline)
+            .service(organization::es::org_pipeline_create)
             .service(stream::schema)
             .service(stream::settings)
             .service(stream::update_settings)
@@ -399,6 +402,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::saved_view::get_view)
             .service(search::saved_view::get_views)
             .service(search::saved_view::delete_view)
+            .service(folders::create_folder)
+            .service(folders::list_folders)
+            .service(folders::update_folder)
+            .service(folders::get_folder)
+            .service(folders::delete_folder)
             .service(functions::save_function)
             .service(functions::list_functions)
             .service(functions::delete_function)
@@ -410,11 +418,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::get_dashboard)
             .service(dashboards::delete_dashboard)
             .service(dashboards::move_dashboard)
-            .service(dashboards::folders::create_folder)
-            .service(dashboards::folders::list_folders)
-            .service(dashboards::folders::update_folder)
-            .service(dashboards::folders::get_folder)
-            .service(dashboards::folders::delete_folder)
             .service(dashboards::reports::create_report)
             .service(dashboards::reports::update_report)
             .service(dashboards::reports::get_report)
@@ -453,11 +456,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(metrics::ingest::otlp_metrics_write)
             .service(logs::ingest::otlp_logs_write)
             .service(traces::otlp_traces_write)
-            .service(dashboards::folders::create_folder)
-            .service(dashboards::folders::list_folders)
-            .service(dashboards::folders::update_folder)
-            .service(dashboards::folders::get_folder)
-            .service(dashboards::folders::delete_folder)
             .service(dashboards::move_dashboard)
             .service(traces::get_latest_traces)
             .service(logs::ingest::multi)

@@ -23,8 +23,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
@@ -57,7 +57,7 @@ use crate::{
             MetadataType,
         },
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
@@ -748,6 +748,7 @@ async fn write_traces(
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
+                let alert_end_time = chrono::Utc::now().timestamp_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -760,7 +761,10 @@ async fn write_traces(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
+                    if let Ok((Some(v), _)) = alert
+                        .evaluate(Some(&record_val), (None, alert_end_time))
+                        .await
+                    {
                         triggers.push((alert.clone(), v));
                         evaluated_alerts.insert(key);
                     }

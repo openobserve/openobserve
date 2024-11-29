@@ -16,21 +16,24 @@
 use std::io;
 
 use actix_web::{http, web, HttpResponse};
-use config::{ider, utils::json};
-
-use crate::{
-    common::{
-        meta::{
-            authz::Authz,
-            dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
-            http::HttpResponse as MetaHttpResponse,
-        },
-        utils::auth::{remove_ownership, set_ownership},
+use config::{
+    ider,
+    meta::{
+        dashboards::Dashboards,
+        folder::{Folder, DEFAULT_FOLDER},
     },
-    service::db::dashboards,
+    utils::json,
 };
 
-pub mod folders;
+use super::folders;
+use crate::{
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    service::db,
+};
+
 pub mod reports;
 
 #[tracing::instrument(skip(body))]
@@ -38,67 +41,67 @@ pub async fn create_dashboard(
     org_id: &str,
     folder_id: &str,
     body: web::Bytes,
-) -> Result<HttpResponse, io::Error> {
+) -> Result<HttpResponse, anyhow::Error> {
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    match dashboards::folders::get(org_id, folder_id).await {
-        Ok(_) => {
-            let dashboard_id = ider::generate();
-            match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
-                Ok(res) => {
-                    set_ownership(
-                        org_id,
-                        "dashboards",
-                        Authz {
-                            obj_id: dashboard_id,
-                            parent_type: "folders".to_owned(),
-                            parent: folder_id.to_owned(),
-                        },
-                    )
-                    .await;
-                    Ok(res)
-                }
-                Err(_) => todo!(),
+    if db::folders::exists(org_id, folder_id).await? {
+        let dashboard_id = ider::generate();
+        match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
+            Ok(res) => {
+                set_ownership(
+                    org_id,
+                    "dashboards",
+                    Authz {
+                        obj_id: dashboard_id,
+                        parent_type: "folders".to_owned(),
+                        parent: folder_id.to_owned(),
+                    },
+                )
+                .await;
+                Ok(res)
             }
+            Err(error) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            ),
         }
-        Err(_) => {
-            if folder_id == DEFAULT_FOLDER {
-                let folder = Folder {
-                    folder_id: DEFAULT_FOLDER.to_string(),
-                    name: DEFAULT_FOLDER.to_string(),
-                    description: DEFAULT_FOLDER.to_string(),
-                };
-                folders::save_folder(org_id, folder, true).await?;
-                let dashboard_id = ider::generate();
-                match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
-                    Ok(res) => {
-                        set_ownership(
-                            org_id,
-                            "dashboards",
-                            Authz {
-                                obj_id: dashboard_id,
-                                parent_type: "folders".to_owned(),
-                                parent: folder_id.to_owned(),
-                            },
-                        )
-                        .await;
-                        Ok(res)
-                    }
-                    Err(error) => Ok(HttpResponse::InternalServerError().json(
-                        MetaHttpResponse::message(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            error.to_string(),
-                        ),
-                    )),
-                }
-            } else {
-                Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                    http::StatusCode::NOT_FOUND.into(),
-                    "folder not found".to_string(),
-                )))
+    } else if folder_id == DEFAULT_FOLDER {
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: DEFAULT_FOLDER.to_string(),
+        };
+        folders::save_folder(org_id, folder, true).await?;
+        let dashboard_id = ider::generate();
+        match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
+            Ok(res) => {
+                set_ownership(
+                    org_id,
+                    "dashboards",
+                    Authz {
+                        obj_id: dashboard_id,
+                        parent_type: "folders".to_owned(),
+                        parent: folder_id.to_owned(),
+                    },
+                )
+                .await;
+                Ok(res)
             }
+            Err(error) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            ),
         }
+    } else {
+        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "folder not found".to_string(),
+        )))
     }
 }
 
@@ -116,9 +119,14 @@ pub async fn update_dashboard(
 
 #[tracing::instrument]
 pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
-    Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: dashboards::list(org_id, folder_id).await.unwrap(),
-    }))
+    let resp = match db::dashboards::list(org_id, folder_id).await {
+        Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
+        Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            error.to_string(),
+        )),
+    };
+    Ok(resp)
 }
 
 #[tracing::instrument]
@@ -127,10 +135,13 @@ pub async fn get_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, folder_id).await {
-        HttpResponse::Ok().json(dashboard)
-    } else {
-        return Ok(Response::NotFound("Dashboard".to_string()).into());
+    let resp = match db::dashboards::get(org_id, dashboard_id, folder_id).await {
+        Ok(Some(dash)) => HttpResponse::Ok().json(dash),
+        Ok(None) => Response::NotFound("Dashboard".to_string()).into(),
+        Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+            error.to_string(),
+        )),
     };
     Ok(resp)
 }
@@ -141,16 +152,25 @@ pub async fn delete_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    if dashboards::get(org_id, dashboard_id, folder_id)
-        .await
-        .is_err()
-    {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Dashboard not found".to_string(),
-        )));
-    }
-    match dashboards::delete(org_id, dashboard_id, folder_id).await {
+    match db::dashboards::get(org_id, dashboard_id, folder_id).await {
+        Ok(Some(_)) => {} // Dashboard exists. Continue with deleting.
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Dashboard not found".to_string(),
+            )));
+        }
+        Err(error) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            )
+        }
+    };
+
+    match db::dashboards::delete(org_id, dashboard_id, folder_id).await {
         Ok(_) => {
             remove_ownership(
                 org_id,
@@ -183,7 +203,7 @@ async fn save_dashboard(
     body: web::Bytes,
     hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
-    match dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
+    match db::dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
@@ -205,12 +225,13 @@ pub async fn move_dashboard(
     dashboard_id: &str,
     from_folder: &str,
     to_folder: &str,
-) -> Result<HttpResponse, io::Error> {
-    if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, from_folder).await {
+) -> Result<HttpResponse, anyhow::Error> {
+    if let Ok(Some(dashboard)) = db::dashboards::get(org_id, dashboard_id, from_folder).await {
         // make sure the destination folder exists
-        if dashboards::folders::get(org_id, to_folder).await.is_err() {
+        if !db::folders::exists(org_id, to_folder).await? {
             return Ok(Response::NotFound("Destination Folder".to_string()).into());
         }
+
         let dash = if dashboard.version == 1 {
             json::to_vec(&dashboard.v1.unwrap()).unwrap()
         } else if dashboard.version == 2 {
@@ -225,13 +246,13 @@ pub async fn move_dashboard(
 
         // add the dashboard to the destination folder
         if let Err(error) =
-            dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
+            db::dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
         {
             return Ok(Response::InternalServerError(error).into());
         }
 
         // delete the dashboard from the source folder
-        let _ = dashboards::delete(org_id, dashboard_id, from_folder).await;
+        let _ = db::dashboards::delete(org_id, dashboard_id, from_folder).await;
         Ok(Response::OkMessage("Dashboard moved successfully".to_string()).into())
     } else {
         Ok(Response::NotFound("Dashboard".to_string()).into())

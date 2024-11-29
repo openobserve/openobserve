@@ -15,12 +15,12 @@
 
 use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
 use dashmap::{DashMap, DashSet};
-use infra::{cache, file_list};
+use infra::{cache, cache::stats, file_list, file_list as infra_file_list};
 use once_cell::sync::Lazy;
 
 pub mod broadcast;
 pub mod local;
-pub mod remote;
+use crate::service::db;
 
 pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
@@ -70,5 +70,25 @@ pub async fn progress(
         }
     }
 
+    Ok(())
+}
+
+pub async fn cache_stats() -> Result<(), anyhow::Error> {
+    let orgs = db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
+        if ret.is_err() {
+            log::error!("Load stream stats error: {}", ret.err().unwrap());
+            continue;
+        }
+        for (stream, stats) in ret.unwrap() {
+            let columns = stream.split('/').collect::<Vec<&str>>();
+            let org_id = columns[0];
+            let stream_type = columns[1];
+            let stream_name = columns[2];
+            stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
     Ok(())
 }

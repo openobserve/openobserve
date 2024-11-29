@@ -45,7 +45,7 @@ pub async fn delete(
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
             log::error!("[COMPACT] delete files from storage failed: {}", e);
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -74,7 +74,7 @@ pub async fn delete(
             // so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
                 log::error!("[COMPACT] delete files from storage failed: {}", e);
-                return Err(e);
+                return Err(e.into());
             }
         }
     }
@@ -107,7 +107,7 @@ pub async fn delete(
             // maybe the file already deleted, so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
                 log::error!("[COMPACT] delete files from storage failed: {}", e);
-                return Err(e);
+                return Err(e.into());
             }
         }
     }
@@ -118,7 +118,7 @@ pub async fn delete(
             storage::del(&files.keys().map(|file| file.as_str()).collect::<Vec<_>>()).await
         {
             log::error!("[COMPACT] delete files from storage failed: {}", e);
-            return Err(e);
+            return Err(e.into());
         }
     }
 

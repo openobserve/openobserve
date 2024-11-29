@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.13.1"
+version = "0.13.2"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -72,6 +72,7 @@ bitflags = "2.6.0"
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
     "std",
@@ -87,7 +88,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-aggregate-common.workspace = true
-datafusion-functions-json = "0.42.0"
+datafusion-functions-json = "0.43.0"
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-schema.workspace = true
@@ -184,7 +185,7 @@ tantivy.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
-expect-test = "1.4"
+expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
 
@@ -229,20 +230,22 @@ byteorder = "1.4.3"
 chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
     "tokio-runtime",
     "_fetcher-rusttls-tokio",
-], default-features = false, rev = "348967500868c2b5dfcb3930fe483b2ff17b35ff" }
+], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
+collapse = "0.1.2"
 dashmap = { version = "6.0", features = ["serde"] }
-datafusion = "42.0.0"
-datafusion-proto = "42.0.0"
-datafusion-functions-aggregate-common = "42.0.0"
-arrow = { version = "53.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "53.0.0"
-arrow-json = "53.0.0"
-arrow-schema = { version = "53.0.0", features = ["serde"] }
-parquet = { version = "53.0.0", features = ["arrow", "async", "object_store"] }
+datafusion = "43.0.0"
+datafusion-proto = "43.0.0"
+datafusion-functions-aggregate-common = "43.0.0"
+expect-test = "1.4"
+arrow = { version = "53.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "53.2.0"
+arrow-json = "53.2.0"
+arrow-schema = { version = "53.2.0", features = ["serde"] }
+parquet = { version = "53.2.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.11.0", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.50.0", features = ["serde", "visitor"] }
+sqlparser = { version = "0.51.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.1"
 dotenvy = "0.15.7"
 env_logger = "0.10"
@@ -273,6 +276,7 @@ memchr = "2.7"
 murmur3 = "0.5"
 async-nats = "0.37"
 once_cell = "1.17"
+ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = "0.13"
 prost = "0.13.1"
@@ -288,6 +292,12 @@ sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
     "macros",
+] }
+sea-orm-migration = { version = "1.1.0", features = [
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }

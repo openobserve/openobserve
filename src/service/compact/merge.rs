@@ -172,7 +172,7 @@ pub async fn generate_job_by_stream(
     // generate merging job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMAPCT] add file_list_jobs failed: {}",
+            "[COMPACT] add file_list_jobs failed: {}",
             e
         ));
     }
@@ -291,7 +291,7 @@ pub async fn generate_old_data_job_by_stream(
         );
         if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
             return Err(anyhow::anyhow!(
-                "[COMAPCT] add file_list_jobs for old data failed: {}",
+                "[COMPACT] add file_list_jobs for old data failed: {}",
                 e
             ));
         }
@@ -747,6 +747,8 @@ pub async fn merge_files(
             diff_fields,
             true,
             None,
+            None,
+            vec![],
         )
         .await
         {
@@ -780,7 +782,7 @@ pub async fn merge_files(
     // clear cached data
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     for file in files.iter() {
-        let _ = file_data::disk::remove(&trace_id, file).await;
+        let _ = file_data::disk::remove("", file).await;
     }
 
     let (_new_schema, buf) = match merge_result {

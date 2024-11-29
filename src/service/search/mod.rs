@@ -23,9 +23,9 @@ use config::{
     meta::{
         cluster::RoleGroup,
         search,
+        self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, SqlOperator},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query},
@@ -57,9 +57,9 @@ use {
     tracing::info_span,
 };
 
-use super::usage::report_request_usage_stats;
+use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, utils},
+    common::{self, infra::cluster as infra_cluster},
     handler::grpc::request::search::Searcher,
 };
 
@@ -67,12 +67,13 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod index;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
-pub(crate) mod utlis;
+pub(crate) mod utils;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -93,264 +94,6 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .build()
         .unwrap()
 });
-
-/// Returns Error if the first query is failed, otherwise returns the partial results.
-/// In case one query fails, the remaining queries are not executed.
-#[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
-pub async fn search_multi(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    user_id: Option<String>,
-    multi_req: &search::MultiStreamRequest,
-) -> Result<search::Response, Error> {
-    let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
-    let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            let ctx = tracing::Span::current().context();
-            ctx.span().span_context().trace_id().to_string()
-        } else {
-            ider::uuid()
-        }
-    } else {
-        trace_id.to_string()
-    };
-
-    let mut per_query_resp = multi_req.per_query_response;
-
-    let mut query_fn = multi_req
-        .query_fn
-        .as_ref()
-        .and_then(|v| base64::decode_url(v).ok());
-
-    if let Some(vrl_function) = &query_fn {
-        if RESULT_ARRAY.is_match(vrl_function) {
-            // The query function expects results array as input
-            // Hence, per_query_resp should be true
-            per_query_resp = true;
-        }
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
-        }
-    }
-
-    let mut queries = multi_req.to_query_req();
-    log::info!(
-        "search_multi: trace_id: {}, queries.len(): {}",
-        trace_id,
-        queries.len()
-    );
-    let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
-    // Before making any rpc requests, first check the sql expressions can be decoded correctly
-    for req in queries.iter_mut() {
-        if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
-        }
-    }
-    let queries_len = queries.len();
-    let mut stream_name = "".to_string();
-    let mut sqls = vec![];
-    let mut index = 0;
-
-    for mut req in queries {
-        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
-            Ok(v) => v.source.to_string(),
-            Err(e) => {
-                log::error!("report_usage: parse sql error: {:?}", e);
-                "".to_string()
-            }
-        };
-        sqls.push(req.query.sql.clone());
-        if !per_query_resp {
-            req.query.query_fn = query_fn.clone();
-        }
-
-        for fn_name in utils::functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
-                req.query.uses_zo_fn = true;
-                break;
-            }
-        }
-
-        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
-
-        match res {
-            Ok(res) => {
-                index += 1;
-                multi_res.took += res.took;
-
-                if res.total > multi_res.total {
-                    multi_res.total = res.total;
-                }
-                multi_res.from = res.from;
-                multi_res.size += res.size;
-                multi_res.file_count += res.file_count;
-                multi_res.scan_size += res.scan_size;
-                multi_res.scan_records += res.scan_records;
-                multi_res.columns.extend(res.columns);
-
-                multi_res.response_type = res.response_type;
-                multi_res.trace_id = res.trace_id;
-                multi_res.cached_ratio = res.cached_ratio;
-                log::debug!(
-                    "search_multi: res.hits.len() for query timerange to {} from {} : {}",
-                    req.query.end_time,
-                    req.query.start_time,
-                    res.hits.len()
-                );
-
-                if per_query_resp {
-                    multi_res.hits.push(serde_json::Value::Array(res.hits));
-                } else {
-                    multi_res.hits.extend(res.hits);
-                }
-            }
-            Err(e) => {
-                log::error!("search_multi: search error: {:?}", e);
-                if index == 0 {
-                    // Error in the first query, return the error
-                    return Err(e); // TODO: return partial results
-                } else {
-                    // Error in subsequent queries, add the error to the response and break
-                    // No need to run the remaining queries
-                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
-                    multi_res.is_partial = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
-        // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
-
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
-        if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
-        }
-        let mut runtime = utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
-            Ok(program) => {
-                let registry = program
-                    .config
-                    .get_custom::<vector_enrichment::TableRegistry>()
-                    .unwrap();
-                registry.finish_load();
-                Some(program)
-            }
-            Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
-                None
-            }
-        };
-        match program {
-            Some(program) => {
-                report_function_usage = true;
-                if apply_over_hits {
-                    let ret_val = crate::service::ingestion::apply_vrl_fn(
-                        &mut runtime,
-                        &config::meta::function::VRLResultResolver {
-                            program: program.program.clone(),
-                            fields: program.fields.clone(),
-                        },
-                        json::Value::Array(multi_res.hits),
-                        org_id,
-                        &[stream_name.clone()],
-                    );
-                    ret_val
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .filter_map(|v| {
-                            if per_query_resp {
-                                let flattened_array = v
-                                    .as_array()
-                                    .unwrap()
-                                    .iter()
-                                    .map(|item| {
-                                        config::utils::flatten::flatten(item.clone()).unwrap()
-                                    })
-                                    .collect::<Vec<_>>();
-                                Some(serde_json::Value::Array(flattened_array))
-                            } else {
-                                (!v.is_null())
-                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
-                            }
-                        })
-                        .collect()
-                } else {
-                    multi_res
-                        .hits
-                        .into_iter()
-                        .filter_map(|hit| {
-                            let ret_val = crate::service::ingestion::apply_vrl_fn(
-                                &mut runtime,
-                                &config::meta::function::VRLResultResolver {
-                                    program: program.program.clone(),
-                                    fields: program.fields.clone(),
-                                },
-                                hit,
-                                org_id,
-                                &[stream_name.clone()],
-                            );
-                            (!ret_val.is_null())
-                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
-                        })
-                        .collect()
-                }
-            }
-            None => multi_res.hits,
-        }
-    } else {
-        multi_res.hits
-    };
-    log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
-    multi_res.cached_ratio /= queries_len;
-    multi_res.hits.sort_by(|a, b| {
-        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
-            return std::cmp::Ordering::Equal;
-        }
-        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
-        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
-        b_ts.cmp(&a_ts)
-    });
-    let time = start.elapsed().as_secs_f64();
-
-    if report_function_usage {
-        let req_stats = RequestStats {
-            // For functions, records = records * num_function, in this case num_function = 1
-            records: multi_res.total as i64,
-            response_time: time,
-            size: multi_res.scan_size as f64,
-            request_body: Some(json::to_string(&sqls).unwrap()),
-            user_email: None,
-            min_ts: None,
-            max_ts: None,
-            cached_ratio: None,
-            trace_id: None,
-            search_type: multi_req.search_type,
-            search_event_context: multi_req.search_event_context.clone(),
-            ..Default::default()
-        };
-        report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            stream_type,
-            UsageType::Functions,
-            0, // The request stats already contains function event
-            started_at,
-        )
-        .await;
-    }
-    Ok(multi_res)
-}
 
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
@@ -464,6 +207,7 @@ pub async fn search(
                     if matches!(
                         search_type,
                         search::SearchEventType::UI
+                            | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
                     ) {
@@ -512,6 +256,7 @@ pub async fn search(
                         None
                     },
                     work_group: _work_group,
+                    result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
@@ -519,7 +264,7 @@ pub async fn search(
                     req_stats,
                     org_id,
                     &stream_name,
-                    StreamType::Logs,
+                    stream_type,
                     UsageType::Search,
                     num_fn,
                     started_at,
@@ -530,6 +275,264 @@ pub async fn search(
         }
         Err(e) => Err(e),
     }
+}
+
+/// Returns Error if the first query is failed, otherwise returns the partial results.
+/// In case one query fails, the remaining queries are not executed.
+#[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
+pub async fn search_multi(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    multi_req: &search::MultiStreamRequest,
+) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
+    let trace_id = if trace_id.is_empty() {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::uuid()
+        }
+    } else {
+        trace_id.to_string()
+    };
+
+    let mut per_query_resp = multi_req.per_query_response;
+
+    let mut query_fn = multi_req
+        .query_fn
+        .as_ref()
+        .and_then(|v| base64::decode_url(v).ok());
+
+    if let Some(vrl_function) = &query_fn {
+        if RESULT_ARRAY.is_match(vrl_function) {
+            // The query function expects results array as input
+            // Hence, per_query_resp should be true
+            per_query_resp = true;
+        }
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
+
+    let mut queries = multi_req.to_query_req();
+    log::info!(
+        "search_multi: trace_id: {}, queries.len(): {}",
+        trace_id,
+        queries.len()
+    );
+    let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+    // Before making any rpc requests, first check the sql expressions can be decoded correctly
+    for req in queries.iter_mut() {
+        if let Err(e) = req.decode() {
+            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+        }
+    }
+    let queries_len = queries.len();
+    let mut stream_name = "".to_string();
+    let mut sqls = vec![];
+    let mut index = 0;
+
+    for mut req in queries {
+        stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
+            Ok(v) => v.source.to_string(),
+            Err(e) => {
+                log::error!("report_usage: parse sql error: {:?}", e);
+                "".to_string()
+            }
+        };
+        sqls.push(req.query.sql.clone());
+        if !per_query_resp {
+            req.query.query_fn = query_fn.clone();
+        }
+
+        for fn_name in common::utils::functions::get_all_transform_keys(org_id).await {
+            if req.query.sql.contains(&format!("{}(", fn_name)) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
+        }
+
+        let res = search(&trace_id, org_id, stream_type, user_id.clone(), &req).await;
+
+        match res {
+            Ok(res) => {
+                index += 1;
+                multi_res.took += res.took;
+
+                if res.total > multi_res.total {
+                    multi_res.total = res.total;
+                }
+                multi_res.from = res.from;
+                multi_res.size += res.size;
+                multi_res.file_count += res.file_count;
+                multi_res.scan_size += res.scan_size;
+                multi_res.scan_records += res.scan_records;
+                multi_res.columns.extend(res.columns);
+
+                multi_res.response_type = res.response_type;
+                multi_res.trace_id = res.trace_id;
+                multi_res.cached_ratio = res.cached_ratio;
+                log::debug!(
+                    "search_multi: res.hits.len() for query timerange to {} from {} : {}",
+                    req.query.end_time,
+                    req.query.start_time,
+                    res.hits.len()
+                );
+
+                if per_query_resp {
+                    multi_res.hits.push(serde_json::Value::Array(res.hits));
+                } else {
+                    multi_res.hits.extend(res.hits);
+                }
+            }
+            Err(e) => {
+                log::error!("search_multi: search error: {:?}", e);
+                if index == 0 {
+                    // Error in the first query, return the error
+                    return Err(e); // TODO: return partial results
+                } else {
+                    // Error in subsequent queries, add the error to the response and break
+                    // No need to run the remaining queries
+                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.is_partial = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let mut report_function_usage = false;
+    multi_res.hits = if query_fn.is_some() && !multi_res.hits.is_empty() && !multi_res.is_partial {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.unwrap().trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = common::utils::functions::init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                report_function_usage = true;
+                if apply_over_hits {
+                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &config::meta::function::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        json::Value::Array(multi_res.hits),
+                        org_id,
+                        &[stream_name.clone()],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            if per_query_resp {
+                                let flattened_array = v
+                                    .as_array()
+                                    .unwrap()
+                                    .iter()
+                                    .map(|item| {
+                                        config::utils::flatten::flatten(item.clone()).unwrap()
+                                    })
+                                    .collect::<Vec<_>>();
+                                Some(serde_json::Value::Array(flattened_array))
+                            } else {
+                                (!v.is_null())
+                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                            }
+                        })
+                        .collect()
+                } else {
+                    multi_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &config::meta::function::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                hit,
+                                org_id,
+                                &[stream_name.clone()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => multi_res.hits,
+        }
+    } else {
+        multi_res.hits
+    };
+    log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
+    let column_timestamp = get_config().common.column_timestamp.to_string();
+    multi_res.cached_ratio /= queries_len;
+    multi_res.hits.sort_by(|a, b| {
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
+            return std::cmp::Ordering::Equal;
+        }
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
+        b_ts.cmp(&a_ts)
+    });
+    let time = start.elapsed().as_secs_f64();
+
+    if report_function_usage {
+        let req_stats = RequestStats {
+            // For functions, records = records * num_function, in this case num_function = 1
+            records: multi_res.total as i64,
+            response_time: time,
+            size: multi_res.scan_size as f64,
+            request_body: Some(json::to_string(&sqls).unwrap()),
+            user_email: None,
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            trace_id: None,
+            search_type: multi_req.search_type,
+            search_event_context: multi_req.search_event_context.clone(),
+            ..Default::default()
+        };
+        report_request_usage_stats(
+            req_stats,
+            org_id,
+            &stream_name,
+            stream_type,
+            UsageType::Functions,
+            0, // The request stats already contains function event
+            started_at,
+        )
+        .await;
+    }
+    Ok(multi_res)
 }
 
 #[tracing::instrument(name = "service:search_partition", skip(req))]
@@ -1155,7 +1158,7 @@ pub async fn search_partition_multi(
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
-impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
+impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {

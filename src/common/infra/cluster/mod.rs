@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, collections::HashMap, ops::Bound, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    collections::HashMap,
+    ops::Bound,
+    sync::{atomic::Ordering, Arc},
+    time::Duration,
+};
 
 use config::{
     cluster::*,
@@ -30,9 +36,6 @@ use infra::{
     errors::Result,
 };
 use once_cell::sync::Lazy;
-use tokio::time;
-
-use crate::service::db as db_service;
 
 mod etcd;
 mod nats;
@@ -182,7 +185,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
         let client = reqwest::Client::new();
         loop {
-            time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);
             }
@@ -229,9 +232,8 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 }
 
 pub async fn leave() -> Result<()> {
-    unsafe {
-        LOCAL_NODE_STATUS = NodeStatus::Offline;
-    }
+    LOCAL_NODE_STATUS.store(NodeStatus::Offline as _, Ordering::Release);
+
     let cfg = get_config();
     if cfg.common.local_mode {
         return Ok(());
@@ -268,7 +270,6 @@ async fn watch_node_list() -> Result<()> {
     log::info!("Start watching node_list");
 
     loop {
-        let cfg = get_config();
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
@@ -280,7 +281,7 @@ async fn watch_node_list() -> Result<()> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
-                let (broadcasted, exist) = match NODES.read().await.get(item_key) {
+                let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
                     Some(v) => (v.broadcasted, item_value.eq(v)),
                     None => (false, false),
                 };
@@ -320,31 +321,6 @@ async fn watch_node_list() -> Result<()> {
                     continue;
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
-                if !cfg.common.meta_store_external && !broadcasted {
-                    // The ingester need broadcast local file list to the new node
-                    if LOCAL_NODE.is_ingester()
-                        && (item_value.status.eq(&NodeStatus::Prepare)
-                            || item_value.status.eq(&NodeStatus::Online))
-                    {
-                        let notice_uuid = if item_key.eq(LOCAL_NODE.uuid.as_str()) {
-                            log::info!("[CLUSTER] broadcast file_list to other nodes");
-                            None
-                        } else {
-                            log::info!(
-                                "[CLUSTER] broadcast file_list to new node: {}",
-                                &item_value.grpc_addr
-                            );
-                            Some(item_key.to_string())
-                        };
-                        tokio::task::spawn(async move {
-                            if let Err(e) =
-                                db_service::file_list::local::broadcast_cache(notice_uuid).await
-                            {
-                                log::error!("[CLUSTER] broadcast file_list error: {}", e);
-                            }
-                        });
-                    }
-                }
                 item_value.broadcasted = true;
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(

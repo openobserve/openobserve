@@ -18,9 +18,9 @@ use config::{
     get_config,
     meta::{
         search::{self, ResponseTook},
+        self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
@@ -39,7 +39,7 @@ use crate::{
     },
     service::{
         search::{self as SearchService, cache::cacher::check_cache},
-        usage::{http_report_metrics, report_request_usage_stats},
+        self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 
@@ -64,9 +64,9 @@ pub async fn search(
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-    let stream_name = match resolve_stream_names(&origin_sql) {
+    let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
         // TODO: cache don't not support multiple stream names
-        Ok(v) => v[0].clone(),
+        Ok(v) => (v[0].clone(), v.join(",")),
         Err(e) => {
             return Err(Error::Message(e.to_string()));
         }
@@ -314,7 +314,7 @@ pub async fn search(
     report_request_usage_stats(
         req_stats,
         org_id,
-        &stream_name,
+        &all_streams,
         stream_type,
         UsageType::Search,
         num_fn,

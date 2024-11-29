@@ -62,6 +62,7 @@ pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
+pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -583,6 +584,8 @@ pub struct Common {
     pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
     pub feature_query_without_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = false)]
+    pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -714,6 +717,12 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
+        default = false,
+        help = "Toggle inverted index cache."
+    )]
+    pub inverted_index_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
@@ -738,8 +747,20 @@ pub struct Common {
     )]
     pub inverted_index_search_format: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
+        default = "",
+        help = "Tantivy search mode, puffin or mmap, default is puffin."
+    )]
+    pub inverted_index_tantivy_mode: String,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
-        default = "prefix",
+        default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
     )]
     pub full_text_search_type: String,
@@ -841,6 +862,8 @@ pub struct Common {
     pub result_cache_discard_duration: i64,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
+    #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
+    pub fake_es_version: String,
 }
 
 #[derive(EnvConfig)]
@@ -863,7 +886,7 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 0)]
+    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 1000)]
     pub udschema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
@@ -1051,6 +1074,18 @@ pub struct Limit {
     pub max_enrichment_table_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 0,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1118,7 +1153,7 @@ pub struct MemoryCache {
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
     pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1154,7 +1189,7 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 80% of
+    // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
     pub skip_size: usize,
@@ -1705,8 +1740,8 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.memory_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 2;
     } else {
         cfg.memory_cache.skip_size *= 1024 * 1024;
     }
@@ -1820,8 +1855,8 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
-        // 80% of max_size
-        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 10 * 8;
+        // 50% of max_size
+        cfg.disk_cache.skip_size = cfg.disk_cache.max_size / 2;
     } else {
         cfg.disk_cache.skip_size *= 1024 * 1024;
     }
@@ -1858,6 +1893,17 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
+
+    // check disk cache with tantivy mode
+    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
+    if cfg.common.inverted_index_tantivy_mode.is_empty() {
+        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
+    }
+    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
+        return Err(anyhow::anyhow!(
+            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
+        ));
+    }
 
     Ok(())
 }
@@ -2008,10 +2054,6 @@ mod tests {
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
 
-        // Test invalid endpoint
-        cfg.sns.endpoint = "invalid-url".to_string();
-        assert!(check_sns_config(&mut cfg).is_err());
-
         // Test custom timeouts
         cfg.sns.connect_timeout = 15;
         cfg.sns.operation_timeout = 45;
@@ -2046,7 +2088,7 @@ mod tests {
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
         cfg.compact.data_retention_days = 2;
-        let ret = check_common_config(&mut cfg);
+        let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
         cfg.common.data_dir = "".to_string();

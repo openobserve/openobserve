@@ -23,8 +23,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
@@ -55,7 +55,7 @@ use crate::{
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
@@ -554,8 +554,11 @@ pub async fn metrics_json_handler(
                 let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
+                        if let Ok((Some(v), _)) =
+                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
+                        {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }
@@ -640,10 +643,10 @@ pub async fn metrics_json_handler(
     let mut out = BytesMut::with_capacity(response.encoded_len());
     response.encode(&mut out).expect("Out of memory");
 
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_JSON)
-        .body(out));
+        .body(out))
 }
 
 fn process_sum(

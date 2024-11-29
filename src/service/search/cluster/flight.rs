@@ -57,7 +57,7 @@ use crate::{
         generate_filter_from_equal_items,
         request::Request,
         sql::Sql,
-        utlis::{AsyncDefer, ScanStatsVisitor},
+        utils::{AsyncDefer, ScanStatsVisitor},
         DATAFUSION_RUNTIME,
     },
 };
@@ -372,6 +372,8 @@ pub async fn run_datafusion(
         idx_file_list,
         equal_keys,
         match_all_keys,
+        sql.index_condition.clone(),
+        sql.index_optimize_mode,
         false, // for super cluster
         context,
     );
@@ -382,19 +384,10 @@ pub async fn run_datafusion(
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
-            rewrite.file_id_lists.get(table_name).unwrap().clone(),
-            rewrite.idx_file_list.clone(),
             rewrite
-                .equal_keys
-                .get(table_name)
-                .cloned()
-                .unwrap_or_default(),
-            rewrite.match_all_keys.clone(),
-            false,
-            rewrite.req,
-            rewrite.nodes,
-            rewrite.context,
-        ));
+                .remote_scan_nodes
+                .get_remote_node(table_name.as_str()),
+        )?);
     }
 
     if cfg.common.print_key_sql {
@@ -729,11 +722,7 @@ pub async fn generate_context(
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
     for (stream_name, schema) in &sql.schemas {
-        let schema = schema
-            .schema()
-            .as_ref()
-            .clone()
-            .with_metadata(std::collections::HashMap::new());
+        let schema = schema.schema().as_ref().clone();
         let table = Arc::new(
             NewEmptyTable::new(stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())
@@ -936,14 +925,14 @@ pub async fn get_inverted_index_file_list(
                 ..Default::default()
             });
         match (&entry.segment_ids, &segment_ids) {
-            (Some(_), None) => {}
+            (_, None) => {}
             (Some(bin_data), Some(segment_ids)) => {
-                let mut bv = BitVec::from_slice(bin_data);
+                let mut bv = bin_data.clone();
                 bv |= BitVec::from_slice(segment_ids);
-                entry.segment_ids = Some(bv.into_vec());
+                entry.segment_ids = Some(bv);
             }
-            (None, _) => {
-                entry.segment_ids = segment_ids;
+            (None, Some(segment_ids)) => {
+                entry.segment_ids = Some(BitVec::from_slice(segment_ids));
             }
         }
     }

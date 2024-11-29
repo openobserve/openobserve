@@ -27,8 +27,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        self_reporting::usage::{RequestStats, UsageType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
-        usage::{RequestStats, UsageType},
     },
     metrics,
     utils::{
@@ -49,7 +49,7 @@ use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
@@ -405,6 +405,7 @@ async fn write_logs(
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
+                let end_time = chrono::Utc::now().timestamp_micros();
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -418,7 +419,9 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val), None).await {
+                    if let Ok((Some(v), _)) =
+                        alert.evaluate(Some(&record_val), (None, end_time)).await
+                    {
                         triggers.push((alert.clone(), v));
                         evaluated_alerts.insert(key);
                     }

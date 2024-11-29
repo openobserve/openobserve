@@ -90,6 +90,12 @@ impl FileData {
         })
     }
 
+    async fn get_size(&self, file: &str) -> Option<usize> {
+        let idx = get_bucket_idx(file);
+        let data = DATA[idx].get(file)?;
+        Some(data.value().len())
+    }
+
     async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
@@ -248,6 +254,16 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     let idx = get_bucket_idx(file);
     let files = FILES[idx].read().await;
     files.get(file, range).await
+}
+
+#[inline]
+pub async fn get_size(file: &str) -> Option<usize> {
+    if !get_config().memory_cache.enabled {
+        return None;
+    }
+    let idx = get_bucket_idx(file);
+    let files = FILES[idx].read().await;
+    files.get_size(file).await
 }
 
 #[inline]

@@ -34,9 +34,11 @@
 
 use std::sync::Arc;
 
+use arrow_schema::{DataType, Schema, SchemaRef};
 use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
 use datafusion::{
     common::{
+        project_schema,
         stats::Precision,
         tree_node::{TreeNode, TreeNodeRecursion},
         Column, DataFusionError, Result,
@@ -47,11 +49,16 @@ use datafusion::{
     },
     logical_expr::{Expr, Volatility},
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
+    physical_plan::{
+        expressions::CastExpr, filter::FilterExec, projection::ProjectionExec, ExecutionPlan,
+        PhysicalExpr,
+    },
 };
 use futures::{stream::BoxStream, TryStreamExt};
+use hashbrown::HashMap;
 use object_store::ObjectStore;
 
-use crate::service::search::datafusion::storage;
+use crate::service::search::{datafusion::storage, index::IndexCondition};
 
 /// Check whether the given expression can be resolved using only the columns `col_names`.
 /// This means that if this function returns true:
@@ -156,7 +163,7 @@ pub fn split_files(
     partitioned_files.sort_by(|a, b| a.path().cmp(b.path()));
 
     // effectively this is div with rounding up instead of truncating
-    let chunk_size = (partitioned_files.len() + n - 1) / n;
+    let chunk_size = partitioned_files.len().div_ceil(n);
     partitioned_files
         .chunks(chunk_size)
         .map(|c| c.to_vec())
@@ -164,22 +171,21 @@ pub fn split_files(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
-    let index_segment_length = if config::get_config()
+    if config::get_config()
         .common
         .inverted_index_search_format
         .eq("tantivy")
     {
-        1
-    } else {
-        INDEX_SEGMENT_LENGTH
+        return generate_access_plan_row_level(file);
     };
+    let index_segment_length = INDEX_SEGMENT_LENGTH;
     let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
-    let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
-    let segment_count = (num_rows + index_segment_length - 1) / index_segment_length;
+    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
+    let segment_count = num_rows.div_ceil(index_segment_length);
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
     let mut selection = Vec::with_capacity(segment_ids.len());
     let mut last_group_id = 0;
@@ -218,6 +224,119 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
         access_plan
     );
     Some(Arc::new(access_plan))
+}
+
+pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
+    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
+    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
+
+    for (row_group_id, chunk) in row_ids.chunks(PARQUET_MAX_ROW_GROUP_SIZE).enumerate() {
+        let mut selection = Vec::new();
+        let mut current_count = 0;
+        let mut current_select = false;
+
+        for val in chunk
+            .iter()
+            .take(num_rows - row_group_id * PARQUET_MAX_ROW_GROUP_SIZE)
+        {
+            if *val == current_select {
+                current_count += 1;
+            } else {
+                if current_count > 0 {
+                    if current_select {
+                        selection.push(RowSelector::select(current_count));
+                    } else {
+                        selection.push(RowSelector::skip(current_count));
+                    }
+                }
+                current_select = *val;
+                current_count = 1;
+            }
+        }
+
+        // handle the last batch
+        if current_count > 0 {
+            if current_select {
+                selection.push(RowSelector::select(current_count));
+            } else {
+                selection.push(RowSelector::skip(current_count));
+            }
+        }
+
+        if selection.iter().any(|s| !s.skip) {
+            access_plan.scan(row_group_id);
+            access_plan.scan_selection(row_group_id, RowSelection::from(selection));
+        }
+    }
+
+    log::debug!(
+        "file path: {:?}, row_group_count: {}, access_plan: {:?}",
+        file.path().as_ref(),
+        row_group_count,
+        access_plan
+    );
+    Some(Arc::new(access_plan))
+}
+
+fn wrap_filter(
+    index_condition: &IndexCondition,
+    schema: &Schema,
+    fst_fields: &[String],
+    exec: Arc<dyn ExecutionPlan>,
+    projection: Option<&Vec<usize>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let expr = index_condition
+        .to_physical_expr(schema, fst_fields)
+        .map_err(|e| DataFusionError::External(e.into()))?;
+
+    Ok(Arc::new(
+        FilterExec::try_new(expr, exec)?.with_projection(projection.cloned())?,
+    ))
+}
+
+pub fn apply_projection(
+    schema: &SchemaRef,
+    diff_rules: &HashMap<String, DataType>,
+    projection: Option<&Vec<usize>>,
+    memory_exec: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if diff_rules.is_empty() {
+        return Ok(memory_exec);
+    }
+    let projected_schema = project_schema(schema, projection)?;
+    let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
+        Vec::with_capacity(projected_schema.fields().len());
+    for (idx, field) in projected_schema.fields().iter().enumerate() {
+        let name = field.name().to_string();
+        let col = Arc::new(datafusion::physical_expr::expressions::Column::new(
+            &name, idx,
+        ));
+        if let Some(data_type) = diff_rules.get(&name) {
+            exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
+        } else {
+            exprs.push((col, name));
+        }
+    }
+    Ok(Arc::new(ProjectionExec::try_new(exprs, memory_exec)?))
+}
+
+pub fn apply_filter(
+    index_condition: Option<&IndexCondition>,
+    schema: &Schema,
+    fst_fields: &[String],
+    exec_plan: Arc<dyn ExecutionPlan>,
+    filter_projection: Option<&Vec<usize>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if let Some(condition) = index_condition {
+        wrap_filter(condition, schema, fst_fields, exec_plan, filter_projection)
+    } else {
+        Ok(exec_plan)
+    }
 }
 
 #[cfg(test)]

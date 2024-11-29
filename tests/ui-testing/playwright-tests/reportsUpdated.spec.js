@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "./baseFixtures";
 import { LoginPage } from '../pages/loginPage';
 import { DashboardPage } from '../pages/dashboardPage';
 import { ReportsPage } from '../pages/reportsPage';
@@ -22,9 +22,9 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
         await reportsPage.createReport(dashboardPage.dashboardName);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports");
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();

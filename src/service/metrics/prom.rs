@@ -22,8 +22,8 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
+        self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
-        usage::UsageType,
     },
     metrics,
     utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
@@ -53,7 +53,7 @@ use crate::{
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
-        usage::report_request_usage_stats,
+        self_reporting::report_request_usage_stats,
     },
 };
 
@@ -491,8 +491,11 @@ pub async fn remote_write(
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
+                    let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) = alert.evaluate(Some(val_map), None).await {
+                        if let Ok((Some(v), _)) =
+                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
+                        {
                             trigger_alerts.push((alert.clone(), v));
                         }
                     }

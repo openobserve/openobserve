@@ -65,6 +65,7 @@ const defaultObject = {
   currentSelectedNodeData : <any> {
     stream_type: "logs",
     stream_name: "",
+    dynamic_stream_name:"",
     data: {},
     type:"",
   },
@@ -252,7 +253,7 @@ export default function useDragAndDrop() {
         height: 20, // Increase arrow height
 
       },
-      type: 'button',      
+      type: 'custom',      
       style:{
         strokeWidth: 2,
       },
@@ -355,7 +356,7 @@ export default function useDragAndDrop() {
           width: 20,  // Increase arrow width
           height: 20, // Increase arrow height
         },
-        type: 'button',
+        type: 'custom',
         
         style:{
           strokeWidth: 2,
@@ -394,7 +395,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
         width: 20,  // Increase arrow width
         height: 20, // Increase arrow height
       },
-    type: 'button',
+    type: 'custom',
     
     style:{
       strokeWidth: 2,

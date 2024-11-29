@@ -137,7 +137,16 @@ pub async fn get(
     _trace_id: &str,
     file: &str,
     range: Option<Range<usize>>,
-) -> Result<bytes::Bytes, anyhow::Error> {
+) -> object_store::Result<bytes::Bytes> {
+    get_opts(_trace_id, file, range, true).await
+}
+
+pub async fn get_opts(
+    _trace_id: &str,
+    file: &str,
+    range: Option<Range<usize>>,
+    remote: bool,
+) -> object_store::Result<bytes::Bytes> {
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled {
@@ -152,10 +161,51 @@ pub async fn get(
         }
     }
     // get from storage
-    match range {
-        Some(r) => crate::storage::get_range(file, r).await,
-        None => crate::storage::get(file).await,
+    if remote {
+        return match range {
+            Some(r) => crate::storage::get_range(file, r).await,
+            None => crate::storage::get(file).await,
+        };
     }
+
+    Err(object_store::Error::NotFound {
+        path: file.to_string(),
+        source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
+    })
+}
+
+pub async fn get_size(_trace_id: &str, file: &str) -> object_store::Result<usize> {
+    get_size_opts(_trace_id, file, true).await
+}
+
+pub async fn get_size_opts(
+    _trace_id: &str,
+    file: &str,
+    remote: bool,
+) -> object_store::Result<usize> {
+    let cfg = config::get_config();
+    // get from memory cache
+    if cfg.memory_cache.enabled {
+        if let Some(v) = memory::get_size(file).await {
+            return Ok(v);
+        }
+    }
+    // get from disk cache
+    if cfg.disk_cache.enabled {
+        if let Some(v) = disk::get_size(file).await {
+            return Ok(v);
+        }
+    }
+    // get from storage
+    if remote {
+        let meta = crate::storage::head(file).await?;
+        return Ok(meta.size);
+    }
+
+    Err(object_store::Error::NotFound {
+        path: file.to_string(),
+        source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
+    })
 }
 
 #[cfg(test)]
@@ -170,9 +220,9 @@ mod tests {
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
-        cache.remove();
-        assert!(cache.contains_key(key1));
-        assert!(!cache.contains_key(key2));
+        cache.remove(); // contains_key() does not mark the key1 as used -> removed
+        assert!(!cache.contains_key(key1));
+        assert!(cache.contains_key(key2));
     }
 
     #[test]

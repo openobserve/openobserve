@@ -16,13 +16,15 @@
 pub mod alerts;
 pub mod bitvec;
 pub mod cluster;
+pub mod dashboards;
+pub mod folder;
 pub mod function;
 pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
 pub mod pipeline;
 pub mod search;
+pub mod self_reporting;
 pub mod short_url;
 pub mod sql;
 pub mod stream;
-pub mod usage;

@@ -112,6 +112,8 @@ pub enum BlobTypes {
     O2FstV1,
     #[serde(rename = "o2-ttv-v1")]
     O2TtvV1,
+    #[serde(rename = "o2-ttv-footer-v1")]
+    O2TtvFooterV1,
 }
 
 #[derive(Default)]
@@ -139,11 +141,6 @@ impl BlobMetadataBuilder {
 
     pub fn length(mut self, length: u64) -> Self {
         self.length = Some(length);
-        self
-    }
-
-    pub fn compression_codec(mut self, compression_codec: Option<CompressionCodec>) -> Self {
-        self.compression_codec = compression_codec;
         self
     }
 
