@@ -183,20 +183,13 @@ function calculateOptimalGrid(
   }
 
   let numRows = Math.ceil(Math.sqrt(numGrids / aspectRatio));
+  let numCols = Math.ceil(numGrids / numRows);
 
   // Binary search for optimal row count
-  let low = 1,
-    high = numRows;
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    const cols = Math.ceil(numGrids / mid);
-    if (mid * cols >= numGrids) {
-      numRows = mid;
-      high = mid;
-    } else {
-      low = mid + 1;
-    }
+  while ((numRows - 1) * numCols >= numGrids) {
+    numRows--;
+    numCols = Math.ceil(numGrids / numRows);
   }
 
-  return { numRows, numCols: Math.ceil(numGrids / numRows) };
+  return { numRows, numCols };
 }
