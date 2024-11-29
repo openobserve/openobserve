@@ -434,7 +434,7 @@ export default defineComponent({
       // ignore case
       timezone.value =
         timezoneOptions.find(
-          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase(),
         ) || currentTimezone;
 
       // call onTimezoneChange to set the timezone in the store
@@ -553,7 +553,7 @@ export default defineComponent({
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
@@ -561,11 +561,10 @@ export default defineComponent({
         props.defaultType;
       },
       () => {
-        if (props.defaultType == "absolute") {
-          selectedType.value = "absolute";
+        if (props.defaultType !== selectedType.value) {
+          selectedType.value = props.defaultType;
         }
       },
-      { deep: true }
     );
 
     const setRelativeDate = (period, value) => {
@@ -752,7 +751,7 @@ export default defineComponent({
 
         const startTimeStamp = date.subtractFromDate(
           endTimeStamp,
-          JSON.parse(subtractObject)
+          JSON.parse(subtractObject),
         );
 
         return {
@@ -773,7 +772,7 @@ export default defineComponent({
           start = new Date();
         } else {
           start = new Date(
-            selectedDate.value.from + " " + selectedTime.value.startTime
+            selectedDate.value.from + " " + selectedTime.value.startTime,
           );
         }
 
@@ -781,7 +780,7 @@ export default defineComponent({
           end = new Date();
         } else {
           end = new Date(
-            selectedDate.value.to + " " + selectedTime.value.endTime
+            selectedDate.value.to + " " + selectedTime.value.endTime,
           );
         }
 
@@ -878,7 +877,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
         );
       });
       return filteredOptions;
@@ -888,7 +887,7 @@ export default defineComponent({
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
-        "yyyy/MM/dd"
+        "yyyy/MM/dd",
       );
       return date >= "1999/01/01" && date <= formattedDate;
     };
@@ -981,7 +980,7 @@ export default defineComponent({
                 if (relativePeriodsMaxValue.value[periodUnits[i]] > -1) {
                   setRelativeDate(
                     periodUnits[i],
-                    relativeDates[periodUnits[i]][0]
+                    relativeDates[periodUnits[i]][0],
                   );
                   break;
                 }
