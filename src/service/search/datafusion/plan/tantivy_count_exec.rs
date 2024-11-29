@@ -84,7 +84,7 @@ impl DisplayAs for TantivyCountExec {
             .join(", ");
         write!(
             f,
-            "TantivyCountExec: file num : {}, file_list: [{file_keys}]",
+            "TantivyCountExec: file num: {}, file_list: [{file_keys}]",
             self.file_list.len()
         )
     }
@@ -149,8 +149,8 @@ async fn adapt_tantivy_result(
     index_condition: Option<IndexCondition>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
-    let (_, error, total_hits) = filter_file_list_by_tantivy_index(
-        query,
+    let (idx_took, error, total_hits) = filter_file_list_by_tantivy_index(
+        query.clone(),
         &mut file_list,
         index_condition,
         Some(InvertedIndexOptimizeMode::SimpleCount),
@@ -161,6 +161,15 @@ async fn adapt_tantivy_result(
     if error {
         return internal_err!("Error while filtering file list by Tantivy index");
     }
+
+    log::info!(
+        "[trace_id {}] search->storage: stream {}/{}/{}, TantivyCountExec execution time {} ms",
+        query.trace_id,
+        query.org_id,
+        query.stream_type,
+        query.stream_name,
+        idx_took
+    );
 
     let array = vec![Arc::new(Int64Array::from(vec![total_hits as i64])) as Arc<dyn Array>];
 

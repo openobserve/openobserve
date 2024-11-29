@@ -26,7 +26,9 @@ use config::{
         stream::FileKey,
     },
     utils::{
-        file::is_exists, inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        file::is_exists,
+        inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
         time::BASE_TIME,
     },
     FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
@@ -699,6 +701,9 @@ async fn search_tantivy_index(
             };
 
             let index = tantivy::Index::open(reader_directory)?;
+            index
+                .tokenizers()
+                .register(O2_TOKENIZER, o2_tokenizer_build());
             let reader = index
                 .reader_builder()
                 .reload_policy(tantivy::ReloadPolicy::Manual)
