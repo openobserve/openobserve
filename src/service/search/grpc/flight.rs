@@ -326,6 +326,7 @@ pub async fn search(
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
     if !tantivy_file_list.is_empty() {
+        scan_stats.add(&collect_stats(&tantivy_file_list));
         let tantivy_exec = Arc::new(TantivyCountExec::new(
             query_params,
             physical_plan.schema(),
@@ -428,4 +429,16 @@ fn split_file_list_by_time_range(
     file_list.into_iter().partition(|file| {
         file.meta.min_ts >= start_time && file.meta.max_ts <= end_time && file.meta.index_size > 0
     })
+}
+
+fn collect_stats(files: &[FileKey]) -> ScanStats {
+    let mut scan_stats = ScanStats::new();
+    scan_stats.files = files.len() as i64;
+    for file in files.iter() {
+        scan_stats.idx_scan_size += file.meta.index_size;
+        scan_stats.records += file.meta.records;
+        scan_stats.original_size += file.meta.original_size;
+        scan_stats.compressed_size += file.meta.compressed_size;
+    }
+    scan_stats
 }
