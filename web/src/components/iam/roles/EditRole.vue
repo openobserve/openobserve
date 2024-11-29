@@ -545,7 +545,9 @@ const setDefaultPermissions = () => {
     }
 
     modifyResourcePermissions(resourcePermission);
-
+    if (resourcePermission.name === 'org' && store.state.selectedOrganization.identifier !== store.state.zoConfig.meta_org) {
+      return; // Skip adding 'org' resource if the organization is not _meta
+    }
     permissionsState.permissions.push(resourcePermission as Resource);
   });
 
@@ -553,7 +555,6 @@ const setDefaultPermissions = () => {
     (resource) => !resource.parent
   );
 };
-
 const modifyResourcePermissions = (resource: Resource) => {
   if (resource.resourceName === "settings") {
     resource.permission.AllowList.show = false;
