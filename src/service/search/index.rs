@@ -156,12 +156,6 @@ impl IndexCondition {
 impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
-        let cfg = config::get_config();
-        let (prefix, suffix) = match cfg.common.full_text_search_type.as_str() {
-            "eq" => ("", ""),
-            "contains" => ("*", "*"),
-            _ => ("", "*"),
-        };
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
