@@ -72,7 +72,7 @@ pub(crate) async fn put(
 
 #[tracing::instrument]
 pub(crate) async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let ds = dashboards::list(params.into()).await?;
+    let ds = dashboards::list(params).await?;
     Ok(ds)
 }
 
