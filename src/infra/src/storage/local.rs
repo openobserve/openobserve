@@ -102,16 +102,16 @@ impl ObjectStore for Local {
         }
     }
 
-    async fn put_multipart(&self, _location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
+        self.client.put_multipart(location).await
     }
 
     async fn put_multipart_opts(
         &self,
-        _location: &Path,
-        _opts: PutMultipartOpts,
+        location: &Path,
+        opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        Err(Error::NotImplemented)
+        self.client.put_multipart_opts(location, opts).await
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
