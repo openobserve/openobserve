@@ -103,7 +103,9 @@ impl ObjectStore for Local {
     }
 
     async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        self.client.put_multipart(location).await
+        self.client
+            .put_multipart(&(format_key(location.as_ref(), self.with_prefix).into()))
+            .await
     }
 
     async fn put_multipart_opts(
@@ -111,7 +113,12 @@ impl ObjectStore for Local {
         location: &Path,
         opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
-        self.client.put_multipart_opts(location, opts).await
+        self.client
+            .put_multipart_opts(
+                &(format_key(location.as_ref(), self.with_prefix).into()),
+                opts,
+            )
+            .await
     }
 
     async fn get(&self, location: &Path) -> Result<GetResult> {
