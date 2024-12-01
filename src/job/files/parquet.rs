@@ -1498,6 +1498,9 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 doc.add_text(field, column_data.value(i));
             }
         }
+
+        // yield, this operation is time-consuming
+        tokio::task::yield_now().await;
     }
 
     // no docs need to create index, return
