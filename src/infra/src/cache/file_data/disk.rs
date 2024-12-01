@@ -274,7 +274,7 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::info!(
+        log::debug!(
             "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
             data_size
         );
