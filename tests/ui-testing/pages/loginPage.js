@@ -11,6 +11,13 @@ export class LoginPage {
     await this.page.goto(process.env["ZO_BASE_URL"]);
     console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   }
+
+  async loginAsInternalUser() {
+    //await this.page.goto(process.env["ZO_BASE_URL"]);
+    await this.page.getByText('Login as internal user').click();
+    
+  }
+
   async login() {
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     const waitForLogin = this.page.waitForResponse(

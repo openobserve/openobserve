@@ -1,0 +1,51 @@
+// homePage.js
+import { expect } from '@playwright/test';
+//import { validateUrlContains } from './utils/validateUrlContains';
+
+export class HomePage {
+    constructor(page) {
+        this.page = page;
+        this.homePageMenu = page.locator('[data-test="menu-link-\\/-item"]');
+
+    }
+    async gotoHomePage() {
+
+        await this.homePageMenu.click();
+
+    }
+
+    async homePageValidation() {
+
+        await expect(this.page.getByRole('main')).toContainText('Streams');
+        await expect(this.page.getByRole('main')).toContainText('Query functions');
+        await expect(this.page.getByRole('main')).toContainText('Scheduled alerts');
+
+
+    }
+
+
+    async homePageDefaultOrg() {
+
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+        await this.page.getByText('default', { exact: true }).click();
+
+
+    }
+
+    async homePageDefaultMultiOrg() {
+
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+        await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+       // await validateUrlContains(this.page, 'path');
+
+
+    }
+
+    async homePageURLValidation() {
+
+        await expect(this.page).toHaveURL(/defaulttestmulti/);
+
+    }
+    
+
+}
