@@ -1365,7 +1365,7 @@ pub(crate) async fn create_tantivy_index(
     let Some(idx_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
         return Ok(0);
-    }; 
+    };
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
