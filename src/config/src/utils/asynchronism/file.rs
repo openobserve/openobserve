@@ -134,7 +134,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_file_contents_with_range() {
         let content = b"Hello World";
-        let file_name = "range_test.txt";
+        let file_name = "range_test_async.txt";
 
         put_file_contents(file_name, content).await.unwrap();
 
