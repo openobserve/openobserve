@@ -795,13 +795,9 @@ pub async fn merge_files(
     };
 
     // clear session data
-    log::info!("[COMPACT:{thread_id}] start clearing session data");
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
-    // clear cached data
-    log::info!("[COMPACT:{thread_id}] start clearing cache data");
-    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-    log::info!("[COMPACT:{thread_id}] clear cache data successfully");
 
+    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     let (_new_schema, buf) = match merge_result {
         Ok(v) => v,
         Err(e) => {
