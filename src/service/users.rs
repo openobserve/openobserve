@@ -919,6 +919,16 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
     Ok(())
 }
 
+pub async fn create_root_user_if_not_exists(
+    org_id: &str,
+    usr_req: UserRequest,
+) -> Result<(), Error> {
+    if db::user::root_user_exists().await {
+        return Ok(());
+    }
+    create_root_user(org_id, usr_req).await
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::user::{UserRole, UserType};
@@ -978,6 +988,9 @@ mod tests {
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga("dummy")
+            .await
+            .unwrap();
         set_up().await;
 
         let resp = post_user(
@@ -1003,6 +1016,9 @@ mod tests {
     async fn test_user() {
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga("dummy")
+            .await
+            .unwrap();
         set_up().await;
 
         let resp = update_user(

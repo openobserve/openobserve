@@ -914,7 +914,7 @@ mod tests {
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::common::meta::user::UserRequest;
+    use crate::{common::meta::user::UserRequest, service::organization};
 
     #[tokio::test]
     async fn test_validation_response_builder_from_db_user() {
@@ -978,7 +978,10 @@ mod tests {
 
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
-        users::create_root_user(
+        organization::check_and_create_org_without_ofga(org_id)
+            .await
+            .unwrap();
+        users::create_root_user_if_not_exists(
             org_id,
             UserRequest {
                 email: init_user.to_string(),
