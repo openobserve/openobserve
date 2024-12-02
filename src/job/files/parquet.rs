@@ -43,7 +43,7 @@ use config::{
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
-        asynchronism::file::get_file_meta,
+        async_file::get_file_meta,
         file::scan_files_with_channel,
         inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
