@@ -421,7 +421,8 @@ mod tests {
 
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
-        users::create_root_user(
+        check_and_create_org_without_ofga(org_id).await.unwrap();
+        users::create_root_user_if_not_exists(
             org_id,
             UserRequest {
                 email: init_user.to_string(),
