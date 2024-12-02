@@ -52,10 +52,20 @@ pub async fn get_file_contents(
                 "invalid range: start > end",
             ));
         }
+        let to_read = range.end - range.start;
+        let mut buf = Vec::with_capacity(to_read);
         file.seek(std::io::SeekFrom::Start(range.start as u64))
             .await?;
-        let mut buf = vec![0; range.end - range.start];
-        file.read_exact(&mut buf).await?;
+        let read = file.take(to_read as u64).read_to_end(&mut buf).await?;
+        if read != to_read {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected to read {} bytes, but read {} bytes",
+                    to_read, read
+                ),
+            ));
+        }
         buf
     } else {
         let mut buf: Vec<u8> = Vec::new();

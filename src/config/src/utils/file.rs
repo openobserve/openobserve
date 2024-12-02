@@ -23,8 +23,8 @@ use std::{
 use async_recursion::async_recursion;
 
 #[inline(always)]
-pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
-    let file = File::open(file)?;
+pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
+    let file = File::open(path)?;
     file.metadata()
 }
 
@@ -46,9 +46,19 @@ pub fn get_file_contents(
 ) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
     let data = if let Some(range) = range {
+        let to_read = range.end - range.start;
+        let mut buf = Vec::with_capacity(to_read);
         file.seek(std::io::SeekFrom::Start(range.start as u64))?;
-        let mut buf = vec![0; range.end - range.start];
-        file.read_exact(&mut buf)?;
+        let read = file.take(to_read as u64).read_to_end(&mut buf)?;
+        if read != to_read {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected to read {} bytes, but read {} bytes",
+                    to_read, read
+                ),
+            ));
+        }
         buf
     } else {
         let mut buf: Vec<u8> = Vec::new();
