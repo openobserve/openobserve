@@ -160,7 +160,7 @@ async fn permitted_folders(
 #[cfg(feature = "enterprise")]
 async fn permitted_folders(
     org_id: &str,
-    user_id: &str,
+    user_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, FolderError> {
     let Some(user_id) = user_id else {
         return Err(FolderError::PermittedFoldersMissingUser);
@@ -169,6 +169,6 @@ async fn permitted_folders(
         &org_id, user_id, "GET", "dfolder",
     )
     .await
-    .map_error(FolderError::PermittedFoldersValidator)?;
+    .map_err(FolderError::PermittedFoldersValidator)?;
     Ok(stream_list)
 }
