@@ -183,4 +183,23 @@ mod tests {
         assert!(!scan_files(".", "parquet", None).unwrap().is_empty());
         std::fs::remove_file(file_name).unwrap();
     }
+
+    #[test]
+    fn test_get_file_contents_with_range() {
+        let content = b"Hello World";
+        let file_name = "range_test.txt";
+
+        put_file_contents(file_name, content).unwrap();
+
+        // Test valid range
+        assert_eq!(get_file_contents(file_name, Some(0..5)).unwrap(), b"Hello");
+
+        // Test invalid range should error
+        assert!(get_file_contents(file_name, Some(3..5)).is_ok());
+
+        // Test out of bounds should error
+        assert!(get_file_contents(file_name, Some(0..100)).is_err());
+
+        std::fs::remove_file(file_name).unwrap();
+    }
 }

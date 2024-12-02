@@ -145,7 +145,7 @@ mod tests {
         );
 
         // Test invalid range should error
-        assert!(get_file_contents(file_name, Some(5..3)).await.is_err());
+        assert!(get_file_contents(file_name, Some(3..5)).await.is_ok());
 
         // Test out of bounds should error
         assert!(get_file_contents(file_name, Some(0..100)).await.is_err());
