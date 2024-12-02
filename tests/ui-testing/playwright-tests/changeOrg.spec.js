@@ -3,16 +3,18 @@ import { LoginPage } from '../pages/loginPage.js';
 import { LogsPage } from '../pages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage.js';
 import { HomePage } from "../pages/homePage.js";
+import { MetricsPage } from "../pages/metricsPage.js";
 
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage;
+    let loginPage, logsPage, ingestionPage, homePage, metricsPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         ingestionPage = new IngestionPage(page);
         logsPage = new LogsPage(page);
         homePage = new HomePage(page);
+        metricsPage = new MetricsPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -38,14 +40,12 @@ test.describe("Change Organisation", () => {
         await homePage.homePageValidation();
         await homePage.homePageURLValidation();
     
-
     });
 
     test("Logs Page default validation", async ({ page }) => {
 
         await logsPage.navigateToLogs();
-        await logsPage.validateLogsPage();
-       
+        await logsPage.validateLogsPage();   
     });
 
     test("Logs Page change organisation validation", async ({ page }) => {
@@ -59,11 +59,31 @@ test.describe("Change Organisation", () => {
         await logsPage.navigateToLogs();
         await logsPage.validateLogsPage();
         await logsPage.logsPageURLValidation();
-
-      
-       
+  
     });
 
+    test("Metrics Page default validation", async ({ page }) => {
+
+       
+        await metricsPage.gotoMetricsPage();
+        await metricsPage.metricsPageValidation(); 
+        await metricsPage.metricsURLValidation(); 
+    });
+
+    test("Metrics Page change organisation validation", async ({ page }) => {
+
+        await metricsPage.gotoMetricsPage();
+        await page.waitForTimeout(5000); 
+        await metricsPage.metricsPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await metricsPage.metricsPageValidation();
+      
+        await metricsPage.metricsPageURLValidation();
+        await metricsPage.gotoMetricsPage();
+        await metricsPage.metricsPageValidation();
+        await metricsPage.metricsPageURLValidation();
+  
+    });
 
    
     
