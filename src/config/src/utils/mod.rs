@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod arrow;
-pub mod asynchronism;
+pub mod async_file;
 pub mod base64;
 pub mod cgroup;
 pub mod file;
