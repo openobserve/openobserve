@@ -508,9 +508,9 @@ pub async fn handle_trace_request(
         _ => "/api/otlp/v1/traces",
     };
 
-    // record span metrics
-    for m in span_metrics {
-        if cfg.common.traces_span_metrics_enabled {
+    if cfg.common.traces_span_metrics_enabled {
+        // record span metrics
+        for m in span_metrics {
             metrics::SPAN_DURATION_MILLISECONDS
                 .with_label_values(&[
                     org_id,
@@ -521,11 +521,11 @@ pub async fn handle_trace_request(
                     &m.span_kind,
                 ])
                 .observe(m.duration);
-        }
 
-        // send to metrics job
-        if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
-            log::error!("traces metrics item send to job fail: {e}")
+            // send to metrics job
+            if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
+                log::error!("traces metrics item send to job fail: {e}")
+            }
         }
     }
 
