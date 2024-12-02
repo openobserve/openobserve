@@ -186,6 +186,7 @@ import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/util
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { generateDurationLabel } from "../../utils/date";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -695,7 +696,51 @@ export default defineComponent({
 
         // find drilldown data
         const drilldownData = panelSchema.value.config.drilldown[index];
+        const navigateToLogs = () => {
+          console.log(
+            "navigateToLogs: Initializing navigation to logs.",
+            panelSchema.value,
+          );
+          const queryDetails = panelSchema.value;
+          console.log("navigateToLogs: Retrieved query details:", queryDetails);
 
+          const query =
+            drilldownData.logsMode === "auto"
+              ? b64EncodeUnicode("SELECT * FROM " + queryDetails.queries[0].fields.stream)
+              : b64EncodeUnicode(queryDetails.queries[0].query);
+          console.log("navigateToLogs: Encoded query:", query);
+          console.log("navigateToLogs: Drilldown data:", drilldownVariables);
+
+          router
+            .push({
+              path: "/logs",
+              query: {
+                stream_type: queryDetails.queries[0].fields.stream_type,
+                stream: queryDetails.queries[0].fields.stream,
+                from: (drilldownVariables.start_time = new Date(
+                  selectedTimeObj?.value?.start_time?.toISOString(),
+                ).getTime()),
+                to: (drilldownVariables.end_time = new Date(
+                  selectedTimeObj?.value?.end_time?.toISOString(),
+                ).getTime()),
+                refresh: generateDurationLabel(5),
+                sql_mode: "false",
+                query,
+                org_identifier: store.state.selectedOrganization.identifier,
+                quick_mode: "false",
+                show_histogram: "true",
+              },
+            })
+            .then(() => {
+              console.log("navigateToLogs: Successfully navigated to logs.");
+            })
+            .catch((error) => {
+              console.error(
+                "navigateToLogs: Failed to navigate to logs:",
+                error,
+              );
+            });
+        };
         // need to change dynamic variables to it's value using current variables, current chart data(params)
         // if pie, donut or heatmap then series name will come in name field
         // also, if value is an array, then last value will be taken
@@ -796,6 +841,14 @@ export default defineComponent({
               drilldownData.targetBlank ? "_blank" : "_self",
             );
           } catch (error) {}
+        } else if (drilldownData.type == "logs") {
+          console.log("navigateToLogs: Navigating to logs.");
+
+          try {
+            navigateToLogs();
+          } catch (error) {
+            console.error("navigateToLogs: Failed to navigate to logs:", error);
+          }
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
           // so we have to get id of folder, dashboard and tab
@@ -832,7 +885,7 @@ export default defineComponent({
 
           if (!dashboardData) {
             console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`,
             );
             return;
           }

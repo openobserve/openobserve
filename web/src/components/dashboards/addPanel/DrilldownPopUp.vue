@@ -77,9 +77,53 @@
             style="cursor: pointer; height: 25px; display: flex !important"
           />URL</q-btn
         >
+        <q-btn
+          :class="drilldownData.type === 'logs' ? 'selected' : ''"
+          size="sm"
+          @click="changeTypeOfDrilldown('logs')"
+          data-test="dashboard-drilldown-by-url-btn"
+          ><q-icon
+            class="q-mr-xs"
+            name="link"
+            style="cursor: pointer; height: 25px; display: flex !important"
+          />Logs</q-btn
+        >
       </q-btn-group>
     </div>
 
+    <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
+      <div>
+        <label>Select Logs Mode:</label>
+        <q-btn-group>
+          <q-btn
+            :class="drilldownData.logsMode === 'auto' ? 'selected' : ''"
+            size="sm"
+            @click="drilldownData.logsMode = 'auto'"
+          >
+            Auto
+          </q-btn>
+          <q-btn
+            :class="drilldownData.logsMode === 'custom' ? 'selected' : ''"
+            size="sm"
+            @click="drilldownData.logsMode = 'custom'"
+          >
+            Custom
+          </q-btn>
+        </q-btn-group>
+      </div>
+      <div v-if="drilldownData.logsMode === 'custom'" style="margin-top: 10px">
+        <label>Enter Custom Query:</label>
+        <textarea
+          v-model="drilldownData.data.query"
+          style="
+            width: 100%;
+            height: 100px;
+            border: 1px solid gray;
+            border-radius: 5px;
+          "
+        ></textarea>
+      </div>
+    </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
         Enter URL:
@@ -357,6 +401,7 @@ export default defineComponent({
       targetBlank: false,
       findBy: "name",
       data: {
+        logsMode: "auto",
         url: "",
         folder: "",
         dashboard: "",
@@ -548,6 +593,17 @@ export default defineComponent({
         if (drilldownData.value.data.url.trim()) {
           // check if url is valid with protocol
           return !isFormURLValid.value;
+        }
+      } else if (drilldownData.value.type == "logs") {
+        console.log("drilldownData.value.data", drilldownData.value.data);
+        if (drilldownData.value.logsMode === "custom") {
+          console.log("drilldownData.value.data", drilldownData.value);
+
+          return false;
+        } else if (drilldownData.value.logsMode === "auto") {
+          console.log("drilldownData.value.data", drilldownData.value);
+          
+          return false;
         }
       } else {
         if (
