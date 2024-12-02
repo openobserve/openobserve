@@ -172,15 +172,15 @@ pub fn set_permission<P: AsRef<std::path::Path>>(
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_scan_files() {
+    #[test]
+    fn test_scan_files() {
         let content = b"Some Text";
         let file_name = "sample.parquet";
 
         put_file_contents(file_name, content).unwrap();
         assert_eq!(get_file_contents(file_name, None).unwrap(), content);
         assert!(get_file_meta(file_name).unwrap().is_file());
-        assert!(!scan_files(".", "parquet", None).unwrap().is_empty());
+        assert!(!scan_files("./", "parquet", None).unwrap().is_empty());
         std::fs::remove_file(file_name).unwrap();
     }
 
