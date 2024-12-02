@@ -115,6 +115,10 @@ export const convertSQLData = async (
     return { options: null };
   }
 
+  if (panelSchema?.error_config?.trellis_layout_error_message) {
+    delete panelSchema.error_config.trellis_layout_error_message;
+  }
+
   // get the x axis key
   const getXAxisKeys = () => {
     return panelSchema?.queries[0]?.fields?.x?.length
@@ -637,8 +641,8 @@ export const convertSQLData = async (
             ellipsis: "...",
           },
           top:
-            parseInt(gridData.gridArray[index].top) -
-            (18 / chartPanelRef.value.offsetHeight) * 100 +
+            parseFloat(gridData.gridArray[index].top) -
+            (20 / chartPanelRef.value.offsetHeight) * 100 +
             "%",
           left: gridData.gridArray[index].left,
         });
@@ -649,6 +653,20 @@ export const convertSQLData = async (
 
       options.legend.show = false;
     } catch (err: any) {
+      try {
+        const error = JSON.parse(err.message);
+        if (
+          error.type === "trellis_vertical_spacing" ||
+          error.type === "trellis_horizontal_spacing"
+        ) {
+          panelSchema.error_config = {
+            ...(panelSchema.error_config || {}),
+            trellis_layout_error_message: error.message,
+          };
+        }
+        // eslint-disable-next-line no-empty
+      } catch (e) {}
+
       console.error(`Trellis configuration failed: ${err}`);
       // Fallback to default single grid configuration
       options.grid = [
@@ -1162,7 +1180,11 @@ export const convertSQLData = async (
       panelSchema.type == "area-stacked" ||
       ((panelSchema.type == "line" ||
         panelSchema.type == "area" ||
-        panelSchema.type == "scatter") &&
+        panelSchema.type == "scatter" ||
+        panelSchema.type == "bar" ||
+        panelSchema.type == "h-bar" ||
+        panelSchema.type == "stacked" ||
+        panelSchema.type == "h-stacked") &&
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
       return yAxisKeys.length === 1 ? xAXisKey : `${xAXisKey} (${label})`;
@@ -1191,6 +1213,7 @@ export const convertSQLData = async (
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               yAxisName = getYAxisLabel(yAxis, key);
+
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
               return getSeriesObj(yAxisName, seriesData, seriesConfig);

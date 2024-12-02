@@ -109,13 +109,25 @@ export function getTrellisGrid(
   const totalHorizontalSpacing =
     SPACING_CONFIG.horizontal * (numCols - 1) + leftMargin + 32;
   if (totalHorizontalSpacing >= width) {
-    throw new Error("Total horizontal spacing exceeds available width");
+    throw new Error(
+      JSON.stringify({
+        type: "trellis_horizontal_spacing",
+        message:
+          "Trellis Layout Error \nPanel width needs to be increased to apply the trellis layout.",
+      }),
+    );
   }
 
   // Validate total vertical spacing doesn't exceed height
   const totalVerticalSpacing = SPACING_CONFIG.vertical * (numRows - 1) + 72;
   if (totalVerticalSpacing >= height) {
-    throw new Error("Total vertical spacing exceeds available height");
+    throw new Error(
+      JSON.stringify({
+        type: "trellis_vertical_spacing",
+        message:
+          "Trellis Layout Error \nPanel height needs to be increased to apply the trellis layout.",
+      }),
+    );
   }
 
   // How many cols
