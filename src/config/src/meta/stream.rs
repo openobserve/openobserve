@@ -878,6 +878,9 @@ impl RoutingCondition {
                     _ => false,
                 }
             }
+            Value::Null => {
+                matches!(self.value, Value::Null) && matches!(self.operator, Operator::EqualTo)
+            }
             _ => false,
         }
     }
