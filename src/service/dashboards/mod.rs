@@ -24,6 +24,7 @@ use config::{
     },
     utils::json,
 };
+use infra::table;
 
 use super::folders;
 use crate::{
@@ -44,7 +45,7 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    if db::folders::exists(org_id, folder_id).await? {
+    if table::folders::exists(org_id, folder_id).await? {
         let dashboard_id = ider::generate();
         match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
             Ok(res) => {
@@ -227,7 +228,7 @@ pub async fn move_dashboard(
 ) -> Result<HttpResponse, anyhow::Error> {
     if let Ok(Some(dashboard)) = db::dashboards::get(org_id, dashboard_id, from_folder).await {
         // make sure the destination folder exists
-        if !db::folders::exists(org_id, to_folder).await? {
+        if !table::folders::exists(org_id, to_folder).await? {
             return Ok(Response::NotFound("Destination Folder".to_string()).into());
         }
 
