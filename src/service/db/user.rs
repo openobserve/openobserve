@@ -329,10 +329,18 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
 
 #[cfg(test)]
 mod tests {
+    use infra::{db as infra_db, table as infra_table};
+
     use super::*;
+    use crate::service::organization;
 
     #[tokio::test]
     async fn test_user() {
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga("dummy")
+            .await
+            .unwrap();
         let org_id = "dummy".to_string();
         let email = "user3@example.com";
         let resp = add(&DBUser {

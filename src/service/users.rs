@@ -899,7 +899,10 @@ pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
     }
 }
 
-pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+pub(crate) async fn create_root_user(
+    org_id: &str,
+    usr_req: UserRequest,
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
@@ -915,14 +918,23 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
         usr_req.is_external,
         password_ext,
     );
-    db::user::add(&user).await.unwrap();
-    Ok(())
+    match db::user::add(&user).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            if db::user::root_user_exists().await {
+                Ok(())
+            } else {
+                log::error!("Error creating root user: {}", e);
+                Err(e)
+            }
+        }
+    }
 }
 
 pub async fn create_root_user_if_not_exists(
     org_id: &str,
     usr_req: UserRequest,
-) -> Result<(), Error> {
+) -> Result<(), anyhow::Error> {
     if db::user::root_user_exists().await {
         return Ok(());
     }
@@ -938,6 +950,11 @@ mod tests {
     use crate::common::infra::config::USERS;
 
     async fn set_up() {
+        infra_db::create_table().await.unwrap();
+        infra_table::create_user_tables().await.unwrap();
+        organization::check_and_create_org_without_ofga("dummy")
+            .await
+            .unwrap();
         USERS.insert(
             "admin@zo.dev".to_string(),
             infra::table::users::UserRecord {
@@ -986,11 +1003,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_user() {
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga("dummy")
-            .await
-            .unwrap();
         set_up().await;
 
         let resp = post_user(
@@ -1014,11 +1026,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_user() {
-        infra_db::create_table().await.unwrap();
-        infra_table::create_user_tables().await.unwrap();
-        organization::check_and_create_org_without_ofga("dummy")
-            .await
-            .unwrap();
         set_up().await;
 
         let resp = update_user(
