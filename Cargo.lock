@@ -10229,6 +10229,7 @@ dependencies = [
  "config",
  "crc32fast",
  "criterion",
+ "log",
  "parking_lot",
  "snafu 0.7.5",
  "snap",
