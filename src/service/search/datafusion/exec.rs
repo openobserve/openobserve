@@ -98,8 +98,6 @@ pub async fn merge_parquet_files(
         )
     };
 
-    log::info!("merge_parquet_files sql: {}", sql);
-
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = cfg.limit.cpu_num;
@@ -113,13 +111,10 @@ pub async fn merge_parquet_files(
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
 
-    log::info!("merge_parquet_files plan created");
-
     // write result to parquet file
     let mut buf = Vec::new();
     let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
-    log::info!("merge_parquet_files start writing");
     loop {
         match batch_stream.try_next().await {
             Ok(Some(batch)) => {
@@ -138,7 +133,6 @@ pub async fn merge_parquet_files(
         }
     }
     writer.close().await?;
-    log::info!("merge_parquet_files write done");
 
     ctx.deregister_table("tbl")?;
     drop(ctx);

@@ -48,11 +48,31 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
+// read only
+static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::DATA));
+    }
+    files
+});
+
 static RESULT_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
         files.push(RwLock::new(FileData::new(FileType::RESULT)));
+    }
+    files
+});
+
+// read only
+static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::RESULT));
     }
     files
 });
@@ -348,6 +368,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let root_dir = file.read().await.root_dir.clone();
         std::fs::create_dir_all(&root_dir).expect("create cache dir success");
     }
+    // trigger read only files
+    for file in FILES_READER.iter() {
+        let root_dir = file.root_dir.clone();
+        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    }
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
@@ -386,9 +411,9 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
-        FILES[idx].read().await
+        FILES_READER.get(idx).unwrap()
     } else {
-        RESULT_FILES[idx].read().await
+        RESULT_FILES_READER.get(idx).unwrap()
     };
     files.get(file, range).await
 }
@@ -400,9 +425,9 @@ pub async fn get_size(file: &str) -> Option<usize> {
     }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
-        FILES[idx].read().await
+        FILES_READER.get(idx).unwrap()
     } else {
-        RESULT_FILES[idx].read().await
+        RESULT_FILES_READER.get(idx).unwrap()
     };
     files.get_size(file).await
 }
