@@ -1232,7 +1232,8 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const getColumnNames = (columnData: any) => {
+    const getColumnNames = (parsedSQL: any) => {
+      const columnData = parsedSQL?.columns;
       const columnNames = [];
       for (const item of columnData) {
         if (item.expr.type === "column_ref") {
@@ -1251,6 +1252,10 @@ export default defineComponent({
           });
         }
       }
+
+      if(parsedSQL?._next) {
+        columnNames = getColumnNames(parsedSQL._next);
+      }
       return columnNames;
     };
 
@@ -1265,7 +1270,8 @@ export default defineComponent({
           // onStreamChange(value);
         }
         if (parsedSQL != undefined && parsedSQL?.columns?.length > 0) {
-          const columnNames = getColumnNames(parsedSQL?.columns);
+          const columnNames = getColumnNames(parsedSQL);
+
           searchObj.data.stream.interestingFieldList = [];
           for (const col of columnNames) {
             if (
@@ -2391,25 +2397,86 @@ export default defineComponent({
       emit("showSearchHistory");
     };
 
+    const QUERY_TEMPLATE = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
+
+    function getFieldList(
+      stream,
+      streamFields,
+      interestingFields,
+      isQuickMode,
+    ) {
+      searchObj.data.streamResults.list.forEach((item) => {
+        if (
+          item.name == stream &&
+          Object.hasOwn(item, "schema") &&
+          item.schema.length > 0
+        ) {
+          streamFields = item.schema;
+        }
+      });
+      return streamFields
+        .filter((item) => interestingFields.includes(item.name))
+        .map((item) => item.name);
+    }
+
+    function buildStreamQuery(stream, fieldList, isQuickMode) {
+      return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
+        "[FIELD_LIST]",
+        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+      );
+    }
+
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
-        if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
-          parsedSQL.where = null;
-        }
+        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
+          if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
+            parsedSQL.where = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
-          parsedSQL.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+            parsedSQL.limit = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
-          parsedSQL._next.where = null;
-          parsedSQL._next.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
+            parsedSQL._next.where = null;
+            parsedSQL._next.limit = null;
+          }
 
-        searchObj.data.query = fnUnparsedSQL(parsedSQL);
-        searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
-        searchObj.data.editorValue = searchObj.data.query;
+          searchObj.data.query = fnUnparsedSQL(parsedSQL);
+          searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+          searchObj.data.editorValue = searchObj.data.query;
+        } else {
+          // Handle both single and multiple stream scenarios
+          const queries = searchObj.data.stream.selectedStream
+            .map((stream) => {
+              // Destructure for better readability
+              const { selectedStreamFields, interestingFieldList } =
+                searchObj.data.stream;
+              const { quickMode } = searchObj.meta;
+
+              // Generate the field list for the current stream
+              const fieldList = getFieldList(
+                stream,
+                selectedStreamFields,
+                interestingFieldList,
+                quickMode,
+              );
+
+              // Ensure fieldList is valid before building the query
+              if (!fieldList || fieldList.length === 0) {
+                console.warn(`No fields available for stream: ${stream}`);
+                return null;
+              }
+
+              // Build and return the query for the current stream
+              return buildStreamQuery(stream, fieldList, quickMode);
+            })
+            .filter(Boolean);
+
+          searchObj.data.query = queries.join(" UNION ");
+          searchObj.data.editorValue = searchObj.data.query;
+        }
       } else {
         searchObj.data.query = "";
         searchObj.data.editorValue = "";

@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::hash::{Hash, Hasher};
+
 use chrono::{DateTime, FixedOffset, Utc};
-use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+use crate::meta::stream::StreamType;
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     #[serde(default)]
@@ -39,13 +42,34 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
 }
 
+impl From<Dashboard> for super::Dashboard {
+    fn from(value: Dashboard) -> Self {
+        let version: i32 = 1;
+
+        let mut hasher = std::hash::DefaultHasher::new();
+        hasher.write_i32(version);
+        value.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
+
+        Self {
+            v1: Some(value),
+            v2: None,
+            v3: None,
+            v4: None,
+            v5: None,
+            version,
+            hash,
+        }
+    }
+}
+
 fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
         "BUG", // This can't possibly fail. Can it?
     ))
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -58,7 +82,7 @@ pub struct Layout {
     pub is_static: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -72,7 +96,7 @@ pub struct Panel {
     pub custom_query: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -81,7 +105,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -92,7 +116,7 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -106,7 +130,7 @@ pub enum AggregationFunc {
     Median,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
@@ -117,7 +141,7 @@ pub struct PanelFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
     title: String,
     description: String,
@@ -130,13 +154,13 @@ pub struct PanelConfig {
     unit_custom: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VariableList {
     #[serde(rename = "type")]
@@ -149,7 +173,7 @@ pub struct VariableList {
     pub options: Option<Vec<CustomFieldsOption>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct QueryData {
     pub stream_type: StreamType,
     pub stream: String,
@@ -157,7 +181,7 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomFieldsOption {
     pub label: String,
@@ -166,10 +190,10 @@ pub struct CustomFieldsOption {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json;
     use expect_test::expect;
 
     use super::*;
+    use crate::utils::json;
 
     #[test]
     fn test_dashboard1() {

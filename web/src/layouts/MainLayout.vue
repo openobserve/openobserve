@@ -180,14 +180,16 @@ size="xs" class="warning" />{{
             v-model="selectedOrg"
             borderless
             :options="orgOptions"
+            option-label="identifier"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated
-no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
@@ -332,6 +334,7 @@ import {
   watch,
   markRaw,
   nextTick,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -624,6 +627,28 @@ export default defineComponent({
       },
     ];
 
+    onBeforeMount(() => {
+      try {
+        const url = new URL(window.location.href);
+        const localOrg: any = useLocalOrganization();
+        if (
+          Object.keys(localOrg.value).length == 0 &&
+          url.searchParams.get("org_identifier") != null
+        ) {
+          localOrg.value = {
+            identifier: url.searchParams.get("org_identifier"),
+            user_email: store.state.userInfo.email,
+          };
+
+          selectedOrg.value = localOrg.value;
+          useLocalOrganization(localOrg.value);
+          store.dispatch("setSelectedOrganization", localOrg.value);
+        }
+      } catch (error) {
+        console.error("Error in onBeforeMount:", error);
+      }
+    });
+
     onMounted(async () => {
       miniMode.value = true;
       filterMenus();
@@ -738,7 +763,7 @@ export default defineComponent({
       });
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
-
+      // setSelectedOrganization();
       // if (
       //   config.isCloud &&
       //   selectedOrg.value.subscription_type == config.freePlan
@@ -767,7 +792,6 @@ export default defineComponent({
       ) {
         await verifyStreamExist(selectedOrg.value);
       }
-      // }
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
@@ -791,113 +815,153 @@ export default defineComponent({
     };
 
     const setSelectedOrganization = async () => {
-      customOrganization = router.currentRoute.value.query.hasOwnProperty(
-        "org_identifier",
-      )
-        ? router.currentRoute.value.query.org_identifier
-        : "";
-      let tempDefaultOrg = {};
-      let localOrgFlag = false;
-      if (store.state.organizations?.length > 0) {
-        const localOrg: any = useLocalOrganization();
+      try {
+        customOrganization = router.currentRoute.value.query.hasOwnProperty(
+          "org_identifier",
+        )
+          ? router.currentRoute.value.query.org_identifier
+          : "";
+        let tempDefaultOrg = {};
+        let localOrgFlag = false;
         const url = new URL(window.location.href);
-        if (
-          Object.keys(localOrg.value).length == 0 &&
-          url.searchParams.get("org_identifier") != null
-        ) {
-          localOrg.value = {
-            identifier: url.searchParams.get("org_identifier"),
-            user_email: store.state.userInfo.email,
-          };
-        }
-        orgOptions.value = store.state.organizations.map(
-          (data: {
-            id: any;
-            name: any;
-            type: any;
-            identifier: any;
-            UserObj: any;
-            ingest_threshold: number;
-            search_threshold: number;
-            CustomerBillingObj: { subscription_type: string; note: string };
-            status: string;
-          }) => {
-            const optiondata: any = {
-              label: data.name,
-              id: data.id,
-              identifier: data.identifier,
+        if (store.state.organizations?.length > 0) {
+          const localOrg: any = useLocalOrganization();
+          if (
+            Object.keys(localOrg.value).length == 0 &&
+            url.searchParams.get("org_identifier") != null
+          ) {
+            localOrg.value = {
+              identifier: url.searchParams.get("org_identifier"),
               user_email: store.state.userInfo.email,
-              ingest_threshold: data.ingest_threshold,
-              search_threshold: data.search_threshold,
-              subscription_type: data.hasOwnProperty("CustomerBillingObj")
-                ? data.CustomerBillingObj.subscription_type
-                : "",
-              status: data.status,
-              note: data.hasOwnProperty("CustomerBillingObj")
-                ? data.CustomerBillingObj.note
-                : "",
             };
+          }
+          orgOptions.value = store.state.organizations.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              ingest_threshold: number;
+              search_threshold: number;
+              CustomerBillingObj: { subscription_type: string; note: string };
+              status: string;
+            }) => {
+              const optiondata: any = {
+                label: data.name,
+                id: data.id,
+                identifier: data.identifier,
+                user_email: store.state.userInfo.email,
+                ingest_threshold: data.ingest_threshold,
+                search_threshold: data.search_threshold,
+                subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                  ? data.CustomerBillingObj.subscription_type
+                  : "",
+                status: data.status,
+                note: data.hasOwnProperty("CustomerBillingObj")
+                  ? data.CustomerBillingObj.note
+                  : "",
+              };
 
-            if (
-              config.isCloud == "true" &&
-              localOrg.value?.identifier == data?.identifier &&
-              (customOrganization == "" || customOrganization == undefined)
-            ) {
-              // localOrg.value.subscription_type =
-              //   data.CustomerBillingObj.subscription_type;
-              // useLocalOrganization(localOrg.value);
-              useLocalOrganization(optiondata);
-            }
+              if (
+                config.isCloud == "true" &&
+                localOrg.value?.identifier == data?.identifier &&
+                (customOrganization == "" || customOrganization == undefined)
+              ) {
+                // localOrg.value.subscription_type =
+                //   data.CustomerBillingObj.subscription_type;
+                // useLocalOrganization(localOrg.value);
+                useLocalOrganization(optiondata);
+              }
 
-            if (localOrg.value.identifier == data.identifier) {
-              localOrgFlag = true;
-            }
+              if (
+                localOrg.value.identifier == data.identifier ||
+                url.searchParams.get("org_identifier") == data.identifier
+              ) {
+                localOrgFlag = true;
+              }
 
-            if (
-              (Object.keys(selectedOrg.value).length == 0 &&
-                data.type == "default" &&
-                store.state.userInfo.email == data.UserObj.email &&
-                (customOrganization == "" ||
-                  customOrganization == undefined)) ||
-              (store.state.organizations?.length == 1 &&
-                (customOrganization == "" || customOrganization == undefined))
-            ) {
-              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-              useLocalOrganization(optiondata);
-              store.dispatch("setSelectedOrganization", optiondata);
-            } else if (data.identifier == customOrganization) {
-              selectedOrg.value = optiondata;
-              useLocalOrganization(optiondata);
-              store.dispatch("setSelectedOrganization", optiondata);
-            }
+              if (
+                (Object.keys(selectedOrg.value).length == 0 &&
+                  data.type == "default" &&
+                  store.state.userInfo.email == data.UserObj.email &&
+                  (customOrganization == "" ||
+                    customOrganization == undefined)) ||
+                (store.state.organizations?.length == 1 &&
+                  (customOrganization == "" || customOrganization == undefined))
+              ) {
+                selectedOrg.value = localOrg.value
+                  ? localOrg.value
+                  : optiondata;
+                useLocalOrganization(optiondata);
+                store.dispatch("setSelectedOrganization", optiondata);
+              } else if (data.identifier == customOrganization) {
+                selectedOrg.value = optiondata;
+                useLocalOrganization(optiondata);
+                store.dispatch("setSelectedOrganization", optiondata);
+              }
 
-            if (data.type == "default") {
-              tempDefaultOrg = optiondata;
-            }
+              if (data.type == "default") {
+                tempDefaultOrg = optiondata;
+              }
 
-            return optiondata;
-          },
-        );
+              return optiondata;
+            },
+          );
+        }
+
+        if (localOrgFlag == false) {
+          selectedOrg.value = tempDefaultOrg;
+          useLocalOrganization(tempDefaultOrg);
+          store.dispatch("setSelectedOrganization", tempDefaultOrg);
+        }
+
+        if (
+          Object.keys(selectedOrg.value).length == 0 &&
+          store.state.organizations.length > 0
+        ) {
+          let data = store.state.organizations[0];
+          let optiondata = {
+            label: data.name,
+            id: data.id,
+            identifier: data.identifier,
+            user_email: store.state.userInfo.email,
+            ingest_threshold: data.ingest_threshold,
+            search_threshold: data.search_threshold,
+            subscription_type: data.hasOwnProperty("CustomerBillingObj")
+              ? data.CustomerBillingObj.subscription_type
+              : "",
+            status: data.status,
+            note: data.hasOwnProperty("CustomerBillingObj")
+              ? data.CustomerBillingObj.note
+              : "",
+          };
+          selectedOrg.value = optiondata;
+          useLocalOrganization(optiondata);
+          store.dispatch("setSelectedOrganization", optiondata);
+        }
+
+        if (router.currentRoute.value.query.action == "subscribe") {
+          router.push({
+            name: "plans",
+          });
+        }
+
+        if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
+          mainLayoutMixin.setup().getOrganizationThreshold(store);
+        }
+
+        if (
+          Object.keys(selectedOrg.value).length > 0 &&
+          selectedOrg.value.identifier != "" &&
+          selectedOrg.value.identifier != undefined
+        ) {
+          await getOrganizationSettings();
+          isLoading.value = true;
+        }
+      } catch (error) {
+        console.error("Error in setSelectedOrganization:", error);
       }
-
-      if (localOrgFlag == false) {
-        selectedOrg.value = tempDefaultOrg;
-        useLocalOrganization(tempDefaultOrg);
-        store.dispatch("setSelectedOrganization", tempDefaultOrg);
-      }
-
-      if (router.currentRoute.value.query.action == "subscribe") {
-        router.push({
-          name: "plans",
-        });
-      }
-
-      if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
-        mainLayoutMixin.setup().getOrganizationThreshold(store);
-      }
-
-      await getOrganizationSettings();
-      isLoading.value = true;
     };
 
     // get organizations settings on first load and identifier change
@@ -1026,10 +1090,12 @@ export default defineComponent({
     forceFetchOrganization() {
       mainLayoutMixin.setup().getDefaultOrganization(this.store);
     },
-    changeOrganization() {
-      setTimeout(() => {
+    changeOrganization: {
+      handler() {
         this.setSelectedOrganization();
-      }, 500);
+      },
+      deep: true,
+      immediate: true,
     },
     async changeOrganizationIdentifier() {
       this.isLoading = false;
@@ -1039,7 +1105,7 @@ export default defineComponent({
 
       await this.getOrganizationSettings();
 
-      // this.isLoading = true;
+      this.isLoading = true;
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {

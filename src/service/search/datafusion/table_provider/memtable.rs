@@ -20,24 +20,24 @@ use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
     catalog::Session,
-    common::{project_schema, Constraints, Result},
+    common::{Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
     physical_expr::{LexOrdering, PhysicalSortExpr},
-    physical_plan::{
-        expressions::{CastExpr, Column},
-        projection::ProjectionExec,
-        sorts::sort::SortExec,
-        ExecutionPlan, PhysicalExpr,
-    },
+    physical_plan::{expressions::Column, sorts::sort::SortExec, ExecutionPlan},
 };
 use hashbrown::HashMap;
+
+use super::{apply_filter, apply_projection};
+use crate::service::search::index::IndexCondition;
 
 #[derive(Debug)]
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
     sorted_by_time: bool,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 }
 
 impl NewMemTable {
@@ -47,12 +47,16 @@ impl NewMemTable {
         partitions: Vec<Vec<RecordBatch>>,
         rules: HashMap<String, DataType>,
         sorted_by_time: bool,
+        index_condition: Option<IndexCondition>,
+        fst_fields: Vec<String>,
     ) -> Result<Self> {
         let mem = MemTable::try_new(schema, partitions)?;
         Ok(Self {
             mem_table: mem,
             diff_rules: rules,
             sorted_by_time,
+            index_condition,
+            fst_fields,
         })
     }
 }
@@ -82,38 +86,50 @@ impl TableProvider for NewMemTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        let (mem_projection, filter_projection) =
+            if let Some(index_condition) = self.index_condition.as_ref() {
+                // get the projection for the filter
+                let mut filter_projection =
+                    index_condition.get_schema_projection(self.schema(), &self.fst_fields);
+                if let Some(v) = projection.as_ref() {
+                    filter_projection.extend(v.iter().copied());
+                }
+                filter_projection.sort();
+                filter_projection.dedup();
+                // regenerate the projection with the filter_projection
+                let projection = projection.as_ref().map(|p| {
+                    p.iter()
+                        .filter_map(|i| filter_projection.iter().position(|f| f == i))
+                        .collect::<Vec<_>>()
+                });
+                (Some(filter_projection), projection)
+            } else {
+                (projection.cloned(), None)
+            };
+        let mem_projection = mem_projection.as_ref();
+        let filter_projection = filter_projection.as_ref();
+
         let memory_exec = self
             .mem_table
-            .scan(state, projection, filters, limit)
+            .scan(state, mem_projection, filters, limit)
             .await?;
 
-        // add the diff rules to the execution plan
-        if self.diff_rules.is_empty() {
-            return Ok(if self.sorted_by_time {
-                wrap_sort(memory_exec)
-            } else {
-                memory_exec
-            });
-        }
+        let projection_exec = apply_projection(
+            &self.schema(),
+            &self.diff_rules,
+            mem_projection,
+            memory_exec,
+        )?;
 
-        let projected_schema = project_schema(&self.schema(), projection)?;
-        let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
-            Vec::with_capacity(projected_schema.fields().len());
-        for (idx, field) in projected_schema.fields().iter().enumerate() {
-            let name = field.name().to_string();
-            let col = Arc::new(Column::new(&name, idx));
-            if let Some(data_type) = self.diff_rules.get(&name) {
-                exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
-            } else {
-                exprs.push((col, name));
-            }
-        }
-        let projection_exec = Arc::new(ProjectionExec::try_new(exprs, memory_exec)?);
-        Ok(if self.sorted_by_time {
-            wrap_sort(projection_exec)
-        } else {
-            projection_exec
-        })
+        let filter_exec = apply_filter(
+            self.index_condition.as_ref(),
+            &projection_exec.schema(),
+            &self.fst_fields,
+            projection_exec,
+            filter_projection,
+        )?;
+
+        apply_sort(filter_exec, self.sorted_by_time)
     }
 
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
@@ -138,4 +154,15 @@ fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
         }
         Err(_) => exec,
     }) as _
+}
+
+fn apply_sort(
+    exec_plan: Arc<dyn ExecutionPlan>,
+    sorted_by_time: bool,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    Ok(if sorted_by_time {
+        wrap_sort(exec_plan)
+    } else {
+        exec_plan
+    })
 }

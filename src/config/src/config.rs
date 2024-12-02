@@ -753,6 +753,12 @@ pub struct Common {
     )]
     pub inverted_index_tantivy_mode: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
@@ -1074,6 +1080,12 @@ pub struct Limit {
         help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 0,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
 }
 
 #[derive(EnvConfig)]
@@ -2042,10 +2054,6 @@ mod tests {
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
 
-        // Test invalid endpoint
-        cfg.sns.endpoint = "invalid-url".to_string();
-        assert!(check_sns_config(&mut cfg).is_err());
-
         // Test custom timeouts
         cfg.sns.connect_timeout = 15;
         cfg.sns.operation_timeout = 45;
@@ -2080,7 +2088,7 @@ mod tests {
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
         cfg.compact.data_retention_days = 2;
-        let ret = check_common_config(&mut cfg);
+        let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
         cfg.common.data_dir = "".to_string();

@@ -72,6 +72,7 @@ bitflags = "2.6.0"
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
     "std",
@@ -184,7 +185,7 @@ tantivy.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
-expect-test = "1.4"
+expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
 
@@ -237,6 +238,7 @@ dashmap = { version = "6.0", features = ["serde"] }
 datafusion = "43.0.0"
 datafusion-proto = "43.0.0"
 datafusion-functions-aggregate-common = "43.0.0"
+expect-test = "1.4"
 arrow = { version = "53.2.0", features = ["ipc_compression", "prettyprint"] }
 arrow-flight = "53.2.0"
 arrow-json = "53.2.0"
@@ -274,6 +276,7 @@ memchr = "2.7"
 murmur3 = "0.5"
 async-nats = "0.37"
 once_cell = "1.17"
+ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = "0.13"
 prost = "0.13.1"

@@ -24,16 +24,18 @@ mod tests {
     use chrono::{Duration, Utc};
     use config::{
         get_config,
-        meta::alerts::{
-            alert::Alert,
-            destinations::{Destination, DestinationType},
-            Operator, QueryCondition, TriggerCondition,
+        meta::{
+            alerts::{
+                alert::Alert,
+                destinations::{Destination, DestinationType},
+                Operator, QueryCondition, TriggerCondition,
+            },
+            dashboards::{v1, Dashboard, Dashboards},
         },
         utils::json,
     };
     use infra::scheduler::Trigger;
     use openobserve::{
-        common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,
@@ -1546,11 +1548,9 @@ mod tests {
         // Optionally, deserialize and check the response body
         let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
-        assert!(
-            destinations
-                .iter()
-                .any(|d| d.destination_type == DestinationType::Sns)
-        );
+        assert!(destinations
+            .iter()
+            .any(|d| d.destination_type == DestinationType::Sns));
     }
 
     async fn e2e_update_sns_alert_destination() {

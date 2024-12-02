@@ -358,7 +358,10 @@ import { useI18n } from "vue-i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { verifyOrganizationStatus } from "@/utils/zincutils";
+import {
+  verifyOrganizationStatus,
+  useLocalInterestingFields,
+} from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
@@ -972,7 +975,7 @@ export default defineComponent({
         field,
         isFieldExistInSQL,
       );
-
+      
       // Modify the query based on stream name
       const streamName = searchObj.data.stream.selectedStream[0].replace(
         /[.*+?^${}()|[\]\\]/g,
@@ -990,8 +993,6 @@ export default defineComponent({
       searchObj.data.editorValue = newQuery;
       searchBarRef.value.updateQuery();
       searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
-
-      console.log(parsedSQL);
     };
 
     const processInterestingFiledInSQLQuery = (
@@ -999,6 +1000,7 @@ export default defineComponent({
       field,
       isFieldExistInSQL,
     ) => {
+      let fieldPrefix = "";
       if (parsedSQL) {
         if (isFieldExistInSQL) {
           // Remove the field from the query
@@ -1010,12 +1012,10 @@ export default defineComponent({
             );
             if (index > -1) {
               searchObj.data.stream.interestingFieldList.splice(index, 1);
-              field.isInterestingField = false;
             }
             parsedSQL.columns = filteredData;
           }
         } else {
-          let fieldPrefix = "";
           if (searchObj.data.stream.selectedStream.length > 1) {
             if (parsedSQL && parsedSQL.from.length > 1) {
               fieldPrefix = parsedSQL.from[0].as
@@ -1029,12 +1029,22 @@ export default defineComponent({
             parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
           }
 
-          parsedSQL.columns.push({
-            expr: {
-              type: "column_ref",
-              column: fieldPrefix + field.name,
-            },
-            type: "expr",
+          // check is required for union query where both streams interesting fields goes into single array
+          // but it should be added if field exist in the strem schema
+          searchObj.data.streamResults.list.forEach((stream) => {
+            if (stream.name === parsedSQL.from[0].table) {
+              stream.schema.forEach((stream_field) => {
+                if (field.name === stream_field.name) {
+                  parsedSQL.columns.push({
+                    expr: {
+                      type: "column_ref",
+                      column: fieldPrefix + field.name,
+                    },
+                    type: "expr",
+                  });
+                }
+              });
+            }
           });
         }
 

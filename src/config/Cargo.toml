@@ -47,6 +47,7 @@ md5.workspace = true
 memchr.workspace = true
 murmur3.workspace = true
 once_cell.workspace = true
+ordered-float.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
 prometheus.workspace = true
@@ -61,6 +62,7 @@ sqlparser.workspace = true
 sqlx.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
+tantivy.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
@@ -69,3 +71,6 @@ tracing-subscriber.workspace = true
 urlencoding.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true

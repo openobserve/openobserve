@@ -31,5 +31,6 @@ pub mod schema;
 pub mod schema_ext;
 pub mod sql;
 pub mod str;
+pub mod tantivy;
 pub mod time;
 pub mod util;

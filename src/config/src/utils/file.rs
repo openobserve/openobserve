@@ -78,8 +78,7 @@ pub fn scan_files<P: AsRef<Path>>(
         if path.is_file() {
             let path_ext = path
                 .extension()
-                .unwrap_or_default()
-                .to_str()
+                .and_then(|s| s.to_str())
                 .unwrap_or_default();
             if path_ext == ext {
                 files.push(path.to_str().unwrap().to_string());
@@ -123,8 +122,7 @@ pub async fn scan_files_with_channel(
         } else {
             let path_ext = path
                 .extension()
-                .unwrap_or_default()
-                .to_str()
+                .and_then(|s| s.to_str())
                 .unwrap_or_default();
             if path_ext == ext {
                 files.push(path.to_str().unwrap().to_string());
