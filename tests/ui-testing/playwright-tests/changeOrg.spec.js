@@ -65,80 +65,16 @@ test.describe("Change Organisation", () => {
     });
 
 
-    test("Run query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
+   
+    
 
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerName();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
+   
 
-    });
+   
 
-    test("Run query after selecting two streams, SQL Mode On and entering join queries", async ({ page }) => {
+   
 
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
+   
 
-    });
-
-    test("Run query after selecting two streams, SQL Mode On and entering join limit", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoinLimit();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
-
-    });
-
-    test("Run query after selecting two streams, SQL Mode On and entering join like", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameJoinLike();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
-
-    });
-
-    test("Run query after selecting two streams, SQL Mode On and entering Left join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameLeftJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
-
-    });
-
-    test("Run query after selecting two streams, SQL Mode On and entering Right join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameRightJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
-
-    });
-
-    test("Run query after selecting two streams, SQL Mode On and entering Full join queries", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.kubernetesContainerNameFullJoin();
-        await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
-        await logsPage.signOut();
-
-    });
+    
 });

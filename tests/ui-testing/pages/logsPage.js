@@ -69,6 +69,7 @@ export class LogsPage {
   async logsPageDefaultMultiOrg() {
 
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
    // await validateUrlContains(this.page, 'path');
 

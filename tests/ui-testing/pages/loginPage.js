@@ -31,10 +31,6 @@ export class LoginPage {
       waitUntil: "networkidle",
     });
   
-    // await this.page
-    //   .locator('[data-test="navbar-organizations-select"]')
-    //   .getByText("arrow_drop_down")
-    //   .click();
-    // await this.page.getByRole("option", { name: "default", exact: true }).click();
+    
   }
 }
