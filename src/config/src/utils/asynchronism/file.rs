@@ -46,12 +46,6 @@ pub async fn get_file_contents(
 ) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(path).await?;
     let data = if let Some(range) = range {
-        if range.start > range.end {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "invalid range: start > end",
-            ));
-        }
         let to_read = range.end - range.start;
         let mut buf = Vec::with_capacity(to_read);
         file.seek(std::io::SeekFrom::Start(range.start as u64))
