@@ -713,6 +713,8 @@ pub async fn merge_files(
         entry.push(file.clone());
     }
 
+    log::info!("[COMPACT:{thread_id}] start generate final schema");
+
     // generate the final schema
     let all_fields = schemas
         .values()
@@ -723,6 +725,8 @@ pub async fn merge_files(
     for field in schema_latest.fields() {
         schema_latest_fields.insert(field.name(), field);
     }
+
+    log::info!("[COMPACT:{thread_id}] start generate datafusion table");
 
     // generate datafusion tables
     let mut tables = Vec::new();
@@ -765,6 +769,8 @@ pub async fn merge_files(
         };
         tables.push(table);
     }
+
+    log::info!("[COMPACT:{thread_id}] start merging files by datafusion");
 
     let start = std::time::Instant::now();
     let merge_result = exec::merge_parquet_files(
