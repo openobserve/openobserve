@@ -60,7 +60,9 @@ use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
     service::{
-        db, file_list, schema::generate_schema_for_defined_schema_fields, search::datafusion::exec,
+        db, file_list,
+        schema::generate_schema_for_defined_schema_fields,
+        search::{datafusion::exec, DATAFUSION_RUNTIME},
         stream,
     },
 };
@@ -773,15 +775,24 @@ pub async fn merge_files(
     log::info!("[COMPACT:{thread_id}] start merging files by datafusion");
 
     let start = std::time::Instant::now();
-    let merge_result = exec::merge_parquet_files(
-        stream_type,
-        stream_name,
-        schema_latest.clone(),
-        tables,
-        &bloom_filter_fields,
-        &new_file_meta,
-    )
-    .await;
+    let merge_result = {
+        let stream_name = stream_name.to_string();
+        let schema_latest = schema_latest.clone();
+        let new_file_meta = new_file_meta.clone();
+        DATAFUSION_RUNTIME
+            .spawn(async move {
+                exec::merge_parquet_files(
+                    stream_type,
+                    &stream_name,
+                    schema_latest,
+                    tables,
+                    &bloom_filter_fields,
+                    &new_file_meta,
+                )
+                .await
+            })
+            .await?
+    };
 
     // clear session data
     log::info!("[COMPACT:{thread_id}] start clearing session data");
