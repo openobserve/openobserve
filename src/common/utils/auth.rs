@@ -653,7 +653,7 @@ mod tests {
     use super::*;
     use crate::{
         common::meta::user::UserRequest,
-        service::{organization, users},
+        service::{self, organization, users},
     };
 
     #[test]
@@ -706,6 +706,9 @@ mod tests {
             },
         )
         .await;
+        service::db::user::cache().await.unwrap();
+        service::db::organization::cache().await.unwrap();
+        service::db::org_users::cache().await.unwrap();
         assert!(is_root_user("root@example.com"));
         assert!(!is_root_user("root2@example.com"));
     }

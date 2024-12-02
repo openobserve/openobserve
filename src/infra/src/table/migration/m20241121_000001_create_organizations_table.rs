@@ -53,10 +53,10 @@ fn create_organizations_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Organizations::OrgType).small_integer().not_null())
         .col(
             ColumnDef::new(Organizations::CreatedAt)
-            .big_unsigned()
+            .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Organizations::UpdatedAt).big_unsigned().not_null())
+        .col(ColumnDef::new(Organizations::UpdatedAt).big_integer().not_null())
         .to_owned()
 }
 
@@ -101,8 +101,8 @@ mod tests {
                 `identifier` varchar(256) NOT NULL PRIMARY KEY,
                 `org_name` varchar(100) NOT NULL,
                 `org_type` smallint NOT NULL,
-                `created_at` bigint UNSIGNED NOT NULL,
-                `updated_at` bigint UNSIGNED NOT NULL
+                `created_at` bigint NOT NULL,
+                `updated_at` bigint NOT NULL
             )"#
         );
     }

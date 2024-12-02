@@ -81,8 +81,8 @@ fn create_org_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(OrgUsers::Role).small_integer().not_null())
         .col(ColumnDef::new(OrgUsers::Token).string_len(256).not_null())
         .col(ColumnDef::new(OrgUsers::RumToken).string_len(256))
-        .col(ColumnDef::new(OrgUsers::CreatedAt).big_unsigned().not_null())
-        .col(ColumnDef::new(OrgUsers::UpdatedAt).big_unsigned().not_null())
+        .col(ColumnDef::new(OrgUsers::CreatedAt).big_integer().not_null())
+        .col(ColumnDef::new(OrgUsers::UpdatedAt).big_integer().not_null())
         .foreign_key(ForeignKey::create()
             .name(ORG_USER_ORGANIZATION_FOREIGN_KEY)
             .from(OrgUsers::Table, OrgUsers::OrgId)
@@ -178,8 +178,8 @@ mod tests {
                 `role` smallint NOT NULL,
                 `token` varchar(256) NOT NULL,
                 `rum_token` varchar(256),
-                `created_at` bigint UNSIGNED NOT NULL,
-                `updated_at` bigint UNSIGNED NOT NULL,
+                `created_at` bigint NOT NULL,
+                `updated_at` bigint NOT NULL,
                 CONSTRAINT `org_users_org_id_fk` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`identifier`),
                 CONSTRAINT `org_users_user_email_fk` FOREIGN KEY (`email`) REFERENCES `users` (`email`)
             )"#

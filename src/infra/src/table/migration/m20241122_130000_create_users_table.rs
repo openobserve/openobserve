@@ -64,10 +64,10 @@ fn create_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Users::UserType).small_integer().not_null())
         .col(
             ColumnDef::new(Users::CreatedAt)
-            .big_unsigned()
+            .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Users::UpdatedAt).big_unsigned().not_null())
+        .col(ColumnDef::new(Users::UpdatedAt).big_integer().not_null())
         .to_owned()
 }
 
@@ -145,8 +145,8 @@ mod tests {
                 `is_root` bool NOT NULL,
                 `password_ext` varchar(256),
                 `user_type` smallint NOT NULL,
-                `created_at` bigint UNSIGNED NOT NULL,
-                `updated_at` bigint UNSIGNED NOT NULL
+                `created_at` bigint NOT NULL,
+                `updated_at` bigint NOT NULL
             )"#
         );
         assert_eq!(

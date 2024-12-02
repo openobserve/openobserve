@@ -62,7 +62,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             );
         }
         let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
-        let _ = users::create_root_user(
+        if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
             UserRequest {
                 email: cfg.auth.root_user_email.clone(),
@@ -76,7 +76,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 is_external: false,
             },
         )
-        .await;
+        .await
+        {
+            panic!("Failed to create root user: {e}");
+        }
     }
 
     if !cfg.common.mmdb_disable_download {
