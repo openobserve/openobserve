@@ -742,7 +742,7 @@ pub async fn merge_files(
             id: format!("{trace_id}-{schema_key}"),
             storage_type: StorageType::Memory,
             work_group: None,
-            target_partitions: 0,
+            target_partitions: 2,
         };
 
         let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
