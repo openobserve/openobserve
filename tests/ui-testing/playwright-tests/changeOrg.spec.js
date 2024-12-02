@@ -4,10 +4,11 @@ import { LogsPage } from '../pages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage.js';
 import { HomePage } from "../pages/homePage.js";
 import { MetricsPage } from "../pages/metricsPage.js";
+import { TracesPage } from "../pages/tracesPage.js";
 
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage, metricsPage;
+    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -15,6 +16,7 @@ test.describe("Change Organisation", () => {
         logsPage = new LogsPage(page);
         homePage = new HomePage(page);
         metricsPage = new MetricsPage(page);
+        tracesPage = new TracesPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -85,7 +87,30 @@ test.describe("Change Organisation", () => {
   
     });
 
-   
+    test("Traces Page default validation", async ({ page }) => {
+
+       
+        await tracesPage.navigateToTraces();
+        await tracesPage.validateTracesPage(); 
+        await tracesPage.tracesURLValidation(); 
+    });
+
+    test("Traces Page change organisation validation", async ({ page }) => {
+
+        await tracesPage.navigateToTraces();
+        await page.waitForTimeout(5000); 
+        await tracesPage.tracesPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await tracesPage.validateTracesPage();
+      
+        await tracesPage.tracesPageURLValidation();
+        await tracesPage.navigateToTraces();
+        await tracesPage.validateTracesPage();
+        await tracesPage.tracesPageURLValidation();
+  
+    });
+
+
     
 
    

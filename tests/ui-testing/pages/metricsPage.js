@@ -17,7 +17,7 @@ export class MetricsPage {
     async metricsPageValidation() {
 
         await expect(this.page.locator('[data-cy="syntax-guide-button"]')).toContainText('Syntax Guide');
-  await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
+        await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
 
 
     }
@@ -33,16 +33,16 @@ export class MetricsPage {
 
     async metricsPageDefaultMultiOrg() {
 
-      
+
 
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-       // await this.page.pause();
-      // await this.page.waitForTimeout(5000);
-       
+        // await this.page.pause();
+        // await this.page.waitForTimeout(5000);
+
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
 
-     
-       // await validateUrlContains(this.page, 'path');
+
+        // await validateUrlContains(this.page, 'path');
 
 
     }
@@ -52,7 +52,7 @@ export class MetricsPage {
         await expect(this.page).toHaveURL(/defaulttestmulti/);
 
     }
-    
+
     async metricsURLValidation() {
 
         await expect(this.page).toHaveURL(/metrics/);
