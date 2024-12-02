@@ -592,6 +592,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             }
         }
     }
+
     // write all data from result_cache to QUERY_RESULT_CACHE
     QUERY_RESULT_CACHE.write().await.extend(result_cache);
     Ok(())
