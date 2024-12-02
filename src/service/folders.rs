@@ -169,6 +169,6 @@ async fn permitted_folders(
         &org_id, user_id, "GET", "dfolder",
     )
     .await
-    .map_err(FolderError::PermittedFoldersValidator)?;
+    .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
     Ok(stream_list)
 }
