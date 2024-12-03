@@ -564,6 +564,8 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    #[serde(default)]
+    pub index_setting_timestamp: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -703,6 +705,11 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let index_setting_timestamp = settings
+            .get("index_setting_timestamp")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+
         Self {
             partition_time_level,
             partition_keys,
@@ -715,6 +722,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            index_setting_timestamp,
         }
     }
 }
@@ -822,13 +830,14 @@ impl RoutingCondition {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
+                // field not found -> dropped
                 return false;
             }
         };
         match val {
             Value::String(v) => {
                 let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default();
+                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -877,6 +886,10 @@ impl RoutingCondition {
                     Operator::NotEqualTo => val != con_val,
                     _ => false,
                 }
+            }
+            Value::Null => {
+                matches!(self.operator, Operator::EqualTo)
+                    && matches!(&self.value, Value::String(v) if v == "null")
             }
             _ => false,
         }
