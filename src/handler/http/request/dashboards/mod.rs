@@ -77,8 +77,9 @@ pub async fn create_dashboard(
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    let Ok(dashboard) = parse_dashboard(body) else {
-        return MetaHttpResponse::bad_request("Error parsing dashboard");
+    let dashboard = match parse_dashboard(body) {
+        Ok(dashboard) => dashboard,
+        Err(err) => return MetaHttpResponse::bad_request(err),
     };
     match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
         Ok(dashboard) => HttpResponse::Ok().json(dashboard),
@@ -118,8 +119,9 @@ async fn update_dashboard(
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
-    let Ok(dashboard) = parse_dashboard(body) else {
-        return MetaHttpResponse::bad_request("Error parsing dashboard");
+    let dashboard = match parse_dashboard(body) {
+        Ok(dashboard) => dashboard,
+        Err(err) => return MetaHttpResponse::bad_request(err),
     };
     match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash).await {
         Ok(dashboard) => HttpResponse::Ok().json(dashboard),
