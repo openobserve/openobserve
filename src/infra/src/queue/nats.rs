@@ -118,9 +118,9 @@ impl super::Queue for NatsQueue {
 
 fn get_deliver_policy() -> DeliverPolicy {
     match get_config().nats.deliver_policy.to_lowercase().as_str() {
-        "all" | "DeliverAll" => DeliverPolicy::All,
-        "last" | "DeliverLast" => DeliverPolicy::Last,
-        "new" | "DeliverNew" => DeliverPolicy::New,
+        "all" | "deliverall" | "deliver_all" => DeliverPolicy::All,
+        "last" | "deliverlast" | "deliver_last" => DeliverPolicy::Last,
+        "new" | "delivernew" | "deliver_new" => DeliverPolicy::New,
         _ => DeliverPolicy::All,
     }
 }
