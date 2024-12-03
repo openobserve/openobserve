@@ -1070,7 +1070,6 @@ export default defineComponent({
         align: "center",
         sortable: true,
         field: "name",
-        style: "min-width: 200px",
       },
       {
         name: "settings",
