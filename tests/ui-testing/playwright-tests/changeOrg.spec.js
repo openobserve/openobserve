@@ -5,10 +5,12 @@ import { IngestionPage } from '../pages/ingestionPage.js';
 import { HomePage } from "../pages/homePage.js";
 import { MetricsPage } from "../pages/metricsPage.js";
 import { TracesPage } from "../pages/tracesPage.js";
+import { RumPage } from "../pages/rumPage.js";
+import { PipelinesPage } from "../pages/pipelinesPage.js";
 
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage;
+    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage, rumPage, pipelinesPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -17,6 +19,8 @@ test.describe("Change Organisation", () => {
         homePage = new HomePage(page);
         metricsPage = new MetricsPage(page);
         tracesPage = new TracesPage(page);
+        rumPage = new RumPage(page);
+        pipelinesPage = new PipelinesPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -110,9 +114,44 @@ test.describe("Change Organisation", () => {
   
     });
 
+    test("RUM Page default validation", async ({ page }) => {
+
+       
+        await rumPage.gotoRumPage();
+        await rumPage.rumURLValidation(); 
+    });
+
+    test("RUM Page change organisation validation", async ({ page }) => {
+
+        await rumPage.gotoRumPage();
+        await page.waitForTimeout(5000); 
+        await rumPage.rumPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await rumPage.rumPageURLValidation();
+        await rumPage.gotoRumPage();
+        await rumPage.rumPageURLValidation();
+  
+    });
 
     
+    test("Pipelines Page default validation", async ({ page }) => {
 
+       
+        await pipelinesPage.gotoPipelinesPage();
+        await pipelinesPage.pipelinesURLValidation(); 
+    });
+
+    test("Pipelines Page change organisation validation", async ({ page }) => {
+
+        await pipelinesPage.gotoPipelinesPage();
+        await page.waitForTimeout(5000); 
+        await pipelinesPage.pipelinesPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await pipelinesPage.pipelinesPageURLValidation();
+        await pipelinesPage.gotoPipelinesPage();
+        await pipelinesPage.pipelinesPageURLValidation();
+  
+    });
    
 
    
