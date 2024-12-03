@@ -256,26 +256,34 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
+        console.log('Updating variables data:', data);
         // update the variables data
         Object.assign(variablesData, data);
+        console.log('Updated variablesData:', variablesData);
 
         if (needsVariablesAutoUpdate) {
+          console.log('Checking if variables need auto-update');
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData)) {
             needsVariablesAutoUpdate = false;
+            console.log('Variables loaded, disabling auto-update');
           }
 
           Object.assign(refreshVariableDataRef, variablesData);
+          console.log('Updated refreshVariableDataRef:', refreshVariableDataRef);
         }
+        
 
         return;
       } catch (error) {
+        console.error('Error updating variables data:', error);
         console.log(error);
       }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
       // NOTE: need to improve this logic it should only called if the variable requires more space
+      console.log('Dispatching resize event');
       window.dispatchEvent(new Event("resize"));
     };
     const currentDashboardData: any = reactive({
