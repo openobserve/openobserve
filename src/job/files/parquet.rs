@@ -43,7 +43,7 @@ use config::{
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
-        asynchronism::file::get_file_meta,
+        async_file::get_file_meta,
         file::scan_files_with_channel,
         inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
@@ -1346,7 +1346,7 @@ pub(crate) async fn create_tantivy_index(
     let caller = format!("[{caller}:JOB]");
 
     let dir = PuffinDirWriter::new();
-    let _index = generate_tantivy_index(
+    let index = generate_tantivy_index(
         dir.clone(),
         reader,
         full_text_search_fields,
@@ -1354,6 +1354,10 @@ pub(crate) async fn create_tantivy_index(
         schema,
     )
     .await?;
+    if index.is_none() {
+        return Ok(0);
+    }
+
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
@@ -1362,7 +1366,6 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
-
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
@@ -1423,6 +1426,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
+    // no fields need to create index, return
     if tantivy_fields.is_empty() {
         return Ok(None);
     }
@@ -1494,6 +1498,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 doc.add_text(field, column_data.value(i));
             }
         }
+
+        // yield, this operation is time-consuming
+        tokio::task::yield_now().await;
+    }
+
+    // no docs need to create index, return
+    if docs.is_empty() {
+        return Ok(None);
     }
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
