@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod auth;
-pub mod models;
-pub mod request;
-pub mod router;
+//! This module contains models that can be serialized and deserialized as JSON
+//! for HTTP responses and requests.
+
+pub mod folders;
