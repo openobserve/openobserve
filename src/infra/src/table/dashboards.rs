@@ -114,13 +114,13 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, errors
 }
 
 /// Lists all dashboards belonging to the given org and folder.
-pub async fn list_all() -> Result<Vec<Dashboard>, errors::Error> {
+pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let dashboards = list_all_models(client)
         .await?
         .into_iter()
-        .map(Dashboard::try_from)
-        .collect::<Result<_, _>>()?;
+        .map(|(org, db)| Ok((org, Dashboard::try_from(db)?)))
+        .collect::<Result<_, errors::Error>>()?;
     Ok(dashboards)
 }
 
@@ -317,7 +317,7 @@ async fn list_models(
 /// Lists all dashboard ORM models that belong to the given org and folder.
 async fn list_all_models(
     db: &DatabaseConnection,
-) -> Result<Vec<dashboards::Model>, sea_orm::DbErr> {
+) -> Result<Vec<(String, dashboards::Model)>, sea_orm::DbErr> {
     let query = folders::Entity::find()
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
 
@@ -334,7 +334,7 @@ async fn list_all_models(
         .all(db)
         .await?
         .into_iter()
-        .flat_map(|(_, ds)| ds)
+        .flat_map(|(folder, ds)| ds.into_iter().map(move |d| (folder.org.clone(), d)))
         .collect();
     Ok(dashboards)
 }

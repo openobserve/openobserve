@@ -267,7 +267,7 @@ pub async fn reset() -> Result<(), anyhow::Error> {
     let dashboards = dashboards::list_all().await?;
     let ids: Vec<_> = dashboards
         .iter()
-        .map(|d| d.dashboard_id().unwrap())
+        .map(|(_, d)| d.dashboard_id().unwrap())
         .collect();
     for id in ids {
         distinct_values::batch_remove(OriginType::Dashboard, &id).await?;

@@ -13,13 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::bail;
-use config::meta::stream::{DistinctField, StreamSettings, StreamType};
+use config::meta::{
+    dashboards::Dashboard,
+    stream::{DistinctField, StreamSettings, StreamType},
+};
 use hashbrown::HashMap;
 use infra::{
     db as infra_db,
     schema::get_settings,
-    table::distinct_values::{self, DistinctFieldRecord, OriginType},
+    table::{
+        dashboards,
+        distinct_values::{self, DistinctFieldRecord, OriginType},
+    },
 };
 
 use crate::service::{db::dashboards::get_query_variables, stream::save_stream_settings};
@@ -29,21 +34,13 @@ type SettingsCache = HashMap<(String, String, StreamType), StreamSettings>;
 /// This takes query variables from the dashboard and inserts them
 /// in the distinct_values table as well as the stream settings
 async fn add_distinct_from_dashboard(
-    key: &str,
-    value: bytes::Bytes,
+    org_id: &str,
+    dashboard: &Dashboard,
     settings_cache: &mut SettingsCache,
 ) -> Result<(), anyhow::Error> {
-    let local_key = key.strip_prefix('/').unwrap_or(key);
+    let dashboard_id = dashboard.dashboard_id().unwrap();
 
-    // key format is dashboard/org_id/folder/id
-    let parts = local_key.split('/').collect::<Vec<_>>();
-    if parts.len() < 4 {
-        bail!("invalid key {local_key}, skipping");
-    }
-    let org_id = parts.get(1).unwrap();
-    let dashboard_id = parts.get(3).unwrap();
-
-    let variables = get_query_variables(Some(value));
+    let variables = get_query_variables(Some(dashboard));
 
     for ((stream, stype), fields) in variables {
         let cache_key = (org_id.to_string(), stream.clone(), stype);
@@ -84,6 +81,8 @@ async fn add_distinct_from_dashboard(
     Ok(())
 }
 
+// due to the order we init the resources, this migration will always run after
+// the sea-orm migrations, so we can be certain that dashboard folders are migrated here.
 pub async fn run() -> Result<(), anyhow::Error> {
     // load dashboards list
     let db = infra_db::get_db().await;
@@ -93,10 +92,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let len = local_key.split('/').collect::<Vec<&str>>().len();
         if len > 3 {
-            // println!(
-            // "Skip dashboard migration as it is already part of folder: {}",
-            // key
-            // );
             continue;
         }
         let new_key = key.replace("/dashboard/", "/dashboard/default/");
@@ -114,15 +109,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if distinct_values::len().await? > 0 {
         log::info!("dashboard distinct values migration already done.");
     } else {
-        let data = db.list(&db_key).await?;
-
+        let dashboards = dashboards::list_all().await?;
         let mut settings_cache: SettingsCache = HashMap::new();
 
-        for (key, value) in data {
-            match add_distinct_from_dashboard(&key, value, &mut settings_cache).await {
-                Ok(_) => log::info!("dashboard {key} migrated for distinct values"),
+        for (org, dashboard) in dashboards {
+            match add_distinct_from_dashboard(&org, &dashboard, &mut settings_cache).await {
+                Ok(_) => log::info!(
+                    "dashboard {} migrated for distinct values",
+                    dashboard.dashboard_id().unwrap()
+                ),
                 Err(e) => log::error!(
-                    "failed to process variables from dashboard {key} for distinct values : {e}"
+                    "failed to process variables from dashboard {} for distinct values : {e}",
+                    dashboard.dashboard_id().unwrap()
                 ),
             }
         }
