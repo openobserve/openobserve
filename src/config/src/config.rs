@@ -1292,7 +1292,7 @@ pub struct Nats {
     pub history: i64,
     #[env_config(
         name = "ZO_NATS_DELIVER_POLICY",
-        default = "",
+        default = "all",
         help = "The point in the stream from which to receive messages, default is: all, valid option is: all, last, new."
     )]
     pub deliver_policy: String,
