@@ -185,6 +185,7 @@ tantivy.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
+async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
