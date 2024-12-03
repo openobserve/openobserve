@@ -345,6 +345,7 @@ pub async fn update_stream_settings(
                 settings
                     .index_fields
                     .extend(update_settings.index_fields.add);
+                settings.index_setting_timestamp = chrono::Utc::now().timestamp_micros();
             }
 
             if !update_settings.index_fields.remove.is_empty() {
