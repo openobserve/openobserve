@@ -92,21 +92,20 @@ async fn update_distinct_variables(
                 continue;
             }
             // get entry from previous variables corresponding to this stream
-            let old_fields = match old_variables.remove(&(name.to_owned(), typ)) {
-                Some(v) => v,
-                None => vec![],
-            };
+            let old_fields = old_variables
+                .remove(&(name.to_owned(), typ))
+                .unwrap_or_default();
             let mut _new_added = false;
 
             for f in fields.iter() {
                 // we ignore full text search no matter what
-                if stream_settings.full_text_search_keys.contains(&f) {
+                if stream_settings.full_text_search_keys.contains(f) {
                     continue;
                 }
                 // we add entry for all the fields, because we need mappings for each individual
                 // origin-stream-field mapping. The duplicates are handled in add function, so
                 // we can call it for each field without issues
-                add_distinct_field_entry(&dashboard_id, org_id, &name, typ.to_string(), &f).await?;
+                add_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), f).await?;
                 let _temp = DistinctField {
                     name: f.to_owned(),
                     added_ts: chrono::Utc::now().timestamp_micros(),
@@ -120,7 +119,7 @@ async fn update_distinct_variables(
             // if so, remove their entry.
             for f in old_fields {
                 if !fields.contains(&f) {
-                    remove_distinct_field_entry(&dashboard_id, org_id, &name, typ.to_string(), &f)
+                    remove_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), &f)
                         .await?;
                 }
             }
@@ -133,14 +132,14 @@ async fn update_distinct_variables(
         // it has all corresponding fields removed, so remove those as well
         for ((name, typ), fields) in old_variables.into_iter() {
             for f in fields {
-                remove_distinct_field_entry(&dashboard_id, org_id, &name, typ.to_string(), &f)
+                remove_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), &f)
                     .await?;
             }
         }
     } else {
         // I guess all the variables were removed from the dashboard.
         // we can batch remove all entries belonging to this dashboard.
-        distinct_values::batch_remove(OriginType::Dashboard, &dashboard_id).await?
+        distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?
     }
     Ok(())
 }
@@ -270,7 +269,7 @@ pub async fn reset() -> Result<(), anyhow::Error> {
         .map(|(_, d)| d.dashboard_id().unwrap())
         .collect();
     for id in ids {
-        distinct_values::batch_remove(OriginType::Dashboard, &id).await?;
+        distinct_values::batch_remove(OriginType::Dashboard, id).await?;
     }
     dashboards::delete_all().await?;
     Ok(())

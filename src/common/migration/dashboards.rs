@@ -38,7 +38,9 @@ async fn add_distinct_from_dashboard(
     dashboard: &Dashboard,
     settings_cache: &mut SettingsCache,
 ) -> Result<(), anyhow::Error> {
-    let dashboard_id = dashboard.dashboard_id().unwrap();
+    let dashboard_id = dashboard
+        .dashboard_id()
+        .ok_or_else(|| anyhow::anyhow!("Dashboard ID is missing"))?;
 
     let variables = get_query_variables(Some(dashboard));
 
