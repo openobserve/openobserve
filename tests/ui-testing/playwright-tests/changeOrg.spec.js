@@ -8,10 +8,12 @@ import { TracesPage } from "../pages/tracesPage.js";
 import { RumPage } from "../pages/rumPage.js";
 import { PipelinesPage } from "../pages/pipelinesPage.js";
 import { DashboardPage } from "../pages/dashboardPage.js";
+import { StreamsPage } from "../pages/streamsPage.js";
 
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage, rumPage, pipelinesPage, dashboardPage;
+    let loginPage, logsPage, ingestionPage, homePage, metricsPage,
+     tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -23,6 +25,7 @@ test.describe("Change Organisation", () => {
         rumPage = new RumPage(page);
         pipelinesPage = new PipelinesPage(page);
         dashboardPage = new DashboardPage(page);
+        streamsPage = new StreamsPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -174,7 +177,24 @@ test.describe("Change Organisation", () => {
   
     });
    
+    test("Streams Page default validation", async ({ page }) => {
 
+       
+        await streamsPage.gotoStreamsPage();
+        await streamsPage.streamsURLValidation(); 
+    });
+
+    test("Streams Page change organisation validation", async ({ page }) => {
+
+        await streamsPage.gotoStreamsPage();
+        await page.waitForTimeout(5000); 
+        await streamsPage.streamsPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await streamsPage.streamsPageURLValidation();
+        await streamsPage.gotoStreamsPage();
+        await streamsPage.streamsPageURLValidation();
+  
+    });
    
 
    
