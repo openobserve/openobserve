@@ -16,6 +16,7 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 
 use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::folders::{
         CreateFolderRequestBody, CreateFolderResponseBody, ListFoldersResponseBody,
         UpdateFolderRequestBody,
@@ -26,15 +27,19 @@ use crate::{
 impl From<FolderError> for HttpResponse {
     fn from(value: FolderError) -> Self {
         match value {
-            FolderError::InfraError(_) => HttpResponse::InternalServerError().finish(),
-            FolderError::MissingName => HttpResponse::BadRequest().body(value.to_string()),
-            FolderError::UpdateDefaultFolder => HttpResponse::BadRequest().body(value.to_string()),
-            FolderError::DeleteWithDashboards => HttpResponse::BadRequest().body(value.to_string()),
-            FolderError::NotFound => HttpResponse::NotFound().body("Folder not found"),
-            FolderError::PermittedFoldersMissingUser => HttpResponse::Forbidden().finish(),
-            FolderError::PermittedFoldersValidator(e) => {
-                HttpResponse::Forbidden().body(e.to_string())
+            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            FolderError::MissingName => {
+                MetaHttpResponse::bad_request("Folder name cannot be empty")
             }
+            FolderError::UpdateDefaultFolder => {
+                MetaHttpResponse::bad_request("Can't update default folder")
+            }
+            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
+                "Dashboard folder contains dashboards, please move/delete dashboards from folder",
+            ),
+            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
+            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
+            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
         }
     }
 }
