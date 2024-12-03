@@ -37,7 +37,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{
         get_stream_setting_fts_fields, get_stream_setting_index_setting_timestamp,
-        unwrap_stream_settings,
+        unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
 use itertools::Itertools;
@@ -144,6 +144,7 @@ pub async fn search(
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
 
     let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
+    let stream_created_at = unwrap_stream_created_at(schema_latest.as_ref());
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
         .filter_map(|v| {
@@ -154,7 +155,8 @@ pub async fn search(
             }
         })
         .collect_vec();
-    let index_setting_timestamp = get_stream_setting_index_setting_timestamp(&stream_settings);
+    let index_setting_timestamp =
+        get_stream_setting_index_setting_timestamp(&stream_settings, stream_created_at);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
