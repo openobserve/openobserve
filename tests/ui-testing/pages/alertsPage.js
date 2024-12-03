@@ -24,6 +24,7 @@ export  class AlertsPage {
 
   async navigateToAlerts() {
     await this.alertMenu.click();
+    await expect(this.page.locator('[data-test="alerts-list-title"]')).toContainText('Alerts');
   }
 
   async alertsPageDefaultMultiOrg() {

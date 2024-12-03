@@ -11,12 +11,14 @@ import { DashboardPage } from "../pages/dashboardPage.js";
 import { StreamsPage } from "../pages/streamsPage.js";
 import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPage.js";
+import { DataPage } from "../pages/dataPage.js";
+import { IamPage } from "../pages/iamPage.js";
 
 
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage, 
-        reportsPage, alertsPage;
+        reportsPage, alertsPage, dataPage, iamPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -31,6 +33,8 @@ test.describe("Change Organisation", () => {
         streamsPage = new StreamsPage(page);
         reportsPage = new ReportsPage(page);
         alertsPage = new AlertsPage(page);
+        dataPage = new DataPage(page);
+        iamPage = new IamPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -236,6 +240,44 @@ test.describe("Change Organisation", () => {
         await alertsPage.alertsPageURLValidation();
         await alertsPage.navigateToAlerts();
         await alertsPage.alertsPageURLValidation();
+
+    });
+
+    test("Data sources Page default validation", async ({ page }) => {
+
+
+        await dataPage.gotoDataPage();
+        await dataPage.dataURLValidation();
+    });
+
+    test("Data sources Page change organisation validation", async ({ page }) => {
+
+        await dataPage.gotoDataPage();
+        await page.waitForTimeout(5000);
+        await dataPage.dataPageDefaultMultiOrg();
+        await page.waitForTimeout(5000);
+        await dataPage.dataPageURLValidation();
+        await dataPage.gotoDataPage();
+        await dataPage.dataPageURLValidation();
+
+    });
+
+    test("IAM Page default validation", async ({ page }) => {
+
+
+        await iamPage.gotoIamPage();
+        await iamPage.iamURLValidation();
+    });
+
+    test("IAM Page change organisation validation", async ({ page }) => {
+
+        await iamPage.gotoIamPage();
+        await page.waitForTimeout(5000);
+        await iamPage.iamPageDefaultMultiOrg();
+        await page.waitForTimeout(5000);
+        await iamPage.iamPageURLValidation();
+        await iamPage.gotoIamPage();
+        await iamPage.iamPageURLValidation();
 
     });
 
