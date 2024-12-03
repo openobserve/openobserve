@@ -343,12 +343,10 @@ fn parse_dashboard(bytes: web::Bytes) -> Result<Dashboard, serde_json::Error> {
 
 #[derive(Clone, Debug, Deserialize)]
 struct DashboardVersion {
-    #[serde(default)]
+    #[serde(default = "default_version")]
     pub version: i32,
 }
 
-impl Default for DashboardVersion {
-    fn default() -> Self {
-        Self { version: 1 }
-    }
+fn default_version() -> i32 {
+    1
 }
