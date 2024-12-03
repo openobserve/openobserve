@@ -719,34 +719,39 @@ export default defineComponent({
 
     // Setup logic for the logs tab
     async function setupLogsTab() {
-      searchObj.organizationIdentifier =
-        store.state.selectedOrganization.identifier;
+      try {
+        searchObj.organizationIdentifier =
+          store.state.selectedOrganization.identifier;
 
-      searchObj.meta.pageType = "logs";
-      searchObj.meta.refreshHistogram = true;
-      searchObj.loading = true;
+        searchObj.meta.pageType = "logs";
+        searchObj.meta.refreshHistogram = true;
+        searchObj.loading = true;
 
-      resetSearchObj();
+        resetSearchObj();
 
-      resetStreamData();
+        resetStreamData();
 
-      restoreUrlQueryParams();
+        restoreUrlQueryParams();
 
-      await importSqlParser();
+        await importSqlParser();
 
-      if (isEnterpriseClusterEnabled()) {
-        await getRegionInfo();
+        if (isEnterpriseClusterEnabled()) {
+          await getRegionInfo();
+        }
+
+        loadLogsData();
+
+        if (isCloudEnvironment()) {
+          setupCloudSpecificThreshold();
+        }
+
+        searchObj.meta.quickMode = isQuickModeEnabled();
+
+        isLogsMounted.value = true;
+      } catch (error) {
+        console.error("Failed to setup logs tab:", error);
+        searchObj.loading = false;
       }
-
-      loadLogsData();
-
-      if (isCloudEnvironment()) {
-        setupCloudSpecificThreshold();
-      }
-
-      searchObj.meta.quickMode = isQuickModeEnabled();
-
-      isLogsMounted.value = true;
     }
 
     // Helper function to check if the environment is enterprise and super cluster is enabled
@@ -773,24 +778,29 @@ export default defineComponent({
     }
 
     const handleActivation = async () => {
-      const queryParams: any = router.currentRoute.value.query;
+      try {
+        const queryParams: any = router.currentRoute.value.query;
 
-      const isSearchTab = searchObj.meta.logsVisualizeToggle === "logs";
-      const isStreamExplorer = queryParams.type === "stream_explorer";
-      const isTraceExplorer = queryParams.type === "trace_explorer";
-      const isStreamChanged =
-        queryParams.stream_type !== searchObj.data.stream.streamType ||
-        queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
+        const isSearchTab = searchObj.meta.logsVisualizeToggle === "logs";
+        const isStreamExplorer = queryParams.type === "stream_explorer";
+        const isTraceExplorer = queryParams.type === "trace_explorer";
+        const isStreamChanged =
+          queryParams.stream_type !== searchObj.data.stream.streamType ||
+          queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
-      if (isSearchTab) {
-        await handleSearchTab(
-          queryParams,
-          isStreamExplorer,
-          isTraceExplorer,
-          isStreamChanged,
-        );
-      } else {
-        handleVisualizeTab();
+        if (isSearchTab) {
+          await handleSearchTab(
+            queryParams,
+            isStreamExplorer,
+            isTraceExplorer,
+            isStreamChanged,
+          );
+        } else {
+          handleVisualizeTab();
+        }
+      } catch (err) {
+        searchObj.loading = false;
+        console.error("Failed to handle activation:", err);
       }
     };
 
@@ -801,25 +811,30 @@ export default defineComponent({
       isTraceExplorer,
       isStreamChanged,
     ) => {
-      searchObj.meta.refreshHistogram = true;
+      try {
+        searchObj.meta.refreshHistogram = true;
 
-      if (isTraceExplorer) {
-        handleTraceExplorer(queryParams);
-        return;
+        if (isTraceExplorer) {
+          handleTraceExplorer(queryParams);
+          return;
+        }
+
+        if (isStreamChanged && isStreamExplorer && !searchObj.loading) {
+          handleStreamExplorer();
+          return;
+        }
+
+        if (isOrganizationChanged() && !searchObj.loading) {
+          handleOrganizationChange();
+        } else if (!searchObj.loading) {
+          updateStreams();
+        }
+
+        refreshHistogramChart();
+      } catch (err) {
+        searchObj.loading = false;
+        console.error("Failed to handle search tab:", err);
       }
-
-      if (isStreamChanged && isStreamExplorer && !searchObj.loading) {
-        handleStreamExplorer();
-        return;
-      }
-
-      if (isOrganizationChanged() && !searchObj.loading) {
-        handleOrganizationChange();
-      } else if (!searchObj.loading) {
-        updateStreams();
-      }
-
-      refreshHistogramChart();
     };
 
     // Helper function for handling the trace explorer
