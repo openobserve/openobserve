@@ -33,7 +33,7 @@ impl From<DashboardError> for HttpResponse {
     fn from(value: DashboardError) -> Self {
         match value {
             DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DashboardError::DashboadNotFound => MetaHttpResponse::not_found("Dashboard not found"),
+            DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
             DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error("Request to update existing dashboard with missing or invalid hash value. BUG"),
             DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict("Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."),
             DashboardError::PutMissingTitle => MetaHttpResponse::internal_error("Dashboard should have title"),
@@ -78,7 +78,7 @@ pub async fn create_dashboard(
     let org_id = path.into_inner();
     let folder = get_folder(req);
     let Ok(dashboard) = parse_dashboard(body) else {
-        return MetaHttpResponse::internal_error("Error parsing dashboard");
+        return MetaHttpResponse::bad_request("Error parsing dashboard");
     };
     match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
         Ok(dashboard) => HttpResponse::Ok().json(dashboard),
@@ -119,7 +119,7 @@ async fn update_dashboard(
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
     let Ok(dashboard) = parse_dashboard(body) else {
-        return MetaHttpResponse::internal_error("Error parsing dashboard");
+        return MetaHttpResponse::bad_request("Error parsing dashboard");
     };
     match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash).await {
         Ok(dashboard) => HttpResponse::Ok().json(dashboard),

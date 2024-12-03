@@ -40,7 +40,7 @@ pub enum DashboardError {
     /// Error that occurs when trying to access a dashboard that cannot be
     /// found.
     #[error("dashboard not found")]
-    DashboadNotFound,
+    DashboardNotFound,
 
     /// Error that occurs when trying to update a dashboard using a missing hash
     /// value or a hash value that cannot be parsed as an [i64].
@@ -156,7 +156,7 @@ pub async fn get_dashboard(
 ) -> Result<Dashboard, DashboardError> {
     table::dashboards::get(org_id, dashboard_id, folder_id)
         .await?
-        .ok_or(DashboardError::DashboadNotFound)
+        .ok_or(DashboardError::DashboardNotFound)
 }
 
 #[tracing::instrument]
@@ -167,7 +167,7 @@ pub async fn delete_dashboard(
 ) -> Result<(), DashboardError> {
     match table::dashboards::get(org_id, folder_id, dashboard_id).await? {
         Some(_) => {} // Dashboard exists. Continue with deleting.
-        None => return Err(DashboardError::DashboadNotFound),
+        None => return Err(DashboardError::DashboardNotFound),
     };
     table::dashboards::delete(org_id, folder_id, dashboard_id).await?;
     remove_ownership(
@@ -195,7 +195,7 @@ pub async fn move_dashboard(
     };
 
     let Some(dashboard) = table::dashboards::get(org_id, from_folder, dashboard_id).await? else {
-        return Err(DashboardError::DashboadNotFound);
+        return Err(DashboardError::DashboardNotFound);
     };
 
     // make sure the destination folder exists
