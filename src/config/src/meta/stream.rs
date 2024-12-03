@@ -564,6 +564,8 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    #[serde(default)]
+    pub index_setting_timestamp: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -703,6 +705,11 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let index_setting_timestamp = settings
+            .get("index_setting_timestamp")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+
         Self {
             partition_time_level,
             partition_keys,
@@ -715,6 +722,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            index_setting_timestamp,
         }
     }
 }

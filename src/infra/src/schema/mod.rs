@@ -312,6 +312,20 @@ pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec
     }
 }
 
+pub fn get_stream_setting_index_setting_timestamp(settings: &Option<StreamSettings>) -> i64 {
+    match settings {
+        Some(settings) => {
+            let timestamp = settings.index_setting_timestamp;
+            if timestamp > 0 {
+                timestamp
+            } else {
+                Utc::now().timestamp_micros()
+            }
+        }
+        None => Utc::now().timestamp_micros(),
+    }
+}
+
 pub async fn merge(
     org_id: &str,
     stream_name: &str,

@@ -35,7 +35,10 @@ use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_fts_fields, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_fts_fields, get_stream_setting_index_setting_timestamp,
+        unwrap_stream_settings,
+    },
 };
 use itertools::Itertools;
 use proto::cluster_rpc;
@@ -151,6 +154,7 @@ pub async fn search(
             }
         })
         .collect_vec();
+    let index_setting_timestamp = get_stream_setting_index_setting_timestamp(&stream_settings);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -221,6 +225,7 @@ pub async fn search(
                 file_list,
                 req.search_info.start_time,
                 req.search_info.end_time,
+                index_setting_timestamp,
             );
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
@@ -425,9 +430,13 @@ fn split_file_list_by_time_range(
     file_list: Vec<FileKey>,
     start_time: i64,
     end_time: i64,
+    index_setting_timestamp: i64,
 ) -> (Vec<FileKey>, Vec<FileKey>) {
     file_list.into_iter().partition(|file| {
-        file.meta.min_ts >= start_time && file.meta.max_ts <= end_time && file.meta.index_size > 0
+        file.meta.min_ts >= start_time
+            && file.meta.max_ts <= end_time
+            && file.meta.index_size > 0
+            && file.meta.min_ts > index_setting_timestamp
     })
 }
 
