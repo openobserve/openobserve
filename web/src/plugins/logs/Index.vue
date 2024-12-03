@@ -369,6 +369,7 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
+import type { ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -781,45 +782,46 @@ export default defineComponent({
       try {
         const queryParams: any = router.currentRoute.value.query;
 
-        const isSearchTab = searchObj.meta.logsVisualizeToggle === "logs";
-        const isStreamExplorer = queryParams.type === "stream_explorer";
-        const isTraceExplorer = queryParams.type === "trace_explorer";
-        const isStreamChanged =
-          queryParams.stream_type !== searchObj.data.stream.streamType ||
-          queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
+        const activationState: ActivationState = {
+          isSearchTab: searchObj.meta.logsVisualizeToggle === PageType.LOGS,
+          isStreamExplorer: queryParams.type === PageType.STREAM_EXPLORER,
+          isTraceExplorer: queryParams.type === PageType.TRACE_EXPLORER,
+          isStreamChanged:
+            queryParams.stream_type !== searchObj.data.stream.streamType ||
+            queryParams.stream !==
+              searchObj.data.stream.selectedStream.join(","),
+        };
 
-        if (isSearchTab) {
-          await handleSearchTab(
-            queryParams,
-            isStreamExplorer,
-            isTraceExplorer,
-            isStreamChanged,
-          );
+        if (activationState.isSearchTab) {
+          await handleSearchTab(queryParams, activationState);
         } else {
           handleVisualizeTab();
         }
       } catch (err) {
         searchObj.loading = false;
-        console.error("Failed to handle activation:", err);
+        console.error("Activation handling failed:", {
+          error: err,
+          route: router.currentRoute.value.path,
+          queryParams: router.currentRoute.value.query,
+        });
       }
     };
 
     // Helper function for handling search tab logic
-    const handleSearchTab = (
-      queryParams,
-      isStreamExplorer,
-      isTraceExplorer,
-      isStreamChanged,
-    ) => {
+    const handleSearchTab = (queryParams, activationState: ActivationState) => {
       try {
         searchObj.meta.refreshHistogram = true;
 
-        if (isTraceExplorer) {
+        if (activationState.isTraceExplorer) {
           handleTraceExplorer(queryParams);
           return;
         }
 
-        if (isStreamChanged && isStreamExplorer && !searchObj.loading) {
+        if (
+          activationState.isStreamChanged &&
+          activationState.isStreamExplorer &&
+          !searchObj.loading
+        ) {
           handleStreamExplorer();
           return;
         }
