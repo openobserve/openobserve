@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                   color="primary"
                   data-test="schema-add-fields-title"
-                  @click="isDialogOpen = true"
+                  @click="openDialog"
                   class="font-weight-bold"
                 >
                   Add Field(s)
@@ -204,13 +204,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         
         <!-- Header Section -->
         <q-card-section>
-          <div class="text-h6">Add Field(s)</div>
+          <div class="tw-flex tw-justify-between tw-items-center">
+            <div class="text-h6">Add Field(s)</div>
+            <div>
+              <q-btn
+                data-test="add-stream-cancel-btn"
+                icon="close"
+                class="q-my-sm text-bold q-mr-md"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+                dense
+                flat
+                @click="closeDialog"
+              />
+            </div>
+          </div>
         </q-card-section>
         <!-- Main Content (Scrollable if necessary) -->
         <q-card-section class="q-pa-none" style="flex: 1; overflow-y: auto;">
           <StreamFieldsInputs
             :fields="newSchemaFields"
             :showHeader="false"
+            :isInSchema = 'true'
             :visibleInputs="{
               name: true,
               type: false,
@@ -226,23 +242,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
           <div
-            class="q-table__container q-table--cell-separator"
+            class=" "
             style="margin-bottom: 30px"
           >
             <q-table
+            ref="qTable"
               data-test="schema-log-stream-field-mapping-table"
               :rows="indexData.schema"
               :columns="columns"
               :row-key="(row) => 'tr_' + row.name"
               :filter="`${filterField}@${activeTab}`"
               :filter-method="filterFieldFn"
-              :pagination="{ rowsPerPage }"
+              :pagination="pagination"
               selection="multiple"
               v-model:selected="selectedFields"
               class="q-table"
               id="schemaFieldList"
               :rows-per-page-options="[]"
-              :hidePagination="indexData.schema.length <= rowsPerPage"
               dense
             >
             <template v-slot:header="props">
@@ -261,8 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class=""
                 >
                 <span v-if="col.icon" >
-                  <q-icon color="primary" name="person"></q-icon>
-                  <q-icon color="primary" name="schema"></q-icon>
+                  <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                  <q-icon color="primary" :name="outlinedSchema"></q-icon>
 
                 </span>
                 <span v-else>
@@ -314,8 +330,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-slot:body-cell-settings="props">
                 <q-td  v-if="props.row.isUserDefined" >
-                  <q-icon color="primary" name="person"></q-icon>
-                  <q-icon color="primary" name="schema"></q-icon>
+                  <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                  <q-icon color="primary" :name="outlinedSchema"></q-icon>
 
                 </q-td>
                 <q-td v-else>
@@ -358,62 +374,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-td>
               </template>
 
-              <template v-slot:bottom-row>
-                <q-tr
-                  ><q-td colspan="100%">
-                    <div v-if="indexData.schema.length > 0" class="q-mt-sm">
-                      <q-btn
-                        v-bind:disable="!selectedFields.length"
-                        data-test="schema-delete-button"
-                        class="q-my-sm text-bold btn-delete"
-                        color="warning"
-                        :label="t('logStream.delete')"
-                        text-color="light-text"
-                        padding="sm md"
-                        no-caps
-                        @click="confirmQueryModeChangeDialog = true"
-                      />
 
-                      <q-btn
-                        v-if="isSchemaEvolutionEnabled"
-                        data-test="schema-add-field-button"
-                        class="q-my-sm no-border text-bold q-ml-md"
-                        :label="
-                          activeTab === 'schemaFields'
-                            ? t('logStream.removeSchemaField')
-                            : t('logStream.addSchemaField')
-                        "
-                        padding="sm md"
-                        color="secondary"
-                        no-caps
-                        v-bind:disable="!selectedFields.length"
-                        @click="updateDefinedSchemaFields"
-                      />
-
-                      <q-btn
-                        v-bind:disable="!formDirtyFlag"
-                        data-test="schema-update-settings-button"
-                        :label="t('logStream.updateSettings')"
-                        class="q-my-sm text-bold no-border q-ml-md float-right"
-                        color="secondary"
-                        padding="sm xl"
-                        type="submit"
-                        no-caps
-                      />
-                      <q-btn
-                        v-close-popup="true"
-                        data-test="schema-cancel-button"
-                        class="q-my-sm text-bold float-right q-ml-md"
-                        :label="t('logStream.cancel')"
-                        text-color="light-text"
-                        padding="sm md"
-                        no-caps
-                      /></div></q-td
-                ></q-tr>
+              <template #bottom="scope">
+                <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
               </template>
             </q-table>
+
+
+            <!-- floating footer for the table -->
+  <div :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" class="floating-buttons q-px-md q-py-xs ">
+            <div v-if="indexData.schema.length > 0" class="q-mt-sm">
+             <span class="q-px-sm q-py-md"><strong> {{ selectedFields.length }}</strong> fields selected</span>
+             <q-btn
+                v-if="isSchemaEvolutionEnabled"
+                data-test="schema-add-field-button"
+                class="q-my-sm no-border text-bold q-mr-md"
+                padding="sm md"
+                color="primary"
+                no-caps
+                v-bind:disable="!selectedFields.length"
+                @click="updateDefinedSchemaFields"
+              >
+              <span class="flex items-center justify-start q-mr-sm">
+                <q-icon size="14px"  :name="outlinedPerson"/>
+                <q-icon size="14px" :name="outlinedSchema" />
+              </span>
+              {{ activeTab === 'schemaFields' ? t('logStream.removeSchemaField') : t('logStream.addSchemaField') }}
+
+             </q-btn>
+              <q-btn
+                v-bind:disable="!selectedFields.length"
+                data-test="schema-delete-button"
+                class="q-my-sm text-bold btn-delete"
+                text-color="red"
+                padding="sm md"
+                no-caps
+                dense
+                flat
+                style="border: 1px red solid;"
+                @click="confirmQueryModeChangeDialog = true"
+              >
+              <span class="flex items-center tw-gap-1">
+                <q-icon size="14px" :name="outlinedDelete" />
+                {{   t('logStream.delete') }}
+              </span>
+            </q-btn>
+            <q-btn
+                v-close-popup="true"
+                data-test="schema-cancel-button"
+                class="q-my-sm text-bold float-right q-ml-md"
+                :label="t('logStream.cancel')"
+                text-color="red"
+                padding="sm md"
+                 style="border: 1px red solid;"
+                no-caps
+              />
+              <q-btn
+                v-bind:disable="!formDirtyFlag"
+                data-test="schema-update-settings-button"
+                :label="t('logStream.updateSettings')"
+                class="q-my-sm text-bold no-border q-ml-md float-right"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                no-caps
+              />
+
+            </div>
           </div>
+
+          </div>
+
         </div>
+        
       </q-form>
       <br /><br /><br />
     </q-card-section>
@@ -447,6 +486,11 @@ import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { outlinedSchema,outlinedPerson,outlinedDelete } from "@quasar/extras/material-icons-outlined";
+
+
+
 
 const defaultValue: any = () => {
   return {
@@ -471,6 +515,7 @@ export default defineComponent({
     ConfirmDialog,
     StreamFieldsInputs,
     AppTabs,
+    QTablePagination,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -485,9 +530,10 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
-    const rowsPerPage = ref(250);
+    const rowsPerPage = ref(20);
     const filterField = ref("");
     const router = useRouter();
+    const qTable = ref(null);
     const newSchemaFields = ref([
       {
         name: "",
@@ -499,6 +545,27 @@ export default defineComponent({
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
+    const resultTotal = ref<number>(0);
+      const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+
+
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value?.setPagination(pagination.value);
+    };
+
+    const selectedPerPage = ref<number>(20);
+    const pagination: any = ref({
+      rowsPerPage: 20,
+    });
 
     const selectedFields = ref([]);
 
@@ -513,12 +580,12 @@ export default defineComponent({
     const tabs = computed(() => [
       {
         value: "allFields",
-        label: "All Fields",
+        label: `All Fields (${indexData.value.schema.length})`,
         disabled: false,
       },
       {
         value: "schemaFields",
-        label: "User Defined Schema",
+        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
       },
     ]);
@@ -747,6 +814,7 @@ export default defineComponent({
         .then((streamResponse) => {
           streamResponse = updateStreamResponse(streamResponse);
           setSchema(streamResponse);
+          resultTotal.value = streamResponse.schema.length;
           loadingState.value = false;
           dismiss();
         })
@@ -764,7 +832,6 @@ export default defineComponent({
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
       };
-
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
           color: "negative",
@@ -884,10 +951,10 @@ export default defineComponent({
             true
           ).then((streamResponse) => {
             formDirtyFlag.value = false;
-            newSchemaFields.value = [];
             streamResponse = updateStreamResponse(streamResponse);
             setSchema(streamResponse);
             loadingState.value = false;
+            isDialogOpen.value = false;
             q.notify({
               color: "positive",
               message: "Stream settings updated successfully.",
@@ -998,6 +1065,7 @@ export default defineComponent({
         align: "center",
         sortable: true,
         field: "name",
+        style: "min-width: 200px",
       },
       {
         name: "settings",
@@ -1038,6 +1106,18 @@ export default defineComponent({
 
     const removeSchemaField = (field: any, index: number) => {
       newSchemaFields.value.splice(index, 1);
+      if(newSchemaFields.value.length === 0){
+        isDialogOpen.value = false;
+        newSchemaFields.value = [
+        {
+          name: "",
+          type: "",
+          index_type: [],
+        },
+      ]
+      }
+
+
     };
 
     const scrollToAddFields = () => {
@@ -1049,6 +1129,12 @@ export default defineComponent({
 
     const updateActiveTab = (tab) => {
       activeTab.value = tab;
+      if(tab === 'schemaFields'){
+        resultTotal.value = indexData.value.defined_schema_fields.length;
+      }
+      else{
+        resultTotal.value = indexData.value.schema.length;
+      }
     };
 
     const updateDefinedSchemaFields = () => {
@@ -1106,10 +1192,33 @@ export default defineComponent({
         // Combine the updated schema with additional fields
         streamResponse.schema = [...updatedSchema, ...additionalFields];
       }
-
+      updateResultTotal(streamResponse);
       return streamResponse;
     };
+    const closeDialog = () =>{
+      isDialogOpen.value = false;
+      newSchemaFields.value = [];
+    }
 
+    const openDialog = () =>{
+      isDialogOpen.value = true; 
+      formDirtyFlag.value = true;
+      newSchemaFields.value = [
+        {
+          name: "",
+          type: "",
+          index_type: [],
+        },
+      ]
+    }
+    const updateResultTotal = (streamResponse) =>{
+      if(activeTab.value === 'schemaFields'){
+        resultTotal.value = streamResponse.settings.defined_schema_fields.length;
+      }
+      else{
+        resultTotal.value = streamResponse.schema.length;
+      }
+    }
     return {
       t,
       q,
@@ -1154,6 +1263,17 @@ export default defineComponent({
       allFieldsName,
       updateStreamResponse,
       isDialogOpen,
+      closeDialog,
+      resultTotal,
+      perPageOptions,
+      changePagination,
+      selectedPerPage,
+      pagination,
+      qTable,
+      outlinedPerson,
+      outlinedSchema,
+      outlinedDelete,
+      openDialog,
     };
   },
   created() {
@@ -1196,6 +1316,7 @@ export default defineComponent({
 
   .q-table {
     border-radius: 0.5rem;
+    position: relative;
 
     thead tr {
       height: 2.5rem;
@@ -1360,4 +1481,21 @@ export default defineComponent({
     }
   }
 }
+.floating-buttons {
+  position: sticky;
+  bottom: 0;
+  top: 0;
+  z-index: 1; /* Ensure it stays on top of table content */
+  width: 100%;
+}
+.dark-theme {
+  background-color: var(--q-light);
+  backdrop-filter: blur(10px);
+}
+.light-theme {
+  background-color: var(--q-light);
+  backdrop-filter: blur(10px);
+}
+
+
 </style>

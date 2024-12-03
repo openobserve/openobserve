@@ -43,7 +43,7 @@
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
-            style="width: 40vw"
+            :style="isInSchema ? { width: '40vw' } : { width: '300px' }"
           />
         </div>
         <!-- <div
@@ -122,7 +122,7 @@
             unelevated
             size="sm"
             flat
-
+            :disable="field.name === '' ||  (fields.length === 1 && field.name == '' )"
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
             style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
@@ -138,6 +138,7 @@ import { defineProps, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import { styleText } from "util";
 
 defineProps({
   fields: {
@@ -148,6 +149,10 @@ defineProps({
   showHeader: {
     type: Boolean,
     default: true,
+  },
+  isInSchema: {
+    type: Boolean,
+    default: false,
   },
   visibleInputs: {
     type: Object,
