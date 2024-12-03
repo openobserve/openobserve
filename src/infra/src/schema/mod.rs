@@ -332,9 +332,8 @@ pub fn get_stream_setting_index_setting_timestamp(
     };
     match settings {
         Some(settings) => {
-            let timestamp = settings.index_setting_timestamp;
-            if timestamp > 0 {
-                timestamp
+            if settings.index_setting_timestamp > 0 {
+                settings.index_setting_timestamp
             } else {
                 created_at
             }
