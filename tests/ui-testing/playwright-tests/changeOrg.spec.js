@@ -13,12 +13,14 @@ import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPage.js";
 import { DataPage } from "../pages/dataPage.js";
 import { IamPage } from "../pages/iamPage.js";
+import { ManagementPage } from "../pages/managementPage .js";
+import { AboutPage } from "../pages/aboutPage.js";
 
 
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage, 
-        reportsPage, alertsPage, dataPage, iamPage;
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -35,6 +37,8 @@ test.describe("Change Organisation", () => {
         alertsPage = new AlertsPage(page);
         dataPage = new DataPage(page);
         iamPage = new IamPage(page);
+        managementPage = new ManagementPage(page);
+        aboutPage = new AboutPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -281,6 +285,44 @@ test.describe("Change Organisation", () => {
 
     });
 
+    test("Management Page default validation", async ({ page }) => {
 
+
+        await managementPage.goToManagement();
+        await managementPage.managementURLValidation();
+    });
+
+    test("Management Page change organisation validation", async ({ page }) => {
+
+        await managementPage.goToManagement();
+        await page.waitForTimeout(5000);
+        await managementPage.managementPageDefaultMultiOrg();
+        await page.waitForTimeout(5000);
+        await managementPage.managementPageURLValidation();
+        await managementPage.goToManagement();
+        await managementPage.managementPageURLValidation();
+
+    });
+
+    test("About Page default validation", async ({ page }) => {
+
+
+        await aboutPage.gotoAboutPage();
+        await aboutPage.aboutURLValidation();
+    });
+
+    test("About Page change organisation validation", async ({ page }) => {
+
+        await aboutPage.gotoAboutPage();
+        await page.waitForTimeout(5000);
+        await aboutPage.aboutPageDefaultMultiOrg();
+        await page.waitForTimeout(5000);
+        await aboutPage.aboutPageURLValidation();
+        await aboutPage.gotoAboutPage();
+        await aboutPage.aboutPageURLValidation();
+
+    });
+
+   
 
 });
