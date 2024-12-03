@@ -466,10 +466,12 @@ pub async fn send_notification(
         alert,
         rows,
         &rows_tpl_val,
-        rows_end_time,
-        start_time,
-        evaluation_timestamp,
-        is_email,
+        ProcessTemplateOptions {
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+            is_email,
+        },
     )
     .await;
 
@@ -479,10 +481,12 @@ pub async fn send_notification(
             alert,
             rows,
             &rows_tpl_val,
-            rows_end_time,
-            start_time,
-            evaluation_timestamp,
-            is_email,
+            ProcessTemplateOptions {
+                rows_end_time,
+                start_time,
+                evaluation_timestamp,
+                is_email,
+            },
         )
         .await
     } else {
@@ -731,17 +735,27 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
     rows_tpl
 }
 
+struct ProcessTemplateOptions {
+    pub rows_end_time: i64,
+    pub start_time: Option<i64>,
+    pub evaluation_timestamp: i64,
+    pub is_email: bool,
+}
+
 async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
-    rows_end_time: i64,
-    start_time: Option<i64>,
-    evaluation_timestamp: i64,
-    is_email: bool,
+    options: ProcessTemplateOptions,
 ) -> String {
     let cfg = get_config();
+    let ProcessTemplateOptions {
+        rows_end_time,
+        start_time,
+        evaluation_timestamp,
+        is_email,
+    } = options;
     // format values
     let alert_count = rows.len();
     let mut vars = HashMap::with_capacity(rows.len());
