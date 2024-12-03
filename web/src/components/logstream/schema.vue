@@ -63,8 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           </div>
-          <div class="stream-time-container"  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
-            {{ t("logStream.time") }} <span class="title q-pl-xs">   {{ indexData.stats.doc_time_min }} </span> <span >to</span> <span class="title" >{{ indexData.stats.doc_time_max }}</span>
+          <div class="tw-flex tw-justify-between">
+            <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
+              {{ t("logStream.indexSize") }} <span class="title q-pl-xs">   {{ formatSizeFromMB(indexData.stats.index_size) }}</span>
+              </div>
+              <div class="stream-time-container"  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
+                {{ t("logStream.time") }} <span class="title q-pl-xs">   {{ indexData.stats.doc_time_min }} </span> <span >to</span> <span class="title" >{{ indexData.stats.doc_time_max }}</span>
+              </div>
           </div>
         </div>
 
@@ -1065,7 +1070,6 @@ export default defineComponent({
         align: "center",
         sortable: true,
         field: "name",
-        style: "min-width: 200px",
       },
       {
         name: "settings",
