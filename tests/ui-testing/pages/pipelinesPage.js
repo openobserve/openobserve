@@ -8,10 +8,9 @@ export class PipelinesPage {
         this.pipelinesPageMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
 
     }
+
     async gotoPipelinesPage() {
-
-        await this.pipelinesPageMenu.click();
-
+            await this.pipelinesPageMenu.click();
     }
 
 
@@ -24,29 +23,16 @@ export class PipelinesPage {
     }
 
     async pipelinesPageDefaultMultiOrg() {
-
-
-
-        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-    
-
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-
-
-
-
     }
 
     async pipelinesPageURLValidation() {
-
-        await expect(this.page).toHaveURL(/defaulttestmulti/);
-
+     await expect(this.page).toHaveURL(/defaulttestmulti/);
     }
 
     async pipelinesURLValidation() {
-
-        await expect(this.page).toHaveURL(/pipeline/);
-
+      await expect(this.page).toHaveURL(/pipeline/);
     }
 
 }

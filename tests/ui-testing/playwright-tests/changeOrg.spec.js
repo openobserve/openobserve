@@ -7,10 +7,11 @@ import { MetricsPage } from "../pages/metricsPage.js";
 import { TracesPage } from "../pages/tracesPage.js";
 import { RumPage } from "../pages/rumPage.js";
 import { PipelinesPage } from "../pages/pipelinesPage.js";
+import { DashboardPage } from "../pages/dashboardPage.js";
 
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage, rumPage, pipelinesPage;
+    let loginPage, logsPage, ingestionPage, homePage, metricsPage, tracesPage, rumPage, pipelinesPage, dashboardPage;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -21,6 +22,7 @@ test.describe("Change Organisation", () => {
         tracesPage = new TracesPage(page);
         rumPage = new RumPage(page);
         pipelinesPage = new PipelinesPage(page);
+        dashboardPage = new DashboardPage(page);
         await loginPage.gotoLoginPage();
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
@@ -153,7 +155,24 @@ test.describe("Change Organisation", () => {
   
     });
    
+    test("Dashboard Page default validation", async ({ page }) => {
 
+       
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.dashboardURLValidation(); 
+    });
+
+    test("Dashboard Page change organisation validation", async ({ page }) => {
+
+        await dashboardPage.navigateToDashboards();
+        await page.waitForTimeout(5000); 
+        await dashboardPage.dashboardPageDefaultMultiOrg();
+        await page.waitForTimeout(5000); 
+        await dashboardPage.dashboardPageURLValidation();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.dashboardPageURLValidation();
+  
+    });
    
 
    
