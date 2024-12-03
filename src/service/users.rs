@@ -62,7 +62,7 @@ pub async fn post_user(
             "Not Allowed".to_string(),
         )));
     };
-    let Some(_initiator_user) = initiator_user else {
+    let Some(initiator_user) = initiator_user else {
         return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
             http::StatusCode::UNAUTHORIZED.into(),
             "Not Allowed".to_string(),
@@ -103,14 +103,14 @@ pub async fn post_user(
     }
 
     // For non-enterprise, it is only Admin or Root user
-    #[cfg(not(feature = "enterprise"))]
-    let is_allowed = true;
+    let is_allowed =
+        initiator_user.role.eq(&UserRole::Root) || initiator_user.role.eq(&UserRole::Admin);
     #[cfg(feature = "enterprise")]
     let is_allowed = if get_o2_config().openfga.enabled {
         // Permission already checked through RBAC
         true
     } else {
-        _initiator_user.role.eq(&UserRole::Root) || _initiator_user.role.eq(&UserRole::Admin)
+        is_allowed
     };
     if is_root_user(initiator_id) || is_allowed {
         let existing_user = if is_root_user(&usr_req.email) {
@@ -189,8 +189,8 @@ pub async fn post_user(
             )))
         }
     } else {
-        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
+        Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
             "Not Allowed".to_string(),
         )))
     }
