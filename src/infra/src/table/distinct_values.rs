@@ -25,7 +25,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(15))")]
+#[sea_orm(rs_type = "String", db_type = "String(StringLen::N(16))")]
 pub enum OriginType {
     #[sea_orm(string_value = "stream")]
     Stream,
@@ -41,17 +41,17 @@ pub enum OriginType {
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "distinct_value_fields")]
 pub struct Model {
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(16))")]
     pub origin: OriginType,
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(32))")]
     pub origin_id: String,
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(128))")]
     pub org_name: String,
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(256))")]
     pub stream_name: String,
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(16))")]
     pub stream_type: String,
-    #[sea_orm(primary_key, column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "String(StringLen::N(256))")]
     pub field_name: String,
 }
 
