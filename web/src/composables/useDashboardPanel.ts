@@ -3093,7 +3093,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }
     }
 
-    if (showTrellisConfig.value) {
+    const breakDownFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown;
+
+    if (breakDownFields.length && showTrellisConfig.value) {
       if (
         dashboardPanelData.data.config?.trellis?.layout === "custom" &&
         dashboardPanelData.data.config?.trellis?.num_of_columns > 16
