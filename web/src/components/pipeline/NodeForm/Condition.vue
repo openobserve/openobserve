@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
             :enableNewValueMode="true" 
           />
-          <q-card class="note-container" >
+          <q-card class="note-container " >
 
-          <q-card-section>
+          <q-card-section class="q-pa-sm ">
             <div class="note-heading ">Condition value Guidelines:</div>
             <q-banner  inline dense class="note-info " >
               <div>
@@ -529,7 +529,6 @@ const validateSqlQuery = () => {
 
 .note-container {
   background-color: #F9F290 ;
-  padding: 4px 8px;
   border-radius: 4px;
   border: 1px solid #F5A623;
   color: #865300;
