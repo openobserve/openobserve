@@ -556,13 +556,13 @@ export default defineComponent({
 
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
-      if (res.code == 200) {
-        $q.notify({
-          color: "positive",
-          message: "Service Account added successfully.",
-        });
-
+      if (res.code == 200 ) {
         if (operationType == "created") {
+            $q.notify({
+              color: "positive",
+              message: "Service Account created successfully.",
+            });
+
           await getServiceToken(data, false);
           isShowToken.value = true;
           if (
@@ -582,6 +582,12 @@ export default defineComponent({
             resultTotal.value = serviceAccountsState.service_accounts_users.length;
           }
         } else {
+          setTimeout(() => {
+            $q.notify({
+              color: "positive",
+              message: "Service Account updated successfully.",
+            });
+          }, 2000);
           serviceAccountsState.service_accounts_users.forEach((member: any, key: number) => {
             if (member.email == data.email) {
               serviceAccountsState.service_accounts_users[key] = {

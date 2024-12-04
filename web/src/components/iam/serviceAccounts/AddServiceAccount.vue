@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <q-input
-            v-model="formData.first_name"
+            v-model="firstName"
             :label="t('user.firstName')"
             color="input-border"
             bg-color="input-bg"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <q-input
-            v-model="formData.last_name"
+            v-model="lastName"
             :label="t('user.lastName')"
             color="input-border"
             bg-color="input-bg"
@@ -165,10 +165,13 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
 
+    const firstName = ref(formData.value.first_name);
+    const lastName = ref("");
+
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
+      console.log()
     });
-
 
 
     return {
@@ -184,6 +187,8 @@ export default defineComponent({
       getImageURL,
       loadingOrganizations,
       logout_confirm,
+      firstName,
+      lastName,
     };
   },
   created() {
@@ -197,6 +202,8 @@ export default defineComponent({
     ) {
       this.beingUpdated = true;
       this.formData = this.modelValue;
+      this.firstName = this.modelValue?.first_name;
+      this.lastName = this.modelValue?.last_name;
     }
   },
   methods: {
@@ -212,6 +219,8 @@ export default defineComponent({
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(this.formData.other_organization);
       }
+      this.formData.first_name = this.firstName;
+      this.formData.last_name = this.lastName;
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
         delete this.formData.email;
@@ -222,11 +231,13 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "updated");
           })
           .catch((err: any) => {
-            this.$q.notify({
-              color: "negative",
-              message: err.response.data.message,
-              timeout: 2000,
-            });
+            if(err?.response?.data?.message ) {
+              this.$q.notify({
+                color: "negative",
+                message: err?.response?.data?.message,
+                timeout: 2000,
+              });
+            }
             dismiss();
             this.formData.email = userEmail;
           });
@@ -238,11 +249,13 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "created");
             })
             .catch((err: any) => {
+              if(err?.response?.data?.message ) {
               this.$q.notify({
                 color: "negative",
-                message: err.response.data.message,
+                message: err?.response?.data?.message,
                 timeout: 2000,
               });
+            }
               dismiss();
             });
       }
