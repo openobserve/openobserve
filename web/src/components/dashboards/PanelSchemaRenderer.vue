@@ -721,9 +721,10 @@ export default defineComponent({
           console.log("navigateToLogs: Extracted WHERE clause:", whereClause);
 
           // Construct the new query
-          const modifiedQuery = whereClause
-            ? `SELECT * FROM "${streamName}" WHERE ${whereClause}`
-            : queryDetails.queries[0].query;
+          const modifiedQuery =
+            drilldownData.data.logsMode === "auto"
+              ? `SELECT * FROM "${streamName}" WHERE ${whereClause}`
+              : drilldownData.data.logsQuery;
 
           console.log("navigateToLogs: Modified query:", modifiedQuery);
 

@@ -96,32 +96,33 @@
         <label>Select Logs Mode:</label>
         <q-btn-group>
           <q-btn
-            :class="drilldownData.logsMode === 'auto' ? 'selected' : ''"
+            :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
             size="sm"
-            @click="drilldownData.logsMode = 'auto'"
+            @click="drilldownData.data.logsMode = 'auto'"
           >
             Auto
           </q-btn>
           <q-btn
-            :class="drilldownData.logsMode === 'custom' ? 'selected' : ''"
+            :class="drilldownData.data.logsMode === 'custom' ? 'selected' : ''"
             size="sm"
-            @click="drilldownData.logsMode = 'custom'"
+            @click="drilldownData.data.logsMode = 'custom'"
           >
             Custom
           </q-btn>
         </q-btn-group>
       </div>
-      <div v-if="drilldownData.logsMode === 'custom'" style="margin-top: 10px">
+      <div v-if="drilldownData.data.logsMode === 'custom'" style="margin-top: 10px">
         <label>Enter Custom Query:</label>
-        <textarea
-          v-model="drilldownData.data.query"
-          style="
-            width: 100%;
-            height: 100px;
-            border: 1px solid gray;
-            border-radius: 5px;
-          "
-        ></textarea>
+        <query-editor
+          data-test="scheduled-alert-sql-editor"
+          ref="queryEditorRef"
+          editor-id="alerts-query-editor"
+          class="monaco-editor"
+          style="height: 80px"
+          :debounceTime="300"
+          v-model:query="drilldownData.data.logsQuery"
+          @update:query="updateQueryValue"
+        />
       </div>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
@@ -341,7 +342,7 @@
 </template>
 
 <script lang="ts">
-import { inject, reactive, ref } from "vue";
+import { defineAsyncComponent, inject, reactive, ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -360,12 +361,16 @@ import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue"),
+);
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
     DrilldownUserGuide,
     CommonAutoComplete,
+    QueryEditor,
   },
   props: {
     isEditMode: {
@@ -402,6 +407,7 @@ export default defineComponent({
       findBy: "name",
       data: {
         logsMode: "auto",
+        logsQuery: "",
         url: "",
         folder: "",
         dashboard: "",
@@ -596,11 +602,11 @@ export default defineComponent({
         }
       } else if (drilldownData.value.type == "logs") {
         console.log("drilldownData.value.data", drilldownData.value.data);
-        if (drilldownData.value.logsMode === "custom") {
+        if (drilldownData.value.data.logsMode === "custom") {
           console.log("drilldownData.value.data", drilldownData.value);
 
           return false;
-        } else if (drilldownData.value.logsMode === "auto") {
+        } else if (drilldownData.value.data.logsMode === "auto") {
           console.log("drilldownData.value.data", drilldownData.value);
           
           return false;
@@ -621,9 +627,13 @@ export default defineComponent({
       // if editmode then made changes
       // else add new drilldown
       if (props?.isEditMode) {
+        console.log("drilldownData.value edit", drilldownData.value);
+        
         dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
       } else {
+        console.log("drilldownData.value", drilldownData.value);
+        
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
       }
       emit("close");
@@ -736,6 +746,10 @@ export default defineComponent({
       }
     });
 
+    const updateQueryValue = (value: string) => {
+      drilldownData.value.data.logsQuery = value;
+    };
+
     return {
       t,
       outlinedDashboard,
@@ -752,6 +766,7 @@ export default defineComponent({
       changeTypeOfDrilldown,
       options,
       variableNamesFn,
+      updateQueryValue,
     };
   },
 });
