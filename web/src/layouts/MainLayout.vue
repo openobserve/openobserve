@@ -227,7 +227,7 @@ class="padding-none" />
           </q-tooltip>
         </q-btn>
 
-        <q-btn round flat dense :ripple="false">
+        <q-btn round flat dense :ripple="false" data-test="header-my-account-profile-icon">
           <div class="row items-center no-wrap">
             <q-icon
               :name="user.picture ? user.picture : 'person'"
@@ -1322,9 +1322,9 @@ export default defineComponent({
         }
 
         .q-item__label {
-          color: $white;
+          color: white;
         }
-        color: $white;
+        color: white;
       }
 
       &__label {
