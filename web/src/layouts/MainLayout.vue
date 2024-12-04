@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-header
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
-      <q-toolbar>
+      <q-toolbar class="o2-bg-color">
         <div
           class="flex relative-position q-mr-sm"
           v-if="
@@ -112,6 +112,7 @@ size="xs" class="warning" />{{
           <q-select
             v-model="selectedOrg"
             borderless
+            dense
             :options="orgOptions"
             option-label="identifier"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
@@ -380,6 +381,7 @@ class="padding-none" />
       :width="80"
       :breakpoint="500"
       bordered
+      class="o2-bg-color"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -1279,6 +1281,10 @@ export default defineComponent({
   }
 }
 
+.q-toolbar{
+  min-height: 40px;
+}
+
 .headerMenu {
   margin-right: 1rem;
 
@@ -1291,6 +1297,10 @@ export default defineComponent({
 .q-item {
   min-height: 30px;
   padding: 8px 8px;
+}
+
+.o2-bg-color {
+  background-color: rgba(89, 96, 178, 0.08);
 }
 
 .q-list {
