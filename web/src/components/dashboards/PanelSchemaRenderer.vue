@@ -709,7 +709,7 @@ export default defineComponent({
           const streamName = queryDetails.queries[0].fields.stream;
 
           // Function to extract WHERE clause
-          const extractWhereClause = (query) => {
+          const extractWhereClause = (query: any) => {
             const whereMatch = query.match(
               /WHERE\s+(.+?)\s+(GROUP BY|ORDER BY|$)/i,
             );
