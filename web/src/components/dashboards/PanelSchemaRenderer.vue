@@ -701,31 +701,54 @@ export default defineComponent({
             "navigateToLogs: Initializing navigation to logs.",
             panelSchema.value,
           );
+
           const queryDetails = panelSchema.value;
           console.log("navigateToLogs: Retrieved query details:", queryDetails);
 
-          const query =
-            drilldownData.logsMode === "auto"
-              ? b64EncodeUnicode("SELECT * FROM " + queryDetails.queries[0].fields.stream)
-              : b64EncodeUnicode(queryDetails.queries[0].query);
-          console.log("navigateToLogs: Encoded query:", query);
+          const originalQuery = queryDetails.queries[0].query;
+          const streamName = queryDetails.queries[0].fields.stream;
+
+          // Function to extract WHERE clause
+          const extractWhereClause = (query) => {
+            const whereMatch = query.match(
+              /WHERE\s+(.+?)\s+(GROUP BY|ORDER BY|$)/i,
+            );
+            return whereMatch ? whereMatch[1].trim() : null;
+          };
+
+          // Extract WHERE clause
+          const whereClause = extractWhereClause(originalQuery);
+          console.log("navigateToLogs: Extracted WHERE clause:", whereClause);
+
+          // Construct the new query
+          const modifiedQuery = whereClause
+            ? `SELECT * FROM "${streamName}" WHERE ${whereClause}`
+            : queryDetails.queries[0].query;
+
+          console.log("navigateToLogs: Modified query:", modifiedQuery);
+
+          // Encode the modified query
+          const encodedQuery = b64EncodeUnicode(modifiedQuery);
+          console.log("navigateToLogs: Encoded query:", encodedQuery);
+
           console.log("navigateToLogs: Drilldown data:", drilldownVariables);
 
+          // Navigate to logs
           router
             .push({
               path: "/logs",
               query: {
                 stream_type: queryDetails.queries[0].fields.stream_type,
-                stream: queryDetails.queries[0].fields.stream,
+                stream: streamName,
                 from: (drilldownVariables.start_time = new Date(
                   selectedTimeObj?.value?.start_time?.toISOString(),
                 ).getTime()),
                 to: (drilldownVariables.end_time = new Date(
                   selectedTimeObj?.value?.end_time?.toISOString(),
                 ).getTime()),
-                refresh: generateDurationLabel(5),
-                sql_mode: "false",
-                query,
+                refresh: generateDurationLabel(0),
+                sql_mode: "true",
+                query: encodedQuery,
                 org_identifier: store.state.selectedOrganization.identifier,
                 quick_mode: "false",
                 show_histogram: "true",
@@ -741,6 +764,7 @@ export default defineComponent({
               );
             });
         };
+
         // need to change dynamic variables to it's value using current variables, current chart data(params)
         // if pie, donut or heatmap then series name will come in name field
         // also, if value is an array, then last value will be taken
