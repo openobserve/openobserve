@@ -32,12 +32,22 @@ use o2_enterprise::enterprise::common::auditor;
 use proto::cluster_rpc;
 use tokio::sync::oneshot;
 
+use crate::service::organization::check_and_create_org;
+
 mod ingestion;
 mod queues;
 
 pub async fn run() {
     let cfg = get_config();
     if !cfg.common.usage_enabled {
+        return;
+    }
+    let usage_org = cfg.common.usage_org.clone();
+
+    if check_and_create_org(&usage_org).await.is_err() {
+        log::error!(
+            "[SELF-REPORTING] Failed to create {usage_org} organization for usage reporting"
+        );
         return;
     }
 
@@ -270,6 +280,14 @@ pub async fn flush() {
 pub async fn run_audit_publish() {
     let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
     if !o2cfg.common.audit_enabled {
+        return;
+    }
+    let usage_org = cfg.common.usage_org.clone();
+
+    if check_and_create_org(&usage_org).await.is_err() {
+        log::error!(
+            "[SELF-REPORTING] Failed to create {usage_org} organization for audit reporting"
+        );
         return;
     }
     let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(

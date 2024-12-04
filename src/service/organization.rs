@@ -180,6 +180,7 @@ pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
+    org.name = org.name.trim().to_owned();
     org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::generate());
     match db::organization::save_org(org).await {
         Ok(_) => {
@@ -197,6 +198,7 @@ pub async fn create_org(
 /// Checks if the org exists, otherwise creates the org. Does not associate any user
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
+    let org_id = org_id.trim();
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -225,6 +227,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
 pub async fn check_and_create_org_without_ofga(
     org_id: &str,
 ) -> Result<Organization, anyhow::Error> {
+    let org_id = org_id.trim();
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -267,7 +270,7 @@ pub async fn rename_org(
         return Err(anyhow::anyhow!("Organization doesn't exist"));
     }
     let mut org = get_org(org_id).await.unwrap();
-    org.name = name.to_owned();
+    org.name = name.trim().to_owned();
     match db::organization::save_org(&org).await {
         Ok(_) => Ok(org),
         Err(e) => {
