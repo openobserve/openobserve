@@ -588,6 +588,10 @@ export const convertSQLData = async (
           throw new Error("Number of columns must be positive");
         }
 
+        if (panelSchema.config.trellis.num_of_columns > 16) {
+          throw new Error("Cannot have more than 16 columns");
+        }
+
         customCols = panelSchema.config.trellis?.num_of_columns;
       }
 
