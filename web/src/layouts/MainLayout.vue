@@ -208,14 +208,6 @@ class="padding-none" />
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-separator />
-              <q-item clickable @click="openSlack()">
-                <q-item-section>
-                  <q-item-label>
-                    {{ t("menu.slack") }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
             </q-list>
           </q-menu>
         </q-btn>
