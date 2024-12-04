@@ -121,7 +121,7 @@ pub async fn add(work_group: &str, user_id: &str, trace_id: &str) -> Result<(), 
     Ok(())
 }
 
-pub async fn delete(id: &str) -> Result<(), errors::Error> {
+pub async fn delete(id: i64) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
