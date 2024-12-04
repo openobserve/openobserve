@@ -20,7 +20,7 @@ import { AboutPage } from "../pages/aboutPage.js";
 test.describe("Change Organisation", () => {
     let loginPage, logsPage, ingestionPage, homePage, metricsPage,
         tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage, 
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage;
+        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, defaulttestmulti;
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
@@ -315,7 +315,7 @@ test.describe("Change Organisation", () => {
 
         await aboutPage.gotoAboutPage();
         await page.waitForTimeout(5000);
-        await aboutPage.aboutPageDefaultMultiOrg();
+       await aboutPage.aboutPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
         await aboutPage.aboutPageURLValidation();
         await aboutPage.gotoAboutPage();

@@ -43,7 +43,7 @@ export class HomePage {
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
 
      
-       // await validateUrlContains(this.page, 'path');
+      
 
 
     }

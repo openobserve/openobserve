@@ -13,8 +13,11 @@ export class LoginPage {
   }
 
   async loginAsInternalUser() {
-    //await this.page.goto(process.env["ZO_BASE_URL"]);
+  
     await this.page.getByText('Login as internal user').click();
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
+       waitUntil: "networkidle",
+       });
     
   }
 
