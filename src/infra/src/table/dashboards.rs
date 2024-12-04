@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::dashboards::{
-    v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3,
-    v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard, ListDashboardsParams,
+use config::meta::{
+    dashboards::{
+        v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3,
+        v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
+        ListDashboardsParams,
+    },
+    folder::Folder,
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
@@ -103,13 +107,17 @@ pub async fn get(
 }
 
 /// Lists all dashboards belonging to the given org and folder.
-pub async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, errors::Error> {
+pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let dashboards = list_models(client, params)
         .await?
         .into_iter()
-        .map(Dashboard::try_from)
-        .collect::<Result<_, _>>()?;
+        .map(|(f, d)| {
+            let f = Folder::from(f);
+            let d = Dashboard::try_from(d)?;
+            Ok((f, d))
+        })
+        .collect::<Result<_, errors::Error>>()?;
     Ok(dashboards)
 }
 
@@ -273,7 +281,7 @@ async fn get_model(
 async fn list_models(
     db: &DatabaseConnection,
     params: ListDashboardsParams,
-) -> Result<Vec<dashboards::Model>, sea_orm::DbErr> {
+) -> Result<Vec<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
     let query = folders::Entity::find()
         .filter(folders::Column::Org.eq(params.org_id))
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
@@ -309,7 +317,7 @@ async fn list_models(
         .all(db)
         .await?
         .into_iter()
-        .flat_map(|(_, ds)| ds)
+        .flat_map(|(f, ds)| ds.into_iter().map(move |d| (f.clone(), d)))
         .collect();
     Ok(dashboards)
 }
