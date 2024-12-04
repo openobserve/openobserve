@@ -13,102 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait,
-    QueryFilter, Schema, Set,
-};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
-use super::get_lock;
+use super::{entity::search_queue::*, get_lock};
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{connect_to_orm, ORM_CLIENT},
     errors,
 };
-
-// define the short_urls table
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "search_queue")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = true)]
-    pub id: i64,
-    #[sea_orm(column_type = "String(StringLen::N(16))")]
-    pub work_group: String,
-    #[sea_orm(column_type = "String(StringLen::N(256))")]
-    pub user_id: String,
-    #[sea_orm(column_type = "String(StringLen::N(32))")]
-    pub trace_id: String,
-    pub created_ts: i64,
-}
-
-#[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
-
-impl RelationTrait for Relation {
-    fn def(&self) -> RelationDef {
-        panic!("No relations defined")
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-pub async fn init() -> Result<(), errors::Error> {
-    create_table().await?;
-    create_table_index().await?;
-    Ok(())
-}
-
-pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let builder = client.get_database_backend();
-
-    let schema = Schema::new(builder);
-    let create_table_stmt = schema
-        .create_table_from_entity(Entity)
-        .if_not_exists()
-        .take();
-
-    client.execute(builder.build(&create_table_stmt)).await?;
-
-    Ok(())
-}
-
-pub async fn create_table_index() -> Result<(), errors::Error> {
-    let index1 = IndexStatement::new(
-        "search_queue_work_group_idx",
-        "search_queue",
-        false,
-        &["work_group", "user_id"],
-    );
-    let index2 = IndexStatement::new(
-        "search_queue_created_ts_idx",
-        "search_queue",
-        false,
-        &["created_ts"],
-    );
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match client.get_database_backend() {
-        DatabaseBackend::MySql => {
-            mysql::create_index(index1).await?;
-            mysql::create_index(index2).await?;
-        }
-        DatabaseBackend::Postgres => {
-            postgres::create_index(index1).await?;
-            postgres::create_index(index2).await?;
-        }
-        _ => {
-            sqlite::create_index(index1).await?;
-            sqlite::create_index(index2).await?;
-        }
-    }
-    Ok(())
-}
 
 pub async fn add(work_group: &str, user_id: &str, trace_id: &str) -> Result<(), errors::Error> {
     let record = ActiveModel {
         work_group: Set(work_group.to_string()),
         user_id: Set(user_id.to_string()),
         trace_id: Set(trace_id.to_string()),
-        created_ts: Set(chrono::Utc::now().timestamp_micros()),
+        created_at: Set(chrono::Utc::now().timestamp_micros()),
         ..Default::default()
     };
 
@@ -173,7 +91,7 @@ pub async fn clean_incomplete(expired: i64) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .filter(Column::CreatedTs.lt(expired))
+        .filter(Column::CreatedAt.lt(expired))
         .exec(client)
         .await?;
 
