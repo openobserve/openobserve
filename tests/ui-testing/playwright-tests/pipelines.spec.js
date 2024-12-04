@@ -441,7 +441,7 @@ test.describe("Pipeline testcases", () => {
   });
 
 
-  test.skip("should display error if query added without sql", async ({ page }) => {
+  test("should display error if query added without sql", async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
 
     // Open the pipeline menu and wait for a moment
