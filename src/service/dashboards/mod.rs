@@ -154,7 +154,7 @@ pub async fn get_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<Dashboard, DashboardError> {
-    table::dashboards::get(org_id, dashboard_id, folder_id)
+    table::dashboards::get(org_id, folder_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)
 }
