@@ -75,6 +75,7 @@ use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
+    transport::{Identity, ServerTlsConfig},
 };
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -424,7 +425,15 @@ async fn init_common_grpc_server(
 
     log::info!("starting gRPC server at {}", gaddr);
     init_tx.send(()).ok();
-    tonic::transport::Server::builder()
+    let builder = if cfg.grpc.tls_enabled {
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let identity = Identity::from_pem(cert, key);
+        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
+    } else {
+        tonic::transport::Server::builder()
+    };
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -470,7 +479,15 @@ async fn init_router_grpc_server(
 
     log::info!("starting gRPC server at {}", gaddr);
     init_tx.send(()).ok();
-    tonic::transport::Server::builder()
+    let builder = if cfg.grpc.tls_enabled {
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let identity = Identity::from_pem(cert, key);
+        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
+    } else {
+        tonic::transport::Server::builder()
+    };
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)

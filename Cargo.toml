@@ -322,7 +322,7 @@ time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.12.3", features = ["prost", "gzip"] }
+tonic = { version = "0.12.3", features = ["prost", "gzip", "tls"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
