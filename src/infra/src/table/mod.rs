@@ -25,12 +25,10 @@ pub mod distinct_values;
 mod entity;
 pub mod folders;
 mod migration;
-pub mod search_queue;
 pub mod short_urls;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
-    search_queue::init().await?;
     short_urls::init().await?;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Migrator::up(client, None).await?;

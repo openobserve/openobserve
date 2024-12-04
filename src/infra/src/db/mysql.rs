@@ -166,6 +166,13 @@ impl super::Db for MysqlDb {
             }
             return Err(e.into());
         }
+        // need commit it first because of the index will create a gap lock and then block other
+        // update, at the end, deadlock
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit put meta error: {}", e);
+            return Err(e.into());
+        }
+        let mut tx = pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["update", "meta"]).inc();
         if let Err(e) = sqlx::query(
               r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
