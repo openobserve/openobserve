@@ -185,6 +185,7 @@ tantivy.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
+async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
@@ -321,15 +322,15 @@ time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.12.3", features = ["prost", "gzip"] }
+tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.26"
 tracing-subscriber = { version = "0.3.0", features = [
-    "registry",
     "env-filter",
     "json",
+    "registry",
 ] }
 url = "2.2"
 urlencoding = "2.1"
