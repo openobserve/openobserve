@@ -52,13 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           text-align: center;
         "
           >
-          {{
-            props.row.isTokenVisible
-              ? props.row?.token?.length > 8
-                ? `${props.row?.token?.slice(0, 4)} **** ${props.row.token.slice(-4)}`
-                : props.row.token
-              : '* * * * * * * * * * * * * * * *'
-            }}
+          {{ getDisplayToken(props.row) }}
           </span>
 
           <!-- Button to fetch or toggle token visibility -->
@@ -445,21 +439,28 @@ export default defineComponent({
     };
     const getServiceToken = async (row:any, fromColum = true) =>{
       if(fromColum){ row.isLoading = true;
-      row.isTokenVisible = !row.isTokenVisible;
+        if(!row.isTokenVisible){
+          row.isTokenVisible = true;
+          setTimeout(() => {
+            row.isTokenVisible = false;
+          }, 5 * 60 * 1000);
+        }
+        else{
+          row.isTokenVisible = false;
+        }
       if(row.token){
         row.isLoading = false;
         return;
       }
       }
-     
        service_accounts.get_service_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
         if(fromColum) row.token = res.data.token;
         else serviceToken.value = res.data.token;
        }).catch((err)=>{
-        row.isLoading = false;
+        console.log(err,'err')
         $q.notify({
           color: "negative",
-          message: "Error while fetching token.",
+          message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
         });
        }).finally(()=>{
         row.isLoading = false;
@@ -671,6 +672,17 @@ export default defineComponent({
       toBeRefreshed.value = row;
     };
 
+    const getDisplayToken = (row: any): string => {
+      if (!row.token) return '* * * * * * * * * * * * * * * *';
+      if (!row.isTokenVisible) return '* * * * * * * * * * * * * * * *';
+      return maskToken(row.token);
+    };
+
+    const maskToken = (token: string): string => {
+      if (token.length <= 8) return token;
+      return `${token.slice(0, 4)} **** ${token.slice(-4)}`;
+    };
+
     return {
       t,
       qTable,
@@ -708,6 +720,8 @@ export default defineComponent({
       isShowToken,
       serviceToken,
       confirmRefreshAction,
+      getDisplayToken,
+      maskToken,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];

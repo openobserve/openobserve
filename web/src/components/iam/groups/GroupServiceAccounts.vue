@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   onBeforeMount(async () => {
     groupUsersMap.value = new Set(props.groupUsers);
-    await getchOrgServiceAccounts();
+    await fetchOrgServiceAccounts();
     updateUserTable(usersDisplay.value);
   });
   
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       hasFetchedOrgServiceAccounts.value = false;
       groupUsersMap.value = new Set(props.groupUsers);
 
-      await getchOrgServiceAccounts();
+      await fetchOrgServiceAccounts();
       updateUserTable(usersDisplay.value);
     },
     {
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     usersDisplay.value = value;
   
     if (!hasFetchedOrgServiceAccounts.value && value === "all") {
-      await getchOrgServiceAccounts();
+      await fetchOrgServiceAccounts();
     }
   
     if (usersDisplay.value === "all") {
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }
   };
   
-  const getchOrgServiceAccounts = async () => {
+  const fetchOrgServiceAccounts = async () => {
     // fetch group users
     hasFetchedOrgServiceAccounts.value = true;
     return new Promise(async (resolve) => {
