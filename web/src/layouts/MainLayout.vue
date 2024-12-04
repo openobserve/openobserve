@@ -170,6 +170,9 @@ class="padding-none" />
         <q-btn round flat dense :ripple="false">
           <div class="row items-center no-wrap">
             <q-icon name="help_outline" size="25px"></q-icon>
+            <q-tooltip anchor="top middle" self="bottom middle">
+              {{ t("menu.help") }}
+            </q-tooltip>
           </div>
 
           <q-menu
@@ -272,26 +275,27 @@ class="padding-none" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item
-                v-if="config.isCloud == 'true'"
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                :to="{ path: '/settings' }"
-              >
-                <q-item-section avatar>
-                  <q-avatar
-                    size="md"
-                    icon="settings"
-                    color="red"
-                    text-color="white"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ t("menu.settings") }}</q-item-label>
-                </q-item-section>
-              </q-item>
-              <q-separator />
+              <div v-if="config.isCloud == 'true'">
+                <q-item
+                  v-ripple="true"
+                  v-close-popup="true"
+                  clickable
+                  :to="{ path: '/settings' }"
+                >
+                  <q-item-section avatar>
+                    <q-avatar
+                      size="md"
+                      icon="settings"
+                      color="red"
+                      text-color="white"
+                    />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ t("menu.settings") }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-separator />
+              </div>
               <q-item clickable>
                 <q-item-section avatar>
                   <q-icon size="xs" name="language"
