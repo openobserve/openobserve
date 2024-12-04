@@ -595,6 +595,27 @@ export const convertSQLData = async (
         customCols = 1;
       }
 
+      if (window.location.pathname === "/dashboards/add_panel") {
+        let numOfChartsToDisplay = options.series.length;
+        const numOfRows = 4;
+        let numOfCols = 4;
+
+        if (panelSchema.config.trellis?.layout === "vertical") {
+          numOfCols = 1;
+        }
+
+        if (panelSchema.config.trellis?.layout === "custom") {
+          numOfCols = customCols;
+        }
+
+        numOfChartsToDisplay = Math.min(
+          numOfChartsToDisplay,
+          numOfRows * numOfCols,
+        );
+
+        options.series = options.series.slice(0, numOfChartsToDisplay);
+      }
+
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
