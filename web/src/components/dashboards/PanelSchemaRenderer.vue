@@ -746,7 +746,7 @@ export default defineComponent({
                 to: (drilldownVariables.end_time = new Date(
                   selectedTimeObj?.value?.end_time?.toISOString(),
                 ).getTime()),
-                refresh: generateDurationLabel(0),
+                refresh: "0",
                 sql_mode: "true",
                 query: encodedQuery,
                 org_identifier: store.state.selectedOrganization.identifier,
