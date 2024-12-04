@@ -480,6 +480,7 @@ export default defineComponent({
     let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
+      console.log("Updating variables data", data);
       Object.assign(variablesData, data);
 
       // change route query params based on current variables values
@@ -489,6 +490,7 @@ export default defineComponent({
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
           );
+          console.log("Filtered dynamic filters", filters);
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
             operator: item.operator,
@@ -501,6 +503,9 @@ export default defineComponent({
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });
+
+      console.log("Constructed variableObj", variableObj);
+
       router.replace({
         query: {
           ...route.query,
@@ -513,6 +518,7 @@ export default defineComponent({
         // check if the length is > 0
         if (checkIfVariablesAreLoaded(variablesData)) {
           needsVariablesAutoUpdate = false;
+          console.log("variablesData is loaded", variablesData);
         }
         Object.assign(updatedVariablesData, variablesData);
       }
