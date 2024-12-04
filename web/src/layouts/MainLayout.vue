@@ -159,7 +159,7 @@ class="padding-none" />
 
         <ThemeSwitcher></ThemeSwitcher>
 
-        <q-btn round flat dense :ripple="false" @click="openSlack">
+        <q-btn round flat dense :ripple="false" @click="openSlack" data-test="menu-link-slack-item">
           <div class="row items-center no-wrap">
             <q-icon><component :is="slackIcon" size="25px" /></q-icon>
           </div>
@@ -213,6 +213,7 @@ class="padding-none" />
         </q-btn>
 
         <q-btn
+          data-test="menu-link-settings-item"
           round
           flat
           dense
