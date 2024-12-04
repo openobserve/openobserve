@@ -423,11 +423,15 @@ async fn init_common_grpc_server(
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
-    log::info!("starting gRPC server at {}", gaddr);
+    log::info!(
+        "starting gRPC server {} at {}",
+        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
+        gaddr
+    );
     init_tx.send(()).ok();
     let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
         let identity = Identity::from_pem(cert, key);
         tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
     } else {
@@ -477,11 +481,15 @@ async fn init_router_grpc_server(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    log::info!("starting gRPC server at {}", gaddr);
+    log::info!(
+        "starting gRPC server {} at {}",
+        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
+        gaddr
+    );
     init_tx.send(()).ok();
     let builder = if cfg.grpc.tls_enabled {
-        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
-        let key = std::fs::read_to_string(&cfg.grpc.tls_cert_file)?;
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
         let identity = Identity::from_pem(cert, key);
         tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
     } else {

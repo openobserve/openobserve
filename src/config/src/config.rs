@@ -487,10 +487,12 @@ pub struct Grpc {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
-    #[env_config(name = "ZO_GRPC_TLS_CERT_FILE", default = "")]
-    pub tls_cert_file: String,
-    #[env_config(name = "ZO_GRPC_TLS_KEY_FILE", default = "")]
-    pub tls_key_file: String,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
+    pub tls_cert_domain: String,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -1664,9 +1666,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.grpc.tls_enabled
-        && (cfg.grpc.tls_cert_file.is_empty() || cfg.grpc.tls_key_file.is_empty())
+        && (cfg.grpc.tls_cert_domain.is_empty()
+            || cfg.grpc.tls_cert_path.is_empty()
+            || cfg.grpc.tls_key_path.is_empty())
     {
-        return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_FILE and ZO_GRPC_TLS_KEY_FILE must be set when ZO_GRPC_TLS_ENABLED is true"));
+        return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
     }
     Ok(())
 }
