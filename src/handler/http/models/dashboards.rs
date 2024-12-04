@@ -50,9 +50,6 @@ pub struct ListDashboardsResponseBody {
 /// An item in the list returned by the `ListDashboards` endpoint.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ListDashboardsResponseBodyItem {
-    pub hash: String,
-    pub version: i32,
-
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v1: Option<v1::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
@@ -63,6 +60,8 @@ pub struct ListDashboardsResponseBodyItem {
     pub v4: Option<v4::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v5: Option<v5::Dashboard>,
+    pub version: i32,
+    pub hash: String,
 }
 
 /// HTTP request body for `MoveDashboard` endpoint.
@@ -76,12 +75,12 @@ pub struct MoveDashboardRequestBody {
 /// Version-specific dashboard details and hash.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DashboardDetails {
-    pub version: i32,
     pub v1: Option<v1::Dashboard>,
     pub v2: Option<v2::Dashboard>,
     pub v3: Option<v3::Dashboard>,
     pub v4: Option<v4::Dashboard>,
     pub v5: Option<v5::Dashboard>,
+    pub version: i32,
     pub hash: String,
 }
 
