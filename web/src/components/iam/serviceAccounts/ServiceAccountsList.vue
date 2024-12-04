@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           {{
             props.row.isTokenVisible
-              ? props.row.token.length > 8
-                ? `${props.row.token.slice(0, 4)} **** ${props.row.token.slice(-4)}`
+              ? props.row?.token?.length > 8
+                ? `${props.row?.token?.slice(0, 4)} **** ${props.row.token.slice(-4)}`
                 : props.row.token
               : '* * * * * * * * * * * * * * * *'
             }}
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           flat
           style="cursor: pointer !important"
-          @click="refreshServiceToken(props.row)"
+          @click="confirmRefreshAction(props.row)"
           />
           <q-btn
             icon="edit"
@@ -198,11 +198,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-dialog>
 
+    <q-dialog v-model="confirmRefresh">
+      <q-card style="width: 240px">
+        <q-card-section class="confirmBody">
+          <div class="head">{{ t("serviceAccounts.confirmRefreshHead") }}</div>
+          <div class="para">{{ t("serviceAccounts.confirmRefreshMsg") }}</div>
+        </q-card-section>
+
+        <q-card-actions class="confirmActions">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+            {{ t("user.cancel") }}
+          </q-btn>
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="refreshServiceToken(toBeRefreshed,false)"
+          >
+            {{ t("user.ok") }}
+          </q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <q-dialog v-model="confirmDelete">
       <q-card style="width: 240px">
         <q-card-section class="confirmBody">
-          <div class="head">{{ t("user.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
+          <div class="head">{{ t("serviceAccounts.confirmDeleteHead") }}</div>
+          <div class="para">{{ t("serviceAccounts.confirmDeleteMsg") }}</div>
         </q-card-section>
 
         <q-card-actions class="confirmActions">
@@ -321,6 +345,10 @@ export default defineComponent({
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
+    const confirmRefresh  = ref(false);
+    const toBeRefreshed = ref({
+
+    });
 
     const serviceToken  = ref("");
 
@@ -428,6 +456,7 @@ export default defineComponent({
         if(fromColum) row.token = res.data.token;
         else serviceToken.value = res.data.token;
        }).catch((err)=>{
+        row.isLoading = false;
         $q.notify({
           color: "negative",
           message: "Error while fetching token.",
@@ -637,6 +666,11 @@ export default defineComponent({
       URL.revokeObjectURL(link.href); // Cleanup
     };
 
+    const confirmRefreshAction = (row: any) => {
+      confirmRefresh.value = true;
+      toBeRefreshed.value = row;
+    };
+
     return {
       t,
       qTable,
@@ -673,6 +707,7 @@ export default defineComponent({
       downloadTokenAsFile,
       isShowToken,
       serviceToken,
+      confirmRefreshAction,
       filterQuery: ref(""),
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -696,6 +731,8 @@ export default defineComponent({
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
+      toBeRefreshed,
+      confirmRefresh,
     };
   },
 });

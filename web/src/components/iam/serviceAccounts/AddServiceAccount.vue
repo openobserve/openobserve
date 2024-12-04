@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row items-center no-wrap">
         <div class="col">
           <div v-if="beingUpdated" class="text-h6">
-            {{ t("user.editUser") }}
+            {{ t("serviceAccounts.update") }}
           </div>
-          <div v-else class="text-h6">{{ t("user.add") }}</div>
+          <div v-else class="text-h6">{{ t("serviceAccounts.add") }}</div>
         </div>
         <div class="col-auto">
           <q-btn
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="cancel"
             @click="
               router.push({
-                name: 'users',
+                name: 'serviceAccounts',
                 query: {
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
