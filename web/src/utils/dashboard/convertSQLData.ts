@@ -599,7 +599,7 @@ export const convertSQLData = async (
         customCols = 1;
       }
 
-      if (window.location.pathname === "/dashboards/add_panel") {
+      if (window.location.pathname.includes("/dashboards/add_panel")) {
         let numOfChartsToDisplay = options.series.length;
         const numOfRows = 4;
         let numOfCols = 4;
