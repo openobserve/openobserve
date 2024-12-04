@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory"
-id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -102,8 +101,7 @@ id="secondLevel" class="full-height">
                   class="q-mt-lg"
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning"
-color="warning" size="10rem" /><br />
+                    <q-icon name="warning" color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -183,8 +181,7 @@ color="warning" size="10rem" /><br />
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info"
-color="primary" size="md" /> Select a
+                    <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -203,8 +200,7 @@ color="primary" size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                     <q-btn
                       v-if="
@@ -231,8 +227,7 @@ color="primary" size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-ma-none col-10"
                   >
-                    <q-icon name="info"
-color="primary" size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -374,6 +369,7 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
+import type { ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -544,6 +540,8 @@ export default defineComponent({
     const showSearchHistory = ref(false);
     let parser: any;
 
+    const isLogsMounted = ref(false);
+
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
 
@@ -598,92 +596,21 @@ export default defineComponent({
     // resetStreamData();
     // });
 
-    onActivated(async () => {
-      // if search tab
-      if (searchObj.meta.logsVisualizeToggle == "logs") {
-        const queryParams: any = router.currentRoute.value.query;
-        searchObj.meta.refreshHistogram = true;
-
-        const isStreamChanged =
-          queryParams.stream_type !== searchObj.data.stream.streamType ||
-          queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
-
-        if (queryParams.type === "trace_explorer") {
-          searchObj.organizationIdentifier = queryParams.org_identifier;
-          searchObj.data.stream.selectedStream.value = queryParams.stream;
-          searchObj.data.stream.streamType = queryParams.stream_type;
-          resetSearchObj();
-          resetStreamData();
-          restoreUrlQueryParams();
-          loadLogsData();
-
-          return;
-        }
-        if (
-          isStreamChanged &&
-          queryParams.type === "stream_explorer" &&
-          searchObj.loading == false
-        ) {
-          resetSearchObj();
-          resetStreamData();
-          restoreUrlQueryParams();
-          loadLogsData();
-          return;
-        }
-
-        if (
-          searchObj.organizationIdentifier !=
-            store.state.selectedOrganization.identifier &&
-          searchObj.loading == false
-        ) {
-          searchObj.loading = true;
-          loadLogsData();
-        } else if (!searchObj.loading) updateStreams();
-
-        refreshHistogramChart();
-      } else {
-        // visualize tab
-        handleRunQueryFn();
-      }
+    onBeforeMount(() => {
+      handleBeforeMount();
     });
 
-    onBeforeMount(async () => {
-      await importSqlParser();
-      if (searchObj.meta.logsVisualizeToggle == "logs") {
-        // searchObj.loading = true;
-        searchObj.meta.pageType = "logs";
-        searchObj.meta.refreshHistogram = true;
-        if (
-          config.isEnterprise == "true" &&
-          store.state.zoConfig.super_cluster_enabled
-        ) {
-          await getRegionInfo();
-        }
-
-        searchObj.organizationIdentifier =
-          store.state.selectedOrganization.identifier;
-        restoreUrlQueryParams();
-        if (searchObj.loading == false) {
-          resetSearchObj();
-          resetStreamData();
-          restoreUrlQueryParams();
-          searchObj.loading = true;
-          loadLogsData();
-        }
-        if (config.isCloud == "true") {
-          MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
-        }
-        searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
-      }
-    });
-    onMounted(async () => {
-      //
+    onMounted(() => {
       if (
         router.currentRoute.value.query.hasOwnProperty("action") &&
         router.currentRoute.value.query.action == "history"
       ) {
         showSearchHistory.value = true;
       }
+    });
+
+    onActivated(() => {
+      if (isLogsMounted.value) handleActivation();
     });
 
     /**
@@ -737,6 +664,13 @@ export default defineComponent({
           searchObj.data.stream.streamType =
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
+
+          // As when redirecting from search history to logs page, date type was getting set as absolute, so forcefully keeping it relative.
+          searchBarRef.value.dateTimeRef.setRelativeTime(
+            router.currentRoute.value.query.period,
+          );
+          searchObj.data.datetime.type = "relative";
+
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
           resetStreamData();
@@ -769,6 +703,179 @@ export default defineComponent({
         console.log(e);
       }
     };
+
+    // Main method for handling before mount logic
+    async function handleBeforeMount() {
+      if (isLogsTab()) {
+        await setupLogsTab();
+      } else {
+        await importSqlParser();
+      }
+    }
+
+    // Helper function to check if the current tab is "logs"
+    function isLogsTab() {
+      return searchObj.meta.logsVisualizeToggle === "logs";
+    }
+
+    // Setup logic for the logs tab
+    async function setupLogsTab() {
+      try {
+        searchObj.organizationIdentifier =
+          store.state.selectedOrganization.identifier;
+
+        searchObj.meta.pageType = "logs";
+        searchObj.meta.refreshHistogram = true;
+        searchObj.loading = true;
+
+        resetSearchObj();
+
+        resetStreamData();
+
+        restoreUrlQueryParams();
+
+        await importSqlParser();
+
+        if (isEnterpriseClusterEnabled()) {
+          await getRegionInfo();
+        }
+
+        loadLogsData();
+
+        if (isCloudEnvironment()) {
+          setupCloudSpecificThreshold();
+        }
+
+        searchObj.meta.quickMode = isQuickModeEnabled();
+
+        isLogsMounted.value = true;
+      } catch (error) {
+        console.error("Failed to setup logs tab:", error);
+        searchObj.loading = false;
+      }
+    }
+
+    // Helper function to check if the environment is enterprise and super cluster is enabled
+    function isEnterpriseClusterEnabled() {
+      return (
+        config.isEnterprise === "true" &&
+        store.state.zoConfig.super_cluster_enabled
+      );
+    }
+
+    // Helper function to check if the environment is cloud
+    function isCloudEnvironment() {
+      return config.isCloud === "true";
+    }
+
+    // Setup cloud-specific organization threshold
+    function setupCloudSpecificThreshold() {
+      MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
+    }
+
+    // Helper function to check if quick mode is enabled
+    function isQuickModeEnabled() {
+      return store.state.zoConfig.quick_mode_enabled;
+    }
+
+    const handleActivation = async () => {
+      try {
+        const queryParams: any = router.currentRoute.value.query;
+
+        const activationState: ActivationState = {
+          isSearchTab: searchObj.meta.logsVisualizeToggle === PageType.LOGS,
+          isStreamExplorer: queryParams.type === PageType.STREAM_EXPLORER,
+          isTraceExplorer: queryParams.type === PageType.TRACE_EXPLORER,
+          isStreamChanged:
+            queryParams.stream_type !== searchObj.data.stream.streamType ||
+            queryParams.stream !==
+              searchObj.data.stream.selectedStream.join(","),
+        };
+
+        if (activationState.isSearchTab) {
+          await handleSearchTab(queryParams, activationState);
+        } else {
+          handleVisualizeTab();
+        }
+      } catch (err) {
+        searchObj.loading = false;
+        console.error("Activation handling failed:", {
+          error: err,
+          route: router.currentRoute.value.path,
+          queryParams: router.currentRoute.value.query,
+        });
+      }
+    };
+
+    // Helper function for handling search tab logic
+    const handleSearchTab = (queryParams, activationState: ActivationState) => {
+      try {
+        searchObj.meta.refreshHistogram = true;
+
+        if (activationState.isTraceExplorer) {
+          handleTraceExplorer(queryParams);
+          return;
+        }
+
+        if (
+          activationState.isStreamChanged &&
+          activationState.isStreamExplorer &&
+          !searchObj.loading
+        ) {
+          handleStreamExplorer();
+          return;
+        }
+
+        if (isOrganizationChanged() && !searchObj.loading) {
+          handleOrganizationChange();
+        } else if (!searchObj.loading) {
+          updateStreams();
+        }
+
+        refreshHistogramChart();
+      } catch (err) {
+        searchObj.loading = false;
+        console.error("Failed to handle search tab:", err);
+      }
+    };
+
+    // Helper function for handling the trace explorer
+    function handleTraceExplorer(queryParams) {
+      searchObj.organizationIdentifier = queryParams.org_identifier;
+      searchObj.data.stream.selectedStream.value = queryParams.stream;
+      searchObj.data.stream.streamType = queryParams.stream_type;
+      resetSearchObj();
+      resetStreamData();
+      restoreUrlQueryParams();
+      loadLogsData();
+    }
+
+    // Helper function for handling the stream explorer
+    function handleStreamExplorer() {
+      resetSearchObj();
+      resetStreamData();
+      restoreUrlQueryParams();
+      loadLogsData();
+    }
+
+    // Helper function for organization change
+    function handleOrganizationChange() {
+      searchObj.loading = true;
+      loadLogsData();
+    }
+
+    // Check if the selected organization has changed
+    function isOrganizationChanged() {
+      return (
+        searchObj.organizationIdentifier !==
+        store.state.selectedOrganization.identifier
+      );
+    }
+
+    // Helper function for handling the visualize tab
+    function handleVisualizeTab() {
+      handleRunQueryFn();
+    }
 
     const refreshTimezone = () => {
       updateGridColumns();
@@ -975,7 +1082,7 @@ export default defineComponent({
         field,
         isFieldExistInSQL,
       );
-      
+
       // Modify the query based on stream name
       const streamName = searchObj.data.stream.selectedStream[0].replace(
         /[.*+?^${}()|[\]\\]/g,
