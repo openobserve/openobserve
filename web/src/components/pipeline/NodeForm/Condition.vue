@@ -40,33 +40,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
             :enableNewValueMode="true" 
           />
-          <q-card class="note-container q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark ' : 'bg-white'">
+          <q-card class="note-container" >
 
-          <q-card-section >
+          <q-card-section>
             <div class="note-heading ">Condition value Guidelines:</div>
-            <q-banner inline dense class="note-info" >
-              <span>
+            <q-banner  inline dense class="note-info " >
+              <div>
                 <q-icon name="info" color="orange" class="q-mr-sm" />
                 <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
                   <span class="code">app_name != ""</span>
                 </span>
-              </span>
-            </q-banner>
-            <q-banner inline dense class="note-info"  >
-              <span>
+              </div>
+              <div>
                 <q-icon name="info" color="orange"class="q-mr-sm" />
                 <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
                   <span class="code">app_name != null</span>
                 </span>
-              </span>
-            </q-banner>
-            <q-banner inline dense class="note-info" >
-              <q-icon name="warning" color="red" class="q-mr-sm" />
-              <span>If conditions are not met, the record will be dropped.</span>
-            </q-banner>
-            <q-banner inline dense class="note-info">
-              <q-icon name="warning" color="red" class="q-mr-sm" />
-              <span>If the record does not have the specified field, it will be dropped.</span>
+              </div>
+              <div>
+                <q-icon name="warning" color="red" class="q-mr-sm" />
+                <span>If conditions are not met, the record will be dropped.</span>
+              </div>
+              <div>
+                <q-icon name="warning" color="red" class="q-mr-sm" />
+                <span>If the record does not have the specified field, it will be dropped.</span>
+              </div>
             </q-banner>
           </q-card-section>
           </q-card>
@@ -75,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="flex justify-start q-mt-lg q-py-sm full-width"
+          class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
@@ -530,13 +528,14 @@ const validateSqlQuery = () => {
 }
 
 .note-container {
-  padding: 10px;
-  margin-top: 1rem;
-  border-left: 4px solid #007bff; /* Blue border for emphasis */
+  background-color: #F9F290 ;
+  padding: 4px 8px;
   border-radius: 4px;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  color: gray;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
+  margin-top: 10px;
 }
 
 .note-container .highlight {
@@ -554,6 +553,8 @@ const validateSqlQuery = () => {
   padding: 2px 4px;
   border-radius: 3px;
   color: #d63384; /* Soft pinkish-red for code */
+
+
 }
 
 .note-heading{
@@ -562,7 +563,12 @@ const validateSqlQuery = () => {
 
 .note-info{
   font-size: small;
-  color: gray;
+  color: #865300;
+  background-color: #F9F290 ;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
 }
 
 </style>
