@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-layout
-    view="hHh lpR fFf"
+    view="hHh Lpr lff"
     :class="[
-      miniMode ? 'miniMode' : '',
       store.state.printMode === true ? 'printMode' : '',
     ]"
   >
@@ -260,12 +259,11 @@ color="grey" text-color="white">
     </q-header>
 
     <q-drawer
-      :mini="miniMode"
-      bordered
+      v-model="drawer"
       show-if-above
-      @mouseover="expandMenu"
-      @mouseout="miniMode = true"
-      mini-to-overlay
+      :width="80"
+      :breakpoint="500"
+      bordered
     >
       <q-list class="leftNavList">
         <menu-link
@@ -448,7 +446,7 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const miniMode = ref(true);
+    const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
@@ -650,7 +648,6 @@ export default defineComponent({
     });
 
     onMounted(async () => {
-      miniMode.value = true;
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
@@ -1043,7 +1040,7 @@ export default defineComponent({
     };
 
     const expandMenu = () => {
-      miniMode.value = false;
+      // miniMode.value = false;
       if (!isMonacoEditorLoaded.value) prefetch();
     };
 
@@ -1174,27 +1171,6 @@ export default defineComponent({
   }
 }
 
-.q-page-container {
-  padding-left: 57px;
-}
-
-.q-drawer {
-  @extend .border-right;
-  min-width: 50px;
-  max-width: 210px;
-  color: unset;
-
-  &--mini {
-    .leftNavList {
-      padding: 5px 8px;
-    }
-  }
-
-  &--standard {
-    z-index: 99999;
-  }
-}
-
 .headerMenu {
   margin-right: 1rem;
 
@@ -1212,10 +1188,14 @@ export default defineComponent({
 .q-list {
   &.leftNavList {
     padding-bottom: 0px;
-    padding-top: 5px;
 
     .q-item {
-      margin-bottom: 5px;
+      margin: 5px 5px 5px 5px;
+      display: list-item;
+      text-align: center;
+      list-style: none;
+      padding: 5px 2px;
+      border-radius: 5px;
 
       .q-icon {
         height: 1.5rem;
@@ -1226,6 +1206,17 @@ export default defineComponent({
         .q-icon img {
           filter: brightness(100);
         }
+
+        .q-item__label {
+          color: $white;
+        }
+        color: $white;
+      }
+
+      &__label {
+        font-size: 12px;
+        font-weight: 600;
+        color: grey;
       }
     }
   }
@@ -1239,10 +1230,14 @@ export default defineComponent({
   }
 
   .q-item {
+    
     &__section {
       &--avatar {
-        padding-right: 0.875rem;
+        padding-right: 0px !important;
         min-width: 1.5rem;
+        display: list-item;
+        text-align: center;
+        list-style: none;
       }
     }
 

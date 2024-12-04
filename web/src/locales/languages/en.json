@@ -156,7 +156,7 @@
     "openapi": "OpenAPI",
     "docs": "Docs",
     "billings": "Billing",
-    "rum": "Real User Monitoring",
+    "rum": "RUM",
     "settings": "Management",
     "iam": "IAM",
     "report": "Reports",
