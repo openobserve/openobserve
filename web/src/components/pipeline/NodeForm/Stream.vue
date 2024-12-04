@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
           </div>
-          <div style="font-size: 14px;" class="note-message" >
+          <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
           <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
             </div>
         </div>
