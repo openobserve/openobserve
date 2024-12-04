@@ -40,8 +40,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
             :enableNewValueMode="true" 
           />
+          <q-card class="note-container q-pa-md" :class="store.state.theme === 'dark' ? 'bg-dark ' : 'bg-white'">
 
-   
+          <q-card-section >
+            <div class="note-heading ">Condition value Guidelines:</div>
+            <q-banner inline dense class="note-info" >
+              <span>
+                <q-icon name="info" color="orange" class="q-mr-sm" />
+                <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
+                  <span class="code">app_name != ""</span>
+                </span>
+              </span>
+            </q-banner>
+            <q-banner inline dense class="note-info"  >
+              <span>
+                <q-icon name="info" color="orange"class="q-mr-sm" />
+                <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
+                  <span class="code">app_name != null</span>
+                </span>
+              </span>
+            </q-banner>
+            <q-banner inline dense class="note-info" >
+              <q-icon name="warning" color="red" class="q-mr-sm" />
+              <span>If conditions are not met, the record will be dropped.</span>
+            </q-banner>
+            <q-banner inline dense class="note-info">
+              <q-icon name="warning" color="red" class="q-mr-sm" />
+              <span>If the record does not have the specified field, it will be dropped.</span>
+            </q-banner>
+          </q-card-section>
+          </q-card>
+
+
         </div>
 
         <div
@@ -498,4 +528,41 @@ const validateSqlQuery = () => {
 .previous-drop-down{
   width: 600px;
 }
+
+.note-container {
+  padding: 10px;
+  margin-top: 1rem;
+  border-left: 4px solid #007bff; /* Blue border for emphasis */
+  border-radius: 4px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: gray;
+}
+
+.note-container .highlight {
+  font-weight: bold;
+  color: #007bff; /* Blue color to highlight key terms */
+}
+
+.note-container .emphasis {
+  font-style: italic;
+  color: #555; /* Subtle dark gray for emphasis */
+}
+
+.note-container .code {
+  font-family: monospace;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #d63384; /* Soft pinkish-red for code */
+}
+
+.note-heading{
+  font-size: medium;
+}
+
+.note-info{
+  font-size: small;
+  color: gray;
+}
+
 </style>

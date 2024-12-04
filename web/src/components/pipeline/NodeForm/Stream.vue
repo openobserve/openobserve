@@ -348,7 +348,6 @@ const saveStream = () => {
     return;
   }
   addNode(streamNodeData);
-
   emit("cancel:hideform");
 };
 

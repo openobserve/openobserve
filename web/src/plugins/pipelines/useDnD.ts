@@ -148,6 +148,7 @@ export default function useDragAndDrop() {
    * @param {DragEvent} event
    */
   function onDrop(event:any ,offSet:any = {x:0,y:0}) {
+
     const position = screenToFlowCoordinate({
       x: event.clientX + offSet.x,
       y: event.clientY + offSet.y,
@@ -183,6 +184,7 @@ export default function useDragAndDrop() {
     pipelineObj.dialog.name = newNode.data.node_type;
     pipelineObj.dialog.show = true;
     pipelineObj.isEditNode = false;
+
   }
 
   function onNodeChange(changes:any) {
@@ -336,8 +338,7 @@ export default function useDragAndDrop() {
     return true; // Allow connection for 'both' nodes
   }
 
-  function addNode(newNode:any) {
-    console.log(pipelineObj.userClickedNode,'pipeline obj')
+  function addNode(newNode:any) {    
 
     if(pipelineObj.isEditNode){
       if(pipelineObj.userSelectedNode == null){
@@ -373,60 +374,59 @@ export default function useDragAndDrop() {
       pipelineObj.userClickedNode = {};
       pipelineObj.userSelectedNode = {};
     }
-
-if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
-  const newEdge = {
-    id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
-    source:  pipelineObj.userSelectedNode.id,
-    target:pipelineObj.currentSelectedNodeData.id,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,  // Increase arrow width
-        height: 20, // Increase arrow height
-      },
-    type: 'custom',
-    
-    style:{
-      strokeWidth: 2,
-    },
-    animated:true,
-
+    if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
+      const newEdge = {
+        id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
+        source:  pipelineObj.userSelectedNode.id,
+        target:pipelineObj.currentSelectedNodeData.id,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,  // Increase arrow width
+            height: 20, // Increase arrow height
+          },
+        type: 'custom',
+        
+        style:{
+          strokeWidth: 2,
+        },
+        animated:true,
 
 
-  };
+
+      };
 
 
-  
+      
 
-  const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
-  if(isCycle){
-    $q.notify({
-      message: "Adding this edge will create a cycle in the pipeline",
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
-    
-  });
-  return;
-  }
-  const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
+      const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
+      if(isCycle){
+        $q.notify({
+          message: "Adding this edge will create a cycle in the pipeline",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        
+      });
+      return;
+      }
+      const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
 
-    // If targetEdgeIfExist is found, filter it out from the edges array
+        // If targetEdgeIfExist is found, filter it out from the edges array
 
-  if (targetEdgeIfExist) {
-    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
-      (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
-    );
-  }
-  // Add the new edge to the edges array
-  pipelineObj.currentSelectedPipeline.edges = [
-    ...pipelineObj.currentSelectedPipeline.edges,
-    newEdge,
-  ];
-  // Update edges state
+      if (targetEdgeIfExist) {
+        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
+          (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
+        );
+      }
+      // Add the new edge to the edges array
+      pipelineObj.currentSelectedPipeline.edges = [
+        ...pipelineObj.currentSelectedPipeline.edges,
+        newEdge,
+      ];
+      // Update edges state
 
 
-}
+    }
 
     if(pipelineObj.isEditPipeline == true ){
       pipelineObj.dirtyFlag = true;
@@ -455,12 +455,50 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
       }
     }
 
+
+
     
     pipelineObj.isEditNode = false;
     // pipelineObj.currentSelectedNodeData = dialogObj;
     pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
-    console.log(pipelineObj.currentSelectedNodeData,"pipelineObj.currentSelectedPipeline")
+    console.log(pipelineObj.currentSelectedNodeData,'current')
+    if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
+      console.log(pipelineObj.currentSelectedPipeline.nodes.length,'length')
+      const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
+
+      const nodeId = getUUID();
+  
+      const outputNode = {
+        id: nodeId,
+        type: 'output',
+        io_type: 'output',
+        position,
+        data: {...pipelineObj.currentSelectedNodeData.data,label: nodeId},
+      };
+      pipelineObj.currentSelectedPipeline.nodes.push(outputNode);
+      const newEdge = {
+        id: `e${pipelineObj.currentSelectedNodeData.id}-${outputNode.id}`,
+        source: pipelineObj.currentSelectedNodeData.id,
+        target: outputNode.id,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        },
+        type: 'custom',
+        
+        style:{
+          strokeWidth: 2,
+        },
+        animated:true,
+      };
+      pipelineObj.currentSelectedPipeline.edges = [
+        ...pipelineObj.currentSelectedPipeline.edges,
+        newEdge,
+      ];
+    }
+    console.log(pipelineObj.currentSelectedPipeline,'cur')
   }
 
 
