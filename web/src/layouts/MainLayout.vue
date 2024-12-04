@@ -1352,6 +1352,7 @@ export default defineComponent({
   }
 
   .q-item {
+    
     &__section {
       &--avatar {
         padding-right: 0px !important;
