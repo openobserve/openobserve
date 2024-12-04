@@ -86,10 +86,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
-    // cache users
-    tokio::task::spawn(async move { db::user::watch().await });
-    tokio::task::spawn(async move { db::org_users::watch().await });
-    tokio::task::spawn(async move { db::organization::watch().await });
 
     db::user::cache().await.expect("user cache failed");
     db::organization::cache()
@@ -100,9 +96,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::organization::org_settings_cache()
         .await
         .expect("organization settings cache sync failed");
-    db::organization::cache()
-        .await
-        .expect("organization cache sync failed");
+
+    // watch org users
+    tokio::task::spawn(async move { db::user::watch().await });
+    tokio::task::spawn(async move { db::org_users::watch().await });
+    tokio::task::spawn(async move { db::organization::watch().await });
 
     // check version
     db::version::set().await.expect("db version set failed");
@@ -141,7 +139,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
-    tokio::task::spawn(async move { db::organization::watch().await });
+
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
 

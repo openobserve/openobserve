@@ -182,9 +182,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
+    let org_name = entry.name.trim();
+    if org_name.is_empty() {
+        return Err(anyhow::anyhow!("Organization name cannot be empty"));
+    }
     if let Err(e) = organizations::add(
         &entry.identifier,
-        &entry.name,
+        org_name,
         entry.org_type.as_str().parse().unwrap(),
     )
     .await
