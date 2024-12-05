@@ -88,7 +88,7 @@ export function getTrellisGrid(
   }
 
   // Calculate the aspect ratio of the available space
-  const aspectRatio = width / height;
+  const aspectRatio = 16 / 9;
 
   let numRows = 1;
   let numCols = 1;
@@ -106,47 +106,64 @@ export function getTrellisGrid(
   }
 
   // Validate total horizontal spacing doesn't exceed width
-  const totalHorizontalSpacing =
-    SPACING_CONFIG.horizontal * (numCols - 1) + leftMargin + 32;
-  if (totalHorizontalSpacing >= width) {
-    throw new Error(
-      JSON.stringify({
-        type: "trellis_horizontal_spacing",
-        message:
-          "Trellis Layout Error \nPanel width needs to be increased to apply the trellis layout.",
-      }),
-    );
-  }
+  // const totalHorizontalSpacing =
+  //   SPACING_CONFIG.horizontal * (numCols - 1) + leftMargin + 32;
+  // if (totalHorizontalSpacing >= width) {
+  //   throw new Error(
+  //     JSON.stringify({
+  //       type: "trellis_horizontal_spacing",
+  //       message:
+  //         "Trellis Layout Error \nPanel width needs to be increased to apply the trellis layout.",
+  //     }),
+  //   );
+  // }
 
   // Validate total vertical spacing doesn't exceed height
-  const totalVerticalSpacing = SPACING_CONFIG.vertical * (numRows - 1) + 72;
-  if (totalVerticalSpacing >= height) {
-    throw new Error(
-      JSON.stringify({
-        type: "trellis_vertical_spacing",
-        message:
-          "Trellis Layout Error \nPanel height needs to be increased to apply the trellis layout.",
-      }),
-    );
-  }
+  // const totalVerticalSpacing = SPACING_CONFIG.vertical * (numRows - 1) + 72;
+  // if (totalVerticalSpacing >= height) {
+  //   throw new Error(
+  //     JSON.stringify({
+  //       type: "trellis_vertical_spacing",
+  //       message:
+  //         "Trellis Layout Error \nPanel height needs to be increased to apply the trellis layout.",
+  //     }),
+  //   );
+  // }
 
+  const xSpacingBetweenInPx = SPACING_CONFIG.horizontal * (numCols - 1);
   // How many cols
   const xSpacingBetween =
     ((SPACING_CONFIG.horizontal * (numCols - 1)) / width) * 100;
-  const ySpacingBetween =
-    ((SPACING_CONFIG.vertical * (numRows - 1)) / height) * 100;
-  const topPadding = (SPACING_CONFIG.padding.top / height) * 100;
-  const bottomPadding = (SPACING_CONFIG.padding.bottom / height) * 100;
+
+  const leftPaddingInPx = leftMargin + SPACING_CONFIG.padding.extraLeft;
 
   const leftPadding =
     ((leftMargin + SPACING_CONFIG.padding.extraLeft) / width) * 100;
+
   const rightPadding = (SPACING_CONFIG.padding.right / width) * 100;
 
   // width and height for single gauge
+  const cellWidthInPx =
+    (width -
+      (SPACING_CONFIG.padding.right + leftPaddingInPx) -
+      xSpacingBetweenInPx) /
+    numCols;
+
   const cellWidth =
     (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
-  const cellHeight =
-    (100 - (ySpacingBetween + topPadding + bottomPadding)) / numRows;
+
+  // Calculate cell height based on cell width
+  const cellHeightInPx = cellWidthInPx * 0.3;
+
+  height =
+    cellHeightInPx * numRows +
+    SPACING_CONFIG.vertical * (numRows - 1) +
+    SPACING_CONFIG.padding.top +
+    SPACING_CONFIG.padding.bottom;
+
+  const topPadding = (SPACING_CONFIG.padding.top / height) * 100;
+
+  const cellHeight = (cellHeightInPx / height) * 100;
 
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
@@ -171,6 +188,7 @@ export function getTrellisGrid(
     gridHeight: (cellHeight * height) / 100,
     gridNoOfRow: numRows,
     gridNoOfCol: numCols,
+    panelHeight: height,
   };
 }
 

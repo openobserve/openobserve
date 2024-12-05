@@ -599,27 +599,6 @@ export const convertSQLData = async (
         customCols = 1;
       }
 
-      if (window.location.pathname.includes("/dashboards/add_panel")) {
-        let numOfChartsToDisplay = options.series.length;
-        const numOfRows = 4;
-        let numOfCols = 4;
-
-        if (panelSchema.config.trellis?.layout === "vertical") {
-          numOfCols = 1;
-        }
-
-        if (panelSchema.config.trellis?.layout === "custom") {
-          numOfCols = customCols;
-        }
-
-        numOfChartsToDisplay = Math.min(
-          numOfChartsToDisplay,
-          numOfRows * numOfCols,
-        );
-
-        options.series = options.series.slice(0, numOfChartsToDisplay);
-      }
-
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
@@ -630,6 +609,8 @@ export const convertSQLData = async (
       );
 
       options.grid = gridData.gridArray;
+
+      panelSchema.chartHeight = gridData.panelHeight;
 
       // Update axes configuration for trellis layout
       options.xAxis = options.xAxis.slice(0, 1);
@@ -667,7 +648,7 @@ export const convertSQLData = async (
           },
           top:
             parseFloat(gridData.gridArray[index].top) -
-            (20 / chartPanelRef.value.offsetHeight) * 100 +
+            (20 / (gridData.panelHeight as number)) * 100 +
             "%",
           left: gridData.gridArray[index].left,
         });

@@ -16,8 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
-    <div ref="chartPanelRef" style="height: 100%; position: relative">
-      <div v-if="!errorDetail" style="height: 100%; width: 100%">
+    <div ref="chartPanelRef" style="height: 100%">
+      <div
+        v-if="!errorDetail"
+        :style="{ height: getChartHeight, width: '100%' }"
+      >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -914,6 +917,18 @@ export default defineComponent({
       }
     };
 
+    const getChartHeight = computed(() => {
+      console.log(panelSchema.value);
+      if (
+        panelSchema.value.queries[0].fields?.breakdown?.length &&
+        panelSchema.value.config?.trellis?.layout
+      ) {
+        return `${panelSchema.value?.chartHeight}px`;
+      }
+
+      return "100%";
+    });
+
     return {
       store,
       chartPanelRef,
@@ -930,6 +945,7 @@ export default defineComponent({
       openDrilldown,
       drilldownPopUpRef,
       hideDrilldownPopUp,
+      getChartHeight,
     };
   },
 });
