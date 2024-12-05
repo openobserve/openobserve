@@ -845,6 +845,7 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
                 match bucket.get(key).await {
                     Ok(Some(_)) => {
                         log::debug!("Another process is currently locking the key: {}", key);
+                        continue;
                     }
                     Ok(None) => return Ok(()),
                     Err(e) => {
