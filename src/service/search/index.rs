@@ -284,22 +284,7 @@ impl Condition {
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_fields)?;
                 let right_query = right.to_tantivy_query(schema, default_fields)?;
-                let left_query_as = left_query.as_any().downcast_ref::<TermQuery>();
-                let right_query_as = right_query.as_any().downcast_ref::<TermQuery>();
-                if let (Some(left), Some(right)) = (left_query_as, right_query_as) {
-                    let left_term = left.term();
-                    let right_term = right.term();
-                    if left_term.field() == right_term.field() {
-                        return Ok(Box::new(TermSetQuery::new(vec![
-                            left_term.clone(),
-                            right_term.clone(),
-                        ])));
-                    }
-                }
-                Box::new(BooleanQuery::new(vec![
-                    (Occur::Should, left_query),
-                    (Occur::Should, right_query),
-                ]))
+                optimize_or_query_with_termset(left_query, right_query)
             }
             Condition::And(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_fields)?;
@@ -434,8 +419,11 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         Expr::InList {
             expr,
             list,
-            negated: _,
+            negated,
         } => {
+            if *negated {
+                return false;
+            }
             if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
                 return false;
             }
@@ -525,4 +513,58 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         )))),
         _ => unimplemented!(),
     })
+}
+
+fn optimize_or_query_with_termset(left: Box<dyn Query>, right: Box<dyn Query>) -> Box<dyn Query> {
+    // check both termQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermQuery>(),
+        right.as_any().downcast_ref::<TermQuery>(),
+    ) {
+        let left_term = left.term();
+        let right_term = right.term();
+        if left_term.field() == right_term.field() {
+            return Box::new(TermSetQuery::new(vec![
+                left_term.clone(),
+                right_term.clone(),
+            ]));
+        }
+    }
+
+    // check left is termSetQuery, right is termQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermSetQuery>(),
+        right.as_any().downcast_ref::<TermQuery>(),
+    ) {
+        let right_term = right.term();
+        let mut termset = Vec::new();
+        left.query_terms(&mut |term, _| {
+            termset.push(term);
+        });
+        if !termset.is_empty() && termset.first().unwrap().field() == right_term.field() {
+            termset.push(right_term);
+            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
+        }
+    }
+
+    // check left is termQuery, right is termSetQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermQuery>(),
+        right.as_any().downcast_ref::<TermSetQuery>(),
+    ) {
+        let left_term = left.term();
+        let mut termset = Vec::new();
+        right.query_terms(&mut |term, _| {
+            termset.push(term);
+        });
+        if !termset.is_empty() && termset.first().unwrap().field() == left_term.field() {
+            termset.push(left_term);
+            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
+        }
+    }
+
+    Box::new(BooleanQuery::new(vec![
+        (Occur::Should, left),
+        (Occur::Should, right),
+    ]))
 }
