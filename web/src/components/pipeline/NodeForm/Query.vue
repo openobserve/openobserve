@@ -485,9 +485,10 @@ const validateSqlQuery = () => {
       .catch((err: any) => {
         if (  err) {
           isValidSqlQuery.value = false;
+          const message = err?.response?.data?.message ? `Invalid SQL Query: ${err?.response?.data?.message}` : "Invalid SQL Query";
           q.notify({
             type: "negative",
-            message: "Invalid SQL Query : " + err.response.data.message,
+            message: `${message}`,
             timeout: 3000,
           });
           reject("");

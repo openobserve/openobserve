@@ -457,7 +457,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
     // TODO: Change the locator to the correct one, once fixed
-    await page.getByText('Invalid SQL Query : undefined').click()
+    await page.getByText('Invalid SQL Query').click()
 
   });
 
