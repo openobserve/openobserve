@@ -151,8 +151,15 @@ pub async fn search(
     let (took_wait, work_group_str, locker) =
         check_work_group(&req, trace_id, start, file_list_took).await?;
     #[cfg(feature = "enterprise")]
-    let (took_wait, work_group_str, work_group) =
-        check_work_group(&req, trace_id, &file_id_list_vec, start, file_list_took).await?;
+    let (took_wait, work_group_str, work_group) = check_work_group(
+        &req,
+        trace_id,
+        &nodes,
+        &file_id_list_vec,
+        start,
+        file_list_took,
+    )
+    .await?;
     // add work_group
     req.add_work_group(Some(work_group_str));
 
@@ -471,6 +478,7 @@ pub async fn check_work_group(
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
+    nodes: &[Node],
     file_id_list_vec: &[&FileId],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
