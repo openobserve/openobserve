@@ -928,7 +928,7 @@ export default defineComponent({
 
     const chartPanelHeight = computed(() => {
       if (
-        panelSchema.value.queries?.[0]?.fields?.breakdown?.length &&
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -940,7 +940,7 @@ export default defineComponent({
 
     const chartPanelClass = computed(() => {
       if (
-        panelSchema.value.queries?.[0]?.fields?.breakdown?.length &&
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
