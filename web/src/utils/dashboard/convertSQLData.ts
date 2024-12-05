@@ -1279,46 +1279,7 @@ export const convertSQLData = async (
           new Set(getAxisDataFromKey(xAxisKeys[0])),
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
-      } else if (panelSchema.type == "line" || panelSchema.type == "area") {
-        //if x and y length is not 2 and 1 respectively then do following
-        options.series = yAxisKeys?.map((key: any) => {
-          const seriesLabel = panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key,
-          )?.label;
-
-          const seriesData = getAxisDataFromKey(key);
-
-          const seriesObj = {
-            name: seriesLabel,
-            label: {
-              show: panelSchema.config?.label_option?.position != null,
-              position: panelSchema.config?.label_option?.position || "None",
-              rotate: panelSchema.config?.label_option?.rotate || 0,
-            },
-            color:
-              getSeriesColor(
-                panelSchema.config.color,
-                seriesLabel,
-                seriesData,
-                chartMin,
-                chartMax,
-              ) ?? null,
-            opacity: 0.8,
-            ...defaultSeriesProps,
-            // markLine if exist
-            markLine: {
-              silent: true,
-              animation: false,
-              data: getMarkLineData(panelSchema),
-            },
-            // config to connect null values
-            connectNulls: panelSchema.config?.connect_nulls ?? false,
-            data: seriesData,
-          };
-          return seriesObj;
-        });
-        // scatter chart with single x and y axis(single or multiple)
-      } else {
+      } else if (panelSchema.type !== "line" && panelSchema.type !== "area") {
         options.tooltip.formatter = function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
@@ -1389,7 +1350,12 @@ export const convertSQLData = async (
         };
       }
 
-      options.series = getSeries();
+      options.series = getSeries(
+        panelSchema.type == "line" || panelSchema.type == "area"
+          ? { opacity: 0.8 }
+          : {},
+      );
+
       if (panelSchema.config.trellis?.layout && breakDownKeys.length)
         updateTrellisConfig();
 
