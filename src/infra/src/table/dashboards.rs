@@ -282,7 +282,8 @@ async fn list_models(
     db: &DatabaseConnection,
     params: ListDashboardsParams,
 ) -> Result<Vec<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
-    let query = folders::Entity::find()
+    let query = dashboards::Entity::find()
+        .find_also_related(folders::Entity)
         .filter(folders::Column::Org.eq(params.org_id))
         .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
 
@@ -292,15 +293,6 @@ async fn list_models(
     } else {
         query
     };
-
-    // Apply ordering. Confusingly, it is necessary to apply the ordering BEFORE
-    // adding a join to the query builder. If we don't do this then Sea ORM will
-    // always sort on the join key (folder.id) before any other sorting
-    // conditions.
-    let query = query.order_by(dashboards::Column::Title, sea_orm::Order::Asc);
-
-    // Left join on dashboards table.
-    let query = query.find_with_related(dashboards::Entity);
 
     // Apply the optional title substring filter.
     let title_pat = params
@@ -313,13 +305,18 @@ async fn list_models(
         query
     };
 
-    let dashboards = query
+    // Apply ordering.
+    let query = query
+        .order_by_asc(dashboards::Column::Title)
+        .order_by_asc(folders::Column::Name);
+
+    let dashboards_and_folders = query
         .all(db)
         .await?
         .into_iter()
-        .flat_map(|(f, ds)| ds.into_iter().map(move |d| (f.clone(), d)))
+        .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
-    Ok(dashboards)
+    Ok(dashboards_and_folders)
 }
 
 /// Lists all dashboard ORM models that belong to the given org and folder.
@@ -419,7 +416,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"SELECT "folders"."id" AS "A_id", "folders"."org" AS "A_org", "folders"."folder_id" AS "A_folder_id", "folders"."name" AS "A_name", "folders"."description" AS "A_description", "folders"."type" AS "A_type", "dashboards"."id" AS "B_id", "dashboards"."dashboard_id" AS "B_dashboard_id", "dashboards"."folder_id" AS "B_folder_id", "dashboards"."owner" AS "B_owner", "dashboards"."role" AS "B_role", "dashboards"."title" AS "B_title", "dashboards"."description" AS "B_description", "dashboards"."data" AS "B_data", "dashboards"."version" AS "B_version", "dashboards"."created_at" AS "B_created_at" FROM "folders" LEFT JOIN "dashboards" ON "folders"."id" = "dashboards"."folder_id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."id" ASC"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -446,7 +443,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::MySql,
-                r#"SELECT `folders`.`id` AS `A_id`, `folders`.`org` AS `A_org`, `folders`.`folder_id` AS `A_folder_id`, `folders`.`name` AS `A_name`, `folders`.`description` AS `A_description`, `folders`.`type` AS `A_type`, `dashboards`.`id` AS `B_id`, `dashboards`.`dashboard_id` AS `B_dashboard_id`, `dashboards`.`folder_id` AS `B_folder_id`, `dashboards`.`owner` AS `B_owner`, `dashboards`.`role` AS `B_role`, `dashboards`.`title` AS `B_title`, `dashboards`.`description` AS `B_description`, `dashboards`.`data` AS `B_data`, `dashboards`.`version` AS `B_version`, `dashboards`.`created_at` AS `B_created_at` FROM `folders` LEFT JOIN `dashboards` ON `folders`.`id` = `dashboards`.`folder_id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`id` ASC"#,
+                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -473,7 +470,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Sqlite,
-                r#"SELECT "folders"."id" AS "A_id", "folders"."org" AS "A_org", "folders"."folder_id" AS "A_folder_id", "folders"."name" AS "A_name", "folders"."description" AS "A_description", "folders"."type" AS "A_type", "dashboards"."id" AS "B_id", "dashboards"."dashboard_id" AS "B_dashboard_id", "dashboards"."folder_id" AS "B_folder_id", "dashboards"."owner" AS "B_owner", "dashboards"."role" AS "B_role", "dashboards"."title" AS "B_title", "dashboards"."description" AS "B_description", "dashboards"."data" AS "B_data", "dashboards"."version" AS "B_version", "dashboards"."created_at" AS "B_created_at" FROM "folders" LEFT JOIN "dashboards" ON "folders"."id" = "dashboards"."folder_id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."id" ASC"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC"#,
                 [
                     "orgId".into(),
                     0i16.into(),
