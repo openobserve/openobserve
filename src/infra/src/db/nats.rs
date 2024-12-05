@@ -699,7 +699,7 @@ static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 // even the watcher no response still need to check if the key exists. unit: second
 const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
-const LOCKER_WATCHER_UPDATE_TTL: u64 = 5;
+const LOCKER_WATCHER_UPDATE_TTL: u64 = 10;
 
 pub(crate) struct Locker {
     pub key: String,
@@ -902,8 +902,8 @@ async fn keep_alive_lock(
     key: &str,
     lock_id: &str,
 ) -> Result<()> {
-    let mut ticker =
-        tokio::time::interval(tokio::time::Duration::from_secs(LOCKER_WATCHER_UPDATE_TTL));
+    let interval = std::cmp::max(1, (LOCKER_WATCHER_UPDATE_TTL / 2) - 1);
+    let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     loop {
         ticker.tick().await;
         match rx.try_recv() {
