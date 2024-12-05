@@ -51,6 +51,7 @@ export const convertMultiSQLData = async (
   hoveredSeriesState: any,
   resultMetaData: any,
   metadata: any,
+  chartPanelStyle: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     return { options: null };
@@ -68,6 +69,7 @@ export const convertMultiSQLData = async (
         hoveredSeriesState,
         [resultMetaData.value[i]],
         { queries: [metadata.queries[i]] },
+        chartPanelStyle,
       ),
     );
   }
@@ -102,6 +104,7 @@ export const convertSQLData = async (
   hoveredSeriesState: any,
   resultMetaData: any,
   metadata: any,
+  chartPanelStyle: any,
 ) => {
   // if no data than return it
   if (
@@ -606,7 +609,7 @@ export const convertSQLData = async (
 
       options.grid = gridData.gridArray;
 
-      panelSchema.chartHeight = gridData.panelHeight;
+      chartPanelStyle.height = gridData.panelHeight + "px";
 
       // Update axes configuration for trellis layout
       options.xAxis = options.xAxis.slice(0, 1);
