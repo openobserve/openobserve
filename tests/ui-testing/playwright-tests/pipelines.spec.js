@@ -172,7 +172,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmSourceNodeRequired();
   });
 
-  test.skip("should display error on entering only source node and save", async ({
+  test("should display error on entering only source node and save", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -190,6 +190,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -220,6 +222,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Delete the pipeline and confirm
     await pipelinePage.deletePipeline();
@@ -245,6 +249,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(3000);
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
     await page.locator('button').filter({ hasText: 'edit' }).hover();
   await page.getByRole('img', { name: 'Output Stream' }).click();
     await pipelinePage.toggleCreateStream();
@@ -344,8 +350,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     // await pipelinePage.selectAndDragFunction(); // Function drag
     await page.waitForTimeout(2000);
-    // await pipelinePage.selectPreviousNode();
-    // await page.getByText("input").click();
+  await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+  await page.locator('[data-test="confirm-button"]').click()
     await page.locator('button').filter({ hasText: 'edit' }).hover();
     await page.getByRole('img', { name: 'Function',exact: true }).click();
     await pipelinePage.toggleCreateFunction();
@@ -490,6 +496,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(2000);
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
     await page.locator('button').filter({ hasText: 'edit' }).hover();
     await page.getByRole('img', { name: 'Stream',exact: true }).click();
     await page.getByPlaceholder('Column').click();
@@ -581,15 +589,14 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.waitForTimeout(1000);
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
     // Select the second stream, drag, and drop
     await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
-
-    // Select the previous node
-    // await pipelinePage.selectPreviousNode();
-    // await pipelinePage.selectPreviousNodeDrop();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
