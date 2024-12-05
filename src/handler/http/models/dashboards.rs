@@ -54,18 +54,6 @@ pub struct ListDashboardsResponseBody {
 /// An item in the list returned by the `ListDashboards` endpoint.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ListDashboardsResponseBodyItem {
-    pub folder_id: String,
-    pub folder_name: String,
-    pub dashboard_id: String,
-    pub title: String,
-    pub description: String,
-    pub role: String,
-    pub owner: String,
-    #[schema(value_type = String, format = DateTime)]
-    pub created: DateTime<FixedOffset>,
-    pub hash: String,
-    pub version: i32,
-
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v1: Option<v1::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
@@ -76,8 +64,19 @@ pub struct ListDashboardsResponseBodyItem {
     pub v4: Option<v4::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v5: Option<v5::Dashboard>,
+
     pub version: i32,
     pub hash: String,
+
+    pub folder_id: String,
+    pub folder_name: String,
+    pub dashboard_id: String,
+    pub title: String,
+    pub description: String,
+    pub role: String,
+    pub owner: String,
+    #[schema(value_type = String, format = DateTime)]
+    pub created: DateTime<FixedOffset>,
 }
 
 /// HTTP request body for `MoveDashboard` endpoint.
