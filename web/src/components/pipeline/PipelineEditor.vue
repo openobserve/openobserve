@@ -753,7 +753,7 @@ const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
       if (pipelineObj.dirtyFlag || (pipelineObj.currentSelectedPipeline.nodes.length > 1 && !pipelineObj.isEditPipeline)) {
         // Display a confirmation message
-        const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
+        const confirmMessage = t("pipeline.unsavedMessage"); // Some browsers require a return statement to display the message
         e.returnValue = confirmMessage;
         return confirmMessage;
       }
