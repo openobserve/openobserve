@@ -755,6 +755,8 @@ pub(crate) async fn check_permissions(
     auth_info: AuthExtractor,
     role: Option<UserRole>,
 ) -> bool {
+    use crate::common::infra::config::ORG_USERS;
+
     let cfg = get_config();
     if !get_o2_config().openfga.enabled {
         return true;
@@ -773,6 +775,11 @@ pub(crate) async fn check_permissions(
             if role.eq(&UserRole::Root) {
                 // root user should have access to everything , bypass check in openfga
                 return true;
+            } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
+                match ORG_USERS.get(&format!("{}/{user_id}", cfg.common.usage_org)) {
+                    Some(user) => format!("{}", user.role),
+                    None => "".to_string(),
+                }
             } else {
                 format!("{role}")
             }
