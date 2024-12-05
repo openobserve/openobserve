@@ -107,7 +107,7 @@ impl IndexCondition {
                     .to_tantivy_query(&schema, default_fields)
                     .map(|condition| (Occur::Must, condition))
             })
-            .collect::<anyhow::Result<Vec<_>>>()?; 
+            .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
@@ -284,6 +284,18 @@ impl Condition {
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_fields)?;
                 let right_query = right.to_tantivy_query(schema, default_fields)?;
+                let left_query_as = left_query.as_any().downcast_ref::<TermQuery>();
+                let right_query_as = right_query.as_any().downcast_ref::<TermQuery>();
+                if let (Some(left), Some(right)) = (left_query_as, right_query_as) {
+                    let left_term = left.term();
+                    let right_term = right.term();
+                    if left_term.field() == right_term.field() {
+                        return Ok(Box::new(TermSetQuery::new(vec![
+                            left_term.clone(),
+                            right_term.clone(),
+                        ])));
+                    }
+                }
                 Box::new(BooleanQuery::new(vec![
                     (Occur::Should, left_query),
                     (Occur::Should, right_query),
@@ -514,4 +526,3 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         _ => unimplemented!(),
     })
 }
- 
