@@ -16,8 +16,8 @@
 use sea_orm_migration::prelude::*;
 
 use super::{
-    m20241121_000001_create_organizations_table::Organizations,
-    m20241122_130000_create_users_table::Users,
+    m20241205_000001_create_organizations_table::Organizations,
+    m20241205_000200_create_users_table::Users,
 };
 
 #[derive(DeriveMigrationName)]
