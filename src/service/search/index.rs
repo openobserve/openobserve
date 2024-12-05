@@ -9,7 +9,7 @@ use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
     physical_plan::{
-        expressions::{BinaryExpr, Column, LikeExpr, Literal},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
     },
     scalar::ScalarValue,
@@ -17,7 +17,7 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
+    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery, TermSetQuery},
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
@@ -78,6 +78,7 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    In(String, Vec<String>),
     MatchAll(String),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
@@ -106,7 +107,7 @@ impl IndexCondition {
                     .to_tantivy_query(&schema, default_fields)
                     .map(|condition| (Occur::Must, condition))
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .collect::<anyhow::Result<Vec<_>>>()?; 
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
@@ -158,6 +159,7 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
@@ -181,6 +183,15 @@ impl Condition {
                     unreachable!()
                 };
                 Condition::Equal(field, value)
+            }
+            Expr::InList {
+                expr,
+                list,
+                negated: _,
+            } => {
+                let field = get_field_name(expr);
+                let values = list.iter().map(get_value).collect();
+                Condition::In(field, values)
             }
             Expr::Function(func) => {
                 if func.name.to_string().to_lowercase() != "match_all" {
@@ -226,6 +237,13 @@ impl Condition {
                 let field = schema.get_field(field)?;
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+            }
+            Condition::In(field, values) => {
+                let field = schema.get_field(field)?;
+                let terms = values
+                    .iter()
+                    .map(|value| Term::from_field_text(field, value));
+                Box::new(TermSetQuery::new(terms))
             }
             Condition::MatchAll(value) => {
                 if value.starts_with("*") && value.ends_with("*") {
@@ -288,6 +306,9 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
+            Condition::In(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::MatchAll(_) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
@@ -303,6 +324,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
@@ -328,6 +352,16 @@ impl Condition {
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
+            }
+            Condition::In(name, values) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let values: Vec<Arc<dyn PhysicalExpr>> = values
+                    .iter()
+                    .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Arc::new(InListExpr::new(left, values, false, None)))
             }
             Condition::MatchAll(value) => {
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
@@ -383,6 +417,20 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
 
             if !index_fields.contains(&get_field_name(field)) {
                 return false;
+            }
+        }
+        Expr::InList {
+            expr,
+            list,
+            negated: _,
+        } => {
+            if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
+                return false;
+            }
+            for value in list {
+                if !is_value(value) {
+                    return false;
+                }
             }
         }
         Expr::BinaryOp {
@@ -466,3 +514,4 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         _ => unimplemented!(),
     })
 }
+ 
