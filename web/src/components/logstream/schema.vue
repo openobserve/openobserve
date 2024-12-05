@@ -819,7 +819,12 @@ export default defineComponent({
         .then((streamResponse) => {
           streamResponse = updateStreamResponse(streamResponse);
           setSchema(streamResponse);
-          resultTotal.value = streamResponse.schema.length;
+          if(activeTab.value === 'schemaFields'){
+            resultTotal.value = streamResponse.settings?.defined_schema_fields?.length;
+          }
+          else{
+            resultTotal.value = streamResponse.schema?.length;
+          }
           loadingState.value = false;
           dismiss();
         })
@@ -1212,10 +1217,10 @@ export default defineComponent({
     }
     const updateResultTotal = (streamResponse) =>{
       if(activeTab.value === 'schemaFields'){
-        resultTotal.value = streamResponse.settings.defined_schema_fields.length;
+        resultTotal.value = streamResponse.settings?.defined_schema_fields?.length;
       }
       else{
-        resultTotal.value = streamResponse.schema.length;
+        resultTotal.value = streamResponse.schema?.length;
       }
     }
     return {
