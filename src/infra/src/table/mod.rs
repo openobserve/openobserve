@@ -20,6 +20,7 @@ use sea_orm_migration::MigratorTrait;
 use crate::db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE};
 
 pub mod dashboards;
+pub mod distinct_values;
 #[allow(unused_imports)]
 mod entity;
 pub mod folders;
@@ -27,15 +28,15 @@ mod migration;
 pub mod org_invites;
 pub mod org_users;
 pub mod organizations;
+pub mod search_queue;
 pub mod short_urls;
 pub mod users;
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    distinct_values::init().await?;
     short_urls::init().await?;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Migrator::up(client, None).await?;
-
     Ok(())
 }
 
