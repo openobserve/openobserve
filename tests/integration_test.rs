@@ -721,7 +721,7 @@ mod tests {
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
                                 "password": "Abcd12345",
-                                "role": "member"
+                                "role": "admin"
                             }"#;
         let app = test::init_service(
             App::new()
@@ -740,6 +740,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        println!("post user resp: {:?}", resp);
         assert!(resp.status().is_success());
     }
 
