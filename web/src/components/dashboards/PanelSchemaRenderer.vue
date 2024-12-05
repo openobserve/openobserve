@@ -187,6 +187,7 @@ import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
+import { onBeforeMount } from "vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -681,6 +682,17 @@ export default defineComponent({
       }
     };
 
+    let parser: any;
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
@@ -696,74 +708,87 @@ export default defineComponent({
 
         // find drilldown data
         const drilldownData = panelSchema.value.config.drilldown[index];
-        const navigateToLogs = () => {
-          console.log(
-            "navigateToLogs: Initializing navigation to logs.",
-            panelSchema.value,
-          );
+
+        const navigateToLogs = async () => {
+          console.log("navigateToLogs: Initializing navigation to logs.");
 
           const queryDetails = panelSchema.value;
-          console.log("navigateToLogs: Retrieved query details:", queryDetails);
+          if (!queryDetails) {
+            console.error("navigateToLogs: Panel schema is undefined.");
+            return;
+          }
 
-          const originalQuery = queryDetails.queries[0].query;
-          const streamName = queryDetails.queries[0].fields.stream;
+          const originalQuery = queryDetails.queries[0]?.query;
+          const streamName = queryDetails.queries[0]?.fields?.stream;
 
-          // Function to extract WHERE clause
-          const extractWhereClause = (query: any) => {
-            const whereMatch = query.match(
-              /WHERE\s+(.+?)\s+(GROUP BY|ORDER BY|$)/i,
-            );
-            return whereMatch ? whereMatch[1].trim() : null;
-          };
+          if (!originalQuery || !streamName) {
+            console.error("navigateToLogs: Missing query or stream name.");
+            return;
+          }
+
+          // Initialize SQL parser if not already done
+          if (!parser) {
+            await importSqlParser();
+          }
+
+          let ast;
+          try {
+            ast = parser.astify(originalQuery);
+            console.log("navigateToLogs: Parsed AST:", ast);
+          } catch (error) {
+            console.error("navigateToLogs: Failed to parse query:", error);
+            return;
+          }
 
           // Extract WHERE clause
-          const whereClause = extractWhereClause(originalQuery);
-          console.log("navigateToLogs: Extracted WHERE clause:", whereClause);
+          let whereClause: any = ast?.where
+            ? parser.sqlify({ type: "select", where: ast.where })
+            : null;
 
-          // Construct the new query
+          // whereClause will be `SELECT WHERE <whereClause>`
+          // slice where condition(ie WHERE <whereClause>)
+          if (whereClause) {
+            const whereIndex = whereClause.indexOf("WHERE");
+            if (whereIndex !== -1) {
+              whereClause = whereClause.slice(whereIndex);
+            }
+          }
+
+          // Construct new query
           const modifiedQuery =
             drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}" WHERE ${whereClause}`
+              ? `SELECT * FROM "${streamName}"${whereClause ? ` ${whereClause}` : ""}`
               : drilldownData.data.logsQuery;
 
           console.log("navigateToLogs: Modified query:", modifiedQuery);
 
           // Encode the modified query
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
-          console.log("navigateToLogs: Encoded query:", encodedQuery);
-
-          console.log("navigateToLogs: Drilldown data:", drilldownVariables);
 
           // Navigate to logs
-          router
-            .push({
+          try {
+            await router.push({
               path: "/logs",
               query: {
-                stream_type: queryDetails.queries[0].fields.stream_type,
+                stream_type: queryDetails.queries[0]?.fields?.stream_type,
                 stream: streamName,
-                from: (drilldownVariables.start_time = new Date(
+                from: new Date(
                   selectedTimeObj?.value?.start_time?.toISOString(),
-                ).getTime()),
-                to: (drilldownVariables.end_time = new Date(
+                ).getTime(),
+                to: new Date(
                   selectedTimeObj?.value?.end_time?.toISOString(),
-                ).getTime()),
-                refresh: "0",
+                ).getTime(),
                 sql_mode: "true",
                 query: encodedQuery,
                 org_identifier: store.state.selectedOrganization.identifier,
                 quick_mode: "false",
                 show_histogram: "true",
               },
-            })
-            .then(() => {
-              console.log("navigateToLogs: Successfully navigated to logs.");
-            })
-            .catch((error) => {
-              console.error(
-                "navigateToLogs: Failed to navigate to logs:",
-                error,
-              );
             });
+            console.log("navigateToLogs: Successfully navigated to logs.");
+          } catch (error) {
+            console.error("navigateToLogs: Failed to navigate to logs:", error);
+          }
         };
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
