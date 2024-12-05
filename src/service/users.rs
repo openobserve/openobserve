@@ -539,8 +539,12 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
-pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResponse, Error> {
-    let user_list: Vec<UserResponse> = USERS
+pub async fn list_users(
+    org_id: &str,
+    role: Option<UserRole>,
+    permitted: Option<Vec<String>>,
+) -> Result<HttpResponse, Error> {
+    let mut user_list: Vec<UserResponse> = USERS
         .iter()
         .filter(|user| user.key().starts_with(&format!("{org_id}/"))) // Filter by organization ID
         .filter(|user| {
@@ -548,7 +552,7 @@ pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResp
                 // Filter by role if specified
                 user.value().role == *required_role
             } else {
-                 user.value().role!=UserRole::ServiceAccount
+                user.value().role!=UserRole::ServiceAccount
             }
         })
         .map(|user| UserResponse {
@@ -559,6 +563,16 @@ pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResp
             is_external: user.value().is_external,
         })
         .collect();
+
+    user_list.retain(|user| {
+        if user.role.eq(&UserRole::ServiceAccount) && permitted.is_some() {
+            let permitted = permitted.as_ref().unwrap();
+            permitted.contains(&format!("service_accounts:{}", user.email))
+                || permitted.contains(&format!("service_accounts:_all_{org_id}"))
+        } else {
+            true
+        }
+    });
 
     #[cfg(feature = "enterprise")]
     {
@@ -767,7 +781,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", None).await.is_ok())
+        assert!(list_users("dummy", None, None).await.is_ok())
     }
 
     #[tokio::test]
