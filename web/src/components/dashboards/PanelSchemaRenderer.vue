@@ -767,7 +767,7 @@ export default defineComponent({
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
 
           // Navigate to logs
-          const logsUrl = new URL(window.location.origin + "/logs");
+          const logsUrl: any = new URL(window.location.origin + "/logs");
           logsUrl.searchParams.set(
             "stream_type",
             queryDetails.queries[0]?.fields?.stream_type,
