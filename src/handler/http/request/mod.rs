@@ -20,6 +20,7 @@ pub mod dashboards;
 pub mod enrichment_table;
 pub mod folders;
 pub mod functions;
+pub mod keys;
 pub mod kv;
 pub mod logs;
 pub mod metrics;
