@@ -905,6 +905,7 @@ async fn keep_alive_lock(
     let mut ticker =
         tokio::time::interval(tokio::time::Duration::from_secs(LOCKER_WATCHER_UPDATE_TTL));
     loop {
+        ticker.tick().await;
         match rx.try_recv() {
             Ok(_) => {
                 break;
@@ -914,7 +915,6 @@ async fn keep_alive_lock(
                 break;
             }
         }
-        ticker.tick().await;
         // update the locker time to keep alive
         let expiration = chrono::Utc::now().timestamp_micros()
             + Duration::from_secs(LOCKER_WATCHER_UPDATE_TTL).as_micros() as i64;
