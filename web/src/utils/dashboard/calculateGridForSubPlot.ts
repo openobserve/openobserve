@@ -153,7 +153,7 @@ export function getTrellisGrid(
     (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
 
   // Calculate cell height based on cell width
-  const cellHeightInPx = cellWidthInPx * 0.3;
+  const cellHeightInPx = cellWidthInPx * 0.4;
 
   height =
     cellHeightInPx * numRows +

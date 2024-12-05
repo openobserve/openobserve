@@ -3092,37 +3092,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
       }
     }
-
-    const breakDownFields =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown;
-
-    if (breakDownFields.length && showTrellisConfig.value) {
-      if (
-        dashboardPanelData.data.config?.trellis?.layout === "custom" &&
-        dashboardPanelData.data.config?.trellis?.num_of_columns > 16
-      ) {
-        errors.push(
-          "In Trellis Type number of columns should be less than or equal to 16 for custom layout",
-        );
-      }
-    }
   };
-
-  const showTrellisConfig = computed(() => {
-    const supportedTypes = [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "stacked",
-      "h-stacked",
-    ];
-    return supportedTypes.includes(dashboardPanelData.data.type);
-  });
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
 
