@@ -62,21 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Full screen"
           data-test="dashboard-panel-fullscreen-btn"
         />
-        <q-icon
-          v-if="props.data.error_config?.trellis_layout_error_message"
-          name="info_outline"
-          style="cursor: pointer"
-          data-test="dashboard-panel-error-info"
-          color="red"
-          size="15px"
-          class="tw-relative tw-top-[-1px]"
-        >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ props.data.error_config?.trellis_layout_error_message }}
-            </div>
-          </q-tooltip>
-        </q-icon>
         <!-- if table chart then download button as a csv file -->
         <q-btn
           v-if="

@@ -118,10 +118,6 @@ export const convertSQLData = async (
     return { options: null };
   }
 
-  if (panelSchema?.error_config?.trellis_layout_error_message) {
-    delete panelSchema.error_config.trellis_layout_error_message;
-  }
-
   // get the x axis key
   const getXAxisKeys = () => {
     return panelSchema?.queries[0]?.fields?.x?.length
@@ -658,20 +654,6 @@ export const convertSQLData = async (
 
       options.legend.show = false;
     } catch (err: any) {
-      try {
-        const error = JSON.parse(err.message);
-        if (
-          error.type === "trellis_vertical_spacing" ||
-          error.type === "trellis_horizontal_spacing"
-        ) {
-          panelSchema.error_config = {
-            ...(panelSchema.error_config || {}),
-            trellis_layout_error_message: error.message,
-          };
-        }
-        // eslint-disable-next-line no-empty
-      } catch (e) {}
-
       console.error(`Trellis configuration failed: ${err}`);
       // Fallback to default single grid configuration
       options.grid = [
