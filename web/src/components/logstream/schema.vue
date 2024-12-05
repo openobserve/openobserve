@@ -89,11 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="number"
                   dense
                   filled
-                  min="0"
+                  min="1"
                   round
                   class="q-mr-sm q-ml-sm data-retention-input"
                   hide-bottom-space
                   @change="formDirtyFlag = true"
+                  @update:model-value="markFormDirty"
                 />
               <div>
    
