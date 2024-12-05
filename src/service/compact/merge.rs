@@ -60,7 +60,9 @@ use crate::{
     common::infra::cluster::get_node_by_uuid,
     job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
     service::{
-        db, file_list, schema::generate_schema_for_defined_schema_fields, search::datafusion::exec,
+        db, file_list,
+        schema::generate_schema_for_defined_schema_fields,
+        search::{datafusion::exec, DATAFUSION_RUNTIME},
         stream,
     },
 };
@@ -736,7 +738,7 @@ pub async fn merge_files(
             id: format!("{trace_id}-{schema_key}"),
             storage_type: StorageType::Memory,
             work_group: None,
-            target_partitions: 0,
+            target_partitions: 2,
         };
 
         let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
@@ -767,24 +769,29 @@ pub async fn merge_files(
     }
 
     let start = std::time::Instant::now();
-    let merge_result = exec::merge_parquet_files(
-        stream_type,
-        stream_name,
-        schema_latest.clone(),
-        tables,
-        &bloom_filter_fields,
-        &new_file_meta,
-    )
-    .await;
+    let merge_result = {
+        let stream_name = stream_name.to_string();
+        let schema_latest = schema_latest.clone();
+        let new_file_meta = new_file_meta.clone();
+        DATAFUSION_RUNTIME
+            .spawn(async move {
+                exec::merge_parquet_files(
+                    stream_type,
+                    &stream_name,
+                    schema_latest,
+                    tables,
+                    &bloom_filter_fields,
+                    &new_file_meta,
+                )
+                .await
+            })
+            .await?
+    };
 
     // clear session data
     crate::service::search::datafusion::storage::file_list::clear(&trace_id);
-    // clear cached data
-    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-    for file in files.iter() {
-        let _ = file_data::disk::remove("", file).await;
-    }
 
+    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     let (_new_schema, buf) = match merge_result {
         Ok(v) => v,
         Err(e) => {

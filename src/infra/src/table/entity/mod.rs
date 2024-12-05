@@ -6,4 +6,5 @@ pub mod dashboards;
 pub mod folders;
 pub mod org_users;
 pub mod organizations;
+pub mod search_queue;
 pub mod users;

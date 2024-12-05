@@ -28,6 +28,7 @@ mod m20241122_130000_create_users_table;
 mod m20241122_150000_create_org_users_table;
 mod m20241122_163000_populate_users_table;
 mod m20241123_163000_delete_meta_users_table;
+mod m20241204_143100_create_table_search_queue;
 
 pub struct Migrator;
 
@@ -42,6 +43,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241119_000001_create_dashboards_table::Migration),
             Box::new(m20241119_000002_populate_dashboards_table::Migration),
             Box::new(m20241119_000003_delete_metas::Migration),
+            Box::new(m20241204_143100_create_table_search_queue::Migration),
             Box::new(m20241121_000001_create_organizations_table::Migration),
             Box::new(m20241122_000001_populate_organizations_table::Migration),
             Box::new(m20241122_130000_create_users_table::Migration),

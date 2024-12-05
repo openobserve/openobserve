@@ -2,5 +2,6 @@
 
 pub use super::{
     dashboards::Entity as Dashboards, folders::Entity as Folders, org_users::Entity as OrgUsers,
-    organizations::Entity as Organizations, users::Entity as Users,
+    organizations::Entity as Organizations, search_queue::Entity as SearchQueue,
+    users::Entity as Users,
 };
