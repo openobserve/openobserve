@@ -41,10 +41,13 @@ use {
 
 use crate::{
     common::{
-        infra::{cluster::get_cached_online_querier_nodes, config::ENRICHMENT_TABLES},
+        infra::{
+            cluster::get_cached_online_querier_nodes,
+            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
+        },
         meta::stream::StreamSchema,
     },
-    service::{db, enrichment::StreamTable},
+    service::{db, enrichment::StreamTable, organization::check_and_create_org},
 };
 
 pub async fn merge(
@@ -410,6 +413,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             data,
                         },
                     );
+                }
+
+                // if create_org_through_ingestion is enabled, we need to create the org
+                // if it doesn't exist. Hence, we need to check if the org exists in the cache
+                if cfg.common.create_org_through_ingestion
+                    && !ORGANIZATIONS.read().await.contains_key(org_id)
+                {
+                    if let Err(e) = check_and_create_org(org_id).await {
+                        log::error!("Failed to save organization in database: {}", e);
+                    }
                 }
             }
             db::Event::Delete(ev) => {
