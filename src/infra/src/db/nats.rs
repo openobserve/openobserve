@@ -844,12 +844,12 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
             _ = ticker.tick() => {
                 match bucket.get(key).await {
                     Ok(Some(_)) => {
-                        log::debug!("Another process is currently locking the key: {}", key);
+                        log::debug!("nats another process is currently locking the key: {}", key);
                         continue;
                     }
                     Ok(None) => return Ok(()),
                     Err(e) => {
-                        log::error!("Got error from key request, will wait for next tick, key: {}, error: {}",key, e);
+                        log::error!("nats got error from key request, will wait for next tick, key: {}, error: {}",key, e);
                         continue;
                     }
                 }
@@ -863,11 +863,11 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
                                 if matches!(entry.operation, jetstream::kv::Operation::Delete | jetstream::kv::Operation::Purge) {
                                      return Ok(());
                                 }
-                                log::debug!("Event was not delete, continuing to wait the key: {}", key);
+                                log::debug!("nats event was not delete, continuing to wait the key: {}", key);
                                 continue;
                             }
                             Err(e) => {
-                                log::error!("Got error from key watcher, will wait for next event, key: {}, error: {}", key, e);
+                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", key, e);
                                 continue;
                             }
                         }
