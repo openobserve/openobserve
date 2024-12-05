@@ -149,17 +149,10 @@ pub async fn search(
     let file_list_took = start.elapsed().as_millis() as usize;
     #[cfg(not(feature = "enterprise"))]
     let (took_wait, work_group_str, locker) =
-        check_work_group(&req, trace_id, &nodes, start, file_list_took).await?;
+        check_work_group(&req, trace_id, start, file_list_took).await?;
     #[cfg(feature = "enterprise")]
-    let (took_wait, work_group_str, work_group) = check_work_group(
-        &req,
-        trace_id,
-        &nodes,
-        &file_id_list_vec,
-        start,
-        file_list_took,
-    )
-    .await?;
+    let (took_wait, work_group_str, work_group) =
+        check_work_group(&req, trace_id, &file_id_list_vec, start, file_list_took).await?;
     // add work_group
     req.add_work_group(Some(work_group_str));
 
@@ -444,7 +437,6 @@ pub async fn get_online_querier_nodes(
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
-    nodes: &[Node],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
 ) -> Result<(usize, String, Option<infra::dist_lock::Locker>)> {
@@ -455,11 +447,7 @@ pub async fn check_work_group(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        let node_ids = nodes
-            .iter()
-            .map(|node| node.uuid.to_string())
-            .collect::<HashSet<_>>();
-        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64)
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -483,7 +471,6 @@ pub async fn check_work_group(
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
-    nodes: &[Node],
     file_id_list_vec: &[&FileId],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
@@ -512,11 +499,7 @@ pub async fn check_work_group(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        let node_ids = nodes
-            .iter()
-            .map(|node| node.uuid.to_string())
-            .collect::<HashSet<_>>();
-        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64)
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
