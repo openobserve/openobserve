@@ -233,7 +233,6 @@ export default function useDragAndDrop() {
 
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
     if(isCycle){
-      console.log($q,"qusar")
       $q.notify({
         message: "Adding this edge will create a cycle in the pipeline",
         color: "negative",
@@ -462,9 +461,7 @@ export default function useDragAndDrop() {
     // pipelineObj.currentSelectedNodeData = dialogObj;
     pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
-    console.log(pipelineObj.currentSelectedNodeData,'current')
     if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
-      console.log(pipelineObj.currentSelectedPipeline.nodes.length,'length')
       const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
 
       const nodeId = getUUID();
@@ -498,16 +495,9 @@ export default function useDragAndDrop() {
         newEdge,
       ];
     }
-    console.log(pipelineObj.currentSelectedPipeline,'cur')
   }
 
-
-
-  
-  
-
   function editNode(updatedNode:any) {
-    console.log(updateNode,"update Node")
     const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
       (node:any) => node.id === updatedNode.id,
     );

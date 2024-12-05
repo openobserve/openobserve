@@ -207,6 +207,14 @@ onMounted(async () => {
   await getStreamList();
 });
 
+watch(stream_type, (newValue:any) => {
+  if(newValue){
+    stream_name.value = {label: "", value: "", isDisable: false};
+    
+  }
+  getStreamList();
+});
+
 watch(() => dynamic_stream_name.value,
 ()=>{
   if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
