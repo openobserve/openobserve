@@ -717,9 +717,10 @@ export default defineComponent({
             console.error("navigateToLogs: Panel schema is undefined.");
             return;
           }
-
-          const originalQuery = queryDetails.queries[0]?.query;
-          const streamName = queryDetails.queries[0]?.fields?.stream;
+          console.log("navigateToLogs: Panel schema: metadata", metadata?.value);
+          
+          const originalQuery = metadata?.value?.queries[0]?.query;
+          const streamName = queryDetails?.queries[0]?.fields?.stream;
 
           if (!originalQuery || !streamName) {
             console.error("navigateToLogs: Missing query or stream name.");
