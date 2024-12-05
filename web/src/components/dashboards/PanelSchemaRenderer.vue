@@ -766,25 +766,44 @@ export default defineComponent({
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
 
           // Navigate to logs
+          const logsUrl = new URL(window.location.origin + "/logs");
+          logsUrl.searchParams.set(
+            "stream_type",
+            queryDetails.queries[0]?.fields?.stream_type,
+          );
+          logsUrl.searchParams.set("stream", streamName);
+          logsUrl.searchParams.set(
+            "from",
+            new Date(
+              selectedTimeObj?.value?.start_time?.toISOString(),
+            ).getTime(),
+          );
+          logsUrl.searchParams.set(
+            "to",
+            new Date(selectedTimeObj?.value?.end_time?.toISOString()).getTime(),
+          );
+          logsUrl.searchParams.set("sql_mode", "true");
+          logsUrl.searchParams.set("query", encodedQuery);
+          logsUrl.searchParams.set(
+            "org_identifier",
+            store.state.selectedOrganization.identifier,
+          );
+          logsUrl.searchParams.set("quick_mode", "false");
+          logsUrl.searchParams.set("show_histogram", "true");
+
           try {
-            await router.push({
-              path: "/logs",
-              query: {
-                stream_type: queryDetails.queries[0]?.fields?.stream_type,
-                stream: streamName,
-                from: new Date(
-                  selectedTimeObj?.value?.start_time?.toISOString(),
-                ).getTime(),
-                to: new Date(
-                  selectedTimeObj?.value?.end_time?.toISOString(),
-                ).getTime(),
-                sql_mode: "true",
-                query: encodedQuery,
-                org_identifier: store.state.selectedOrganization.identifier,
-                quick_mode: "false",
-                show_histogram: "true",
-              },
-            });
+            if (drilldownData.targetBlank) {
+              console.log("navigateToLogs: Navigating to logs in a new tab.");
+              window.open(logsUrl.toString(), "_blank");
+            } else {
+              console.log(
+                "navigateToLogs: Navigating to logs in the same tab.",
+              );
+              await router.push({
+                path: "/logs",
+                query: Object.fromEntries(logsUrl.searchParams.entries()),
+              });
+            }
             console.log("navigateToLogs: Successfully navigated to logs.");
           } catch (error) {
             console.error("navigateToLogs: Failed to navigate to logs:", error);
