@@ -172,7 +172,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmSourceNodeRequired();
   });
 
-  test.skip("should display error on entering only source node and save", async ({
+  test("should display error on entering only source node and save", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
