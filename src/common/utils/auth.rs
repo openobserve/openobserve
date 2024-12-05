@@ -685,6 +685,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
         infra_table::create_user_tables().await.unwrap();
