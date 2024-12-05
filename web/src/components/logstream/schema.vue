@@ -84,21 +84,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <q-input
-                data-test="stream-details-data-retention-input"
-                v-model="dataRetentionDays"
-                type="number"
-                dense
-                filled
-                min="0"
-                round
-                class="q-mr-sm q-ml-sm data-retention-input"
-                :rules="[
-                  (val: any) =>
-                    (!!val && val > 0) ||
-                    'Retention period must be at least 1 day',
-                ]"
-                @change="formDirtyFlag = true"
-              ></q-input>
+                  data-test="stream-details-data-retention-input"
+                  v-model="dataRetentionDays"
+                  type="number"
+                  dense
+                  filled
+                  min="0"
+                  round
+                  class="q-mr-sm q-ml-sm data-retention-input"
+                  hide-bottom-space
+                  @change="formDirtyFlag = true"
+                />
               <div>
    
               </div>
@@ -134,22 +130,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-
+          <div
+            class="q-ma-none q-pa-none text-negative"
+            style="min-height: 20px;"
+          >
+            <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
+              Retention period must be at least 1 day
+            </span>
+        </div>
           </template>
 
-          <q-separator class="q-my-md" />
+          <q-separator class="q-mb-md" />
 
 
           <div
             class="title flex tw-justify-between tw-items-center"
             data-test="schema-log-stream-mapping-title-text"
           >
-            <div class="mapping-warning-msg" style="font-weight: 400;">
-              {{ t("logStream.mapping") }}
+            <div  style="font-weight: 400;">
               <label
                 v-show="indexData.defaultFts"
                 style="font-weight:600"
-                >Default FTS keys used (no custom keys set).</label
+                class="mapping-warning-msg"
+                > {{ t("logStream.mapping") }} Default FTS keys used (no custom keys set).</label
               >
             </div>
             <q-toggle
@@ -205,44 +208,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>    
                 </div>
           <div class="q-mb-md" v-if="isDialogOpen">
-            <q-card style="width: 100vw; max-width: 100%; display: flex; flex-direction: column;">
+            <q-card class="add-fields-card" >
         
         <!-- Header Section -->
-        <q-card-section>
-          <div class="tw-flex tw-justify-between tw-items-center">
-            <div class="text-h6">Add Field(s)</div>
-            <div>
-              <q-btn
-                data-test="add-stream-cancel-btn"
-                icon="close"
-                class="q-my-sm text-bold q-mr-md"
-                text-color="light-text"
-                padding="sm md"
-                no-caps
-                dense
-                flat
-                @click="closeDialog"
-              />
-            </div>
-          </div>
-        </q-card-section>
-        <!-- Main Content (Scrollable if necessary) -->
-        <q-card-section class="q-pa-none" style="flex: 1; overflow-y: auto;">
-          <StreamFieldsInputs
-            :fields="newSchemaFields"
-            :showHeader="false"
-            :isInSchema = 'true'
-            :visibleInputs="{
-              name: true,
-              type: false,
-              index_type: false,
-            }"
-            @add="addSchemaField"
-            @remove="removeSchemaField"
-          />
-        </q-card-section>
+              <q-card-section>
+                <div class="tw-flex tw-justify-between tw-items-center">
+                  <div class="text-h6">Add Field(s)</div>
+                  <div>
+                    <q-btn
+                      data-test="add-stream-cancel-btn"
+                      icon="close"
+                      class="q-my-sm text-bold q-mr-md"
+                      text-color="light-text"
+                      padding="sm md"
+                      no-caps
+                      dense
+                      flat
+                      @click="closeDialog"
+                    />
+                  </div>
+                </div>
+              </q-card-section>
+              <!-- Main Content (Scrollable if necessary) -->
+              <q-card-section class="q-pa-none" style="flex: 1; overflow-y: auto;">
+                <StreamFieldsInputs
+                  :fields="newSchemaFields"
+                  :showHeader="false"
+                  :isInSchema = 'true'
+                  :visibleInputs="{
+                    name: true,
+                    type: false,
+                    index_type: false,
+                  }"
+                  @add="addSchemaField"
+                  @remove="removeSchemaField"
+                />
+              </q-card-section>
 
-      </q-card>
+            </q-card>
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -279,7 +282,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="col in props.cols"
                   :key="col.name"
                   :props="props"
-                  class=""
                 >
                 <span v-if="col.icon" >
                   <q-icon color="primary" :name="outlinedPerson"></q-icon>
@@ -334,10 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-td>{{ props.row.type }}</q-td>
               </template>
               <template v-slot:body-cell-settings="props">
-                <q-td  v-if="props.row.isUserDefined" >
+                <q-td class="text-left"  v-if="props.row.isUserDefined" >
                   <q-icon color="primary" :name="outlinedPerson"></q-icon>
                   <q-icon color="primary" :name="outlinedSchema"></q-icon>
-
                 </q-td>
                 <q-td v-else>
 
@@ -345,7 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-slot:body-cell-index_type="props">
                 <q-td data-test="schema-stream-index-select"
-                  ><q-select
+                  >
+                  <q-select
                     v-if="
                       !(
                         props.row.name ==
@@ -373,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    style="width: 300px"
+                    style="min-width:300px; max-width: 300px; "
                     @update:model-value="markFormDirty(props.row.name, 'fts')"
                   />
                 </q-td>
@@ -433,12 +435,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
                 v-close-popup="true"
                 data-test="schema-cancel-button"
-                class="q-my-sm text-bold float-right q-ml-md"
+                class="q-my-sm text-bold float-right q-ml-md btn-delete"
                 :label="t('logStream.cancel')"
                 text-color="red"
                 padding="sm md"
-                 style="border: 1px red solid;"
                 no-caps
+                dense
+                flat
+                 style="border: 1px red solid;"
               />
               <q-btn
                 v-bind:disable="!formDirtyFlag"
@@ -540,11 +544,6 @@ export default defineComponent({
     const router = useRouter();
     const qTable = ref(null);
     const newSchemaFields = ref([
-      {
-        name: "",
-        type: "",
-        index_type: [],
-      },
     ]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
@@ -1087,14 +1086,14 @@ export default defineComponent({
       {
         name: "type",
         label: t("logStream.propertyType"),
-        align: "center",
+        align: "left",
         sortable: true,
         field: "type",
       },
       {
         name: "index_type",
         label: t("logStream.indexType"),
-        align: "center",
+        align: "left",
         sortable: false,
       },
     ];
@@ -1113,11 +1112,6 @@ export default defineComponent({
       if(newSchemaFields.value.length === 0){
         isDialogOpen.value = false;
         newSchemaFields.value = [
-        {
-          name: "",
-          type: "",
-          index_type: [],
-        },
       ]
       }
 
@@ -1445,6 +1439,12 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
+.add-fields-card{
+  width: 100vw; 
+  max-width: 100%; 
+  display: flex; 
+  flex-direction: column;
+}
 .stream-schema-index-select {
   .q-field__control {
     .q-field__control-container {
@@ -1465,6 +1465,20 @@ export default defineComponent({
   .q-table__control {
     width: 100%;
   }
+
+  .q-table{
+    td:nth-child(2) {
+      min-width: 20rem;
+      width: 20rem;
+      max-width: 10rem;
+      overflow: scroll;
+      text-wrap: wrap;
+    }
+    td:nth-child(3) {
+      padding: 4px 8px !important;
+    }
+  }
+
 
   th:first-child,
   td:first-child {
