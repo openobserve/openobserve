@@ -15,7 +15,12 @@
 
 //! Deletes user records from the meta table.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+use std::collections::HashMap;
+
+use config::meta::user::{DBUser, UserOrg};
+use sea_orm::{
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, TransactionTrait,
+};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -33,8 +38,53 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    async fn down(&self, _: &SchemaManager) -> Result<(), DbErr> {
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // The deletion of records from the meta table is not reversable.
+        let db = manager.get_connection();
+        let txn = db.begin().await?;
+        // Migrate pages of 100 records at a time to avoid loading too many
+        // records into memory.
+        // txn.execute()
+        let mut db_users = HashMap::new();
+        let mut user_pages = users::Entity::find()
+            .order_by_asc(users::Column::Id)
+            .paginate(&txn, 100);
+
+        while let Some(users) = user_pages.fetch_and_next().await? {
+            for u in users {
+                let db_user = DBUser {
+                    email: u.email.clone(),
+                    first_name: u.first_name.clone(),
+                    last_name: u.last_name.clone(),
+                    password: u.password.clone(),
+                    salt: u.salt.clone(),
+                    password_ext: u.password_ext.clone(),
+                    is_external: u.user_type != 0,
+                    organizations: vec![],
+                };
+                db_users.insert(u.email.clone(), db_user);
+            }
+        }
+
+        let mut org_user_pages = org_users::Entity::find()
+            .order_by_asc(org_users::Column::Id)
+            .paginate(&txn, 100);
+
+        while let Some(org_users) = org_user_pages.fetch_and_next().await? {
+            for ou in org_users {
+                let db_user = db_users
+                    .get_mut(&ou.email)
+                    .ok_or_else(|| DbErr::Migration("User not found".to_string()))?;
+                db_user.organizations.push(UserOrg {
+                    name: ou.org_id.clone(),
+                    role: ou.role.into(),
+                    token: ou.token.clone(),
+                    rum_token: ou.rum_token.clone(),
+                });
+            }
+        }
+
+        txn.commit().await?;
         Ok(())
     }
 }
@@ -59,6 +109,57 @@ mod meta {
         pub start_dt: i64,
         #[sea_orm(column_type = "Text")]
         pub value: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+mod users {
+    use sea_orm::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "users")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        #[sea_orm(unique)]
+        pub email: String,
+        pub first_name: String,
+        pub last_name: String,
+        #[sea_orm(column_type = "Text")]
+        pub password: String,
+        pub salt: String,
+        pub is_root: bool,
+        pub password_ext: Option<String>,
+        pub user_type: i16,
+        pub created_at: i64,
+        pub updated_at: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+mod org_users {
+    use sea_orm::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "org_users")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub email: String,
+        pub org_id: String,
+        pub role: i16,
+        pub token: String,
+        pub rum_token: Option<String>,
+        pub created_at: i64,
+        pub updated_at: i64,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
