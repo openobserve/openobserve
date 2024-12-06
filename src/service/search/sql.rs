@@ -1334,7 +1334,10 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             pattern: _,
             escape_char: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => f.name.to_string().to_lowercase() == "match_all",
+        Expr::Function(f) => {
+            let f = f.name.to_string().to_lowercase();
+            f == "match_all" || f == "fuzzy_match"
+        }
         _ => false,
     }
 }

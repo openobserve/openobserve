@@ -8,6 +8,7 @@ use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
+    physical_expr::ScalarFunctionExpr,
     physical_plan::{
         expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
@@ -17,12 +18,18 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery, TermSetQuery},
+    query::{
+        BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery,
+        TermSetQuery,
+    },
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
 
-use super::utils::{is_field, is_value, split_conjunction, trim_quotes};
+use super::{
+    datafusion::udf::fuzzy_match_udf,
+    utils::{is_field, is_value, split_conjunction, trim_quotes},
+};
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
@@ -80,6 +87,7 @@ pub enum Condition {
     Equal(String, String),
     In(String, Vec<String>),
     MatchAll(String),
+    FuzzyMatch(String, u8),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
 }
@@ -161,6 +169,10 @@ impl Condition {
             Condition::Equal(field, value) => format!("{}={}", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
+            Condition::FuzzyMatch(value, distance) => format!(
+                "fuzzy({}, {}, {})",
+                INDEX_FIELD_NAME_FOR_ALL, value, distance
+            ),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -284,6 +296,18 @@ impl Condition {
                     }
                 }
             }
+            Condition::FuzzyMatch(value, distance) => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!("There's no FullTextSearch field for fuzzy_match() function")
+                })?;
+                if value.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "The value of fuzzy_match() function can't be empty"
+                    ));
+                }
+                let term = Term::from_field_text(default_field, value);
+                Box::new(FuzzyTermQuery::new(term, *distance, false))
+            }
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
@@ -312,6 +336,9 @@ impl Condition {
             Condition::MatchAll(_) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
+            Condition::FuzzyMatch(..) => {
+                fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
+            }
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_tantivy_fields());
                 fields.extend(right.get_tantivy_fields());
@@ -330,6 +357,9 @@ impl Condition {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
+                fields.extend(fst_fields.iter().cloned());
+            }
+            Condition::FuzzyMatch(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
@@ -379,6 +409,32 @@ impl Condition {
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
                         "Using match_all() function in a stream that don't have full text search field"
+                    )); // already check this in sql.rs
+                }
+                Ok(disjunction(expr_list))
+            }
+            Condition::FuzzyMatch(value, distance) => {
+                let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
+                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))));
+                let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
+                let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
+                    Vec::with_capacity(fst_fields.len());
+                for field in fst_fields.iter() {
+                    let new_expr = Arc::new(ScalarFunctionExpr::new(
+                        fuzzy_expr.name(),
+                        fuzzy_expr.clone(),
+                        vec![
+                            Arc::new(Column::new(field, schema.index_of(field).unwrap())),
+                            term.clone(),
+                            distance.clone(),
+                        ],
+                        DataType::Boolean,
+                    ));
+                    expr_list.push(new_expr);
+                }
+                if expr_list.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "Using fuzzy_match() function in a stream that don't have full text search field"
                     )); // already check this in sql.rs
                 }
                 Ok(disjunction(expr_list))
@@ -445,11 +501,13 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 && is_expr_valid_for_index(right, index_fields);
         }
         Expr::Function(func) => {
-            if func.name.to_string().to_lowercase() != "match_all" {
+            let f = func.name.to_string().to_lowercase();
+            if f != "match_all" && f != "fuzzy_match" {
                 return false;
             }
             if let FunctionArguments::List(list) = &func.args {
-                if list.args.len() != 1 {
+                let args_len = list.args.len();
+                if args_len != 1 && args_len != 2 {
                     return false;
                 }
             } else {
