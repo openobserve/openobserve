@@ -97,14 +97,14 @@ impl IndexCondition {
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         let queries = self
             .conditions
             .iter()
             .map(|condition| {
                 condition
-                    .to_tantivy_query(&schema, default_fields)
+                    .to_tantivy_query(&schema, default_field)
                     .map(|condition| (Occur::Must, condition))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -230,7 +230,7 @@ impl Condition {
     pub fn to_tantivy_query(
         &self,
         schema: &Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         Ok(match self {
             Condition::Equal(field, value) => {
@@ -246,17 +246,20 @@ impl Condition {
                 Box::new(TermSetQuery::new(terms))
             }
             Condition::MatchAll(value) => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
+                })?;
                 if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else if value.to_lowercase().starts_with("re:") {
                     let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else if value.ends_with("*") {
                     let value = value.strip_suffix("*").unwrap();
                     Box::new(PhrasePrefixQuery::new_with_offset(vec![(
                         0,
-                        Term::from_field_text(default_fields, value),
+                        Term::from_field_text(default_field, value),
                     )]))
                 } else {
                     if value.is_empty() {
@@ -267,7 +270,7 @@ impl Condition {
                     let mut terms: Vec<(Occur, Box<dyn Query>)> = o2_collect_tokens(value)
                         .into_iter()
                         .map(|value| {
-                            let term = Term::from_field_text(default_fields, &value);
+                            let term = Term::from_field_text(default_field, &value);
                             (
                                 Occur::Must,
                                 Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
@@ -282,13 +285,13 @@ impl Condition {
                 }
             }
             Condition::Or(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
                 optimize_or_query_with_termset(left_query, right_query)
             }
             Condition::And(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
                 Box::new(BooleanQuery::new(vec![
                     (Occur::Must, left_query),
                     (Occur::Must, right_query),
