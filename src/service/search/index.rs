@@ -9,7 +9,7 @@ use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
     physical_plan::{
-        expressions::{BinaryExpr, Column, LikeExpr, Literal},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
     },
     scalar::ScalarValue,
@@ -17,7 +17,7 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
+    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery, TermSetQuery},
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
@@ -78,6 +78,7 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    In(String, Vec<String>),
     MatchAll(String),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
@@ -96,14 +97,14 @@ impl IndexCondition {
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         let queries = self
             .conditions
             .iter()
             .map(|condition| {
                 condition
-                    .to_tantivy_query(&schema, default_fields)
+                    .to_tantivy_query(&schema, default_field)
                     .map(|condition| (Occur::Must, condition))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -158,6 +159,7 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
@@ -181,6 +183,15 @@ impl Condition {
                     unreachable!()
                 };
                 Condition::Equal(field, value)
+            }
+            Expr::InList {
+                expr,
+                list,
+                negated: _,
+            } => {
+                let field = get_field_name(expr);
+                let values = list.iter().map(get_value).collect();
+                Condition::In(field, values)
             }
             Expr::Function(func) => {
                 if func.name.to_string().to_lowercase() != "match_all" {
@@ -219,7 +230,7 @@ impl Condition {
     pub fn to_tantivy_query(
         &self,
         schema: &Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         Ok(match self {
             Condition::Equal(field, value) => {
@@ -227,18 +238,28 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
+            Condition::In(field, values) => {
+                let field = schema.get_field(field)?;
+                let terms = values
+                    .iter()
+                    .map(|value| Term::from_field_text(field, value));
+                Box::new(TermSetQuery::new(terms))
+            }
             Condition::MatchAll(value) => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
+                })?;
                 if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else if value.to_lowercase().starts_with("re:") {
                     let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else if value.ends_with("*") {
                     let value = value.strip_suffix("*").unwrap();
                     Box::new(PhrasePrefixQuery::new_with_offset(vec![(
                         0,
-                        Term::from_field_text(default_fields, value),
+                        Term::from_field_text(default_field, value),
                     )]))
                 } else {
                     if value.is_empty() {
@@ -249,7 +270,7 @@ impl Condition {
                     let mut terms: Vec<(Occur, Box<dyn Query>)> = o2_collect_tokens(value)
                         .into_iter()
                         .map(|value| {
-                            let term = Term::from_field_text(default_fields, &value);
+                            let term = Term::from_field_text(default_field, &value);
                             (
                                 Occur::Must,
                                 Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
@@ -264,16 +285,13 @@ impl Condition {
                 }
             }
             Condition::Or(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
-                Box::new(BooleanQuery::new(vec![
-                    (Occur::Should, left_query),
-                    (Occur::Should, right_query),
-                ]))
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
+                optimize_or_query_with_termset(left_query, right_query)
             }
             Condition::And(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
                 Box::new(BooleanQuery::new(vec![
                     (Occur::Must, left_query),
                     (Occur::Must, right_query),
@@ -286,6 +304,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
@@ -303,6 +324,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) => {
@@ -328,6 +352,16 @@ impl Condition {
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
+            }
+            Condition::In(name, values) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let values: Vec<Arc<dyn PhysicalExpr>> = values
+                    .iter()
+                    .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Arc::new(InListExpr::new(left, values, false, None)))
             }
             Condition::MatchAll(value) => {
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
@@ -383,6 +417,23 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
 
             if !index_fields.contains(&get_field_name(field)) {
                 return false;
+            }
+        }
+        Expr::InList {
+            expr,
+            list,
+            negated,
+        } => {
+            if *negated {
+                return false;
+            }
+            if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
+                return false;
+            }
+            for value in list {
+                if !is_value(value) {
+                    return false;
+                }
             }
         }
         Expr::BinaryOp {
@@ -465,4 +516,58 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         )))),
         _ => unimplemented!(),
     })
+}
+
+fn optimize_or_query_with_termset(left: Box<dyn Query>, right: Box<dyn Query>) -> Box<dyn Query> {
+    // check both termQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermQuery>(),
+        right.as_any().downcast_ref::<TermQuery>(),
+    ) {
+        let left_term = left.term();
+        let right_term = right.term();
+        if left_term.field() == right_term.field() {
+            return Box::new(TermSetQuery::new(vec![
+                left_term.clone(),
+                right_term.clone(),
+            ]));
+        }
+    }
+
+    // check left is termSetQuery, right is termQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermSetQuery>(),
+        right.as_any().downcast_ref::<TermQuery>(),
+    ) {
+        let right_term = right.term();
+        let mut termset = Vec::new();
+        left.query_terms(&mut |term, _| {
+            termset.push(term);
+        });
+        if !termset.is_empty() && termset.first().unwrap().field() == right_term.field() {
+            termset.push(right_term);
+            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
+        }
+    }
+
+    // check left is termQuery, right is termSetQuery
+    if let (Some(left), Some(right)) = (
+        left.as_any().downcast_ref::<TermQuery>(),
+        right.as_any().downcast_ref::<TermSetQuery>(),
+    ) {
+        let left_term = left.term();
+        let mut termset = Vec::new();
+        right.query_terms(&mut |term, _| {
+            termset.push(term);
+        });
+        if !termset.is_empty() && termset.first().unwrap().field() == left_term.field() {
+            termset.push(left_term);
+            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
+        }
+    }
+
+    Box::new(BooleanQuery::new(vec![
+        (Occur::Should, left),
+        (Occur::Should, right),
+    ]))
 }
