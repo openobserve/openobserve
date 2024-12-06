@@ -134,7 +134,7 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<OrganizationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
+    let mut res = Entity::find().order_by(Column::Identifier, Order::Asc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
