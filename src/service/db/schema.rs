@@ -261,6 +261,10 @@ pub async fn list(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    let audit_enabled = get_o2_config().common.audit_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let audit_enabled = false;
     let key = "/schema/";
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -417,7 +421,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if cfg.common.create_org_through_ingestion
+                if (cfg.common.create_org_through_ingestion
+                    || cfg.common.usage_enabled
+                    || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
                 {
                     if let Err(e) = check_and_create_org(org_id).await {
