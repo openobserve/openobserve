@@ -917,7 +917,7 @@ async fn keep_alive_lock(
     orig_key: &str,
     lock_id: &str,
 ) -> Result<()> {
-    let interval = std::cmp::max(1, (LOCKER_WATCHER_UPDATE_TTL as u64 / 2) - 1);
+    let interval = std::cmp::max(1, LOCKER_WATCHER_UPDATE_TTL as u64 / 3);
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     ticker.tick().await; // first tick will be immediate
     loop {
