@@ -87,7 +87,7 @@ pub enum Condition {
     Equal(String, String),
     In(String, Vec<String>),
     MatchAll(String),
-    FuzzyMatch(String, u8),
+    FuzzyMatchAll(String, u8),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
 }
@@ -169,8 +169,8 @@ impl Condition {
             Condition::Equal(field, value) => format!("{}={}", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
-            Condition::FuzzyMatch(value, distance) => format!(
-                "fuzzy({}, {}, {})",
+            Condition::FuzzyMatchAll(value, distance) => format!(
+                "{}:fuzzy({}, {})",
                 INDEX_FIELD_NAME_FOR_ALL, value, distance
             ),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
@@ -206,14 +206,29 @@ impl Condition {
                 Condition::In(field, values)
             }
             Expr::Function(func) => {
-                if func.name.to_string().to_lowercase() != "match_all" {
-                    unreachable!()
-                }
-                if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() != 1 {
+                let fn_name = func.name.to_string().to_lowercase();
+                if fn_name == "match_all" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 1 {
+                            unreachable!()
+                        }
+                        Condition::MatchAll(trim_quotes(list.args[0].to_string().as_str()))
+                    } else {
                         unreachable!()
                     }
-                    Condition::MatchAll(trim_quotes(list.args[0].to_string().as_str()))
+                } else if fn_name == "fuzzy_match_all" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let value = trim_quotes(list.args[0].to_string().as_str());
+                        let distance = trim_quotes(list.args[1].to_string().as_str())
+                            .parse()
+                            .unwrap_or(1);
+                        Condition::FuzzyMatchAll(value, distance)
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     unreachable!()
                 }
@@ -296,13 +311,15 @@ impl Condition {
                     }
                 }
             }
-            Condition::FuzzyMatch(value, distance) => {
+            Condition::FuzzyMatchAll(value, distance) => {
                 let default_field = default_field.ok_or_else(|| {
-                    anyhow::anyhow!("There's no FullTextSearch field for fuzzy_match() function")
+                    anyhow::anyhow!(
+                        "There's no FullTextSearch field for fuzzy_match_all() function"
+                    )
                 })?;
                 if value.is_empty() {
                     return Err(anyhow::anyhow!(
-                        "The value of fuzzy_match() function can't be empty"
+                        "The value of fuzzy_match_all() function can't be empty"
                     ));
                 }
                 let term = Term::from_field_text(default_field, value);
@@ -336,7 +353,7 @@ impl Condition {
             Condition::MatchAll(_) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
-            Condition::FuzzyMatch(..) => {
+            Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
@@ -359,7 +376,7 @@ impl Condition {
             Condition::MatchAll(_) => {
                 fields.extend(fst_fields.iter().cloned());
             }
-            Condition::FuzzyMatch(..) => {
+            Condition::FuzzyMatchAll(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
@@ -413,7 +430,7 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
-            Condition::FuzzyMatch(value, distance) => {
+            Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))));
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
@@ -434,7 +451,7 @@ impl Condition {
                 }
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
-                        "Using fuzzy_match() function in a stream that don't have full text search field"
+                        "Using fuzzy_match_all() function in a stream that don't have full text search field"
                     )); // already check this in sql.rs
                 }
                 Ok(disjunction(expr_list))
@@ -501,13 +518,21 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 && is_expr_valid_for_index(right, index_fields);
         }
         Expr::Function(func) => {
-            let f = func.name.to_string().to_lowercase();
-            if f != "match_all" && f != "fuzzy_match" {
-                return false;
-            }
-            if let FunctionArguments::List(list) = &func.args {
-                let args_len = list.args.len();
-                if args_len != 1 && args_len != 2 {
+            let fn_name = func.name.to_string().to_lowercase();
+            if fn_name == "match_all" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 1 {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } else if fn_name == "fuzzy_match_all" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 2 {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else {
