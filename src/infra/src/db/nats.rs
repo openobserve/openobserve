@@ -24,7 +24,13 @@ use std::{
 use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, get_config, ider, utils::base64};
+use config::{
+    cluster, get_config, ider,
+    utils::{
+        base64,
+        time::{now_micros, second_micros},
+    },
+};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -699,7 +705,7 @@ static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 // even the watcher no response still need to check if the key exists. unit: second
 const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
-const LOCKER_WATCHER_UPDATE_TTL: u64 = 10;
+const LOCKER_WATCHER_UPDATE_TTL: i64 = 10;
 
 pub(crate) struct Locker {
     pub key: String,
@@ -726,14 +732,13 @@ impl Locker {
             cfg.nats.lock_wait_timeout
         } else {
             timeout
-        };
-        let expiration =
-            chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
+        } as i64;
+        let now = now_micros();
         let value = Bytes::from(format!(
             "{}:{}:{}",
             self.lock_id,
             cluster::LOCAL_NODE.uuid,
-            expiration
+            now + second_micros(LOCKER_WATCHER_UPDATE_TTL)
         ));
         let key = key_encode(new_key);
 
@@ -751,9 +756,11 @@ impl Locker {
         let _lock_guard = locker.lock().await;
 
         // removes locks that are expired or acquired by nodes that are no longer alive
-        _ = check_exist_lock(&bucket, &key).await?;
+        _ = check_exist_lock(&bucket, &key, &self.key).await?;
 
         let mut last_err = None;
+
+        let expiration = now + second_micros(timeout);
         while expiration > chrono::Utc::now().timestamp_micros() {
             match bucket.create(&key, value.clone()).await {
                 Ok(_) => {
@@ -764,7 +771,7 @@ impl Locker {
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    if let Err(e) = wait_for_delete(&bucket, &key).await {
+                    if let Err(e) = wait_for_delete(&bucket, &key, &self.key).await {
                         log::error!("nats wait_for_delete key: {}, error: {}", key, e);
                     }
                 }
@@ -789,8 +796,11 @@ impl Locker {
         self.tx = Some(tx);
         let lock_id = self.lock_id.clone();
         let lock_key = self.key.clone();
+        let bucket_key = key.clone();
         tokio::task::spawn(async move {
-            if let Err(e) = keep_alive_lock(&mut rx, &bucket, &lock_key, &lock_id).await {
+            if let Err(e) =
+                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id).await
+            {
                 log::error!("nats keep alive for key: {}, error: {}", lock_key, e);
             }
         });
@@ -814,19 +824,19 @@ impl Locker {
         if !ret.starts_with(&self.lock_id) {
             return Ok(());
         }
-        if let Err(e) = bucket.purge(&key).await {
-            log::error!("nats unlock for key: {}, error: {}", self.key, e);
-            return Err(Error::Message("nats unlock error".to_string()));
-        };
         self.state.store(2, Ordering::SeqCst);
         if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
             log::error!("nats unlock sender for key: {}, error: {}", self.key, e);
         }
+        if let Err(e) = bucket.purge(&key).await {
+            log::error!("nats unlock for key: {}, error: {}", self.key, e);
+            return Err(Error::Message("nats unlock error".to_string()));
+        };
         Ok(())
     }
 }
 
-async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()> {
+async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &str) -> Result<()> {
     let mut ticker =
         tokio::time::interval(tokio::time::Duration::from_secs(LOCKER_WATCHER_CHECK_TTL));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -841,7 +851,7 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
         }
         tokio::select! {
             _ = ticker.tick() => {
-                if check_exist_lock(bucket, key).await? {
+                if check_exist_lock(bucket, key, orig_key).await? {
                     return Ok(());
                 }
             }
@@ -854,10 +864,10 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
                                 if matches!(entry.operation, jetstream::kv::Operation::Delete | jetstream::kv::Operation::Purge) {
                                      return Ok(());
                                 }
-                                log::debug!("nats event was not delete, continuing to wait the key: {}", key);
+                                log::debug!("nats event was not delete, continuing to wait the key: {}", orig_key);
                              }
                             Err(e) => {
-                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", key, e);
+                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", orig_key, e);
                              }
                         }
                     }
@@ -870,17 +880,21 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()>
     }
 }
 
-async fn check_exist_lock(bucket: &jetstream::kv::Store, key: &str) -> Result<bool> {
+async fn check_exist_lock(
+    bucket: &jetstream::kv::Store,
+    key: &str,
+    orig_key: &str,
+) -> Result<bool> {
     Ok(match bucket.get(key).await {
         Ok(Some(body)) => {
-            log::debug!("nats another process is currently locking the key: {}", key);
+            log::debug!("nats another process is locking the key: {}", orig_key);
             let ret = String::from_utf8_lossy(&body).to_string();
             let ret_parts = ret.split(':').collect::<Vec<_>>();
             let expiration = ret_parts.last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
             if expiration < chrono::Utc::now().timestamp_micros() {
                 if let Err(err) = bucket.purge(&key).await {
-                    log::error!("nats purge lock for key: {}, error: {}", key, err);
+                    log::error!("nats purge lock for key: {}, error: {}", orig_key, err);
                     return Err(Error::Message("nats purge lock error".to_string()));
                 };
                 true
@@ -890,7 +904,7 @@ async fn check_exist_lock(bucket: &jetstream::kv::Store, key: &str) -> Result<bo
         }
         Ok(None) => true,
         Err(e) => {
-            log::error!("nats got error for key: {}, error: {}", key, e);
+            log::error!("nats got error for key: {}, error: {}", orig_key, e);
             false
         }
     })
@@ -900,37 +914,33 @@ async fn keep_alive_lock(
     rx: &mut mpsc::Receiver<()>,
     bucket: &jetstream::kv::Store,
     key: &str,
+    orig_key: &str,
     lock_id: &str,
 ) -> Result<()> {
-    let interval = std::cmp::max(1, (LOCKER_WATCHER_UPDATE_TTL / 2) - 1);
+    let interval = std::cmp::max(1, (LOCKER_WATCHER_UPDATE_TTL as u64 / 2) - 1);
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
+    ticker.tick().await; // first tick will be immediate
     loop {
-        ticker.tick().await;
-        match rx.try_recv() {
-            Ok(_) => {
-                break;
-            }
-            Err(mpsc::error::TryRecvError::Empty) => {}
-            Err(_) => {
+        tokio::select! {
+            _ = ticker.tick() => {}
+            _ = rx.recv() => {
                 break;
             }
         }
         // update the locker time to keep alive
-        let expiration = chrono::Utc::now().timestamp_micros()
-            + Duration::from_secs(LOCKER_WATCHER_UPDATE_TTL).as_micros() as i64;
         let value = Bytes::from(format!(
             "{}:{}:{}",
             lock_id,
             cluster::LOCAL_NODE.uuid,
-            expiration
+            now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
         ));
         if let Err(e) = bucket.put(&key, value).await {
-            log::error!("nats keep alive for key: {}, error: {}", key, e);
+            log::error!("nats keep alive for key: {}, error: {}", orig_key, e);
         }
-        log::debug!("nats keep alive for key: {} updated", key);
+        log::debug!("nats keep alive for key: {} updated", orig_key);
     }
 
-    log::debug!("nats keep alive for key: {} exit", key);
+    log::debug!("nats keep alive for key: {} exit", orig_key);
 
     Ok(())
 }
