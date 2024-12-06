@@ -111,6 +111,7 @@ impl Edge {
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
 pub enum NodeData {
+    Http(Vec<String>),
     Stream(StreamParams),
     Query(DerivedStream),
     Function(FunctionParams),
