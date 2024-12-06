@@ -43,7 +43,7 @@ pub async fn lock_with_trace_id(
     let lock = lock(key, wait_ttl).await;
     match lock {
         Ok(lock) => {
-            log::info!("[trace_id {trace_id}] fetch lock with key: {key}");
+            log::debug!("[trace_id {trace_id}] fetch lock with key: {key}");
             Ok(lock)
         }
         Err(e) => Err(e),
@@ -58,7 +58,7 @@ pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Re
     let unlock = unlock(locker).await;
     match unlock {
         Ok(_) => {
-            log::info!(
+            log::debug!(
                 "[trace_id {trace_id}] release lock with key: {:?}",
                 locker.as_ref().map(|l| l.key()).unwrap_or_default()
             );
