@@ -126,7 +126,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                 {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
-                            "Unexpected argument type for match_all() function: {:?}",
+                            "Unexpected argument type for match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
@@ -152,14 +152,14 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                 } else if name == FUZZY_MATCH_ALL_UDF_NAME {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
-                            "Unexpected argument type for fuzzy_match_all() function: {:?}",
+                            "Unexpected argument type for fuzzy_match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
                     let Expr::Literal(ScalarValue::Int64(Some(distance))) = args[1].clone() else {
                         return Err(DataFusionError::Internal(format!(
-                            "Unexpected argument type for fuzzy_match_all() function: {:?}",
-                            args[0]
+                            "Unexpected argument type for fuzzy_match_all() distance: {:?}",
+                            args[1]
                         )));
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
