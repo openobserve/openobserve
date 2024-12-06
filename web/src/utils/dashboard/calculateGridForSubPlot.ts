@@ -62,12 +62,11 @@ const SPACING_CONFIG = {
 // it is used to create grid array for trellis chart
 export function getTrellisGrid(
   width: number,
-  height: number,
   numGrids: number,
   leftMargin: number,
   numOfColumns: number = -1,
 ) {
-  if (width <= 0 || height <= 0) {
+  if (width <= 0) {
     throw new Error("Width and height must be positive numbers");
   }
 
@@ -105,31 +104,6 @@ export function getTrellisGrid(
     console.error("Error in calculateGridPositions:", err?.message);
   }
 
-  // Validate total horizontal spacing doesn't exceed width
-  // const totalHorizontalSpacing =
-  //   SPACING_CONFIG.horizontal * (numCols - 1) + leftMargin + 32;
-  // if (totalHorizontalSpacing >= width) {
-  //   throw new Error(
-  //     JSON.stringify({
-  //       type: "trellis_horizontal_spacing",
-  //       message:
-  //         "Trellis Layout Error \nPanel width needs to be increased to apply the trellis layout.",
-  //     }),
-  //   );
-  // }
-
-  // Validate total vertical spacing doesn't exceed height
-  // const totalVerticalSpacing = SPACING_CONFIG.vertical * (numRows - 1) + 72;
-  // if (totalVerticalSpacing >= height) {
-  //   throw new Error(
-  //     JSON.stringify({
-  //       type: "trellis_vertical_spacing",
-  //       message:
-  //         "Trellis Layout Error \nPanel height needs to be increased to apply the trellis layout.",
-  //     }),
-  //   );
-  // }
-
   const xSpacingBetweenInPx = SPACING_CONFIG.horizontal * (numCols - 1);
   // How many cols
   const xSpacingBetween =
@@ -155,15 +129,15 @@ export function getTrellisGrid(
   // Calculate cell height based on cell width
   const cellHeightInPx = cellWidthInPx * 0.4;
 
-  height =
+  const totalChartHeight =
     cellHeightInPx * numRows +
     SPACING_CONFIG.vertical * (numRows - 1) +
     SPACING_CONFIG.padding.top +
     SPACING_CONFIG.padding.bottom;
 
-  const topPadding = (SPACING_CONFIG.padding.top / height) * 100;
+  const topPadding = (SPACING_CONFIG.padding.top / totalChartHeight) * 100;
 
-  const cellHeight = (cellHeightInPx / height) * 100;
+  const cellHeight = (cellHeightInPx / totalChartHeight) * 100;
 
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
@@ -173,7 +147,7 @@ export function getTrellisGrid(
       }
       const grid = {
         left: `${col * cellWidth + col * ((SPACING_CONFIG.horizontal / width) * 100) + leftPadding}%`,
-        top: `${row * cellHeight + row * ((SPACING_CONFIG.vertical / height) * 100) + topPadding}%`,
+        top: `${row * cellHeight + row * ((SPACING_CONFIG.vertical / totalChartHeight) * 100) + topPadding}%`,
         width: `${cellWidth}%`,
         height: `${cellHeight}%`,
       };
@@ -184,11 +158,9 @@ export function getTrellisGrid(
   // return grid array, width, height, gridNoOfRow, gridNoOfCol
   return {
     gridArray: gridArray,
-    gridWidth: (cellWidth * width) / 100,
-    gridHeight: (cellHeight * height) / 100,
     gridNoOfRow: numRows,
     gridNoOfCol: numCols,
-    panelHeight: height,
+    panelHeight: totalChartHeight,
   };
 }
 

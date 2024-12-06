@@ -597,7 +597,6 @@ export const convertSQLData = async (
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
-        chartPanelRef.value.offsetHeight,
         options.series.length,
         yAxisNameGap,
         customCols,
