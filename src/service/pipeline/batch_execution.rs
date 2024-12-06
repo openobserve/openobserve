@@ -376,6 +376,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Query(_) => write!(f, "query"),
             NodeData::Function(_) => write!(f, "function"),
             NodeData::Condition(_) => write!(f, "condition"),
+            NodeData::Http(_) => write!(f, "http"),
         }
     }
 }
@@ -675,6 +676,7 @@ async fn process_node(
             }
             log::debug!("[Pipeline]: query node {node_id} done processing {count} records");
         }
+        NodeData::Http(dests) => {}
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
