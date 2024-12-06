@@ -18,7 +18,10 @@ use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::RoleRequest;
 
-use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    user::{UserGroup, UserGroupRequest, UserRoleRequest},
+};
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
@@ -32,7 +35,9 @@ pub async fn create_role(
     let user_req = user_req.into_inner();
 
     if user_req.role.is_empty() || is_standard_role(&user_req.role) {
-        return Ok(HttpResponse::BadRequest().body("Role name cannot be empty or standard role"));
+        return Ok(MetaHttpResponse::bad_request(
+            "Role name cannot be empty or standard role",
+        ));
     }
 
     match o2_enterprise::enterprise::openfga::authorizer::roles::create_role(
@@ -42,7 +47,7 @@ pub async fn create_role(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -52,7 +57,7 @@ pub async fn create_role(
     _org_id: web::Path<String>,
     _role_id: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -64,14 +69,14 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
         .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/roles/{role_id}")]
 pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -94,9 +99,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
             permitted = list;
         }
         Err(e) => {
-            return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                e.to_string(),
-            ));
+            return Ok(MetaHttpResponse::forbidden(e.to_string()));
         }
     }
     // Get List of allowed objects ends
@@ -119,7 +122,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
         .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -129,7 +132,7 @@ pub async fn get_roles(
     _org_id: web::Path<String>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -152,7 +155,7 @@ pub async fn update_role(
     .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -162,7 +165,7 @@ pub async fn update_role(
     _path: web::Path<(String, String)>,
     _permissions: web::Json<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -177,7 +180,7 @@ pub async fn get_role_permissions(
     .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -186,7 +189,7 @@ pub async fn get_role_permissions(
 pub async fn get_role_permissions(
     _path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -199,14 +202,14 @@ pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<Ht
     .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/roles/{role_id}/users")]
 pub async fn get_users_with_role(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -226,7 +229,7 @@ pub async fn create_group(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -236,7 +239,7 @@ pub async fn create_group(
     _org_id: web::Path<String>,
     _user_group: web::Json<UserGroup>,
 ) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -259,7 +262,7 @@ pub async fn update_group(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
@@ -269,7 +272,7 @@ pub async fn update_group(
     _org_id: web::Path<String>,
     _user_group: web::Json<UserGroupRequest>,
 ) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -318,14 +321,14 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
         .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/groups")]
 pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -340,14 +343,14 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
     .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/groups/{group_name}")]
 pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -363,7 +366,7 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -375,12 +378,12 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
         .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/groups/{group_name}")]
 pub async fn delete_group(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
