@@ -19,6 +19,7 @@ use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use regex::Regex;
 
 use crate::{
     common::{
@@ -40,6 +41,16 @@ pub async fn post_user(
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
+    let email_regex = Regex::new(
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+    )
+    .expect("Email regex is valid");
+    if !email_regex.is_match(&usr_req.email) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Invalid email".to_string(),
+        )));
+    }
     let cfg = get_config();
     let is_allowed = if is_root_user(initiator_id) {
         true
@@ -80,10 +91,11 @@ pub async fn post_user(
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
+            let org_id = org_id.replace(' ', "_");
             let user = usr_req.to_new_dbuser(
                 password,
                 salt,
-                org_id.replace(' ', "_"),
+                org_id.clone(),
                 token,
                 rum_token,
                 usr_req.is_external,
@@ -95,7 +107,8 @@ pub async fn post_user(
             {
                 use o2_enterprise::enterprise::openfga::{
                     authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
+                        get_org_creation_tuples, get_service_account_creation_tuple,
+                        get_user_role_tuple, update_tuples,
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
@@ -104,11 +117,14 @@ pub async fn post_user(
                     get_user_role_tuple(
                         &usr_req.role.to_string(),
                         &usr_req.email,
-                        &org_id.replace(' ', "_"),
+                        &org_id,
                         &mut tuples,
                     );
+                    if usr_req.role.eq(&UserRole::ServiceAccount) {
+                        get_service_account_creation_tuple(&org_id, &usr_req.email, &mut tuples);
+                    }
                     get_org_creation_tuples(
-                        org_id,
+                        &org_id,
                         &mut tuples,
                         OFGA_MODELS
                             .iter()
