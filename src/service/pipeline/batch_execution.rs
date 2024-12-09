@@ -20,6 +20,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     meta::{
+        alerts::destinations::HTTPType,
         function::{Transform, VRLResultResolver},
         pipeline::{components::NodeData, Pipeline},
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
@@ -34,6 +35,7 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
+        alerts::destinations,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -673,7 +675,53 @@ async fn process_node(
             }
             log::debug!("[Pipeline]: query node {node_id} done processing {count} records");
         }
-        NodeData::Http(dests) => {}
+        NodeData::Http(dests) => {
+            let mut records = vec![];
+            log::debug!("[Pipeline]: Destination node {node_id} starts processing");
+            while let Some((_, mut record, flattened)) = receiver.recv().await {
+                if !flattened {
+                    record = match flatten::flatten_with_level(
+                        record,
+                        cfg.limit.ingest_flatten_level,
+                    ) {
+                        Ok(flattened) => flattened,
+                        Err(e) => {
+                            let err_msg = format!("LeafNode error with flattening: {}", e);
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                }
+
+                records.push(record);
+                count += 1;
+            }
+
+            for dest in dests {
+                // tokio::spawn(async move {
+                if let Err(e) = send_external_http_request(&org_id, dest, records.clone()).await {
+                    let err_msg = format!("LeafNode error with http request: {}", e);
+                    if let Err(send_err) = error_sender
+                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                        );
+                    }
+                }
+                // });
+                log::debug!("[Pipeline]: LeafNode {node_id} done processing {count} records");
+            }
+        }
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
@@ -703,6 +751,63 @@ async fn send_to_children(
             }
         }
     }
+}
+
+async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value>) -> Result<()> {
+    let dest = destinations::get(org_id, dest).await?;
+    let client = if dest.skip_tls_verify {
+        reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?
+    } else {
+        reqwest::Client::new()
+    };
+    let url = url::Url::parse(&dest.url)?;
+    let mut req = match dest.method {
+        HTTPType::POST => client.post(url),
+        HTTPType::PUT => client.put(url),
+        HTTPType::GET => client.get(url),
+    };
+
+    // Add additional headers if any from destination description
+    let mut has_context_type = false;
+    if let Some(headers) = &dest.headers {
+        for (key, value) in headers.iter() {
+            if !key.is_empty() && !value.is_empty() {
+                if key.to_lowercase().trim() == "content-type" {
+                    has_context_type = true;
+                }
+                req = req.header(key, value);
+            }
+        }
+    };
+    // set default content type
+    if !has_context_type {
+        req = req.header("Content-type", "application/json");
+    }
+
+    let resp = req.json(&records).send().await?;
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
+    log::debug!(
+        "Records sent to destination {} with status: {}, body: {:?}",
+        dest.url,
+        resp_status,
+        resp_body,
+    );
+    if !resp_status.is_success() {
+        log::error!(
+            "Alert http notification failed with status: {}, body: {}",
+            resp_status,
+            resp_body
+        );
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
+        ));
+    }
+    Ok(())
 }
 
 fn topological_sort(node_map: &HashMap<String, ExecutableNode>) -> Result<Vec<String>> {
