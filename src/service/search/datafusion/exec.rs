@@ -68,7 +68,7 @@ const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
 pub async fn merge_parquet_files(
     stream_type: StreamType,
-    _stream_name: &str,
+    stream_name: &str,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
@@ -83,12 +83,32 @@ pub async fn merge_parquet_files(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
             cfg.common.column_timestamp, cfg.common.column_timestamp
         )
+    } else if cfg.limit.distinct_values_hourly
+        && stream_type == StreamType::Metadata
+        && stream_name.starts_with("distinct_values")
+    {
+        let fields = schema
+            .fields()
+            .iter()
+            .filter(|f| f.name() != &cfg.common.column_timestamp && f.name() != "count")
+            .map(|x| x.name().to_string())
+            .collect::<Vec<_>>();
+        let fields_str = fields.join(", ");
+        format!(
+            "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
+            cfg.common.column_timestamp,
+            cfg.common.column_timestamp,
+            fields_str,
+            fields_str,
+            cfg.common.column_timestamp
+        )
     } else {
         format!(
             "SELECT * FROM tbl ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     };
+    log::debug!("merge_parquet_files sql: {}", sql);
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
