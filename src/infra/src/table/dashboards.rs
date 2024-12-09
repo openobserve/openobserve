@@ -251,10 +251,6 @@ pub async fn put(
 
 /// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
 /// keys.
-///
-/// This method differs from [delete_by_id] in that it will only delete the
-/// dashboard if it is found in the specified folder, whereas [delete_by_id]
-/// will only delete the dashboard if it is found in any specified folder.
 pub async fn delete_from_folder(
     org_id: &str,
     folder_id: &str,
