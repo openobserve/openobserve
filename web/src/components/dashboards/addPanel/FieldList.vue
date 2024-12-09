@@ -823,6 +823,17 @@ export default defineComponent({
         ) {
           try {
             await extractFields();
+
+            // if promql mode
+            if (promqlMode.value) {
+              // set the query
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].query =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream?.toString() + "{}";
+            }
           } catch (error: any) {
             showErrorNotification(
               error?.message ?? "Failed to get stream fields",
