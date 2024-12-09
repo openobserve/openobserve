@@ -13,12 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use config::{
+    get_config,
     meta::{
         alerts::destinations::HTTPType,
         function::{Transform, VRLResultResolver},
@@ -681,29 +685,9 @@ async fn process_node(
         NodeData::Http(dests) => {
             let mut records = vec![];
             log::debug!("[Pipeline]: Destination node {node_id} starts processing");
-            while let Some((_, mut record, flattened)) = receiver.recv().await {
-                if !flattened {
-                    record = match flatten::flatten_with_level(
-                        record,
-                        cfg.limit.ingest_flatten_level,
-                    ) {
-                        Ok(flattened) => flattened,
-                        Err(e) => {
-                            let err_msg = format!("LeafNode error with flattening: {}", e);
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
-                                .await
-                            {
-                                log::error!(
-                                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
-                                    );
-                                break;
-                            }
-                            continue;
-                        }
-                    };
-                }
-
+            while let Some((_, record, _)) = receiver.recv().await {
+                // External destinations will automatically flatten the payload, hence
+                // no need to flatten the records here
                 records.push(record);
                 count += 1;
             }
@@ -711,19 +695,19 @@ async fn process_node(
             for dest in dests {
                 // tokio::spawn(async move {
                 if let Err(e) = send_external_http_request(&org_id, dest, records.clone()).await {
-                    let err_msg = format!("LeafNode error with http request: {}", e);
+                    let err_msg = format!("DestinationNode error with http request: {}", e);
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))
                         .await
                     {
                         log::error!(
-                            "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
                         );
                     }
                 }
                 // });
-                log::debug!("[Pipeline]: LeafNode {node_id} done processing {count} records");
             }
+            log::debug!("[Pipeline]: DestinationNode {node_id} done processing {count} records");
         }
     }
 
@@ -757,18 +741,18 @@ async fn send_to_children(
 }
 
 async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value>) -> Result<()> {
+    let cfg = get_config();
     let dest = destinations::get(org_id, dest).await?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(cfg.limit.request_timeout));
     let client = if dest.skip_tls_verify {
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
+        client.danger_accept_invalid_certs(true).build()?
     } else {
-        reqwest::Client::new()
+        client.build()?
     };
     let url = url::Url::parse(&dest.url)?;
     let mut req = match dest.method {
-        HTTPType::POST => client.post(url),
-        HTTPType::PUT => client.put(url),
+        HTTPType::POST => client.post(url).json(&records),
+        HTTPType::PUT => client.put(url).json(&records),
         HTTPType::GET => client.get(url),
     };
 
@@ -789,7 +773,7 @@ async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value
         req = req.header("Content-type", "application/json");
     }
 
-    let resp = req.json(&records).send().await?;
+    let resp = req.send().await?;
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
     log::debug!(
