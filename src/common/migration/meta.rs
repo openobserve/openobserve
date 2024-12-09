@@ -32,6 +32,7 @@ const ITEM_PREFIXES: [&str; 13] = [
     "/kv",
 ];
 
+#[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
 pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
     migrate_meta(from, to).await?;
     migrate_scheduler(from, to).await?;
