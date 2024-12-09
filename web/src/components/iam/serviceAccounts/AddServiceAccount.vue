@@ -170,7 +170,6 @@ export default defineComponent({
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
-      console.log()
     });
 
 
@@ -201,7 +200,7 @@ export default defineComponent({
       this.modelValue.email != ""
     ) {
       this.beingUpdated = true;
-      this.formData = this.modelValue;
+      this.formData = {...this.modelValue};
       this.firstName = this.modelValue?.first_name;
       this.lastName = this.modelValue?.last_name;
     }
