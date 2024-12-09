@@ -61,7 +61,9 @@ use super::{
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
-use crate::service::search::index::IndexCondition;
+use crate::service::{
+    metadata::distinct_values::DISTINCT_STREAM_PREFIX, search::index::IndexCondition,
+};
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -85,7 +87,7 @@ pub async fn merge_parquet_files(
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
-        && stream_name.starts_with("distinct_values")
+        && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
     {
         let fields = schema
             .fields()
