@@ -425,7 +425,9 @@
     "flatteningLbl": "After Flattening",
     "streamTitle": "Associate Stream",
     "conditionTitle": "Associate Condition",
-    "query": "Associate Query"
+    "query": "Associate Query",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?"
+
   },
   "function": {
     "header": "Functions",
