@@ -23,8 +23,8 @@ use config::meta::{
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
-    ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set, TryIntoModel,
+    DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
