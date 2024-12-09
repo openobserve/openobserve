@@ -23,8 +23,8 @@ use config::meta::{
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
-    DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TryIntoModel,
+    ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -88,8 +88,12 @@ impl TryFrom<dashboards::Model> for Dashboard {
     }
 }
 
-/// Gets a dashboard.
-pub async fn get(
+/// Gets a dashboard by it's folder ID and dashboard ID.
+///
+/// This method differs from [get_by_id] in that it will only return the
+/// dashboard if it is found in the specified folder, whereas [get_by_id] will
+/// return the dashboard if it is found in any folder.
+pub async fn get_from_folder(
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,
@@ -105,6 +109,24 @@ pub async fn get(
     } else {
         Ok(None)
     }
+}
+
+/// Gets a dashboard by it's dashboard ID.
+///
+/// This method differs from [get] in that it will return the dashboard if it is
+/// found in any folder, whereas [get] will only return the dashboard if it is
+/// found in the specified folder.
+pub async fn get_by_id(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    let folder = folder_m.into();
+    let dash = dash_m.try_into()?;
+    Ok(Some((folder, dash)))
 }
 
 /// Lists all dashboards belonging to the given org and folder.
@@ -229,7 +251,11 @@ pub async fn put(
 
 /// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
 /// keys.
-pub async fn delete(
+///
+/// This method differs from [delete_by_id] in that it will only delete the
+/// dashboard if it is found in the specified folder, whereas [delete_by_id]
+/// will only delete the dashboard if it is found in any specified folder.
+pub async fn delete_in_folder(
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,
@@ -276,6 +302,23 @@ async fn get_model(
         .await?;
 
     Ok(Some((folder, maybe_dashboard)))
+}
+
+/// Tries to get a dashboard ORM entity and its parent folder ORM entity by the
+/// dashboard ID.
+async fn get_model_by_id(
+    db: &DatabaseConnection,
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
+    let f_and_d = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .find_also_related(folders::Entity)
+        .filter(folders::Column::Org.eq(org_id))
+        .one(db)
+        .await?
+        .and_then(|(d, maybe_f)| maybe_f.map(|f| (f, d)));
+    Ok(f_and_d)
 }
 
 /// Lists dashboard ORM models using the given parameters. Returns each
