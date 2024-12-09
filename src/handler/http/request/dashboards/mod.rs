@@ -184,7 +184,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     ),
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
-async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
+async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
         Ok(dashboard) => dashboard,
@@ -213,7 +213,7 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
-async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
+async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     match dashboards::delete_dashboard(&org_id, &dashboard_id).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
