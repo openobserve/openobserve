@@ -162,7 +162,7 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     else {
         return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete_in_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
     remove_ownership(
         org_id,
         "dashboards",
@@ -202,7 +202,7 @@ pub async fn move_dashboard(
     put(org_id, dashboard_id, to_folder, dashboard, None).await?;
 
     // delete the dashboard from the source folder
-    let _ = table::dashboards::delete_in_folder(org_id, from_folder, dashboard_id).await;
+    let _ = table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id).await;
 
     Ok(())
 }
