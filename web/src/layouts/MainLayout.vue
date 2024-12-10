@@ -601,7 +601,6 @@ export default defineComponent({
       "streamFunctions",
       "enrichmentTables",
       "alertList",
-      "alertList",
       "alertDestinations",
       "alertTemplates",
       "/ingestion/",
