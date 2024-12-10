@@ -56,13 +56,13 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     )
                     .await
                     {
-                        usage_data.search_event_context.as_mut().map(|ctx| {
+                        if let Some(ctx) = usage_data.search_event_context.as_mut() {
                             ctx.enrich_for_dashboard(
                                 dashboard.title().unwrap().to_string(),
                                 folder.name,
                                 folder.folder_id,
                             )
-                        });
+                        };
                     }
                 }
             }

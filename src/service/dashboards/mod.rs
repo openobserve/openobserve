@@ -241,7 +241,7 @@ async fn put(
 }
 
 /// Internal helper function find dashboard and its folder by id.
-/// 
+///
 /// Used by self_reporting to enrich dashboard SearchEventContext
 pub(crate) async fn get_folder_and_dashboard(
     org_id: &str,
