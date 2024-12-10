@@ -645,7 +645,7 @@ export default defineComponent({
           getLogStream();
         })
         .catch((error) => {
-          if(err.response.status == 403){
+          if(error.response.status == 403){
             return;
           }
           $q.notify({
