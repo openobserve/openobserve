@@ -41,7 +41,7 @@ use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::{
     db::organization::get_org_setting,
-    ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+    ingestion::{evaluate_trigger, write_file, write_file_multi, TriggerAlertData},
     metadata::{
         distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
         write, MetadataItem, MetadataType,
@@ -506,7 +506,11 @@ async fn write_logs(
         stream_name,
     )
     .await;
-    let req_stats = write_file(&writer, stream_name, write_buf).await;
+    let req_stats = if cfg.common.feature_batch_writer_lock {
+        write_file_multi(&writer, stream_name, write_buf).await
+    } else {
+        write_file(&writer, stream_name, write_buf).await
+    };
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }

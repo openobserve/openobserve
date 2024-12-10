@@ -574,6 +574,8 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
+    #[env_config(name = "ZO_FEATURE_BATCH_WRITER_LOCK", default = false)]
+    pub feature_batch_writer_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]

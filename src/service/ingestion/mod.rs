@@ -368,12 +368,12 @@ pub async fn write_file(
                     entry.schema,
                     ingester::Entry {
                         stream: Arc::from(stream_name),
+                        schema: None,
                         schema_key: Arc::from(entry.schema_key.as_str()),
                         partition_key: Arc::from(hour_key.as_str()),
                         data: entry.records,
                         data_size: entry.records_size,
                     },
-                    false,
                 )
                 .await
             {
@@ -404,6 +404,44 @@ pub async fn write_file(
         }
     }
 
+    req_stats
+}
+
+pub async fn write_file_multi(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+) -> RequestStats {
+    let mut req_stats = RequestStats::default();
+    let entries = buf
+        .into_iter()
+        .filter_map(|(hour_key, entry)| {
+            if entry.records.is_empty() {
+                None
+            } else {
+                Some(ingester::Entry {
+                    stream: Arc::from(stream_name),
+                    schema: Some(entry.schema),
+                    schema_key: Arc::from(entry.schema_key.as_str()),
+                    partition_key: Arc::from(hour_key.as_str()),
+                    data: entry.records,
+                    data_size: entry.records_size,
+                })
+            }
+        })
+        .collect::<Vec<_>>();
+    let (entries_records, entries_size) = entries
+        .iter()
+        .map(|entry| (entry.data.len(), entry.data_size))
+        .fold((0, 0), |(acc_records, acc_size), (records, size)| {
+            (acc_records + records, acc_size + size)
+        });
+    if let Err(e) = writer.write_batch(entries).await {
+        log::error!("ingestion write file error: {}", e);
+    }
+
+    req_stats.size += (entries_size as i64 / SIZE_IN_MB) as f64;
+    req_stats.records += entries_records as i64;
     req_stats
 }
 

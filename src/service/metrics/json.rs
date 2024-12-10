@@ -41,7 +41,10 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
+        ingestion::{
+            evaluate_trigger, get_write_partition_key, write_file, write_file_multi,
+            TriggerAlertData,
+        },
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
@@ -441,7 +444,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
         let writer =
             ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
-        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
+        let mut req_stats = if cfg.common.feature_batch_writer_lock {
+            write_file_multi(&writer, &stream_name, stream_data).await
+        } else {
+            write_file(&writer, &stream_name, stream_data).await
+        };
         // for performance issue, we will flush all when the app shutdown
         // if let Err(e) = writer.sync().await {
         //     log::error!("ingestion error while syncing writer: {}", e);
