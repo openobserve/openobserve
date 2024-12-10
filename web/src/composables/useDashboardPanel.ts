@@ -3110,11 +3110,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           const parsedQuery = parser.astify(currentQuery);
 
           if (containsSubqueryInFrom(parsedQuery)) {
-            console.log("Subquery detected, skipping further validation.");
             return currentQuery;
           }
-
-          console.log("Valid query", currentQuery);
+          
           return currentQuery; // Return valid query
         } catch (error) {
           return null; // Invalid query
@@ -3208,7 +3206,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const validatedQuery = validateQuery(currentQuery, variables);
 
         if (validatedQuery) {
-          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);;
+          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);
         } else {
           dashboardPanelData.meta.parsedQuery = null;
         }
@@ -3308,11 +3306,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
-      console.log(
-        "dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query",dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-      );
       
       // Only continue if the current mode is "show custom query"
       if (
