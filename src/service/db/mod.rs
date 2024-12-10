@@ -23,6 +23,7 @@ use {
 };
 
 pub mod alerts;
+pub mod background_job;
 pub mod compact;
 pub mod dashboards;
 pub mod enrichment_table;

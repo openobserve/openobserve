@@ -216,6 +216,17 @@ pub struct ResponseTook {
     pub nodes: Vec<ResponseNodeTook>,
 }
 
+impl ResponseTook {
+    pub fn merge(&mut self, other: &ResponseTook) {
+        self.total += other.total;
+        self.idx_took += other.idx_took;
+        self.wait_queue += other.wait_queue;
+        self.cluster_total += other.cluster_total;
+        self.cluster_wait_queue += other.cluster_wait_queue;
+        self.nodes.extend(other.nodes.clone());
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseNodeTook {
     pub node: String,
@@ -326,6 +337,21 @@ impl Response {
     pub fn set_work_group(&mut self, val: Option<String>) {
         self.work_group = val;
     }
+
+    pub fn merge(&mut self, other: &Response) {
+        self.took += other.took;
+        self.total += other.total;
+        self.file_count += other.file_count;
+        self.scan_size += other.scan_size;
+        self.idx_scan_size += other.idx_scan_size;
+        self.scan_records += other.scan_records;
+        self.hits.extend(other.hits.clone());
+        if let Some(took_detail) = &mut self.took_detail {
+            if let Some(other_took_detail) = &other.took_detail {
+                took_detail.merge(other_took_detail);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -359,6 +385,20 @@ impl SearchPartitionRequest {
         }
         self.encoding = RequestEncoding::Empty;
         Ok(())
+    }
+}
+
+impl From<&Request> for SearchPartitionRequest {
+    fn from(req: &Request) -> Self {
+        SearchPartitionRequest {
+            sql: req.query.sql.clone(),
+            start_time: req.query.start_time,
+            end_time: req.query.end_time,
+            encoding: req.encoding,
+            regions: req.regions.clone(),
+            clusters: req.clusters.clone(),
+            query_fn: req.query.query_fn.clone(),
+        }
     }
 }
 
@@ -575,6 +615,12 @@ pub struct CancelQueryResponse {
     pub is_success: bool,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SubmitQueryResponse {
+    pub job_id: i64,
+    pub range_error: String,
+}
+
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]
 pub struct ScanStats {
     pub files: i64,
@@ -714,6 +760,7 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
+    BackgroundJob,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -753,6 +800,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "other"),
             SearchEventType::RUM => write!(f, "rum"),
             SearchEventType::DerivedStream => write!(f, "derived_stream"),
+            SearchEventType::BackgroundJob => write!(f, "background_job"),
         }
     }
 }
@@ -770,8 +818,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
+            "background_job" => Ok(SearchEventType::BackgroundJob),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `background_job`"
             )),
         }
     }

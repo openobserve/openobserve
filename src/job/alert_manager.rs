@@ -61,6 +61,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_schedule_jobs().await });
     tokio::task::spawn(async move { clean_complete_jobs().await });
     tokio::task::spawn(async move { watch_timeout_jobs().await });
+    tokio::task::spawn(async move { run_background_jobs().await });
 
     Ok(())
 }
@@ -103,6 +104,18 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
         interval.tick().await;
         if let Err(e) = infra::scheduler::watch_timeout().await {
             log::error!("[ALERT MANAGER] watch timeout jobs error: {}", e);
+        }
+    }
+}
+
+async fn run_background_jobs() -> Result<(), anyhow::Error> {
+    // TODO: change this to background interval
+    let mut interval = time::interval(time::Duration::from_millis(10)); // 10ms
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = service::alerts::background_jobs::run().await {
+            log::error!("[BACKGROUND JOB MANAGER] run background jobs error: {}", e);
         }
     }
 }

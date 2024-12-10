@@ -55,6 +55,9 @@ use crate::{
 pub mod job;
 pub mod multi_streams;
 pub mod saved_view;
+#[cfg(feature = "enterprise")]
+pub mod utils;
+pub mod background_job;
 
 async fn can_use_distinct_stream(
     org: &str,

@@ -78,7 +78,7 @@ pub async fn query_status(_params: web::Path<String>) -> Result<HttpResponse, Er
 }
 
 #[cfg(feature = "enterprise")]
-async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<HttpResponse, Error> {
+pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Result<HttpResponse, Error> {
     if trace_ids.is_empty() {
         return Ok(HttpResponse::BadRequest().json("Invalid trace_id"));
     }
