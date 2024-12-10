@@ -21,7 +21,7 @@ sea-orm-cli generate entity \
   --ignore-tables seaql_migrations \
   --ignore-tables short_urls \
   --ignore-tables stream_stats \
-  --database-url sqlite:///Users/huaijinhao/gitrepo/openobserve/data/openobserve/db/metadata.sqlite
+  --database-url YOUR_DATABASE_URL
 ```
 
 We use the `--ignore-tables` parameter to omit model generation of existing tables for which automatic model generation is not needed yet. In the future we can include these tables in the automatic model generation when we want to start using `sea-orm` as the means of interacting with these tables.
