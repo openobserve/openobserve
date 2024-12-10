@@ -634,15 +634,6 @@ test.describe("Pipeline testcases", () => {
     const fileName = `enrichment_info_${uuidv4()}.csv`;
     const fileContent = '../test-data/enrichment_info.csv';
   
-    // Read the file content from the fixture
-    // const fileContent = fs.readFileSync('../test-data/enrichment_info.csv', 'utf-8');
-  
-    // // Write the content to a temporary file
-    // const filePath = `./temp/${fileName}`;
-    // fs.writeFileSync(filePath, fileContent);
-  
-    // Upload the file
-    // await page.waitForSelector('input[type="file"]');
     const inputFile = await page.locator('input[type="file"]');
     await inputFile.setInputFiles(fileContent);
   
@@ -663,12 +654,6 @@ test.describe("Pipeline testcases", () => {
     await page.locator('[data-test="function-enrichment-table-tab"]').click();
 
   
-    // Wait for the save action to complete
-    // await page.waitForTimeout(3000);
-  
-    // // Reload the page
-    // await page.reload();
-  
     // Locate rows in the table
     const rows = await page.locator('tbody tr');
   
@@ -685,9 +670,6 @@ test.describe("Pipeline testcases", () => {
         await page.locator('[data-test="confirm-button"]').click();
       }
     }
-  
-    // Clean up temporary file
-    // fs.unlinkSync(fileContent);
   });
 
 });
