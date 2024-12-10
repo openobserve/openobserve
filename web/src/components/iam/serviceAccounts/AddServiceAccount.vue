@@ -230,6 +230,9 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "updated");
           })
           .catch((err: any) => {
+            if(err.response?.status == 403){
+                return;
+              }
             if(err?.response?.data?.message ) {
               this.$q.notify({
                 color: "negative",
@@ -248,6 +251,9 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "created");
             })
             .catch((err: any) => {
+              if(err.response?.status == 403){
+                return;
+              }
               if(err?.response?.data?.message ) {
               this.$q.notify({
                 color: "negative",
