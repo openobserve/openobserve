@@ -43,8 +43,7 @@ use prost::Message;
 use serde_json::Map;
 
 use super::{
-    ingestion::write_file_multi, logs::O2IngestJsonData,
-    metadata::distinct_values::DISTINCT_STREAM_PREFIX,
+    logs::O2IngestJsonData, metadata::distinct_values::DISTINCT_STREAM_PREFIX,
     pipeline::batch_execution::ExecutablePipelineTraceInputs,
 };
 use crate::{
@@ -794,14 +793,13 @@ async fn write_traces(
     // write data to wal
     let writer =
         ingester::get_writer(0, org_id, &StreamType::Traces.to_string(), stream_name).await;
-    let req_stats = if cfg.common.feature_batch_writer_lock {
-        write_file_multi(&writer, stream_name, data_buf).await
-    } else {
-        write_file(&writer, stream_name, data_buf).await
-    };
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let req_stats = write_file(
+        &writer,
+        stream_name,
+        data_buf,
+        !cfg.common.wal_fsync_disabled,
+    )
+    .await;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

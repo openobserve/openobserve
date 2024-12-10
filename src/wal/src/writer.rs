@@ -154,7 +154,7 @@ impl Writer {
         self.f.flush().context(FileSyncSnafu {
             path: self.path.clone(),
         })?;
-        if !config::get_config().limit.wal_fsync_disabled {
+        if !config::get_config().common.wal_fsync_disabled {
             self.f.get_ref().sync_data().context(FileSyncSnafu {
                 path: self.path.clone(),
             })?;

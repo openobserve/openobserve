@@ -200,16 +200,16 @@ impl Writer {
     }
 
     // check_ttl is used to check if the memtable has expired
-    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
+    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry, fsync: bool) -> Result<()> {
         if entry.data.is_empty() {
             return Ok(());
         }
 
         entry.schema = Some(schema);
-        self.write_batch(vec![entry]).await
+        self.write_batch(vec![entry], fsync).await
     }
 
-    pub async fn write_batch(&self, mut entries: Vec<Entry>) -> Result<()> {
+    pub async fn write_batch(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
@@ -249,6 +249,9 @@ impl Writer {
                 continue;
             }
             wal.write(&entry, false).context(WalSnafu)?;
+        }
+        if fsync {
+            wal.sync().context(WalSnafu)?;
         }
         drop(wal);
 
@@ -351,11 +354,6 @@ impl Writer {
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         IMMUTABLES.write().await.insert(path, table);
         Ok(())
-    }
-
-    pub async fn sync(&self) -> Result<()> {
-        let mut wal = self.wal.write().await;
-        wal.sync().context(WalSnafu)
     }
 
     pub async fn read(

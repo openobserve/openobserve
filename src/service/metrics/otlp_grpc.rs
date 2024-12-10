@@ -48,7 +48,7 @@ use crate::{
         ingestion::{
             evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
-            write_file, write_file_multi, TriggerAlertData,
+            write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels},
         pipeline::batch_execution::ExecutablePipeline,
@@ -501,15 +501,9 @@ pub async fn handle_grpc_request(
         // write to file
         let writer =
             ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
-        let mut req_stats = if cfg.common.feature_batch_writer_lock {
-            write_file_multi(&writer, &stream_name, stream_data).await
-        } else {
-            write_file(&writer, &stream_name, stream_data).await
-        };
         // for performance issue, we will flush all when the app shutdown
-        // if let Err(e) = writer.sync().await {
-        //     log::error!("ingestion error while syncing writer: {}", e);
-        // }
+        let fsync = false;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
 
         let fns_length: usize =
             stream_executable_pipelines

@@ -51,9 +51,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{
-            evaluate_trigger, get_val_for_attr, write_file, write_file_multi, TriggerAlertData,
-        },
+        ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
@@ -592,15 +590,9 @@ pub async fn metrics_json_handler(
         // write to file
         let writer =
             ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
-        let mut req_stats = if cfg.common.feature_batch_writer_lock {
-            write_file_multi(&writer, &stream_name, stream_data).await
-        } else {
-            write_file(&writer, &stream_name, stream_data).await
-        };
         // for performance issue, we will flush all when the app shutdown
-        // if let Err(e) = writer.sync().await {
-        //     log::error!("ingestion error while syncing writer: {}", e);
-        // }
+        let fsync = false;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
 
         let fns_length: usize =
             stream_executable_pipelines
