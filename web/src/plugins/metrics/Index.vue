@@ -167,16 +167,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('metrics.runQuery')"
             @click="runQuery"
           />
+          <q-btn
+            data-test="logs-search-bar-share-link-btn"
+            class="q-mx-sm download-logs-btn q-px-sm q-py-xs"
+            size="sm"
+            icon="share"
+            :title="t('search.shareLink')"
+            @click="shareLink.execute()"
+            :loading="shareLink.isLoading.value"
+          />
         </template>
-        <!-- <q-btn
-          data-test="logs-search-bar-share-link-btn"
-          class="q-mx-sm download-logs-btn q-px-sm q-py-xs"
-          size="sm"
-          icon="share"
-          style="height: 30px"
-          :title="t('search.shareLink')"
-          @click="shareLink"
-        /> -->
       </div>
     </div>
     <div class="row" style="height: calc(100vh - 105px); overflow-y: auto">
@@ -306,33 +306,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </span>
                       </div>
-                      <div class="col" style="flex: 1">
-                        <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :dashboard-id="queryParams?.dashboard"
-                          :folder-id="queryParams?.folder"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="variablesData"
-                          :width="6"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          @updated:vrlFunctionFieldList="
-                            updateVrlFunctionFieldList
+                      <div
+                        class="col"
+                        style="position: relative; height: 100%; width: 100%"
+                      >
+                        <div
+                          style="
+                            flex: 1;
+                            min-height: calc(100% - 24px);
+                            height: calc(100% - 24px);
+                            width: 100%;
+                            margin-top: 24px;
                           "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
-                          searchType="Dashboards"
-                        />
-                        <q-dialog v-model="showViewPanel">
-                          <QueryInspector
-                            :metaData="metaData"
-                            :data="panelTitle"
-                          ></QueryInspector>
-                        </q-dialog>
+                        >
+                          <PanelSchemaRenderer
+                            v-if="chartData"
+                            @metadata-update="metaDataValue"
+                            :key="dashboardPanelData.data.type"
+                            :panelSchema="chartData"
+                            :dashboard-id="queryParams?.dashboard"
+                            :folder-id="queryParams?.folder"
+                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                            :variablesData="variablesData"
+                            :width="6"
+                            @error="handleChartApiError"
+                            @updated:data-zoom="onDataZoom"
+                            @updated:vrl-function-field-list="
+                              updateVrlFunctionFieldList
+                            "
+                            @last-triggered-at-update="
+                              handleLastTriggeredAtUpdate
+                            "
+                            searchType="Dashboards"
+                          />
+                        </div>
+                        <div
+                          class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
+                          style="position: absolute; top: 0px; right: -13px"
+                        >
+                          <q-btn
+                            size="md"
+                            class="no-border"
+                            no-caps
+                            dense
+                            style="padding: 2px 4px; z-index: 1"
+                            color="primary"
+                            @click="addToDashboard"
+                            title="Add To Dashboard"
+                            >Add To Dashboard</q-btn
+                          >
+                        </div>
                       </div>
                       <DashboardErrorsComponent
                         :errors="errorData"
@@ -399,6 +422,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
     </div>
+    <q-dialog
+      v-model="showAddToDashboardDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <add-to-dashboard
+        @save="addPanelToDashboard"
+        :dashboardPanelData="dashboardPanelData"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -415,18 +449,14 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
-
+import shortURLService from "@/services/short_url";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import {
-  addPanel,
-  getDashboard,
-  getPanel,
-  updatePanel,
-} from "./../../utils/commons";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
@@ -442,6 +472,9 @@ import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+const AddToDashboard = defineAsyncComponent(() => {
+  return import("./../metrics/AddToDashboard.vue");
+});
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -481,6 +514,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
     SyntaxGuideMetrics,
+    AddToDashboard,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -503,6 +537,7 @@ export default defineComponent({
       resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
+      removeXYFilters,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -518,11 +553,10 @@ export default defineComponent({
       lastTriggeredAt.value = data;
     };
 
+    const showAddToDashboardDialog = ref(false);
+
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
-
-    // this is used to again assign query params on discard or save
-    let routeQueryParamsOnMount: any = {};
 
     // ======= [START] default variable values
 
@@ -541,11 +575,6 @@ export default defineComponent({
       // console.time("metaDataValue");
       metaData.value = metadata;
       // console.timeEnd("metaDataValue");
-    };
-
-    //dashboard tutorial link on click
-    const showTutorial = () => {
-      window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
 
     const variablesDataUpdated = (data: any) => {
@@ -597,13 +626,6 @@ export default defineComponent({
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    const savePanelData = useLoading(async () => {
-      // console.time("savePanelData");
-      const dashboardId = route.query.dashboard + "";
-      await savePanelChangesToDashboard(dashboardId);
-      // console.timeEnd("savePanelData");
-    });
-
     onUnmounted(async () => {
       // console.time("onUnmounted");
       // clear a few things
@@ -615,54 +637,32 @@ export default defineComponent({
     });
 
     onMounted(async () => {
-      // assign the route query params
-      routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
-
       errorData.errors = [];
 
-      // console.time("onMounted");
-      // todo check for the edit more
-      if (route.query.panelId) {
-        editMode.value = true;
-        const panelData = await getPanel(
-          store,
-          route.query.dashboard,
-          route.query.panelId,
-          route.query.folder,
-          route.query.tab,
-        );
+      editMode.value = false;
+      resetDashboardPanelDataAndAddTimeField();
 
-        Object.assign(
-          dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData)),
-        );
+      // for metrics page, use stream type as metric
+      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+      // need to remove the xy filters
+      removeXYFilters();
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.queries[0].customQuery = true;
 
-        // check if vrl function exists
-        if (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery
-        ) {
-          // enable vrl function editor
-          dashboardPanelData.layout.vrlFunctionToggle = true;
-        }
+      // set the value of the query after the reset
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.stream = route.query?.stream;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query = decodeURIComponent(
+        route.query?.query ?? dashboardPanelData.data.queries[0].query ?? "",
+      );
 
-        await nextTick();
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        updateDateTime(selectedDate.value);
-      } else {
-        editMode.value = false;
-        resetDashboardPanelDataAndAddTimeField();
+      chartData.value = {};
+      // set the value of the date time after the reset
+      updateDateTime(selectedDate.value);
 
-        // for metrics page, use stream type as metric
-        dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
-        dashboardPanelData.data.queryType = "promql";
-        dashboardPanelData.data.queries[0].customQuery = true;
-
-        chartData.value = {};
-        // set the value of the date time after the reset
-        updateDateTime(selectedDate.value);
-      }
       // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
@@ -671,12 +671,7 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
-      loadDashboard();
-      // console.timeEnd("add panel loadDashboard");
-    });
-
-    let list = computed(function () {
-      return [toRaw(store.state.currentSelectedDashboard)];
+      getSelectedDateFromRoute();
     });
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
@@ -695,35 +690,7 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
-    // const getDashboard = () => {
-    //   return currentDashboard.dashboardId;
-    // };
-    const loadDashboard = async () => {
-      // console.time("AddPanel:loadDashboard");
-      let data = JSON.parse(
-        JSON.stringify(
-          await getDashboard(
-            store,
-            route.query.dashboard,
-            route.query.folder ?? "default",
-          ),
-        ),
-      );
-      // console.timeEnd("AddPanel:loadDashboard");
-
-      // console.time("AddPanel:loadDashboard:after");
-      currentDashboardData.data = data;
-      // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
-        variablesData.isVariablesLoading = false;
-        variablesData.values = [];
-      }
-
+    const getSelectedDateFromRoute = async () => {
       // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
@@ -826,6 +793,26 @@ export default defineComponent({
       },
     );
 
+    function generateURLQuery(isShareLink = false) {
+      try {
+        const query: any = {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream: dashboardPanelData.data.queries[0].fields.stream,
+          query: b64EncodeUnicode(dashboardPanelData.data.queries[0].query),
+          ...getQueryParamsForDuration(selectedDate.value),
+        };
+
+        return query;
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+    function updateUrlQueryParams() {
+      const query = generateURLQuery();
+      router.push({ query });
+    }
+
     const runQuery = () => {
       // console.time("runQuery");
       if (!isValid(true)) {
@@ -874,26 +861,8 @@ export default defineComponent({
           end_time: new Date(date.endTime),
         };
 
-        router.replace({
-          query: {
-            ...route.query,
-            ...getQueryParamsForDuration(selectedDate.value),
-          },
-        });
+        updateUrlQueryParams();
       }
-    };
-
-    const goBack = () => {
-      return router.push({
-        path: "/dashboards/view",
-        query: {
-          ...routeQueryParamsOnMount,
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-        },
-      });
     };
 
     //watch dashboardpaneldata when changes, isUpdated will be true
@@ -977,89 +946,6 @@ export default defineComponent({
         return false;
       } else {
         return true;
-      }
-    };
-
-    const savePanelChangesToDashboard = async (dashId: string) => {
-      if (!isValid()) {
-        return;
-      }
-
-      try {
-        // console.time("savePanelChangesToDashboard");
-        if (editMode.value) {
-          const errorMessageOnSave = await updatePanel(
-            store,
-            dashId,
-            dashboardPanelData.data,
-            route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          );
-          if (errorMessageOnSave instanceof Error) {
-            errorData.errors.push(
-              "Error saving panel configuration : " +
-                errorMessageOnSave.message,
-            );
-            return;
-          }
-        } else {
-          const panelId =
-            "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
-
-          dashboardPanelData.data.id = panelId;
-          chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-
-          const errorMessageOnSave = await addPanel(
-            store,
-            dashId,
-            dashboardPanelData.data,
-            route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          );
-          if (errorMessageOnSave instanceof Error) {
-            errorData.errors.push(
-              "Error saving panel configuration  : " +
-                errorMessageOnSave.message,
-            );
-            return;
-          }
-        }
-        // console.timeEnd("savePanelChangesToDashboard");
-
-        isPanelConfigWatcherActivated = false;
-        isPanelConfigChanged.value = false;
-
-        await nextTick();
-        return router.push({
-          path: "/dashboards/view",
-          query: {
-            ...routeQueryParamsOnMount,
-            org_identifier: store.state.selectedOrganization.identifier,
-            dashboard: dashId,
-            folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          },
-        });
-      } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
-          );
-        } else {
-          showErrorNotification(
-            error?.message ??
-              (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
-            {
-              timeout: 2000,
-            },
-          );
-        }
       }
     };
 
@@ -1318,18 +1204,57 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
+    const shareLink = useLoading(async () => {
+      const urlObj = new URL(window.location.href);
+
+      try {
+        const res = await shortURLService.create(
+          store.state.selectedOrganization.identifier,
+          urlObj?.href,
+        );
+        const shortURL = res?.data?.short_url;
+        copyToClipboard(shortURL)
+          .then(() => {
+            showPositiveNotification("Link copied successfully");
+          })
+          .catch(() => {
+            showErrorNotification("Error while copying link");
+          });
+      } catch (error) {
+        showErrorNotification("Error while sharing link");
+      }
+    });
+
+    const addToDashboard = () => {
+      const errors: any = [];
+      // will push errors in errors array
+      validatePanel(errors);
+
+      if (errors.length) {
+        // set errors into errorData
+        errorData.errors = errors;
+        showErrorNotification(
+          "There are some errors, please fix them and try again",
+        );
+        return;
+      } else {
+        showAddToDashboardDialog.value = true;
+      }
+    };
+
+    const addPanelToDashboard = () => {
+      showAddToDashboardDialog.value = false;
+    };
+
     // [END] cancel running queries
     return {
       t,
       updateDateTime,
-      goBack,
-      savePanelChangesToDashboard,
       runQuery,
       layoutSplitterUpdated,
       expandedSplitterHeight,
       querySplitterUpdated,
       currentDashboard,
-      list,
       dashboardPanelData,
       chartData,
       editMode,
@@ -1340,7 +1265,6 @@ export default defineComponent({
       currentDashboardData,
       variablesData,
       updatedVariablesData,
-      savePanelData,
       resetAggregationFunction,
       isOutDated,
       store,
@@ -1350,7 +1274,6 @@ export default defineComponent({
       metaData,
       panelTitle,
       onDataZoom,
-      showTutorial,
       updateVrlFunctionFieldList,
       queryParams: route.query as any,
       initialVariableValues,
@@ -1360,12 +1283,11 @@ export default defineComponent({
       cancelAddPanelQuery,
       disable,
       config,
+      shareLink,
+      showAddToDashboardDialog,
+      addPanelToDashboard,
+      addToDashboard,
     };
-  },
-  methods: {
-    goBackToDashboardList(evt: any, row: any) {
-      this.goBack();
-    },
   },
 });
 </script>
