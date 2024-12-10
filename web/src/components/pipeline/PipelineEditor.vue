@@ -377,7 +377,6 @@ const nodeRows = ref<(string | null)[]>([]);
 const q = useQuasar();
 
 const confirmDialogBasicPipeline = ref(false);
-
 const associatedFunctions: Ref<string[]> = ref([]);
 
 const { t } = useI18n();
