@@ -3275,8 +3275,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
         
-        const parsedQuery = parser.astify(currentQuery.query);
-
         if (streamFound) {
           if (currentQuery.fields.stream != streamFound.name) {
             
@@ -3284,7 +3282,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
         } else if(isDummyStreamName(tableName)){
           // nothing to do as the stream is dummy
-        } else if(containsSubqueryInFrom(parsedQuery)){
+        } else if(containsSubqueryInFrom(parser.astify(currentQuery?.query))){
           // nothing to do as the stream is dummy
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
