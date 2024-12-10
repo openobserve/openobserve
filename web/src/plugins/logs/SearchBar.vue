@@ -1331,7 +1331,7 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             const tableName: string =
               searchObj.data.parsedQuery.from[0].table ||
-              searchObj.data.parsedQuery.from[0].expr.ast.from[0].table;
+              searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table;
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
               tableName !== streamName
