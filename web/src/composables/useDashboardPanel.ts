@@ -3103,16 +3103,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
       return q.replace(regex, replacement);
     };
+
     // Recursive validation function
     const validateRecursive: any = (currentQuery: any, remainingVars: any) => {
       if (!remainingVars.length) {
         try {
-          const parsedQuery = parser.astify(currentQuery);
-
-          if (containsSubqueryInFrom(parsedQuery)) {
-            return currentQuery;
-          }
-          
+          // Try parsing the current query
+          parser.astify(currentQuery);
           return currentQuery; // Return valid query
         } catch (error) {
           return null; // Invalid query
@@ -3282,10 +3279,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
         } else if(isDummyStreamName(tableName)){
           // nothing to do as the stream is dummy
-        } else if(containsSubqueryInFrom(parser.astify(currentQuery?.query))){
-          // nothing to do as the stream is dummy
         } else {
-          dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
+          let parsedQuery;
+          try {
+            parsedQuery = parser.astify(currentQuery?.query);
+          } catch (e) {
+            dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
+            return;
+          }
+      
+          if (containsSubqueryInFrom(parsedQuery)) {
+            // nothing to do as the subqueries is found
+          } else {
+            dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
+          }
         }
       } else {
         dashboardPanelData.meta.errors.queryErrors.push("Stream name required");
