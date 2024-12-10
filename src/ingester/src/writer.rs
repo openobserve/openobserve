@@ -205,39 +205,15 @@ impl Writer {
             return Ok(());
         }
 
-        let entry_bytes = entry.into_bytes()?;
-        let entry_batch = entry.into_batch(self.key.stream_type.clone(), schema.clone())?;
-
-        // check rotation
-        self.rotate(entry_bytes.len(), entry.data_size).await?;
-
-        // write into wal
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.write().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
-        wal.write(&entry_bytes, false).context(WalSnafu)?;
-        drop(wal);
-
-        // write into memtable
-        let start = std::time::Instant::now();
-        let mut mem = self.memtable.write().await;
-        let mem_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_MEMTABLE_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(mem_lock_time);
-        mem.write(schema, entry, entry_batch)?;
-        drop(mem);
-
-        Ok(())
+        entry.schema = Some(schema);
+        self.write_batch(vec![entry]).await
     }
 
     pub async fn write_batch(&self, mut entries: Vec<Entry>) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
+
         let bytes_entries = entries
             .iter_mut()
             .map(|entry| entry.into_bytes())
