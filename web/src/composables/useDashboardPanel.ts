@@ -3092,19 +3092,29 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
 
+  const containsSubqueryInFrom = (parsedQuery: any) => {
+    if (!parsedQuery || !parsedQuery.from) return false;
+    return parsedQuery.from.some((item: any) => item.expr?.ast);
+  };
+
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
       const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
       return q.replace(regex, replacement);
     };
-
     // Recursive validation function
     const validateRecursive: any = (currentQuery: any, remainingVars: any) => {
       if (!remainingVars.length) {
         try {
-          // Try parsing the current query
-          parser.astify(currentQuery);
+          const parsedQuery = parser.astify(currentQuery);
+
+          if (containsSubqueryInFrom(parsedQuery)) {
+            console.log("Subquery detected, skipping further validation.");
+            return currentQuery;
+          }
+
+          console.log("Valid query", currentQuery);
           return currentQuery; // Return valid query
         } catch (error) {
           return null; // Invalid query
@@ -3198,7 +3208,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const validatedQuery = validateQuery(currentQuery, variables);
 
         if (validatedQuery) {
-          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);
+          const parsedQuery = parser.astify(validatedQuery);
+          if (containsSubqueryInFrom(parsedQuery)) {
+            console.log(
+              "Subquery detected in FROM clause. Skipping validations.",
+            );
+            dashboardPanelData.meta.parsedQuery = parsedQuery;
+            return;
+          }
+          dashboardPanelData.meta.parsedQuery = parsedQuery;
         } else {
           dashboardPanelData.meta.parsedQuery = null;
         }
