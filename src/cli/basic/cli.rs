@@ -242,6 +242,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 None => "".to_string(),
             };
             println!("Running migration metadata from {} to {}", from, to);
+            #[allow(deprecated)]
             migration::meta::run(&from, &to).await?
         }
         "migrate-dashboards" => {
