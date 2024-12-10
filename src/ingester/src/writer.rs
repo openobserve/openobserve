@@ -248,10 +248,7 @@ impl Writer {
             if entry.is_empty() {
                 continue;
             }
-            wal.write(&entry, false).context(WalSnafu)?;
-        }
-        if fsync {
-            wal.sync().context(WalSnafu)?;
+            wal.write(&entry).context(WalSnafu)?;
         }
         drop(wal);
 
@@ -269,6 +266,13 @@ impl Writer {
             mem.write(entry.schema.clone().unwrap(), entry, batch)?;
         }
         drop(mem);
+
+        // check fsync
+        if fsync {
+            let mut wal = self.wal.write().await;
+            wal.sync().context(WalSnafu)?;
+            drop(wal);
+        }
 
         Ok(())
     }
