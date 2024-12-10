@@ -18,7 +18,10 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    openfga::authorizer::authz::delete_service_account_from_org,
+};
 use regex::Regex;
 
 use crate::{
@@ -647,21 +650,26 @@ pub async fn remove_user_from_org(
                             if get_o2_config().openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
                                 delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                                if user_role.eq(&UserRole::ServiceAccount) {
+                                    delete_service_account_from_org(org_id, email_id).await;
+                                }
                             }
                         }
                     } else {
                         let mut _user_fga_role: Option<String> = None;
                         #[cfg(feature = "enterprise")]
+                        let mut is_service_account = false;
+                        #[cfg(feature = "enterprise")]
                         for org in orgs.iter() {
                             if org.name.eq(&org_id.to_string()) {
                                 let user_role = &org.role;
-                                _user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
-                                    || user_role.eq(&UserRole::User)
-                                {
-                                    Some("allowed_user".to_string())
-                                } else {
-                                    Some(user_role.to_string())
-                                };
+                                is_service_account = user_role.eq(&UserRole::ServiceAccount);
+                                _user_fga_role =
+                                    if is_service_account || user_role.eq(&UserRole::User) {
+                                        Some("allowed_user".to_string())
+                                    } else {
+                                        Some(user_role.to_string())
+                                    };
                             }
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
@@ -684,6 +692,9 @@ pub async fn remove_user_from_org(
                                         _user_fga_role.unwrap().as_str(),
                                     )
                                     .await;
+                                    if is_service_account {
+                                        delete_service_account_from_org(org_id, email_id).await;
+                                    }
                                 }
                             }
                         }
