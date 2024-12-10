@@ -3208,15 +3208,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const validatedQuery = validateQuery(currentQuery, variables);
 
         if (validatedQuery) {
-          const parsedQuery = parser.astify(validatedQuery);
-          if (containsSubqueryInFrom(parsedQuery)) {
-            console.log(
-              "Subquery detected in FROM clause. Skipping validations.",
-            );
-            dashboardPanelData.meta.parsedQuery = parsedQuery;
-            return;
-          }
-          dashboardPanelData.meta.parsedQuery = parsedQuery;
+          dashboardPanelData.meta.parsedQuery = parser.astify(validatedQuery);;
         } else {
           dashboardPanelData.meta.parsedQuery = null;
         }
@@ -3285,12 +3277,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
         
+        const parsedQuery = parser.astify(currentQuery.query);
+
         if (streamFound) {
           if (currentQuery.fields.stream != streamFound.name) {
             
             currentQuery.fields.stream = streamFound.name;
           }
         } else if(isDummyStreamName(tableName)){
+          // nothing to do as the stream is dummy
+        } else if(containsSubqueryInFrom(parsedQuery)){
           // nothing to do as the stream is dummy
         } else {
           dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
@@ -3312,6 +3308,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
+      console.log(
+        "dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query",dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      );
+      
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
