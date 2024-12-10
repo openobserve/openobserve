@@ -189,19 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- if data not available show nodata component -->
           <template #no-data>
-            <!-- The below if condition only appears when user tries to toggle every time before searching across folders -->
-              <div  v-if="!hasSearched && searchAcrossFolders"
-                class="full-width column flex-center q-gutter-sm"
-                style="font-size: 1.5rem"
-              >
-                <q-img
-                  :src="getImageURL('images/common/search_icon.svg')"
-                  style="width: 230px; margin: 20vh auto 2rem ; opacity: 0.5;"
-                />
-                <div class="q-ma-none">{{ t("dashboard.searchMsg") }}</div>
-            </div>
-
-            <NoData v-else />
+            <NoData v-if="!loading" />
           </template>
           <template #body-cell-description="props">
             <q-td :props="props">
@@ -491,7 +479,7 @@ export default defineComponent({
         ];
 
         // Conditionally add the "folder" column
-        if (searchAcrossFolders.value) {
+        if (searchAcrossFolders.value && hasSearched.value) {
             baseColumns.splice(2, 0, {
               name: "folder",
               field: "folder",
@@ -548,6 +536,7 @@ export default defineComponent({
         });
         await getAllDashboardsByFolderId(store, activeFolderId.value);
         dismiss();
+        searchAcrossFolders.value = false;
         router.push({
           path: "/dashboards",
           query: {
@@ -561,7 +550,14 @@ export default defineComponent({
 
     watch(searchQuery, async (newQuery) => {
       await debouncedSearch(newQuery);
+    });
 
+    watch(searchAcrossFolders, async (newVal) => {
+      if (newVal) {
+        searchQuery.value = "";
+        filteredResults.value = [];
+        hasSearched.value = false;
+      }
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -661,7 +657,7 @@ export default defineComponent({
       dismiss();
     };
     const dashboards = computed(function () {
-      if(!searchAcrossFolders.value){
+      if(!searchAcrossFolders.value || !hasSearched.value){
         
        const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
@@ -700,7 +696,7 @@ export default defineComponent({
     });
 
     const resultTotal = computed(function () {
-      if(!searchAcrossFolders.value){
+      if(!searchAcrossFolders.value || !hasSearched.value){
         return store.state.organizationData?.allDashboardList[
           activeFolderId.value
         ]?.length;
