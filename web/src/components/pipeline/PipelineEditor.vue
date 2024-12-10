@@ -763,7 +763,6 @@ const isValidNodes = (nodes:any) =>{
   }
   const inputNode = nodes.find((node:any) => node.io_type === "input");
   const outputNode = nodes.find((node:any) => node.io_type === "output");
-  console.log(inputNode, outputNode, "inputNode, outputNode");
 
   if(inputNode.data.node_type !== 'stream'){
     return true;
