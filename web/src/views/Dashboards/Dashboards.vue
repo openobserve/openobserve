@@ -813,7 +813,7 @@ export default defineComponent({
           );
           return migratedDashboards;
       } catch (error) {
-        q.notify({
+        $q.notify({
           message: "Error fetching search results",
           color: "negative",
         });
@@ -840,7 +840,7 @@ export default defineComponent({
       store,
       orgData,
       router,
-      loading: ref(false),
+      loading,
       dashboards,
       dashboard,
       columns,
