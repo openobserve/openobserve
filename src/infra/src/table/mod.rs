@@ -55,3 +55,12 @@ pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sq
         None
     }
 }
+
+#[macro_export]
+macro_rules! orm_err {
+    ($e:expr) => {
+        Err($crate::errors::Error::DbError(
+            $crate::errors::DbError::SeaORMError($e.to_string()),
+        ))
+    };
+}

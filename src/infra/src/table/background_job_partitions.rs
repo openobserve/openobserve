@@ -21,7 +21,7 @@ use sea_orm::{
 use super::{entity::background_job_partitions::*, get_lock};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors,
+    errors, orm_err,
 };
 
 // in background_jobs table
@@ -42,11 +42,15 @@ pub async fn cancel_partition_job(job_id: i32) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    Entity::update_many()
+    let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(1))
         .filter(Column::Id.eq(job_id))
         .exec(client)
-        .await?;
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("cancel_partition_job failed: {}", e));
+    }
 
     Ok(())
 }
@@ -60,9 +64,13 @@ pub async fn is_have_partition_jobs(job_id: i32) -> Result<bool, errors::Error> 
         .column(Column::Id)
         .filter(Column::Id.eq(job_id))
         .one(client)
-        .await?;
+        .await;
 
-    Ok(status.is_some())
+    match status {
+        Ok(Some(_)) => Ok(true),
+        Ok(None) => Ok(false),
+        Err(e) => orm_err!(format!("is_have_partition_jobs failed: {}", e)),
+    }
 }
 
 pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
@@ -70,7 +78,7 @@ pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let tx = client.begin().await?;
+
     let mut jobs = Vec::with_capacity(partitions.len());
     for (idx, partition) in partitions.iter().enumerate() {
         jobs.push(ActiveModel {
@@ -84,16 +92,21 @@ pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(
         });
     }
 
-    let res = Entity::insert_many(jobs)
-        .exec(&tx)
-        .await
-        .map_err(errors::Error::from);
+    let tx = match client.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
+    };
+
+    let res = Entity::insert_many(jobs).exec(&tx).await;
 
     if let Err(e) = res {
-        tx.rollback().await?;
-        return Err(e);
-    } else {
-        tx.commit().await?;
+        log::error!("submit partition job insert error: {}", e);
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("submit partition job rollback error: {e}"));
+        }
+        return orm_err!(format!("submit partition job insert error: {e}"));
+    } else if let Err(e) = tx.commit().await {
+        return orm_err!(format!("submit partition job commit error: {e}"));
     }
 
     Ok(())
@@ -103,12 +116,16 @@ pub async fn get_partition_jobs_by_job_id(job_id: i32) -> Result<Vec<Model>, err
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // sql: select * from background_job_partitions where job_id = job_id and status = 0
-    Entity::find()
+    let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
         .filter(Column::Status.eq(0))
         .all(client)
-        .await
-        .map_err(errors::Error::from)
+        .await;
+
+    match res {
+        Ok(jobs) => Ok(jobs),
+        Err(e) => orm_err!(format!("get_partition_jobs_by_job_id failed: {}", e)),
+    }
 }
 
 pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(), errors::Error> {
@@ -117,7 +134,7 @@ pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    Entity::update_many()
+    let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(1))
         .col_expr(
             Column::StartedAt,
@@ -126,7 +143,11 @@ pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
         .exec(client)
-        .await?;
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("set_partition_job_start failed: {}", e));
+    }
 
     Ok(())
 }
@@ -141,7 +162,7 @@ pub async fn set_partition_job_finish(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    Entity::update_many()
+    let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(2))
         .col_expr(
             Column::EndedAt,
@@ -151,7 +172,11 @@ pub async fn set_partition_job_finish(
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
         .exec(client)
-        .await?;
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("set_partition_job_finish failed: {}", e));
+    }
 
     Ok(())
 }
@@ -166,13 +191,17 @@ pub async fn set_partition_job_error_message(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    Entity::update_many()
+    let res = Entity::update_many()
         .col_expr(Column::ErrorMessage, Expr::value(error_message))
         .col_expr(Column::Status, Expr::value(2))
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
         .exec(client)
-        .await?;
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("set_partition_job_error_message failed: {}", e));
+    }
 
     Ok(())
 }

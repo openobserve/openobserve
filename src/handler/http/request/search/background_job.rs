@@ -202,7 +202,7 @@ pub async fn cancel_query(path: web::Path<(String, String)>) -> Result<HttpRespo
     let job_id = path.1.clone().parse::<i32>().unwrap();
     // 1. use job_id to query the trace_id
     let trace_id = get_trace_id(job_id).await;
-    if trace_id.is_err() {
+    if trace_id.is_err() || trace_id.as_ref().unwrap().is_none() {
         return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
     }
 
@@ -221,7 +221,7 @@ pub async fn cancel_query(path: web::Path<(String, String)>) -> Result<HttpRespo
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(&org_id, &[&trace_id.unwrap()]).await
+    cancel_query_inner(&org_id, &[&trace_id.unwrap().unwrap()]).await
 }
 
 // 5. get
