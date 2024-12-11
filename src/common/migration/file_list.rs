@@ -22,7 +22,6 @@ use infra::file_list as infra_file_list;
 
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
-#[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
 pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
     // check wal dir
     std::fs::create_dir_all(&get_config().common.data_wal_dir).expect("create wal dir success");
