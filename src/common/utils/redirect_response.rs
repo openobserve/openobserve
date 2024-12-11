@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{HttpResponse, ResponseError};
+use actix_web::{http::header::ContentType, HttpResponse, ResponseError};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -69,7 +69,9 @@ impl RedirectResponse {
                 </body>
                 </html>"#
             );
-            HttpResponse::Found().body(html)
+            HttpResponse::Found()
+                .content_type(ContentType::html())
+                .body(html)
         }
     }
 }
