@@ -40,10 +40,10 @@ pub struct Model {
     pub trigger_threshold_count: i64,
     pub trigger_frequency_type: i16,
     pub trigger_frequency_seconds: i64,
-    pub trigger_silence_seconds: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub trigger_frequency_cron: Option<String>,
     pub trigger_frequency_cron_timezone: Option<String>,
+    pub trigger_silence_seconds: i64,
     pub trigger_tolerance_seconds: Option<i64>,
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,

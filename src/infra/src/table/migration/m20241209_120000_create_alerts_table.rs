@@ -133,16 +133,16 @@ fn create_alerts_table_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(Alerts::TriggerSilenceSeconds)
-                .big_integer()
-                .not_null(),
-        )
         .col(ColumnDef::new(Alerts::TriggerFrequencyCron).text().null())
         .col(
             ColumnDef::new(Alerts::TriggerFrequencyCronTimezone)
                 .string_len(256)
                 .null(),
+        )
+        .col(
+            ColumnDef::new(Alerts::TriggerSilenceSeconds)
+                .big_integer()
+                .not_null(),
         )
         .col(
             ColumnDef::new(Alerts::TriggerToleranceSeconds)
@@ -248,7 +248,7 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &create_alerts_table_statement().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "alerts" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "folder_id" bigint NOT NULL, "name" varchar(256) NOT NULL, "stream_type" varchar(50) NOT NULL, "stream_name" varchar(256) NOT NULL, "is_real_time" bool NOT NULL, "destinations" json NOT NULL, "context_attributes" json NULL, "row_template" text NULL, "description" text NULL, "enabled" bool NOT NULL, "tz_offset" integer NOT NULL, "last_triggered_at" bigint NULL, "last_satisfied_at" bigint NULL, "query_type" varchar(50) NOT NULL, "query_conditions" json NULL, "query_sql" text NULL, "query_promql" text NULL, "query_promql_condition" json NULL, "query_aggregation" json NULL, "query_vrl_function" text NULL, "query_search_event_type" varchar(50) NULL, "query_multi_time_range" json NULL, "trigger_threshold_operator" varchar(50) NOT NULL, "trigger_period_seconds" bigint NOT NULL, "trigger_threshold_count" bigint NOT NULL, "trigger_frequency_type" varchar(50) NOT NULL, "trigger_frequency_seconds" bigint NOT NULL, "trigger_silence_seconds" bigint NOT NULL, "trigger_frequency_cron" text NULL, "trigger_frequency_cron_timezone" varchar(256) NULL, "trigger_tolerance_seconds" bigint NULL, "owner" varchar(256) NULL, "last_edited_by" varchar(256) NULL, "updated_at" bigint NULL, CONSTRAINT "alerts_folders_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") )"#
+            r#"CREATE TABLE IF NOT EXISTS "alerts" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "folder_id" bigint NOT NULL, "name" varchar(256) NOT NULL, "stream_type" varchar(50) NOT NULL, "stream_name" varchar(256) NOT NULL, "is_real_time" bool NOT NULL, "destinations" json NOT NULL, "context_attributes" json NULL, "row_template" text NULL, "description" text NULL, "enabled" bool NOT NULL, "tz_offset" integer NOT NULL, "last_triggered_at" bigint NULL, "last_satisfied_at" bigint NULL, "query_type" smallint NOT NULL, "query_conditions" json NULL, "query_sql" text NULL, "query_promql" text NULL, "query_promql_condition" json NULL, "query_aggregation" json NULL, "query_vrl_function" text NULL, "query_search_event_type" smallint NULL, "query_multi_time_range" json NULL, "trigger_threshold_operator" varchar(50) NOT NULL, "trigger_period_seconds" bigint NOT NULL, "trigger_threshold_count" bigint NOT NULL, "trigger_frequency_type" smallint NOT NULL, "trigger_frequency_seconds" bigint NOT NULL, "trigger_frequency_cron" text NULL, "trigger_frequency_cron_timezone" varchar(256) NULL, "trigger_silence_seconds" bigint NOT NULL, "trigger_tolerance_seconds" bigint NULL, "owner" varchar(256) NULL, "last_edited_by" varchar(256) NULL, "updated_at" bigint NULL, CONSTRAINT "alerts_folders_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") )"#
         );
     }
 
@@ -256,7 +256,7 @@ mod tests {
     fn mysql() {
         collapsed_eq!(
             &create_alerts_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `alerts` ( `id` char(27) NOT NULL PRIMARY KEY, `org` varchar(100) NOT NULL, `folder_id` bigint NOT NULL, `name` varchar(256) NOT NULL, `stream_type` varchar(50) NOT NULL, `stream_name` varchar(256) NOT NULL, `is_real_time` bool NOT NULL, `destinations` json NOT NULL, `context_attributes` json NULL, `row_template` text NULL, `description` text NULL, `enabled` bool NOT NULL, `tz_offset` int NOT NULL, `last_triggered_at` bigint NULL, `last_satisfied_at` bigint NULL, `query_type` varchar(50) NOT NULL, `query_conditions` json NULL, `query_sql` text NULL, `query_promql` text NULL, `query_promql_condition` json NULL, `query_aggregation` json NULL, `query_vrl_function` text NULL, `query_search_event_type` varchar(50) NULL, `query_multi_time_range` json NULL, `trigger_threshold_operator` varchar(50) NOT NULL, `trigger_period_seconds` bigint NOT NULL, `trigger_threshold_count` bigint NOT NULL, `trigger_frequency_type` varchar(50) NOT NULL, `trigger_frequency_seconds` bigint NOT NULL, `trigger_silence_seconds` bigint NOT NULL, `trigger_frequency_cron` text NULL, `trigger_frequency_cron_timezone` varchar(256) NULL, `trigger_tolerance_seconds` bigint NULL, `owner` varchar(256) NULL, `last_edited_by` varchar(256) NULL, `updated_at` bigint NULL, CONSTRAINT `alerts_folders_fk` FOREIGN KEY (`folder_id`) REFERENCES `folders` (`id`) )"#
+            r#"CREATE TABLE IF NOT EXISTS `alerts` ( `id` char(27) NOT NULL PRIMARY KEY, `org` varchar(100) NOT NULL, `folder_id` bigint NOT NULL, `name` varchar(256) NOT NULL, `stream_type` varchar(50) NOT NULL, `stream_name` varchar(256) NOT NULL, `is_real_time` bool NOT NULL, `destinations` json NOT NULL, `context_attributes` json NULL, `row_template` text NULL, `description` text NULL, `enabled` bool NOT NULL, `tz_offset` int NOT NULL, `last_triggered_at` bigint NULL, `last_satisfied_at` bigint NULL, `query_type` smallint NOT NULL, `query_conditions` json NULL, `query_sql` text NULL, `query_promql` text NULL, `query_promql_condition` json NULL, `query_aggregation` json NULL, `query_vrl_function` text NULL, `query_search_event_type` smallint NULL, `query_multi_time_range` json NULL, `trigger_threshold_operator` varchar(50) NOT NULL, `trigger_period_seconds` bigint NOT NULL, `trigger_threshold_count` bigint NOT NULL, `trigger_frequency_type` smallint NOT NULL, `trigger_frequency_seconds` bigint NOT NULL, `trigger_frequency_cron` text NULL, `trigger_frequency_cron_timezone` varchar(256) NULL, `trigger_silence_seconds` bigint NOT NULL, `trigger_tolerance_seconds` bigint NULL, `owner` varchar(256) NULL, `last_edited_by` varchar(256) NULL, `updated_at` bigint NULL, CONSTRAINT `alerts_folders_fk` FOREIGN KEY (`folder_id`) REFERENCES `folders` (`id`) )"#
         );
     }
 
@@ -264,7 +264,7 @@ mod tests {
     fn sqlite() {
         collapsed_eq!(
             &create_alerts_table_statement().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "alerts" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "folder_id" bigint NOT NULL, "name" varchar(256) NOT NULL, "stream_type" varchar(50) NOT NULL, "stream_name" varchar(256) NOT NULL, "is_real_time" boolean NOT NULL, "destinations" json_text NOT NULL, "context_attributes" json_text NULL, "row_template" text NULL, "description" text NULL, "enabled" boolean NOT NULL, "tz_offset" integer NOT NULL, "last_triggered_at" bigint NULL, "last_satisfied_at" bigint NULL, "query_type" varchar(50) NOT NULL, "query_conditions" json_text NULL, "query_sql" text NULL, "query_promql" text NULL, "query_promql_condition" json_text NULL, "query_aggregation" json_text NULL, "query_vrl_function" text NULL, "query_search_event_type" varchar(50) NULL, "query_multi_time_range" json_text NULL, "trigger_threshold_operator" varchar(50) NOT NULL, "trigger_period_seconds" bigint NOT NULL, "trigger_threshold_count" bigint NOT NULL, "trigger_frequency_type" varchar(50) NOT NULL, "trigger_frequency_seconds" bigint NOT NULL, "trigger_silence_seconds" bigint NOT NULL, "trigger_frequency_cron" text NULL, "trigger_frequency_cron_timezone" varchar(256) NULL, "trigger_tolerance_seconds" bigint NULL, "owner" varchar(256) NULL, "last_edited_by" varchar(256) NULL, "updated_at" bigint NULL, FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") )"#
+            r#"CREATE TABLE IF NOT EXISTS "alerts" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "folder_id" bigint NOT NULL, "name" varchar(256) NOT NULL, "stream_type" varchar(50) NOT NULL, "stream_name" varchar(256) NOT NULL, "is_real_time" boolean NOT NULL, "destinations" json_text NOT NULL, "context_attributes" json_text NULL, "row_template" text NULL, "description" text NULL, "enabled" boolean NOT NULL, "tz_offset" integer NOT NULL, "last_triggered_at" bigint NULL, "last_satisfied_at" bigint NULL, "query_type" smallint NOT NULL, "query_conditions" json_text NULL, "query_sql" text NULL, "query_promql" text NULL, "query_promql_condition" json_text NULL, "query_aggregation" json_text NULL, "query_vrl_function" text NULL, "query_search_event_type" smallint NULL, "query_multi_time_range" json_text NULL, "trigger_threshold_operator" varchar(50) NOT NULL, "trigger_period_seconds" bigint NOT NULL, "trigger_threshold_count" bigint NOT NULL, "trigger_frequency_type" smallint NOT NULL, "trigger_frequency_seconds" bigint NOT NULL, "trigger_frequency_cron" text NULL, "trigger_frequency_cron_timezone" varchar(256) NULL, "trigger_silence_seconds" bigint NOT NULL, "trigger_tolerance_seconds" bigint NULL, "owner" varchar(256) NULL, "last_edited_by" varchar(256) NULL, "updated_at" bigint NULL, FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") )"#
         );
     }
 }
