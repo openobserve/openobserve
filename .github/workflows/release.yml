@@ -84,8 +84,8 @@ jobs:
             npm run build
       - name: Build UI for windows
         if: contains(matrix.arch, 'windows')
-        env: 
-          NODE_OPTIONS: "--max-old-space-size=8192"
+        # env: 
+        #   NODE_OPTIONS: "--max-old-space-size=8192"
         shell: bash
         run: |
             cd web/
