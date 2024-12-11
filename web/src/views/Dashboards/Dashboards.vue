@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="q-ml-auto">
         <q-toggle
-          data-test="log-stream-use_approx-toggle-btn"
+          data-test="dashboard-search-across-folders-toggle"
           v-model="searchAcrossFolders"
         >
       </q-toggle>
