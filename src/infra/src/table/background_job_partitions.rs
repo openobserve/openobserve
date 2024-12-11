@@ -111,18 +111,18 @@ pub async fn get_partition_jobs_by_job_id(job_id: i32) -> Result<Vec<Model>, err
         .map_err(errors::Error::from)
 }
 
-pub async fn set_partition_status(
-    job_id: i32,
-    partition_id: i32,
-    status: i32,
-) -> Result<(), errors::Error> {
+pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     Entity::update_many()
-        .col_expr(Column::Status, Expr::value(status))
+        .col_expr(Column::Status, Expr::value(1))
+        .col_expr(
+            Column::StartedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
         .exec(client)
@@ -131,7 +131,32 @@ pub async fn set_partition_status(
     Ok(())
 }
 
-pub async fn set_partition_error_message(
+pub async fn set_partition_job_finish(
+    job_id: i32,
+    partition_id: i32,
+    path: &str,
+) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    Entity::update_many()
+        .col_expr(Column::Status, Expr::value(2))
+        .col_expr(
+            Column::EndedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .col_expr(Column::ResultPath, Expr::value(path))
+        .filter(Column::JobId.eq(job_id))
+        .filter(Column::PartitionId.eq(partition_id))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn set_partition_job_error_message(
     job_id: i32,
     partition_id: i32,
     error_message: &str,

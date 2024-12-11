@@ -25,12 +25,20 @@ pub async fn get_job() -> Result<Option<Job>, errors::Error> {
     infra::table::background_jobs::get_job().await
 }
 
-pub async fn set_error_message(job_id: i32, error_message: &str) -> Result<(), errors::Error> {
-    infra::table::background_jobs::set_error_message(job_id, error_message).await
+pub async fn set_job_error_message(job_id: i32, error_message: &str) -> Result<(), errors::Error> {
+    infra::table::background_jobs::set_job_error_message(job_id, error_message).await
 }
 
-pub async fn set_status(id: i32, status: i32) -> Result<(), errors::Error> {
-    infra::table::background_jobs::set_status(id, status).await
+pub async fn set_job_finish(id: i32, path: &str) -> Result<(), errors::Error> {
+    infra::table::background_jobs::set_job_finish(id, path).await
+}
+
+pub async fn update_running_job(id: i32) -> Result<(), errors::Error> {
+    infra::table::background_jobs::update_running_job(id).await
+}
+
+pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
+    infra::table::background_jobs::check_running_jobs(updated_at).await
 }
 
 // query background_job_partitions table
@@ -46,21 +54,25 @@ pub async fn get_partition_jobs_by_job_id(job_id: i32) -> Result<Vec<PartitionJo
     infra::table::background_job_partitions::get_partition_jobs_by_job_id(job_id).await
 }
 
-pub async fn set_partition_status(
+pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(), errors::Error> {
+    infra::table::background_job_partitions::set_partition_job_start(job_id, partition_id).await
+}
+
+pub async fn set_partition_job_finish(
     job_id: i32,
     partition_id: i32,
-    status: i32,
+    path: &str,
 ) -> Result<(), errors::Error> {
-    infra::table::background_job_partitions::set_partition_status(job_id, partition_id, status)
+    infra::table::background_job_partitions::set_partition_job_finish(job_id, partition_id, path)
         .await
 }
 
-pub async fn set_partition_error_message(
+pub async fn set_partition_job_error_message(
     job_id: i32,
     partition_id: i32,
     error_message: &str,
 ) -> Result<(), errors::Error> {
-    infra::table::background_job_partitions::set_partition_error_message(
+    infra::table::background_job_partitions::set_partition_job_error_message(
         job_id,
         partition_id,
         error_message,

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster::LOCAL_NODE;
 use sea_orm::{
     prelude::Expr, sea_query::LockType, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -188,6 +189,7 @@ pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
     }
 }
 
+// get the job and update status
 pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -212,6 +214,15 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     if let Some(model) = &model {
         Entity::update_many()
             .col_expr(Column::Status, Expr::value(1))
+            .col_expr(
+                Column::UpdatedAt,
+                Expr::value(chrono::Utc::now().timestamp_micros()),
+            )
+            .col_expr(
+                Column::StartedAt,
+                Expr::value(chrono::Utc::now().timestamp_micros()),
+            )
+            .col_expr(Column::Node, Expr::value(&LOCAL_NODE.uuid))
             .filter(Column::Id.eq(model.id))
             .exec(&tx)
             .await?;
@@ -222,7 +233,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     Ok(model)
 }
 
-pub async fn set_error_message(id: i32, error_message: &str) -> Result<(), errors::Error> {
+pub async fn set_job_error_message(id: i32, error_message: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -238,15 +249,56 @@ pub async fn set_error_message(id: i32, error_message: &str) -> Result<(), error
     Ok(())
 }
 
-pub async fn set_status(id: i32, status: i32) -> Result<(), errors::Error> {
+pub async fn set_job_finish(id: i32, result_path: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     Entity::update_many()
-        .col_expr(Column::Status, Expr::value(status))
+        .col_expr(Column::Status, Expr::value(2))
+        .col_expr(Column::ResultPath, Expr::value(result_path))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .col_expr(
+            Column::EndedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
         .filter(Column::Id.eq(id))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn update_running_job(id: i32) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    Entity::update_many()
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Column::Id.eq(id))
+        .filter(Column::Status.eq(1))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn check_running_jobs(update_at: i64) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let _res = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(0))
+        .filter(Column::Status.eq(1))
+        .filter(Column::UpdatedAt.lt(update_at))
         .exec(client)
         .await?;
 
