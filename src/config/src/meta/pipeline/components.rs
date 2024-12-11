@@ -16,9 +16,13 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::meta::{
-    alerts::{QueryCondition, TriggerCondition},
-    stream::{RoutingCondition, StreamParams, StreamType},
+use crate::{
+    ider,
+    meta::{
+        alerts::{QueryCondition, TriggerCondition},
+        stream::{RoutingCondition, StreamParams, StreamType},
+    },
+    utils::{json, time},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -144,6 +148,33 @@ struct Position {
 #[serde(rename_all = "camelCase")]
 struct NodeStyle {
     background_color: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExternalIngestionTask {
+    pub id: String,
+    pub pipeline_id: String,
+    pub destinations: Vec<String>,
+    pub data: Vec<json::Value>,
+    pub tried: u8,
+    pub created_id: i64,
+}
+
+impl ExternalIngestionTask {
+    pub fn new(pipeline_id: String, destinations: Vec<String>, data: Vec<json::Value>) -> Self {
+        Self {
+            id: ider::uuid(),
+            pipeline_id,
+            destinations,
+            data,
+            tried: 0,
+            created_id: time::now_micros(),
+        }
+    }
+
+    pub fn persist_data(self) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
