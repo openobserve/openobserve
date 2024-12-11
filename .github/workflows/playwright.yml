@@ -66,6 +66,7 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
+          NODE_OPTIONS: "--max-old-space-size=8192"
         run: cd web && npm install && npm run build
 
       - name: Build and run binary
