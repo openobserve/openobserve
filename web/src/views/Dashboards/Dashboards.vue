@@ -425,6 +425,7 @@ export default defineComponent({
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
+    const filterQuery = ref("");
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const columns = computed(() => {
@@ -557,10 +558,8 @@ export default defineComponent({
     });
 
     watch(searchAcrossFolders, async (newVal) => {
-      if (newVal) {
-        searchQuery.value = "";
-        filteredResults.value = [];
-      }
+      if(filterQuery.value != "") filterQuery.value = ""; 
+      if(searchQuery.value != "") searchQuery.value = "";
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -661,7 +660,6 @@ export default defineComponent({
     };
     const dashboards = computed(function () {
       if(!searchAcrossFolders.value || searchQuery.value == ""){
-        
        const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
           [],
@@ -788,6 +786,19 @@ export default defineComponent({
       }
     };
 
+    const dynamicQueryModel = computed({
+      get() {
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
+      },
+      set(value) {
+        if (searchAcrossFolders.value) {
+          searchQuery.value = value;
+        } else {
+          filterQuery.value = value;
+        }
+      },
+    });
+
     const fetchSearchResults = useLoading(async (query) => {
       //this is used for showing search msg when user tries to toggle every time before searching across folders
       try {
@@ -872,7 +883,7 @@ export default defineComponent({
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
-      filterQuery: ref(""),
+      filterQuery,
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
         terms = terms.toLowerCase();
@@ -910,7 +921,8 @@ export default defineComponent({
       debouncedSearch,
       filteredResults,
       activeFolderToMove,
-      clearSearchHistory
+      clearSearchHistory,
+      dynamicQueryModel,
     };
   },
   methods: {
@@ -934,20 +946,7 @@ export default defineComponent({
       this.routeToViewD(row);
     },
   },
-  computed:{
-    dynamicQueryModel: {
-      get() {
-        return this.searchAcrossFolders ? this.searchQuery : this.filterQuery;
-      },
-      set(value) {
-        if (this.searchAcrossFolders) {
-          this.searchQuery = value;
-        } else {
-          this.filterQuery = value;
-        }
-      },
-    },
-  }
+
 });
 </script>
 
