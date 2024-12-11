@@ -32,6 +32,7 @@ use crate::common::{
 };
 
 pub mod batch_execution;
+mod external_ingestion;
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {

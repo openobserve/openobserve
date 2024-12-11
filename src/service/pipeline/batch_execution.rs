@@ -13,20 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    time::Duration,
-};
+use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use config::{
-    get_config,
     meta::{
-        alerts::destinations::HTTPType,
         function::{Transform, VRLResultResolver},
-        pipeline::{components::NodeData, Pipeline},
+        pipeline::{
+            components::{ExternalIngestionTask, NodeData},
+            Pipeline,
+        },
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
@@ -39,7 +37,6 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
-        alerts::destinations,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         self_reporting::publish_error,
     },
@@ -215,6 +212,7 @@ impl ExecutablePipeline {
         // Spawn tasks for each node
         let mut node_tasks = Vec::new();
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
+            let pl_id_cp = self.id.to_string();
             let org_id_cp = org_id.to_string();
             let node = self.node_map.get(node_id).unwrap().clone();
             let node_receiver = node_receivers.remove(node_id).unwrap();
@@ -229,6 +227,7 @@ impl ExecutablePipeline {
 
             let task = tokio::spawn(async move {
                 process_node(
+                    pl_id_cp,
                     idx,
                     org_id_cp,
                     node,
@@ -481,6 +480,7 @@ impl Default for ExecutablePipelineTraceInputs {
 
 #[allow(clippy::too_many_arguments)]
 async fn process_node(
+    pipeline_id: String,
     node_id: usize,
     org_id: String,
     node: ExecutableNode,
@@ -689,21 +689,22 @@ async fn process_node(
                 count += 1;
             }
 
-            for dest in dests {
-                // tokio::spawn(async move {
-                if let Err(e) = send_external_http_request(&org_id, dest, records.clone()).await {
-                    let err_msg = format!("DestinationNode error with http request: {}", e);
-                    if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
-                        .await
-                    {
-                        log::error!(
-                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
-                        );
-                    }
+            let external_task = ExternalIngestionTask::new(pipeline_id, dests.clone(), records);
+            if let Err(e) = external_task.persist_data() {
+                let err_msg = format!(
+                    "DestinationNode error persisting data to be ingested externally: {}",
+                    e
+                );
+                if let Err(send_err) = error_sender
+                    .send((node.id.to_string(), node.node_type(), err_msg))
+                    .await
+                {
+                    log::error!(
+                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                    );
                 }
-                // });
             }
+
             log::debug!("[Pipeline]: DestinationNode {node_id} done processing {count} records");
         }
     }
@@ -735,63 +736,6 @@ async fn send_to_children(
             }
         }
     }
-}
-
-async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value>) -> Result<()> {
-    let cfg = get_config();
-    let dest = destinations::get(org_id, dest).await?;
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(cfg.limit.request_timeout));
-    let client = if dest.skip_tls_verify {
-        client.danger_accept_invalid_certs(true).build()?
-    } else {
-        client.build()?
-    };
-    let url = url::Url::parse(&dest.url)?;
-    let mut req = match dest.method {
-        HTTPType::POST => client.post(url).json(&records),
-        HTTPType::PUT => client.put(url).json(&records),
-        HTTPType::GET => client.get(url),
-    };
-
-    // Add additional headers if any from destination description
-    let mut has_context_type = false;
-    if let Some(headers) = &dest.headers {
-        for (key, value) in headers.iter() {
-            if !key.is_empty() && !value.is_empty() {
-                if key.to_lowercase().trim() == "content-type" {
-                    has_context_type = true;
-                }
-                req = req.header(key, value);
-            }
-        }
-    };
-    // set default content type
-    if !has_context_type {
-        req = req.header("Content-type", "application/json");
-    }
-
-    let resp = req.send().await?;
-    let resp_status = resp.status();
-    let resp_body = resp.text().await?;
-    log::debug!(
-        "Records sent to destination {} with status: {}, body: {:?}",
-        dest.url,
-        resp_status,
-        resp_body,
-    );
-    if !resp_status.is_success() {
-        log::error!(
-            "Alert http notification failed with status: {}, body: {}",
-            resp_status,
-            resp_body
-        );
-        return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
-        ));
-    }
-    Ok(())
 }
 
 fn topological_sort(node_map: &HashMap<String, ExecutableNode>) -> Result<Vec<String>> {
