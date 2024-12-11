@@ -50,4 +50,59 @@ export class IamPage {
 
     }
 
+
+    async iamPageServiceAccountsTab() {
+
+        await this.page.locator('[data-test="iam-service-accounts-tab"]').click();
+
+    }
+  
+    async iamPageAddServiceAccount() {
+
+        await this.page.getByRole('button', { name: 'Add Service Account' }).click();
+
+    }
+
+
+    async iamPageAddServiceAccountEmailValidation() {
+
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        
+      //  await expect(this.page.getByRole('alert')).toContainText('Please enter a valid email address');
+        await expect(this.page.getByRole('alert').nth(2)).toContainText('Please enter a valid email address');
+
+
+    }
+
+    async enterEmailServiceAccount() {
+
+        await this.page.getByLabel('Email *').click();
+  await this.page.getByLabel('Email *').fill('aut@ai.ai');
+
+    }
+
+    async clickSaveServiceAccount() {
+
+       
+        await this.page.getByRole('button', { name: 'Save' }).click();
+        await expect(this.page.getByRole('alert')).toContainText('Service Account created successfully.');
+
+    }
+
+    async validateServiceAccount() {
+
+       
+        await expect(this.page.getByRole('alert')).toContainText('Service Account created successfully.');
+
+    }
+
+
+
+
+
+
+
+
+
+
 }
