@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::{DateTime, Datelike};
 use config::{
     meta::{
         search::{self, Response, SearchPartitionRequest},
@@ -132,13 +133,13 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     let mut reponse = Response::default();
     reponse.set_trace_id(job.trace_id.clone());
     for i in 0..partition_jobs.len() {
-        let path = format!("result/{}/{}.json", job.trace_id, i);
+        let path = generate_result_path(job.created_at, &job.trace_id, Some(i as i32));
         let buf = storage::get(&path).await?;
         let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
         reponse.merge(&res);
     }
     let buf = bytes::Bytes::from(json::to_string(&reponse)?);
-    let path = format!("result/{}/final_result.json", job.trace_id);
+    let path = generate_result_path(job.created_at, &job.trace_id, None);
     storage::put(&path, buf).await?;
 
     // 6. update `background_jobs` table
@@ -180,9 +181,10 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     let mut req: search::Request = json::from_str(&job.payload)?;
     req.query.start_time = partition_job.start_time;
     req.query.end_time = partition_job.end_time;
+    let partition_id = partition_job.partition_id;
 
     // 2. set the partition status to running
-    set_partition_job_start(&job.id, partition_job.partition_id).await?;
+    set_partition_job_start(&job.id, partition_id).await?;
 
     // 3. run the query
     let stream_type = StreamType::from(job.stream_type.as_str());
@@ -195,22 +197,43 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     )
     .await;
     if let Err(e) = res {
-        set_partition_job_error_message(&job.id, partition_job.partition_id, &e.to_string())
-            .await?;
+        set_partition_job_error_message(&job.id, partition_id, &e.to_string()).await?;
         return Err(e.into());
     }
 
     // 4. write the result to s3
     let result = res.unwrap();
     let buf = bytes::Bytes::from(json::to_string(&result)?);
-    let path = format!(
-        "result/{}/{}.json",
-        job.trace_id, partition_job.partition_id
-    );
+    let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
     storage::put(&path, buf).await?;
 
     // 5. set the partition status to finish
-    set_partition_job_finish(&job.id, partition_job.partition_id, path.as_str()).await?;
+    set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
 
     Ok(())
+}
+
+fn generate_result_path(
+    created_at: i64,
+    trace_id: &str,
+    partition_id: Option<i32>, // None means it is the final result
+) -> String {
+    let naive_datetime = DateTime::from_timestamp_micros(created_at)
+        .unwrap_or_else(|| panic!("Invalid timestamp for created_at for trace_id: {trace_id}"));
+    let year = naive_datetime.year();
+    let month = naive_datetime.month();
+    let day = naive_datetime.day();
+
+    format!(
+        "result/{year}/{month}/{day}/{trace_id}/{partition_id}.json",
+        year = year,
+        month = month,
+        day = day,
+        trace_id = trace_id,
+        partition_id = if partition_id.is_some() {
+            partition_id.unwrap().to_string()
+        } else {
+            "final".to_string()
+        }
+    )
 }
