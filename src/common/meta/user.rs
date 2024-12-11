@@ -157,7 +157,7 @@ pub fn get_roles() -> Vec<UserRole> {
 
 #[cfg(not(feature = "enterprise"))]
 pub fn get_roles() -> Vec<UserRole> {
-    vec![UserRole::Admin, UserRole::Root]
+    vec![UserRole::Admin, UserRole::Root, UserRole::ServiceAccount]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

@@ -94,7 +94,13 @@ pub async fn validator(
                 );
 
                 if auth_info.bypass_check
-                    || check_permissions(user_id, auth_info, res.user_role).await
+                    || check_permissions(
+                        user_id,
+                        auth_info,
+                        res.user_role.unwrap_or_default(),
+                        !res.is_internal_user,
+                    )
+                    .await
                 {
                     Ok(req)
                 } else {
@@ -179,6 +185,18 @@ pub async fn validate_credentials(
         });
     }
     let user = user.unwrap();
+
+    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+        return Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+            is_internal_user: !user.is_external,
+            user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
+        });
+    }
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
@@ -753,7 +771,8 @@ pub async fn validator_proxy_url(
 pub(crate) async fn check_permissions(
     user_id: &str,
     auth_info: AuthExtractor,
-    role: Option<UserRole>,
+    role: UserRole,
+    _is_external: bool,
 ) -> bool {
     use crate::common::infra::config::ORG_USERS;
 
@@ -804,7 +823,7 @@ pub(crate) async fn check_permissions(
         &auth_info.method,
         &obj_str,
         &auth_info.parent_id,
-        &role,
+        &role.to_string(),
     )
     .await
 }
@@ -813,7 +832,8 @@ pub(crate) async fn check_permissions(
 pub(crate) async fn check_permissions(
     _user_id: &str,
     _auth_info: AuthExtractor,
-    _role: Option<UserRole>,
+    _role: UserRole,
+    _is_external: bool,
 ) -> bool {
     true
 }
