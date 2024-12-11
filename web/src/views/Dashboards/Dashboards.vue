@@ -348,6 +348,7 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  onBeforeUnmount,
   onMounted,
   ref,
   watch,
@@ -560,6 +561,11 @@ export default defineComponent({
     watch(searchAcrossFolders, async (newVal) => {
       if(filterQuery.value != "") filterQuery.value = ""; 
       if(searchQuery.value != "") searchQuery.value = "";
+    });
+
+    // Cleanup debounced function 
+    onBeforeUnmount(() => { 
+      debouncedSearch.cancel(); 
     });
 
     const changePagination = (val: { label: string; value: any }) => {
