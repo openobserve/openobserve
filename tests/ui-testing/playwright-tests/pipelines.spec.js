@@ -4,6 +4,8 @@ import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
 import { pipeline } from "stream";
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -190,6 +192,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -220,6 +224,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Delete the pipeline and confirm
     await pipelinePage.deletePipeline();
@@ -244,15 +250,11 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
-
-    // Select the second stream, drag, and drop
-    await pipelinePage.selectAndDragSecondStream();
-    await page.waitForTimeout(2000);
-
-    // Select the previous node
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
+    await page.waitForTimeout(3000);
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('button').filter({ hasText: 'edit' }).hover();
+  await page.getByRole('img', { name: 'Output Stream' }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -348,10 +350,12 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.selectAndDragFunction(); // Function drag
+    // await pipelinePage.selectAndDragFunction(); // Function drag
     await page.waitForTimeout(2000);
-    await pipelinePage.selectPreviousNode();
-    await page.getByText("input").click();
+  await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+  await page.locator('[data-test="confirm-button"]').click()
+    await page.locator('button').filter({ hasText: 'edit' }).hover();
+    await page.getByRole('img', { name: 'Function',exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page.locator(".view-lines").click();
@@ -372,15 +376,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
-
-    // Select the second stream, drag, and drop
-    await pipelinePage.selectAndDragSecondStream();
-    await page.waitForTimeout(2000);
-
-    // // Select the previous node
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
+    await page.getByRole('button', { name: randomFunctionName }).hover();
+    await page.getByRole('img', { name: 'Output Stream' }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -462,7 +459,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
     // TODO: Change the locator to the correct one, once fixed
-    await page.getByText('Invalid SQL Query : undefined').click()
+    await page.getByText('Invalid SQL Query').click()
 
   });
 
@@ -501,10 +498,10 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(2000);
-
-    await pipelinePage.selectAndDragCondition() // Condition drag
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('button').filter({ hasText: 'edit' }).hover();
+    await page.getByRole('img', { name: 'Stream',exact: true }).click();
     await page.getByPlaceholder('Column').click();
     await page.getByPlaceholder('Column').fill('container_name');
     await page.getByRole('option', { name: 'kubernetes_container_name' }).click();
@@ -513,11 +510,9 @@ test.describe("Pipeline testcases", () => {
     await page.getByPlaceholder('Value').click();
     await page.getByPlaceholder('Value').fill('prometheus');
     await pipelinePage.saveCondition()
-    await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
-
-    await page.locator('.previous-drop-down > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
-    await page.getByText('Condition 1').click();
+    await page.getByRole('button', { name: 'kubernetes_container_name' }).hover();
+    await page.getByRole('img', { name: 'Output Stream' }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -596,15 +591,14 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.waitForTimeout(1000);
+    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
     // Select the second stream, drag, and drop
     await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
-
-    // Select the previous node
-    // await pipelinePage.selectPreviousNode();
-    // await pipelinePage.selectPreviousNodeDrop();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -625,6 +619,57 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.savePipeline();
     await page.getByText('Please connect all nodes').click();
   
+  });
+
+  test('should upload an enrichment table under functions', async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+  
+    // Click the enrichment table tab
+    await page.click('[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label', { force: true });
+  
+    // Click on 'Add Enrichment Table'
+    await page.getByText('Add Enrichment Table').click();
+  
+    // Generate a unique file name
+    const fileName = `enrichment_info_${uuidv4()}.csv`;
+    const fileContent = '../test-data/enrichment_info.csv';
+  
+    const inputFile = await page.locator('input[type="file"]');
+    await inputFile.setInputFiles(fileContent);
+  
+    // Wait for the upload to process
+    await page.waitForTimeout(5000);
+  
+    // Enter the file name
+    await page.fill('.q-input > .q-field__inner > .q-field__control', fileName);
+  
+    // Click on 'Save'
+    await page.getByText('Save').click({ force: true });
+    await page.waitForTimeout(5000);
+    await page.getByRole('button', { name: 'Explore' }).nth(1).click();
+    await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
+    await page.locator('[data-test="close-dialog"]').click();
+    await page.waitForTimeout(5000);
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="function-enrichment-table-tab"]').click();
+
+  
+    // Locate rows in the table
+    const rows = await page.locator('tbody tr');
+  
+    // Iterate through each row to find and delete the function
+    for (let i = 0; i < await rows.count(); i++) {
+      const row = rows.nth(i);
+      const functionName = await row.locator('td.text-left').nth(1).textContent();
+  
+      if (functionName?.includes('enrichment_info')) {
+        // Click the 'Delete Function' button
+        await row.locator('[title="Delete Function"]').click();
+  
+        // Handle the confirmation dialog
+        await page.locator('[data-test="confirm-button"]').click();
+      }
+    }
   });
 
 });

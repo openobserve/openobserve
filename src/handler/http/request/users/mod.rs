@@ -73,7 +73,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
         Some(v) => v.parse::<bool>().unwrap_or(false),
         None => false,
     };
-    users::list_users(&org_id, list_all).await
+    users::list_users(&org_id, None, None, list_all).await
 }
 
 /// CreateUser
@@ -641,7 +641,7 @@ pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
 }
 
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
-    if role.eq(&UserRole::Root) {
+    if role.eq(&UserRole::Root) || role.eq(&UserRole::ServiceAccount) {
         None
     } else {
         #[cfg(feature = "enterprise")]

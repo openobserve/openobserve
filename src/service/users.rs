@@ -24,7 +24,11 @@ use config::{
 use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    openfga::authorizer::authz::delete_service_account_from_org,
+};
+use regex::Regex;
 
 use super::db::org_users::get_cached_user_org;
 #[cfg(feature = "enterprise")]
@@ -49,25 +53,17 @@ pub async fn post_user(
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiator_user = if is_root_user(initiator_id) {
-        db::user::get(None, initiator_id).await
-    } else {
-        db::user::get(Some(org_id), initiator_id).await
-    };
+    let email_regex = Regex::new(
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+    )
+    .expect("Email regex is valid");
+    if !email_regex.is_match(&usr_req.email) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Invalid email".to_string(),
+        )));
+    }
     let cfg = get_config();
-
-    let Ok(initiator_user) = initiator_user else {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
-            "Not Allowed".to_string(),
-        )));
-    };
-    let Some(initiator_user) = initiator_user else {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
-            "Not Allowed".to_string(),
-        )));
-    };
     if usr_req.role.custom_role.is_some() {
         #[cfg(not(feature = "enterprise"))]
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
@@ -102,9 +98,25 @@ pub async fn post_user(
         }
     }
 
-    // For non-enterprise, it is only Admin or Root user
-    let is_allowed =
-        initiator_user.role.eq(&UserRole::Root) || initiator_user.role.eq(&UserRole::Admin);
+    let is_allowed = if is_root_user(initiator_id) {
+        true
+    } else {
+        let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+        let Ok(initiator_user) = initiator_user else {
+            return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                http::StatusCode::UNAUTHORIZED.into(),
+                "Not Allowed".to_string(),
+            )));
+        };
+        let Some(initiator_user) = initiator_user else {
+            return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                http::StatusCode::UNAUTHORIZED.into(),
+                "Not Allowed".to_string(),
+            )));
+        };
+        initiator_user.role.eq(&UserRole::Admin)
+    };
+
     #[cfg(feature = "enterprise")]
     let is_allowed = if get_o2_config().openfga.enabled {
         // Permission already checked through RBAC
@@ -112,14 +124,18 @@ pub async fn post_user(
     } else {
         is_allowed
     };
-    if is_root_user(initiator_id) || is_allowed {
+
+    if is_allowed {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
         } else {
             db::user::get(Some(org_id), &usr_req.email).await
         };
         if existing_user.is_err() {
-            if !usr_req.is_external && usr_req.password.is_empty() {
+            if !usr_req.is_external
+                && usr_req.role.base_role.ne(&UserRole::ServiceAccount)
+                && usr_req.password.is_empty()
+            {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                     http::StatusCode::BAD_REQUEST.into(),
                     "Password required to create new user".to_string(),
@@ -130,10 +146,11 @@ pub async fn post_user(
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
+            let org_id = org_id.replace(' ', "_");
             let user = usr_req.to_new_dbuser(
                 password,
                 salt,
-                org_id.replace(' ', "_"),
+                org_id.clone(),
                 token,
                 rum_token,
                 usr_req.is_external,
@@ -153,7 +170,8 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::authorizer::authz::{
-                    get_user_crole_tuple, get_user_role_tuple, update_tuples,
+                    get_service_account_creation_tuple, get_user_crole_tuple, get_user_role_tuple,
+                    update_tuples,
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
@@ -164,6 +182,9 @@ pub async fn post_user(
                         &org_id,
                         &mut tuples,
                     );
+                    if usr_req.role.base_role.eq(&UserRole::ServiceAccount) {
+                        get_service_account_creation_tuple(&org_id, &usr_req.email, &mut tuples);
+                    }
                     if usr_req.role.custom_role.is_some() {
                         let custom_role = usr_req.role.custom_role.unwrap();
                         tuples.push(get_user_crole_tuple(&org_id, &custom_role, &usr_req.email));
@@ -653,7 +674,12 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
-pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Error> {
+pub async fn list_users(
+    org_id: &str,
+    role: Option<UserRole>,
+    permitted: Option<Vec<String>>,
+    list_all: bool,
+) -> Result<HttpResponse, Error> {
     let cfg = get_config();
     let mut user_list: Vec<UserResponse> = vec![];
     let is_list_all = list_all & org_id.eq(cfg.common.usage_org.as_str());
@@ -674,14 +700,22 @@ pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Er
             }
         } else if org_user.key().starts_with(&format!("{org_id}/")) {
             if let Some(user) = get_user(Some(org_id), org_user.value().email.as_str()).await {
-                user_list.push(UserResponse {
-                    email: user.email.clone(),
-                    role: user.role.to_string(),
-                    first_name: user.first_name.clone(),
-                    last_name: user.last_name.clone(),
-                    is_external: user.is_external,
-                    orgs: None,
-                });
+                let should_include = if let Some(ref required_role) = role {
+                    // Filter by role if specified
+                    user.role.eq(required_role)
+                } else {
+                    user.role.ne(&UserRole::ServiceAccount)
+                };
+                if should_include {
+                    user_list.push(UserResponse {
+                        email: user.email.clone(),
+                        role: user.role.to_string(),
+                        first_name: user.first_name.clone(),
+                        last_name: user.last_name.clone(),
+                        is_external: user.is_external,
+                        orgs: None,
+                    });
+                }
             }
         }
     }
@@ -707,9 +741,19 @@ pub async fn list_users(org_id: &str, list_all: bool) -> Result<HttpResponse, Er
         }
     }
 
+    user_list.retain(|user| {
+        if user.role.eq(&UserRole::ServiceAccount) && permitted.is_some() {
+            let permitted = permitted.as_ref().unwrap();
+            permitted.contains(&format!("service_accounts:{}", user.email))
+                || permitted.contains(&format!("service_accounts:_all_{org_id}"))
+        } else {
+            true
+        }
+    });
+
     #[cfg(feature = "enterprise")]
     {
-        if !org_id.eq(DEFAULT_ORG) {
+        if !org_id.eq(DEFAULT_ORG) && role.is_none() {
             let root = ROOT_USER.get("root").unwrap();
             let root_user = root.value();
             user_list.push(UserResponse {
@@ -774,21 +818,26 @@ pub async fn remove_user_from_org(
                             if get_o2_config().openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
                                 delete_user_from_org(org_id, &email_id, &user_fga_role).await;
+                                if user_role.eq(&UserRole::ServiceAccount) {
+                                    delete_service_account_from_org(org_id, &email_id).await;
+                                }
                             }
                         }
                     } else {
                         let mut _user_fga_role: Option<String> = None;
                         #[cfg(feature = "enterprise")]
+                        let mut is_service_account = false;
+                        #[cfg(feature = "enterprise")]
                         for org in orgs.iter() {
                             if org.name.eq(&org_id.to_string()) {
                                 let user_role = &org.role;
-                                _user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
-                                    || user_role.eq(&UserRole::User)
-                                {
-                                    Some("allowed_user".to_string())
-                                } else {
-                                    Some(user_role.to_string())
-                                };
+                                is_service_account = user_role.eq(&UserRole::ServiceAccount);
+                                _user_fga_role =
+                                    if is_service_account || user_role.eq(&UserRole::User) {
+                                        Some("allowed_user".to_string())
+                                    } else {
+                                        Some(user_role.to_string())
+                                    };
                             }
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
@@ -810,6 +859,9 @@ pub async fn remove_user_from_org(
                                         _user_fga_role.unwrap().as_str(),
                                     )
                                     .await;
+                                    if is_service_account {
+                                        delete_service_account_from_org(org_id, email_id).await;
+                                    }
                                 }
                             }
                         }
@@ -986,7 +1038,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", false).await.is_ok())
+        assert!(list_users("dummy", None, None, false).await.is_ok())
     }
 
     #[tokio::test]
