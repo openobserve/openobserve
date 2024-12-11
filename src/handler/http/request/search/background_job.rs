@@ -29,6 +29,10 @@ use {
         handler::http::request::search::{
             job::cancel_query_inner, utils::check_stream_premissions,
         },
+        service::db::background_job::{
+            cancel_job, cancel_partition_job, get_result_path, get_status_by_job_id,
+            get_status_by_org_id, get_trace_id,
+        },
     },
     actix_web::http::StatusCode,
     config::{
@@ -36,17 +40,11 @@ use {
         meta::{search::SubmitQueryResponse, sql::resolve_stream_names, stream::StreamType},
         utils::json,
     },
-    infra::table::{
-        background_job_partitions::cancel_partition_job,
-        background_jobs::{
-            cancel_job, get_result_path, get_status_by_job_id, get_status_by_org_id, get_trace_id,
-        },
-    },
     std::collections::HashMap,
     tracing::Span,
 };
 
-// 1. submi
+// 1. submit
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/submit")]
 pub async fn submit_query(
@@ -186,8 +184,8 @@ pub async fn query_status_all(org_id: web::Path<String>) -> Result<HttpResponse,
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status/{job_id}")]
 pub async fn query_status(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let job_id = path.1.clone().parse::<i32>().unwrap();
-    let res = get_status_by_job_id(job_id).await;
+    let job_id = path.1.clone();
+    let res = get_status_by_job_id(&job_id).await;
     match res {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -199,15 +197,15 @@ pub async fn query_status(path: web::Path<(String, String)>) -> Result<HttpRespo
 #[delete("/{org_id}/search_job/cancel/{job_id}")]
 pub async fn cancel_query(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let org_id = path.0.clone();
-    let job_id = path.1.clone().parse::<i32>().unwrap();
+    let job_id = path.1.clone();
     // 1. use job_id to query the trace_id
-    let trace_id = get_trace_id(job_id).await;
+    let trace_id = get_trace_id(&job_id).await;
     if trace_id.is_err() || trace_id.as_ref().unwrap().is_none() {
         return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
     }
 
     // 2. use job_id to make background_job cancel
-    let status = cancel_job(job_id).await;
+    let status = cancel_job(&job_id).await;
     if let Err(e) = status {
         return Ok(MetaHttpResponse::bad_request(e));
     }
@@ -215,7 +213,7 @@ pub async fn cancel_query(path: web::Path<(String, String)>) -> Result<HttpRespo
     // 3. use job_id to make background_partition_job cancel
     let status = status.unwrap();
     if status == 1 {
-        if let Err(e) = cancel_partition_job(job_id).await {
+        if let Err(e) = cancel_partition_job(&job_id).await {
             return Ok(MetaHttpResponse::bad_request(e));
         }
     }

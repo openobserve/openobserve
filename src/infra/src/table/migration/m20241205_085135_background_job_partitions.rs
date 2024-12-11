@@ -36,7 +36,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(BackgroundJobPartitions::JobId)
-                .big_integer()
+                .string_len(64)
                 .not_null(),
         )
         .col(

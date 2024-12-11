@@ -36,7 +36,7 @@ pub struct Status {
     pub status: i32,
 }
 
-pub async fn cancel_partition_job(job_id: i32) -> Result<(), errors::Error> {
+pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -55,7 +55,7 @@ pub async fn cancel_partition_job(job_id: i32) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn is_have_partition_jobs(job_id: i32) -> Result<bool, errors::Error> {
+pub async fn is_have_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // sql: select id from background_job_partitions where id = job_id limit 1
@@ -73,7 +73,7 @@ pub async fn is_have_partition_jobs(job_id: i32) -> Result<bool, errors::Error> 
     }
 }
 
-pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
+pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -82,7 +82,7 @@ pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(
     let mut jobs = Vec::with_capacity(partitions.len());
     for (idx, partition) in partitions.iter().enumerate() {
         jobs.push(ActiveModel {
-            job_id: Set(job_id as i64),
+            job_id: Set(job_id.to_string()),
             partition_id: Set(idx as i32),
             start_time: Set(partition[0]),
             end_time: Set(partition[1]),
@@ -112,7 +112,7 @@ pub async fn submit_partitions(job_id: i32, partitions: &[[i64; 2]]) -> Result<(
     Ok(())
 }
 
-pub async fn get_partition_jobs_by_job_id(job_id: i32) -> Result<Vec<Model>, errors::Error> {
+pub async fn get_partition_jobs_by_job_id(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // sql: select * from background_job_partitions where job_id = job_id and status = 0
@@ -128,7 +128,7 @@ pub async fn get_partition_jobs_by_job_id(job_id: i32) -> Result<Vec<Model>, err
     }
 }
 
-pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(), errors::Error> {
+pub async fn set_partition_job_start(job_id: &str, partition_id: i32) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -153,7 +153,7 @@ pub async fn set_partition_job_start(job_id: i32, partition_id: i32) -> Result<(
 }
 
 pub async fn set_partition_job_finish(
-    job_id: i32,
+    job_id: &str,
     partition_id: i32,
     path: &str,
 ) -> Result<(), errors::Error> {
@@ -182,7 +182,7 @@ pub async fn set_partition_job_finish(
 }
 
 pub async fn set_partition_job_error_message(
-    job_id: i32,
+    job_id: &str,
     partition_id: i32,
     error_message: &str,
 ) -> Result<(), errors::Error> {

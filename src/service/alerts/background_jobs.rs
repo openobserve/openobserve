@@ -63,7 +63,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         60,
         config::get_config().limit.background_job_run_timeout / 4,
     ) as u64;
-    let job_id = job.id;
+    let job_id = job.id.clone();
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     tokio::task::spawn(async move {
         loop {
@@ -75,7 +75,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
                 }
             }
 
-            if let Err(e) = update_running_job(job_id).await {
+            if let Err(e) = update_running_job(&job_id).await {
                 log::error!("[BACKGROUND JOB {id}] update_job_status failed: {}", e);
             }
         }
@@ -83,22 +83,22 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
 
     // 3. check if the job is previous running (get error then retry, be cancel then retry) (case 1)
     //    or do not have previous run (case 2)
-    let have_partition_job = is_have_partition_jobs(job.id).await?;
+    let have_partition_job = is_have_partition_jobs(&job.id).await?;
     if !have_partition_job {
         let res = handle_search_partition(&job).await;
         if let Err(e) = res {
-            set_job_error_message(job.id, &e.to_string()).await?;
+            set_job_error_message(&job.id, &e.to_string()).await?;
             log::error!("[BACKGROUND JOB {id}] handle_search_partition error: {}", e);
             return Err(e);
         }
     }
 
     // 4. get all partition jobs from `background_job_partitions` table
-    let partition_jobs = get_partition_jobs_by_job_id(job.id).await?;
+    let partition_jobs = get_partition_jobs_by_job_id(&job.id).await?;
     for partition_job in partition_jobs.iter() {
         let res = run_partition_job(&job, partition_job).await;
         if let Err(e) = res {
-            set_job_error_message(job.id, &e.to_string()).await?;
+            set_job_error_message(&job.id, &e.to_string()).await?;
             log::error!("[BACKGROUND JOB {id}] run_partition_job error: {}", e);
             return Err(e);
         }
@@ -119,7 +119,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     storage::put(&path, buf).await?;
 
     // 6. update `background_jobs` table
-    set_job_finish(job.id, &path).await?;
+    set_job_finish(&job.id, &path).await?;
 
     Ok(())
 }
@@ -134,7 +134,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         SearchService::search_partition(&job.trace_id, &job.org_id, stream_type, &partition_req)
             .await?;
 
-    submit_partitions(job.id, res.partitions.as_slice())
+    submit_partitions(&job.id, res.partitions.as_slice())
         .await
         .map_err(|e| e.into())
 }
@@ -151,7 +151,7 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     req.query.end_time = partition_job.end_time;
 
     // 2. set the partition status to running
-    set_partition_job_start(job.id, partition_job.partition_id).await?;
+    set_partition_job_start(&job.id, partition_job.partition_id).await?;
 
     // 3. run the query
     let stream_type = StreamType::from(job.stream_type.as_str());
@@ -164,7 +164,8 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     )
     .await;
     if let Err(e) = res {
-        set_partition_job_error_message(job.id, partition_job.partition_id, &e.to_string()).await?;
+        set_partition_job_error_message(&job.id, partition_job.partition_id, &e.to_string())
+            .await?;
         return Err(e.into());
     }
 
@@ -175,7 +176,7 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     storage::put(&path, buf).await?;
 
     // 5. set the partition status to finish
-    set_partition_job_finish(job.id, partition_job.partition_id, path.as_str()).await?;
+    set_partition_job_finish(&job.id, partition_job.partition_id, path.as_str()).await?;
 
     Ok(())
 }

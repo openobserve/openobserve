@@ -25,9 +25,8 @@ fn create_table_stmt() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(BackgroundJobs::Id)
-                .big_integer()
+                .string_len(64)
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
         .col(

@@ -18,7 +18,7 @@ use config::{cluster::LOCAL_NODE, get_config};
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
 
-use crate::service::{self, db::background_job::check_running_jobs};
+use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_alert_manager() {
@@ -111,6 +111,7 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn run_background_jobs(id: i64) -> Result<(), anyhow::Error> {
     let interval = get_config().limit.background_job_scheduler_interval;
     let mut interval = time::interval(time::Duration::from_secs(interval as u64));
@@ -123,14 +124,25 @@ async fn run_background_jobs(id: i64) -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
     loop {
         let time = get_config().limit.background_job_run_timeout;
         log::debug!("[BACKGROUND JOB] Running check running jobs");
         let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
-        if let Err(e) = check_running_jobs(updated_at).await {
+        if let Err(e) = service::db::background_job::check_running_jobs(updated_at).await {
             log::error!("[BACKGROUND JOB] run check running jobs error: {e}");
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn run_background_jobs(_id: i64) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
+    Ok(())
 }

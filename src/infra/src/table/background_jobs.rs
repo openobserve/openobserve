@@ -56,8 +56,10 @@ pub async fn submit(
     payload: &str,
     start_time: i64,
     end_time: i64,
-) -> Result<i64, errors::Error> {
+) -> Result<String, errors::Error> {
+    let job_id = config::ider::uuid();
     let record = ActiveModel {
+        id: Set(job_id.clone()),
         trace_id: Set(trace_id.to_string()),
         org_id: Set(org_id.to_string()),
         user_id: Set(user_id.to_string()),
@@ -75,15 +77,12 @@ pub async fn submit(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = match Entity::insert(record).exec(client).await {
+    let _res = match Entity::insert(record).exec(client).await {
         Ok(res) => res,
         Err(e) => return orm_err!(format!("submit background job error: {e}")),
     };
 
-    // TODO: check if it is correct, when use uuid, don't need this
-    let id = res.last_insert_id as i64;
-
-    Ok(id)
+    Ok(job_id)
 }
 
 pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
@@ -101,7 +100,7 @@ pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Er
     Ok(res)
 }
 
-pub async fn get_status_by_job_id(job_id: i32) -> Result<Vec<Model>, errors::Error> {
+pub async fn get_status_by_job_id(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::Id.eq(job_id))
@@ -116,7 +115,7 @@ pub async fn get_status_by_job_id(job_id: i32) -> Result<Vec<Model>, errors::Err
     Ok(res)
 }
 
-pub async fn get_trace_id(job_id: i32) -> Result<Option<String>, errors::Error> {
+pub async fn get_trace_id(job_id: &str) -> Result<Option<String>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .select_only()
@@ -134,7 +133,7 @@ pub async fn get_trace_id(job_id: i32) -> Result<Option<String>, errors::Error> 
     Ok(res.map(|res| res.trace_id))
 }
 
-pub async fn cancel_job(job_id: i32) -> Result<i32, errors::Error> {
+pub async fn cancel_job(job_id: &str) -> Result<i32, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -257,7 +256,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
                 Expr::value(chrono::Utc::now().timestamp_micros()),
             )
             .col_expr(Column::Node, Expr::value(&LOCAL_NODE.uuid))
-            .filter(Column::Id.eq(model.id))
+            .filter(Column::Id.eq(&model.id))
             .exec(&tx)
             .await
         {
@@ -276,7 +275,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     Ok(model)
 }
 
-pub async fn set_job_error_message(id: i32, error_message: &str) -> Result<(), errors::Error> {
+pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -285,7 +284,7 @@ pub async fn set_job_error_message(id: i32, error_message: &str) -> Result<(), e
     let res = Entity::update_many()
         .col_expr(Column::ErrorMessage, Expr::value(error_message))
         .col_expr(Column::Status, Expr::value(2))
-        .filter(Column::Id.eq(id))
+        .filter(Column::Id.eq(job_id))
         .exec(client)
         .await;
 
@@ -296,7 +295,7 @@ pub async fn set_job_error_message(id: i32, error_message: &str) -> Result<(), e
     Ok(())
 }
 
-pub async fn set_job_finish(id: i32, result_path: &str) -> Result<(), errors::Error> {
+pub async fn set_job_finish(job_id: &str, result_path: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -313,7 +312,7 @@ pub async fn set_job_finish(id: i32, result_path: &str) -> Result<(), errors::Er
             Column::EndedAt,
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
-        .filter(Column::Id.eq(id))
+        .filter(Column::Id.eq(job_id))
         .exec(client)
         .await;
 
@@ -324,7 +323,7 @@ pub async fn set_job_finish(id: i32, result_path: &str) -> Result<(), errors::Er
     Ok(())
 }
 
-pub async fn update_running_job(id: i32) -> Result<(), errors::Error> {
+pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -335,7 +334,7 @@ pub async fn update_running_job(id: i32) -> Result<(), errors::Error> {
             Column::UpdatedAt,
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
-        .filter(Column::Id.eq(id))
+        .filter(Column::Id.eq(job_id))
         .filter(Column::Status.eq(1))
         .exec(client)
         .await;
