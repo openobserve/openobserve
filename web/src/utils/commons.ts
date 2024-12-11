@@ -533,10 +533,10 @@ export const deleteDashboardById = async (
     // Get list of all dashboard of all folders
     const allDashboardList = store.state.organizationData.allDashboardList;
 
-    if(allDashboardList[folderId]) {
+    if (allDashboardList[folderId]) {
       // Filter out the deleted dashboard from the list
       const newDashboards = allDashboardList[folderId].filter(
-        (dashboard: any) => dashboard.dashboardId != dashboardId
+        (dashboard: any) => dashboard.dashboardId !== dashboardId
       );
 
       // Update the allDashboardList in the store with the new list

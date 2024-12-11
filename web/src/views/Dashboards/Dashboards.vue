@@ -631,14 +631,14 @@ export default defineComponent({
       const selectedDashboard = store.state.organizationData.allDashboardList[
         activeFolderId.value
       ].find((dashboard) => dashboard.dashboardId === row.id);
-      let selectedTabId
+      let selectedTabId = null;
       if(!searchAcrossFolders.value){
         selectedTabId = selectedDashboard
         ? selectedDashboard?.tabs[0]?.tabId
         : null;
       }
       else{
-        selectedTabId = row.tabs[0].tabId;
+        selectedTabId = row.tabs?.[0]?.tabId || null;
       }      
       return router.push({
         path: "/dashboards/view",
@@ -829,10 +829,7 @@ export default defineComponent({
          
           return migratedDashboards;
       } catch (error) {
-        $q.notify({
-          message: "Error fetching search results",
-          color: "negative",
-        });
+        showErrorNotification(error?.message ?? "Error fetching search results");
       }
     });
     //this debounce search only makes the search call after 600ms of user input
