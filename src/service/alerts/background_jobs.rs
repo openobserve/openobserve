@@ -30,9 +30,9 @@ use tokio::sync::mpsc;
 
 use crate::service::{
     db::background_job::{
-        get_job, get_partition_jobs_by_job_id, is_have_partition_jobs, set_job_error_message,
+        get_job, get_partition_jobs_by_job_id, is_created_partition_jobs, set_job_error_message,
         set_job_finish, set_partition_job_error_message, set_partition_job_finish,
-        set_partition_job_start, submit_partitions, update_running_job,
+        set_partition_job_start, set_partition_num, submit_partitions, update_running_job,
     },
     search as SearchService,
 };
@@ -56,7 +56,12 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         None => return Ok(()),
     };
 
-    log::info!("[BACKGROUND JOB {id}] start running, job_id: {}", job.id);
+    let start = std::time::Instant::now();
+    log::info!(
+        "[BACKGROUND JOB {id}] job_id: {}, start running, trace_id: {}",
+        job.id,
+        job.trace_id
+    );
 
     // 2. similar to the compactor, we need to update the job status every 15 seconds
     let ttl = std::cmp::max(
@@ -70,25 +75,30 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             tokio::select! {
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                 _ = rx.recv() => {
-                    log::debug!("[BACKGROUND JOB {id}] update_running_jobs done");
+                    log::debug!("[BACKGROUND JOB {id}] job_id: {job_id}, update_running_jobs done");
                     return;
                 }
             }
 
             if let Err(e) = update_running_job(&job_id).await {
-                log::error!("[BACKGROUND JOB {id}] update_job_status failed: {}", e);
+                log::error!(
+                    "[BACKGROUND JOB {id}] job_id: {job_id}, update_job_status failed: {e}",
+                );
             }
         }
     });
 
     // 3. check if the job is previous running (get error then retry, be cancel then retry) (case 1)
     //    or do not have previous run (case 2)
-    let have_partition_job = is_have_partition_jobs(&job.id).await?;
+    let have_partition_job = is_created_partition_jobs(&job.id).await?;
     if !have_partition_job {
         let res = handle_search_partition(&job).await;
         if let Err(e) = res {
             set_job_error_message(&job.id, &e.to_string()).await?;
-            log::error!("[BACKGROUND JOB {id}] handle_search_partition error: {}", e);
+            log::error!(
+                "[BACKGROUND JOB {id}] job_id: {}, handle_search_partition error: {e}",
+                job.id
+            );
             return Err(e);
         }
     }
@@ -96,30 +106,49 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     // 4. get all partition jobs from `background_job_partitions` table
     let partition_jobs = get_partition_jobs_by_job_id(&job.id).await?;
     for partition_job in partition_jobs.iter() {
+        log::info!(
+            "[BACKGROUND JOB {id}] running job_id: {}, partition id: {}",
+            job.id,
+            partition_job.partition_id
+        );
         let res = run_partition_job(&job, partition_job).await;
         if let Err(e) = res {
             set_job_error_message(&job.id, &e.to_string()).await?;
-            log::error!("[BACKGROUND JOB {id}] run_partition_job error: {}", e);
+            log::error!(
+                "[BACKGROUND JOB {id}] job_id: {}, run_partition_job error: {e}",
+                job.id
+            );
             return Err(e);
         }
     }
+
+    log::info!(
+        "[BACKGROUND JOB {id}] job_id: {}, start merge all partition result",
+        job.id,
+    );
 
     // 5. after run on partition, write result to s3
     // TODO: handle from and size
     let mut reponse = Response::default();
     reponse.set_trace_id(job.trace_id.clone());
     for i in 0..partition_jobs.len() {
-        let path = format!("result/{}/{}", job.trace_id, i);
+        let path = format!("result/{}/{}.json", job.trace_id, i);
         let buf = storage::get(&path).await?;
         let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
         reponse.merge(&res);
     }
     let buf = bytes::Bytes::from(json::to_string(&reponse)?);
-    let path = format!("result/{}/final_result", job.trace_id);
+    let path = format!("result/{}/final_result.json", job.trace_id);
     storage::put(&path, buf).await?;
 
     // 6. update `background_jobs` table
     set_job_finish(&job.id, &path).await?;
+
+    log::info!(
+        "[BACKGROUND JOB {id}] finish running, job_id: {}, time_elapsed: {}ms",
+        job.id,
+        start.elapsed().as_millis()
+    );
 
     Ok(())
 }
@@ -134,7 +163,9 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         SearchService::search_partition(&job.trace_id, &job.org_id, stream_type, &partition_req)
             .await?;
 
-    submit_partitions(&job.id, res.partitions.as_slice())
+    submit_partitions(&job.id, res.partitions.as_slice()).await?;
+
+    set_partition_num(&job.id, res.partitions.len() as i32)
         .await
         .map_err(|e| e.into())
 }
@@ -172,7 +203,10 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     // 4. write the result to s3
     let result = res.unwrap();
     let buf = bytes::Bytes::from(json::to_string(&result)?);
-    let path = format!("result/{}/{}", job.trace_id, partition_job.partition_id);
+    let path = format!(
+        "result/{}/{}.json",
+        job.trace_id, partition_job.partition_id
+    );
     storage::put(&path, buf).await?;
 
     // 5. set the partition status to finish

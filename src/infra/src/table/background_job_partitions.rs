@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    prelude::Expr, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set,
-    TransactionTrait,
+    prelude::Expr, ColumnTrait, EntityTrait, FromQueryResult, Order, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 
 use super::{entity::background_job_partitions::*, get_lock};
@@ -55,24 +55,6 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn is_have_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    // sql: select id from background_job_partitions where id = job_id limit 1
-    let status = Entity::find()
-        .select_only()
-        .column(Column::Id)
-        .filter(Column::Id.eq(job_id))
-        .one(client)
-        .await;
-
-    match status {
-        Ok(Some(_)) => Ok(true),
-        Ok(None) => Ok(false),
-        Err(e) => orm_err!(format!("is_have_partition_jobs failed: {}", e)),
-    }
-}
-
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -97,6 +79,26 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
         Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
     };
 
+    // sql: select id from background_job_partitions where id = job_id limit 1
+    let status = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Id.eq(job_id))
+        .one(client)
+        .await;
+
+    match status {
+        Ok(Some(_)) => {
+            // this mean we have already created partition jobs
+            if let Err(e) = tx.commit().await {
+                return orm_err!(format!("submit partition job commit error: {e}"));
+            }
+            return Ok(());
+        }
+        Ok(None) => {}
+        Err(e) => return orm_err!(format!("submit partition job check job_id error: {e}")),
+    };
+
     let res = Entity::insert_many(jobs).exec(&tx).await;
 
     if let Err(e) = res {
@@ -118,7 +120,13 @@ pub async fn get_partition_jobs_by_job_id(job_id: &str) -> Result<Vec<Model>, er
     // sql: select * from background_job_partitions where job_id = job_id and status = 0
     let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
-        .filter(Column::Status.eq(0))
+        .filter(
+            Column::Status
+                .eq(0)
+                .or(Column::Status.eq(2))
+                .or(Column::Status.eq(3)),
+        )
+        .order_by(Column::PartitionId, Order::Asc)
         .all(client)
         .await;
 

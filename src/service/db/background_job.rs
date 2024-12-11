@@ -62,13 +62,17 @@ pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
     infra::table::background_jobs::get_result_path(job_id).await
 }
 
+pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), errors::Error> {
+    infra::table::background_jobs::set_partition_num(job_id, partition_num).await
+}
+
+pub async fn is_created_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
+    Ok(infra::table::background_jobs::partition_num(job_id).await? != 0)
+}
+
 // query background_job_partitions table
 pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     infra::table::background_job_partitions::cancel_partition_job(job_id).await
-}
-
-pub async fn is_have_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
-    infra::table::background_job_partitions::is_have_partition_jobs(job_id).await
 }
 
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {

@@ -43,6 +43,11 @@ pub struct Status {
 }
 
 #[derive(FromQueryResult, Debug)]
+pub struct PartitionNum {
+    pub partition_num: Option<i32>,
+}
+
+#[derive(FromQueryResult, Debug)]
 pub struct JobResult {
     pub path: String,
     pub error_message: String,
@@ -361,4 +366,41 @@ pub async fn check_running_jobs(update_at: i64) -> Result<(), errors::Error> {
     }
 
     Ok(())
+}
+
+pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::update_many()
+        .col_expr(Column::PartitionNum, Expr::value(partition_num))
+        .filter(Column::Id.eq(job_id))
+        .exec(client)
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("set partition num error: {e}"));
+    }
+
+    Ok(())
+}
+
+pub async fn partition_num(job_id: &str) -> Result<i32, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::find()
+        .select_only()
+        .column(Column::PartitionNum)
+        .filter(Column::Id.eq(job_id))
+        .into_model::<PartitionNum>()
+        .one(client)
+        .await;
+
+    match res {
+        Ok(Some(num)) => Ok(num.partition_num.unwrap_or_default()),
+        Ok(None) => Ok(0),
+        Err(e) => orm_err!(format!("get partition num error: {e}")),
+    }
 }
