@@ -53,6 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')"
         data-test="dashboard-search"
+        :clearable="searchAcrossFolders"
+        @clear="clearSearchHistory"
       >
         <template #prepend>
           <q-icon name="search" />
@@ -189,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- if data not available show nodata component -->
           <template #no-data>
-            <NoData v-if="!loading" />
+            <NoData />
           </template>
           <template #body-cell-description="props">
             <q-td :props="props">
@@ -378,6 +380,7 @@ import AddFolder from "../../components/dashboards/AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { useLoading } from "@/composables/useLoading";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -416,14 +419,12 @@ export default defineComponent({
     const selectedFolderDelete = ref(null);
     const selectedFolderToEdit = ref(null);
     const searchQuery = ref("");
-    const loading = ref(false);
     const filteredResults = ref([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref(null);
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
-    const hasSearched = ref(false);
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const columns = computed(() => {
@@ -479,7 +480,7 @@ export default defineComponent({
         ];
 
         // Conditionally add the "folder" column
-        if (searchAcrossFolders.value && hasSearched.value) {
+        if (searchAcrossFolders.value && searchQuery.value != "") {
             baseColumns.splice(2, 0, {
               name: "folder",
               field: "folder",
@@ -550,13 +551,15 @@ export default defineComponent({
 
     watch(searchQuery, async (newQuery) => {
       await debouncedSearch(newQuery);
+      if(searchQuery.value == ""){
+        filteredResults.value = [];
+      }
     });
 
     watch(searchAcrossFolders, async (newVal) => {
       if (newVal) {
         searchQuery.value = "";
         filteredResults.value = [];
-        hasSearched.value = false;
       }
     });
 
@@ -657,7 +660,7 @@ export default defineComponent({
       dismiss();
     };
     const dashboards = computed(function () {
-      if(!searchAcrossFolders.value || !hasSearched.value){
+      if(!searchAcrossFolders.value || searchQuery.value == ""){
         
        const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
@@ -696,7 +699,7 @@ export default defineComponent({
     });
 
     const resultTotal = computed(function () {
-      if(!searchAcrossFolders.value || !hasSearched.value){
+      if(!searchAcrossFolders.value || searchQuery.value == ""){
         return store.state.organizationData?.allDashboardList[
           activeFolderId.value
         ]?.length;
@@ -785,10 +788,8 @@ export default defineComponent({
       }
     };
 
-    const fetchSearchResults = async (query) => {
-      loading.value = true;
+    const fetchSearchResults = useLoading(async (query) => {
       //this is used for showing search msg when user tries to toggle every time before searching across folders
-      hasSearched.value = true;
       try {
         //here we are directly calling the dashboard service to get the search results
         const response = await dashboardService.list(
@@ -799,8 +800,11 @@ export default defineComponent({
           "",
           store.state.selectedOrganization.identifier,
           "",
-          query
+          query,
         )
+        if(response.config.params.title != searchQuery.value){
+            return [];
+        }
 
         const migratedDashboards = response.data.dashboards.map((dashboard: any) => ({
           dashboard: convertDashboardSchemaVersion (
@@ -811,27 +815,35 @@ export default defineComponent({
           folder_name: dashboard.folder_name,
             })
           );
+         
           return migratedDashboards;
       } catch (error) {
         $q.notify({
           message: "Error fetching search results",
           color: "negative",
         });
-      } finally {
-        loading.value = false;
       }
-    };
-    //this debounce search only makes the search call after 300ms of user input
+    });
+    //this debounce search only makes the search call after 600ms of user input
+
     const debouncedSearch = debounce (async (query) => {
-      if (query) {
-        const results = await fetchSearchResults(query);
+      if(!query) return;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while searching for dashboards...",
+        });
+        const results = await fetchSearchResults.execute(query);
+        dismiss();
         filteredResults.value = toRaw(results);
-      } 
-    }, 300); // 300ms debounce delay
+    }, 600);
 
     const activeFolderToMove = computed(()=>{
       return selectedDashboardToMove.value.folder_id ? selectedDashboardToMove.value.folder_id : activeFolderId.value;
     })
+    const clearSearchHistory = () => {
+      searchQuery.value = "";
+      filteredResults.value = [];
+    }
 
 
     return {
@@ -840,7 +852,7 @@ export default defineComponent({
       store,
       orgData,
       router,
-      loading,
+      loading: ref(false),
       dashboards,
       dashboard,
       columns,
@@ -898,7 +910,7 @@ export default defineComponent({
       debouncedSearch,
       filteredResults,
       activeFolderToMove,
-      hasSearched,
+      clearSearchHistory
     };
   },
   methods: {
