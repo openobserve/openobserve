@@ -746,8 +746,8 @@ export default defineComponent({
     watch(
       () => props.destinations.length, // Watch for length changes
       (newLength, oldLength) => {
-        formData.value.destinations  = formData.value.destinations.filter(destination => {
-          return props.destinations.some(dest => {
+        formData.value.destinations  = formData.value.destinations.filter((destination : any) => {
+          return props.destinations.some((dest:any) => {
             return dest.name === destination});
         });
       }
