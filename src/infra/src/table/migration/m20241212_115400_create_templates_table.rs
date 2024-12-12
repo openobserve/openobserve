@@ -18,7 +18,7 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const TEMPLATE_ORG_IDX: &str = "template_org_idx";
+const TEMPLATES_ORG_IDX: &str = "templates_org_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -34,7 +34,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(TEMPLATE_ORG_IDX).to_owned())
+            .drop_index(Index::drop().name(TEMPLATES_ORG_IDX).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Templates::Table).to_owned())
@@ -67,7 +67,7 @@ fn create_templates_table_statement() -> TableCreateStatement {
 fn create_templates_org_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(TEMPLATE_ORG_IDX)
+        .name(TEMPLATES_ORG_IDX)
         .table(Templates::Table)
         .col(Templates::Org)
         .to_owned()
