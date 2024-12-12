@@ -213,6 +213,48 @@ pub async fn get_users_with_role(_org_id: web::Path<String>) -> Result<HttpRespo
 }
 
 #[cfg(feature = "enterprise")]
+#[get("/{org_id}/users/{user_email}/roles")]
+pub async fn get_roles_for_user(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, user_email) = path.into_inner();
+    let res = o2_enterprise::enterprise::openfga::authorizer::roles::get_roles_for_org_user(
+        &org_id,
+        &user_email,
+    )
+    .await;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/users/{user_email}/roles")]
+pub async fn get_roles_for_user(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/users/{user_email}/groups")]
+pub async fn get_groups_for_user(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, user_email) = path.into_inner();
+    match o2_enterprise::enterprise::openfga::authorizer::groups::get_groups_for_org_user(
+        &org_id,
+        &user_email,
+    )
+    .await
+    {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/users/{user_email}/groups")]
+pub async fn get_groups_for_user(
+    _path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    Ok(MetaHttpResponse::forbidden("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
 #[post("/{org_id}/groups")]
 pub async fn create_group(
     org_id: web::Path<String>,
