@@ -478,6 +478,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::get_group_details)
             .service(authz::fga::get_resources)
             .service(authz::fga::get_users_with_role)
+            .service(authz::fga::get_roles_for_user)
+            .service(authz::fga::get_groups_for_user)
             .service(authz::fga::delete_role)
             .service(authz::fga::delete_group)
             .service(clusters::list_clusters)
