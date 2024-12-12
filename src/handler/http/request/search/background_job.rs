@@ -320,7 +320,7 @@ pub async fn submit_job(
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/search_job/status_all")]
-pub async fn get_status_all(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_status(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
