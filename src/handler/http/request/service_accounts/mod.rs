@@ -20,7 +20,7 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
-use config::utils::rand::generate_random_string;
+use config::{meta::user::UserRole, utils::rand::generate_random_string};
 use hashbrown::HashMap;
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
-            user::{UpdateUser, UserRequest, UserRole},
+            user::{UpdateUser, UserRequest},
         },
         utils::auth::UserEmail,
     },
@@ -82,6 +82,7 @@ pub async fn list(org_id: web::Path<String>, _req: HttpRequest) -> Result<HttpRe
         &org_id,
         Some(UserRole::ServiceAccount),
         _user_list_from_rbac,
+        false,
     )
     .await
 }
@@ -116,7 +117,10 @@ pub async fn save(
         first_name: service_account.first_name.trim().to_string(),
         last_name: service_account.last_name.trim().to_string(),
         password: generate_random_string(16),
-        role: meta::user::UserRole::ServiceAccount,
+        role: meta::user::UserOrgRole {
+            base_role: UserRole::ServiceAccount,
+            custom_role: None,
+        },
         is_external: false,
     };
 
