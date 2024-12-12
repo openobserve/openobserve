@@ -565,6 +565,14 @@ export const convertSQLData = async (
   const isHorizontalChart =
     panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
+  const defaultGrid = {
+    containLabel: true,
+    left: "10%",
+    right: "10%",
+    top: "15%",
+    bottom: "15%",
+  };
+
   const updateTrellisConfig = () => {
     try {
       if (!chartPanelRef?.value) {
@@ -653,17 +661,12 @@ export const convertSQLData = async (
 
       options.legend.show = false;
     } catch (err: any) {
-      console.error(`Trellis configuration failed: ${err}`);
-      // Fallback to default single grid configuration
-      options.grid = [
-        {
-          containLabel: true,
-          left: "10%",
-          right: "10%",
-          top: "15%",
-          bottom: "15%",
-        },
-      ];
+      console.error("Trellis configuration failed:", {
+        error: err?.message,
+        code: err?.code,
+        details: err?.details,
+      }); // Fallback to default single grid configuration
+      options.grid = defaultGrid;
       options.xAxis = options.xAxis.slice(0, 1);
       options.yAxis = [options.yAxis];
     }
