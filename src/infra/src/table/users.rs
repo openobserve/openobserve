@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::user::{DBUser, UserRole, UserType};
+use config::{
+    ider,
+    meta::user::{DBUser, UserRole, UserType},
+};
 use sea_orm::{
     entity::prelude::*, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set,
@@ -133,7 +136,7 @@ pub async fn add(user: UserRecord) -> Result<(), errors::Error> {
         user_type: Set(user.user_type.into()),
         created_at: Set(now),
         updated_at: Set(now),
-        ..Default::default()
+        id: Set(ider::uuid()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)

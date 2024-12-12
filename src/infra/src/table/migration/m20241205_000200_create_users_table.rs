@@ -46,8 +46,8 @@ fn create_users_table_statement() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(Users::Id)
-                .big_integer()
-                .auto_increment()
+                // Ksiud is a unique id string with 27 characters.
+                .char_len(27)
                 .not_null()
                 .primary_key(),
         )
