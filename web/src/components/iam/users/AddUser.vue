@@ -372,6 +372,7 @@ export default defineComponent({
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
 
+
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
