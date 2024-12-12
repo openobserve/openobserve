@@ -111,7 +111,7 @@ mod tests {
             &create_users_table_statement().to_string(PostgresQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "users" (
-                "id" bigserial NOT NULL PRIMARY KEY,
+                "id" char(27) NOT NULL PRIMARY KEY,
                 "email" varchar(100) NOT NULL,
                 "first_name" varchar(80) NOT NULL,
                 "last_name" varchar(80) NOT NULL,
@@ -136,7 +136,7 @@ mod tests {
             &create_users_table_statement().to_string(MysqlQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS `users` (
-                `id` bigint AUTO_INCREMENT NOT NULL PRIMARY KEY,
+                `id` char(27) NOT NULL PRIMARY KEY,
                 `email` varchar(100) NOT NULL,
                 `first_name` varchar(80) NOT NULL,
                 `last_name` varchar(80) NOT NULL,
@@ -161,7 +161,7 @@ mod tests {
             &create_users_table_statement().to_string(SqliteQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "users" (
-                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "id" char(27) NOT NULL PRIMARY KEY,
                 "email" varchar(100) NOT NULL,
                 "first_name" varchar(80) NOT NULL,
                 "last_name" varchar(80) NOT NULL,
