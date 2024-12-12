@@ -693,7 +693,7 @@ async fn process_node(
             }
 
             let external_task = ExternalIngestionTask::new(pipeline_id, dests.clone(), records);
-            if let Err(e) = external_task.persist_data() {
+            if let Err(e) = external_task.persist_data().await {
                 let err_msg = format!(
                     "DestinationNode error persisting data to be ingested externally: {}",
                     e

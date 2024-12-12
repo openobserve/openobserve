@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use config::{get_config, meta::alerts::destinations::HTTPType, utils::json::Value};
+use tokio::time;
 
 use crate::service::alerts::destinations;
 
@@ -48,11 +49,44 @@ use crate::service::alerts::destinations;
 /// crashes/removed, since both persist data locally. This would require more advanced solution.
 /// Team think it's fine.
 
-async fn load_and_request() {
+async fn read_from_pipeline_local_records() -> Result<Vec<Value>> {
     todo!()
 }
 
-async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value>) -> Result<()> {
+pub async fn run_external_ingestion_job() {
+    let interval = get_config().limit.alert_schedule_interval;
+    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        match read_from_pipeline_local_batches().await {
+            Ok(batches) => {
+                for batch in batches {
+                    let org_id = batch["org_id"].as_str().unwrap();
+                    let destinations = batch["destinations"].as_array().unwrap();
+                    let records = batch["records"].as_array().unwrap().to_vec();
+                    for dest in destinations {
+                        let dest = dest.as_str().unwrap();
+                        if let Err(e) = send_external_http_request(org_id, dest, &records).await {
+                            log::error!("[PIPELINE] run external ingestion jobs error: {}", e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("[PIPELINE] run external ingestion jobs error: {}", e);
+            }
+        }
+        if let Err(e) = read {
+            log::error!(
+                "[PIPELINE] run external destination ingestion jobs error: {}",
+                e
+            );
+        }
+    }
+}
+
+async fn send_external_http_request(org_id: &str, dest: &str, records: &Vec<Value>) -> Result<()> {
     let cfg = get_config();
     let dest = destinations::get(org_id, dest).await?;
     let client = reqwest::Client::builder().timeout(Duration::from_secs(cfg.limit.request_timeout));
@@ -63,8 +97,8 @@ async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value
     };
     let url = url::Url::parse(&dest.url)?;
     let mut req = match dest.method {
-        HTTPType::POST => client.post(url).json(&records),
-        HTTPType::PUT => client.put(url).json(&records),
+        HTTPType::POST => client.post(url).json(records),
+        HTTPType::PUT => client.put(url).json(records),
         HTTPType::GET => client.get(url),
     };
 
@@ -96,7 +130,8 @@ async fn send_external_http_request(org_id: &str, dest: &str, records: Vec<Value
     );
     if !resp_status.is_success() {
         log::error!(
-            "Alert http notification failed with status: {}, body: {}",
+            "External routing to {} failed with status: {}, body: {}",
+            dest.url,
             resp_status,
             resp_body
         );
