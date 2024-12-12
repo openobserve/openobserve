@@ -26,11 +26,11 @@ pub async fn get_job() -> Result<Option<Job>, errors::Error> {
     infra::table::background_jobs::get_job().await
 }
 
-pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Job>, errors::Error> {
-    infra::table::background_jobs::get_status_by_org_id(org_id).await
+pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Job>, errors::Error> {
+    infra::table::background_jobs::list_status_by_org_id(org_id).await
 }
 
-pub async fn get_status_by_job_id(job_id: &str) -> Result<Vec<Job>, errors::Error> {
+pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Job>, errors::Error> {
     infra::table::background_jobs::get_status_by_job_id(job_id).await
 }
 
@@ -84,6 +84,10 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
 
 pub async fn clean_deleted_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
     infra::table::background_jobs::clean_deleted_jobs(job_ids).await
+}
+
+pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
+    infra::table::background_jobs::retry_background_job(job_id).await
 }
 
 // query background_job_partitions table

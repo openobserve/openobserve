@@ -15,11 +15,17 @@
 
 use config::cluster::LOCAL_NODE;
 use sea_orm::{
-    prelude::Expr, sea_query::LockType, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
+    prelude::Expr, sea_query::LockType, ActiveModelTrait, ColumnTrait, EntityTrait,
+    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
-use super::{entity::background_jobs::*, get_lock};
+use super::{
+    entity::{
+        background_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
+        background_jobs::*,
+    },
+    get_lock,
+};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
@@ -94,7 +100,7 @@ pub async fn submit(
     Ok(job_id)
 }
 
-pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
+pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -110,12 +116,12 @@ pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Er
     Ok(res)
 }
 
-pub async fn get_status_by_job_id(job_id: &str) -> Result<Vec<Model>, errors::Error> {
+pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::Id.eq(job_id))
         .filter(Column::Status.ne(4))
-        .all(client)
+        .one(client)
         .await;
 
     let res = match res {
@@ -489,4 +495,85 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
         Ok(_) => Ok(false),
         Err(e) => orm_err!(format!("set job deleted error: {e}")),
     }
+}
+
+// 1. start a transaction
+// 2. move the status from job table -> job result table,
+// 3. clean old status: trace_id updated_at started_at ended_at node status result_path
+//    error_message partition_num
+// 4. generate the new trace_id,
+// 5. make the job as pending status
+// 6. commit the transaction
+pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let tx = match client.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return orm_err!(format!("retry job start transaction error: {e}")),
+    };
+
+    let res = Entity::find().filter(Column::Id.eq(job_id)).one(&tx).await;
+
+    let res = match res {
+        Ok(Some(res)) => res,
+        Ok(None) => {
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("retry job rollback error: {e}"));
+            }
+            return orm_err!("job_id not found");
+        }
+        Err(e) => {
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("retry job rollback error: {e}"));
+            }
+            return orm_err!(format!("retry job get job error: {e}"));
+        }
+    };
+
+    // move the status from job table -> job result table
+    let record = JobResultModel {
+        job_id: Set(res.id.clone()),
+        trace_id: Set(res.trace_id.clone()),
+        started_at: Set(res.started_at),
+        ended_at: Set(res.ended_at),
+        result_path: Set(res.result_path.clone()),
+        error_message: Set(res.error_message.clone()),
+        ..Default::default()
+    };
+
+    // insert into job result table
+    if let Err(e) = JobResultEntity::insert(record).exec(&tx).await {
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("retry job rollback error: {e}"));
+        }
+        return orm_err!(format!("retry job insert job result error: {e}"));
+    };
+
+    let mut model: ActiveModel = res.into();
+    model.trace_id = Set(config::ider::uuid());
+    model.status = Set(0);
+    model.updated_at = Set(chrono::Utc::now().timestamp_micros());
+    model.started_at = Set(None);
+    model.ended_at = Set(None);
+    model.node = Set(None);
+    model.result_path = Set(None);
+    model.error_message = Set(None);
+
+    let res = model.update(&tx).await;
+
+    if let Err(e) = res {
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("retry job rollback error: {e}"));
+        }
+        return orm_err!(format!("retry job update job error: {e}"));
+    }
+
+    if let Err(e) = tx.commit().await {
+        return orm_err!(format!("retry job commit error: {e}"));
+    }
+
+    Ok(())
 }

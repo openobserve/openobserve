@@ -31,7 +31,8 @@ use {
         },
         service::db::background_job::{
             cancel_job_by_job_id, cancel_partition_job, get_job_status, get_result_path,
-            get_status_by_job_id, get_status_by_org_id, get_trace_id, set_job_deleted,
+            get_status_by_job_id, get_trace_id, list_status_by_org_id, retry_background_job,
+            set_job_deleted,
         },
     },
     actix_web::http::StatusCode,
@@ -174,8 +175,8 @@ pub async fn submit_job(
 // 2. status_all
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status_all")]
-pub async fn get_status_all(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let res = get_status_by_org_id(&org_id).await;
+pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let res = list_status_by_org_id(&org_id).await;
     match res {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -189,7 +190,8 @@ pub async fn get_status(path: web::Path<(String, String)>) -> Result<HttpRespons
     let job_id = path.1.clone();
     let res = get_status_by_job_id(&job_id).await;
     match res {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Ok(Some(res)) => Ok(HttpResponse::Ok().json(res)),
+        Ok(None) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -272,13 +274,12 @@ pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse
         return Ok(HttpResponse::Forbidden().json("Only canceled, finished job can be retry"));
     }
 
-    // 2. move the status from job table -> job result table
-
-    // 3. generate the new trace_id
-
-    // 4. make the job as pending status
-
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    // 2. make the job_id as pending in background_job table
+    let res = retry_background_job(&job_id).await;
+    match res {
+        Ok(_) => Ok(HttpResponse::Ok().json(format!("job_id: {} retry success", job_id))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 #[cfg(feature = "enterprise")]

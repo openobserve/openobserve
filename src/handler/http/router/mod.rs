@@ -394,7 +394,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::job::cancel_query)
             .service(search::job::query_status)
             .service(search::background_job::submit_job)
-            .service(search::background_job::get_status_all)
+            .service(search::background_job::list_status)
             .service(search::background_job::get_status)
             .service(search::background_job::get_job_result)
             .service(search::background_job::cancel_job)
