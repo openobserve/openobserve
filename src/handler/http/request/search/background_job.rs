@@ -30,16 +30,18 @@ use {
             job::cancel_query_inner, utils::check_stream_premissions,
         },
         service::db::background_job::{
-            cancel_job_by_job_id, cancel_partition_job, get_result_path, get_status_by_job_id,
-            get_status_by_org_id, get_trace_id, set_job_deleted,
+            cancel_job_by_job_id, cancel_partition_job, get_job_status, get_result_path,
+            get_status_by_job_id, get_status_by_org_id, get_trace_id, set_job_deleted,
         },
     },
     actix_web::http::StatusCode,
+    config::meta::search::Response,
     config::{
         get_config,
         meta::{search::SubmitQueryResponse, sql::resolve_stream_names, stream::StreamType},
         utils::json,
     },
+    infra::storage,
     std::collections::HashMap,
     tracing::Span,
 };
@@ -206,10 +208,25 @@ pub async fn cancel_job(path: web::Path<(String, String)>) -> Result<HttpRespons
 #[get("/{org_id}/search_job/result/{job_id}")]
 pub async fn get_job_result(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let job_id = path.1.clone();
-    // TODO: based on the path to get result
     let res = get_result_path(&job_id).await;
     match res {
-        Ok(res) => Ok(HttpResponse::Ok().json(res.path)),
+        Ok(res) => {
+            if res.error_message.is_some() {
+                Ok(HttpResponse::Ok().json(format!(
+                    "job_id: {} error: {}",
+                    job_id,
+                    res.error_message.unwrap()
+                )))
+            } else if res.result_path.is_none() {
+                Ok(HttpResponse::NotFound().json(format!("job_id: {} don't have result", job_id)))
+            } else {
+                let result = storage::get(&res.result_path.unwrap()).await?;
+                let res = String::from_utf8(result.to_vec())
+                    .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
+                let response: Response = json::from_str(&res)?;
+                Ok(HttpResponse::Ok().json(response))
+            }
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -223,7 +240,9 @@ pub async fn delete_job(path: web::Path<(String, String)>) -> Result<HttpRespons
 
     // 1. cancel the query
     match cancel_job_inner(&org_id, &job_id).await {
-        Ok(res) if res.status() != StatusCode::OK => return Ok(res),
+        Ok(res) if res.status() != StatusCode::OK && res.status() != StatusCode::BAD_REQUEST => {
+            return Ok(res)
+        }
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         _ => {}
     };
@@ -239,14 +258,25 @@ pub async fn delete_job(path: web::Path<(String, String)>) -> Result<HttpRespons
 // 7. retry
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/retry/{job_id}")]
-pub async fn retry_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let _org_id = path.0.clone();
+    let job_id = path.1.clone();
+
     // 1. check the status of the job, only cancel, finish can be retry
+    let status = get_job_status(&job_id).await;
+    let status = match status {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+    if status.status != 2 && status.status != 3 {
+        return Ok(HttpResponse::Forbidden().json("Only canceled, finished job can be retry"));
+    }
 
     // 2. move the status from job table -> job result table
 
     // 3. generate the new trace_id
 
-    // 4. make the job as running
+    // 4. make the job as pending status
 
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

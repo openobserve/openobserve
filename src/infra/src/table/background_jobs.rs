@@ -49,12 +49,12 @@ pub struct PartitionNum {
 
 #[derive(FromQueryResult, Debug)]
 pub struct JobResult {
-    pub job_id: String,
+    pub id: String,
     pub trace_id: String,
     pub created_at: i64,
     pub partition_num: Option<i32>,
-    pub path: String,
-    pub error_message: String,
+    pub result_path: Option<String>,
+    pub error_message: Option<String>,
 }
 
 pub async fn submit(
@@ -192,7 +192,9 @@ pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
             if let Err(e) = tx.rollback().await {
                 return orm_err!(format!("cancel job rollback error: {e}"));
             }
-            return orm_err!(format!("job_id: {job_id} status is pending or running"));
+            return orm_err!(format!(
+                "job_id: {job_id} status is not pending or running, can not cancel"
+            ));
         }
     } else {
         if let Err(e) = tx.rollback().await {
@@ -212,9 +214,13 @@ pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .select_only()
-        .filter(Column::Id.eq(job_id))
+        .column(Column::Id)
+        .column(Column::TraceId)
+        .column(Column::CreatedAt)
+        .column(Column::PartitionNum)
         .column(Column::ResultPath)
         .column(Column::ErrorMessage)
+        .filter(Column::Id.eq(job_id))
         .into_model::<JobResult>()
         .one(client)
         .await;
@@ -223,6 +229,23 @@ pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
         Ok(Some(res)) => Ok(res),
         Ok(None) => orm_err!("job_id not found"),
         Err(e) => orm_err!(format!("get result path error: {e}")),
+    }
+}
+
+pub async fn get_job_status(job_id: &str) -> Result<Status, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .select_only()
+        .column(Column::Status)
+        .filter(Column::Id.eq(job_id))
+        .into_model::<Status>()
+        .one(client)
+        .await;
+
+    match res {
+        Ok(Some(res)) => Ok(res),
+        Ok(None) => orm_err!("job_id not found"),
+        Err(e) => orm_err!(format!("get job status error: {e}")),
     }
 }
 

@@ -253,9 +253,12 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
                 deleted_files.push(path);
             }
         }
-        if !job.path.is_empty() {
-            deleted_files.push(job.path.clone());
+        if job.result_path.is_some() {
+            deleted_files.push(job.result_path.clone().unwrap());
         }
+
+        // TODO: add result path from result table
+
         // delete all files
         let deleted_files_str: Vec<&str> = deleted_files.iter().map(|s| s.as_str()).collect();
         storage::del(&deleted_files_str).await?;
@@ -264,7 +267,9 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
     // 3. delete the partition jobs from database
     clean_deleted_partition_jobs(&deleted_files).await?;
 
-    // 4. delete the job from database
+    // 4. delete the job result from database
+
+    // 5. delete the job from database
     clean_deleted_jobs(&deleted_files).await?;
 
     Ok(())
