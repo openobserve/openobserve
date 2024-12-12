@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{
-    organization::OrganizationType,
-    user::{UserRole, UserType},
+use config::{
+    ider,
+    meta::{
+        organization::OrganizationType,
+        user::{UserRole, UserType},
+    },
 };
 use sea_orm::{
     entity::prelude::*, ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait,
@@ -194,7 +197,7 @@ pub async fn add(
         rum_token: Set(rum_token),
         created_at: Set(now),
         updated_at: Set(now),
-        ..Default::default()
+        id: Set(ider::uuid()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
