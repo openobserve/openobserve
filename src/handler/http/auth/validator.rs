@@ -33,7 +33,10 @@ use crate::{
         meta::{
             ingestion::INGESTION_EP,
             organization::DEFAULT_ORG,
-            user::{AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder},
+            user::{
+                get_default_user_role, AuthTokensExt, TokenValidationResponse,
+                TokenValidationResponseBuilder,
+            },
         },
         utils::{
             auth::{get_hash, is_root_user, AuthExtractor},
@@ -97,7 +100,7 @@ pub async fn validator(
                     || check_permissions(
                         user_id,
                         auth_info,
-                        res.user_role.unwrap_or_default(),
+                        res.user_role.unwrap_or(get_default_user_role()),
                         !res.is_internal_user,
                     )
                     .await
@@ -789,21 +792,16 @@ pub(crate) async fn check_permissions(
     } else {
         object_str
     };
-    let role = match role {
-        Some(role) => {
-            if role.eq(&UserRole::Root) {
-                // root user should have access to everything , bypass check in openfga
-                return true;
-            } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
-                match ORG_USERS.get(&format!("{}/{user_id}", cfg.common.usage_org)) {
-                    Some(user) => format!("{}", user.role),
-                    None => "".to_string(),
-                }
-            } else {
-                format!("{role}")
-            }
+    let role = if role.eq(&UserRole::Root) {
+        // root user should have access to everything , bypass check in openfga
+        return true;
+    } else if auth_info.org_id.eq("organizations") && auth_info.method.eq("POST") {
+        match ORG_USERS.get(&format!("{}/{user_id}", cfg.common.usage_org)) {
+            Some(user) => format!("{}", user.role),
+            None => "".to_string(),
         }
-        None => "".to_string(),
+    } else {
+        format!("{role}")
     };
     let org_id = if auth_info.org_id.eq("organizations") {
         if auth_info.method.eq("POST") {

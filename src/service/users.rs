@@ -742,7 +742,7 @@ pub async fn list_users(
     }
 
     user_list.retain(|user| {
-        if user.role.eq(&UserRole::ServiceAccount) && permitted.is_some() {
+        if user.role.eq(&UserRole::ServiceAccount.to_string()) && permitted.is_some() {
             let permitted = permitted.as_ref().unwrap();
             permitted.contains(&format!("service_accounts:{}", user.email))
                 || permitted.contains(&format!("service_accounts:_all_{org_id}"))
@@ -860,7 +860,7 @@ pub async fn remove_user_from_org(
                                     )
                                     .await;
                                     if is_service_account {
-                                        delete_service_account_from_org(org_id, email_id).await;
+                                        delete_service_account_from_org(org_id, &email_id).await;
                                     }
                                 }
                             }
