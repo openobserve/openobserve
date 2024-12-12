@@ -443,14 +443,6 @@ export default defineComponent({
       { deep: true },
     );
 
-    watch(
-      resultMetaData,
-      () => {
-        emit("result-metadata-update", resultMetaData.value);
-      },
-      { deep: true },
-    );
-
     watch(lastTriggeredAt, () => {
       emit("last-triggered-at-update", lastTriggeredAt.value);
     });
@@ -693,6 +685,55 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
+    watch(
+      resultMetaData,
+      () => {
+        emit("result-metadata-update", resultMetaData.value);
+        console.log("resultMetaData interval", resultMetaData.value);
+        const interval = resultMetaData?.value?.map(
+          (it: any) => it.histogram_interval,
+        )[0];
+        console.log("interval", interval);
+
+        const intervalMillis = interval * 1000;
+
+        console.log("intervalMillis", intervalMillis);
+      },
+      { deep: true },
+    );
+
+    const drilldownHoverSeriesRef = ref(null);
+
+    watch(hoveredSeriesState.value, () => {
+      console.log("inside watch");
+
+      // if hoveredSeriesState is present store it in drilldown ref
+      if (hoveredSeriesState.value) {
+        drilldownHoverSeriesRef.value = hoveredSeriesState.value;
+      }
+      console.log(
+        "drilldownArray",
+        drilldownHoverSeriesRef.value.hoveredSeriesName,
+        drilldownHoverSeriesRef.value.hoveredTime,
+      );
+      // convert hoveredTime to getTime format
+      if (drilldownHoverSeriesRef.value.hoveredTime) {
+        drilldownHoverSeriesRef.value.hoveredTime =
+          new Date(drilldownHoverSeriesRef.value.hoveredTime).getTime() * 1000;
+      }
+      console.log("drilldownArray----", drilldownHoverSeriesRef.value);
+
+      // add hoveredTime with intervalMillis
+      if (drilldownHoverSeriesRef.value.hoveredTime) {
+        drilldownHoverSeriesRef.value.hoveredTime =
+          drilldownHoverSeriesRef.value.hoveredTime + intervalMillis;
+      }
+      console.log(
+        "drilldownArray---- intervalMillis",
+        drilldownHoverSeriesRef.value,
+      );
+    });
+
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
@@ -717,8 +758,11 @@ export default defineComponent({
             console.error("navigateToLogs: Panel schema is undefined.");
             return;
           }
-          console.log("navigateToLogs: Panel schema: metadata", metadata?.value);
-          
+          console.log(
+            "navigateToLogs: Panel schema: metadata",
+            metadata?.value,
+          );
+
           const originalQuery = metadata?.value?.queries[0]?.query;
           const streamName = queryDetails?.queries[0]?.fields?.stream;
 
