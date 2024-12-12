@@ -315,7 +315,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:body-selection="scope">
                 <q-td class="text-center q-td--no-hover">
                   <q-checkbox
-                  disableRipple
                     v-if="
                       !(
                         scope.row.name ==
@@ -1476,9 +1475,8 @@ export default defineComponent({
     td:nth-child(2) {
     min-width: 20rem;
     width: 20rem;
-    max-width: 10rem;
+    max-width: 20rem;
     overflow: auto;
-    text-wrap: wrap;
     scrollbar-width: thin; 
     scrollbar-color: #999 #f0f0f0;
   }
