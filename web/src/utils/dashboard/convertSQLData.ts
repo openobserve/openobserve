@@ -42,6 +42,7 @@ import {
   getSQLMinMaxValue,
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
+import { type SeriesObject } from "@/ts/interfaces/dashboard";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -565,6 +566,14 @@ export const convertSQLData = async (
   const isHorizontalChart =
     panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
+  function configureTrellisAxes(gridData: any, series: any[]) {
+    return {
+      xAxis: [],
+      yAxis: [],
+      title: [],
+    };
+  }
+
   const defaultGrid = {
     containLabel: true,
     left: "10%",
@@ -615,10 +624,9 @@ export const convertSQLData = async (
       chartPanelStyle.height = gridData.panelHeight + "px";
 
       // Update axes configuration for trellis layout
-      options.xAxis = options.xAxis.slice(0, 1);
-      options.yAxis = [options.yAxis];
+      const axisConfig = configureTrellisAxes(gridData, options.series);
 
-      options.title = [];
+      Object.assign(options, axisConfig);
 
       // Configure each series with its corresponding grid index
       options.series.forEach((series: any, index: number) => {
@@ -1077,11 +1085,11 @@ export const convertSQLData = async (
   }
 
   // ------- Series Building Methods -----------
+
   /**
    * Retrieves unique values for the second x-axis key in a stacked chart.
    * Assumes the first value in breakDownKeys corresponds to the second x-axis key.
    *
-   * @param data - Array of objects representing the chart data
    * @param breakDownKeys - Array of strings representing x-axis keys
    * @returns Array of unique values for the second x-axis key
    */
@@ -1134,9 +1142,9 @@ export const convertSQLData = async (
 
   const getSeriesObj = (
     yAxisName: string,
-    seriesData: any[] = [],
+    seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
-  ) => {
+  ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName,

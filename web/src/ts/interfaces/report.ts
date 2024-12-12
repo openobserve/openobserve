@@ -13,24 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-interface Label {
-  show: boolean;
-  position: string;
-  rotate: number;
-}
-
-interface MarkLine {
-  silent: boolean;
-  animation: boolean;
-  data: any[];
-}
-interface SeriesObject {
+export interface ScheduledDashboardReport {
+  "#": number;
   name: string;
-  label: Label;
-  markLine: MarkLine;
-  connectNulls: boolean;
-  large: boolean;
-  color: string | null;
-  data: Array<number | null>;
-  [key: string]: any;
+  tab?: string | null;
+  time_range?: string | null;
+  frequency: string;
+  last_triggered_at: string;
+  created_at: string;
+  orgId: string | number;
+  isCached: boolean;
 }
