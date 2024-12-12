@@ -554,6 +554,44 @@ impl PartialEq for DistinctField {
 }
 impl Eq for DistinctField {}
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct TimeRange {
+    pub start: i64,
+    pub end: i64,
+}
+
+impl TimeRange {
+    pub fn new(start: i64, end: i64) -> Self {
+        Self { start, end }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start == 0 && self.end == 0
+    }
+
+    pub fn contains(&self, other: &Self) -> bool {
+        self.start <= other.start && self.end >= other.end
+    }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        self.start <= other.end && self.end >= other.start
+    }
+
+    pub fn split(&self, other: &Self) -> Vec<Self> {
+        if !self.intersects(other) {
+            return vec![self.clone()];
+        }
+
+        let mut ranges = Vec::new();
+        if self.start < other.start {
+            ranges.push(Self::new(self.start, other.start));
+        }
+        if self.end > other.end {
+            ranges.push(Self::new(other.end, self.end));
+        }
+        ranges
+    }
+}
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
@@ -586,6 +624,8 @@ pub struct StreamSettings {
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
+    #[serde(default)]
+    pub red_days: Vec<TimeRange>
 }
 
 impl Serialize for StreamSettings {
@@ -612,6 +652,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
+        state.serialize_field("red_days", &self.red_days)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -741,6 +782,16 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_i64())
             .unwrap_or_default();
 
+        let mut red_days = vec![];
+        if let Some(values) = settings.get("red_days")
+            .and_then(|v| v.as_array()) {
+            for item in values {
+                let start = item.get("start").and_then(|v| v.as_i64()).unwrap_or_default();
+                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                red_days.push(TimeRange::new(start, end));
+            }
+        }
+
         Self {
             partition_time_level,
             partition_keys,
@@ -755,6 +806,7 @@ impl From<&str> for StreamSettings {
             approx_partition,
             distinct_value_fields,
             index_updated_at,
+            red_days
         }
     }
 }

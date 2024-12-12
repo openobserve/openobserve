@@ -24,6 +24,7 @@ use config::{
     },
     utils::time::BASE_TIME,
 };
+use config::meta::stream::TimeRange;
 use infra::{cache, dist_lock, file_list as infra_file_list};
 
 use crate::{
@@ -36,7 +37,9 @@ pub async fn delete_by_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    red_days: &[TimeRange]
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
@@ -72,14 +75,62 @@ pub async fn delete_by_stream(
         .await;
     }
 
-    // delete files
-    db::compact::retention::delete_stream(
-        org_id,
-        stream_type,
-        stream_name,
-        Some((lifecycle_start, lifecycle_end)),
-    )
-    .await
+    // Create tasks with break on red days
+    let start = DateTime::parse_from_rfc3339(lifecycle_start)?.with_timezone(&Utc);
+    let end = DateTime::parse_from_rfc3339(lifecycle_end)?.with_timezone(&Utc);
+
+    let mut final_time_ranges = vec![];
+
+    let original_time_range = TimeRange::new(start.timestamp_nanos_opt().expect("valid timestamp") / 1000, end.timestamp_nanos_opt().expect("valid timestamp") / 1000);
+    for time_range in red_days.iter() {
+        // skip the time range from the start to end and create subsequent time ranges
+        // for example if the red days fall between the start and end then there will be two tasks
+        // one from start to red_day.start and another from red_day.end to end
+        let mut time_range_start: DateTime<Utc> = Utc.timestamp_nanos(time_range.start * 1000);
+        let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(time_range.end * 1000);
+
+        // In case if a red day is older than the red days retention period then skip the day, which will delete the data
+        let allowed_red_day_retention_end = config::utils::time::now() - Duration::try_days(cfg.compact.red_data_retention_days).unwrap();
+        if time_range_end < allowed_red_day_retention_end {
+            continue
+        } else if time_range_start < allowed_red_day_retention_end {
+            time_range_start = allowed_red_day_retention_end;
+        }
+        let time_range = TimeRange::new(time_range_start.timestamp_nanos_opt().expect("valid timestamp")/1000, time_range_end.timestamp_nanos_opt().expect("valid timestamp")/1000);
+
+        if time_range.contains(&original_time_range) {
+            final_time_ranges.push(original_time_range.clone());
+        }
+
+        let mut ranges = original_time_range.split(&time_range);
+        final_time_ranges.append(&mut ranges);
+    }
+
+    for time_range in final_time_ranges {
+        let time_range_start = Utc.timestamp_nanos(time_range.start * 1000).format("%Y-%m-%d").to_string();
+        let time_range_end = Utc.timestamp_nanos(time_range.end * 1000).format("%Y-%m-%d").to_string();
+        log::debug!(
+            "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
+            org_id,
+            stream_type,
+            stream_name,
+            time_range_start,
+            time_range_end,
+        );
+
+        db::compact::retention::delete_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            Some((
+                time_range_start.as_str(),
+                time_range_end.as_str(),
+            )),
+        )
+        .await?;
+    }
+
+    return Ok(())
 }
 
 pub async fn delete_all(
