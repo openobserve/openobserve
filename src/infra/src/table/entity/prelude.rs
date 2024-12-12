@@ -5,5 +5,6 @@ pub use super::{
     background_job_results::Entity as BackgroundJobResults,
     background_jobs::Entity as BackgroundJobs, dashboards::Entity as Dashboards,
     distinct_value_fields::Entity as DistinctValueFields, folders::Entity as Folders,
+    alerts::Entity as Alerts, 
     search_queue::Entity as SearchQueue,
 };

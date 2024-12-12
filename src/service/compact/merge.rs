@@ -101,7 +101,7 @@ pub async fn generate_job_by_stream(
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
-        let locker = dist_lock::lock(&lock_key, 0, None).await?;
+        let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
@@ -212,7 +212,7 @@ pub async fn generate_old_data_job_by_stream(
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
-        let locker = dist_lock::lock(&lock_key, 0, None).await?;
+        let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
@@ -256,7 +256,7 @@ pub async fn generate_old_data_job_by_stream(
     // get old data by hour, `offset - 2 hours` as old data
     let end_time = offset - hour_micros(2);
     let start_time = end_time
-        - Duration::try_days(stream_data_retention_days as i64)
+        - Duration::try_days(stream_data_retention_days)
             .unwrap()
             .num_microseconds()
             .unwrap();

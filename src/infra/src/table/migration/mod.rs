@@ -26,6 +26,7 @@ mod m20241204_143100_create_table_search_queue;
 mod m20241205_085111_background_jobs;
 mod m20241205_085135_background_job_partitions;
 mod m20241205_085148_background_job_results;
+mod m20241209_120000_create_alerts_table;
 
 pub struct Migrator;
 
@@ -44,6 +45,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241205_085111_background_jobs::Migration),
             Box::new(m20241205_085135_background_job_partitions::Migration),
             Box::new(m20241205_085148_background_job_results::Migration),
+            Box::new(m20241209_120000_create_alerts_table::Migration),
         ]
     }
 }
