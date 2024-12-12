@@ -566,14 +566,6 @@ export const convertSQLData = async (
   const isHorizontalChart =
     panelSchema.type === "h-bar" || panelSchema.type === "h-stacked";
 
-  function configureTrellisAxes(gridData: any, series: any[]) {
-    return {
-      xAxis: [],
-      yAxis: [],
-      title: [],
-    };
-  }
-
   const defaultGrid = {
     containLabel: true,
     left: "10%",
@@ -586,6 +578,14 @@ export const convertSQLData = async (
     try {
       if (!chartPanelRef?.value) {
         throw new Error("Chart panel reference is not available");
+      }
+
+      // Validate panel dimensions
+      if (
+        chartPanelRef.value.offsetWidth <= 0 ||
+        chartPanelRef.value.offsetHeight <= 0
+      ) {
+        throw new Error("Invalid panel dimensions");
       }
 
       if (!options.series?.length) {
@@ -624,9 +624,10 @@ export const convertSQLData = async (
       chartPanelStyle.height = gridData.panelHeight + "px";
 
       // Update axes configuration for trellis layout
-      const axisConfig = configureTrellisAxes(gridData, options.series);
+      options.xAxis = options.xAxis.slice(0, 1);
+      options.yAxis = [options.yAxis];
 
-      Object.assign(options, axisConfig);
+      options.title = [];
 
       // Configure each series with its corresponding grid index
       options.series.forEach((series: any, index: number) => {
@@ -677,6 +678,9 @@ export const convertSQLData = async (
       options.grid = defaultGrid;
       options.xAxis = options.xAxis.slice(0, 1);
       options.yAxis = [options.yAxis];
+
+      // Set default chartPanelStyle height
+      chartPanelStyle.height = chartPanelRef.value.offsetHeight + "px";
     }
   };
 
@@ -2085,7 +2089,9 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis.forEach((it: any) => (it.type = "time"));
+      options.xAxis.forEach((it: any) => {
+        it.type = "time";
+      });
 
       options.xAxis[0].data = [];
 
