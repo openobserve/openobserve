@@ -30,8 +30,8 @@ use {
             job::cancel_query_inner, utils::check_stream_premissions,
         },
         service::db::background_job::{
-            cancel_job, cancel_partition_job, get_result_path, get_status_by_job_id,
-            get_status_by_org_id, get_trace_id,
+            cancel_job_by_job_id, cancel_partition_job, get_result_path, get_status_by_job_id,
+            get_status_by_org_id, get_trace_id, set_job_deleted,
         },
     },
     actix_web::http::StatusCode,
@@ -47,7 +47,7 @@ use {
 // 1. submit
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/submit")]
-pub async fn submit_query(
+pub async fn submit_job(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
@@ -172,7 +172,7 @@ pub async fn submit_query(
 // 2. status_all
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status_all")]
-pub async fn query_status_all(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_status_all(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = get_status_by_org_id(&org_id).await;
     match res {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
@@ -183,7 +183,7 @@ pub async fn query_status_all(org_id: web::Path<String>) -> Result<HttpResponse,
 // 3. status
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status/{job_id}")]
-pub async fn query_status(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_status(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let job_id = path.1.clone();
     let res = get_status_by_job_id(&job_id).await;
     match res {
@@ -195,37 +195,16 @@ pub async fn query_status(path: web::Path<(String, String)>) -> Result<HttpRespo
 // 4. cancel
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/search_job/cancel/{job_id}")]
-pub async fn cancel_query(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn cancel_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let org_id = path.0.clone();
     let job_id = path.1.clone();
-    // 1. use job_id to query the trace_id
-    let trace_id = get_trace_id(&job_id).await;
-    if trace_id.is_err() || trace_id.as_ref().unwrap().is_none() {
-        return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
-    }
-
-    // 2. use job_id to make background_job cancel
-    let status = cancel_job(&job_id).await;
-    if let Err(e) = status {
-        return Ok(MetaHttpResponse::bad_request(e));
-    }
-
-    // 3. use job_id to make background_partition_job cancel
-    let status = status.unwrap();
-    if status == 1 {
-        if let Err(e) = cancel_partition_job(&job_id).await {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    }
-
-    // 4. use cancel query function to cancel the query
-    cancel_query_inner(&org_id, &[&trace_id.unwrap().unwrap()]).await
+    cancel_job_inner(&org_id, &job_id).await
 }
 
 // 5. get
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/result/{job_id}")]
-pub async fn get_query_result(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_job_result(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let job_id = path.1.clone();
     // TODO: based on the path to get result
     let res = get_result_path(&job_id).await;
@@ -238,27 +217,69 @@ pub async fn get_query_result(path: web::Path<(String, String)>) -> Result<HttpR
 // 6. delete
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/search_job/delete/{job_id}")]
-pub async fn delete_query(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let org_id = path.0.clone();
+    let job_id = path.1.clone();
+
     // 1. cancel the query
+    match cancel_job_inner(&org_id, &job_id).await {
+        Ok(res) if res.status() != StatusCode::OK => return Ok(res),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        _ => {}
+    };
 
     // 2. make the job_id in background_job table delete
-
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
+    match set_job_deleted(job_id.as_str()).await {
+        Ok(res) if res => Ok(HttpResponse::Ok().json(format!("job_id: {} delete success", job_id))),
+        Ok(_) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 // 7. retry
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/retry/{job_id}")]
-pub async fn retry_query(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    // 1. check the status of the job
+pub async fn retry_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    // 1. check the status of the job, only cancel, finish can be retry
 
-    // 2. based on the status to retry the job
+    // 2. move the status from job table -> job result table
+
+    // 3. generate the new trace_id
+
+    // 4. make the job as running
+
     Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Error> {
+    // 1. use job_id to query the trace_id
+    let trace_id = get_trace_id(job_id).await;
+    if trace_id.is_err() || trace_id.as_ref().unwrap().is_none() {
+        return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
+    }
+
+    // 2. use job_id to make background_job cancel
+    let status = cancel_job_by_job_id(job_id).await;
+    if let Err(e) = status {
+        return Ok(MetaHttpResponse::bad_request(e));
+    }
+
+    // 3. use job_id to make background_partition_job cancel
+    let status = status.unwrap();
+    if status == 1 {
+        if let Err(e) = cancel_partition_job(job_id).await {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    }
+
+    // 4. use cancel query function to cancel the query
+    cancel_query_inner(org_id, &[&trace_id.unwrap().unwrap()]).await
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[post("/{org_id}/search_job/submit")]
-pub async fn submit_query(
+pub async fn submit_job(
     _org_id: web::Path<String>,
     _in_req: HttpRequest,
     _body: web::Bytes,
@@ -268,36 +289,36 @@ pub async fn submit_query(
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/search_job/status_all")]
-pub async fn query_status_all(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_status_all(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/search_job/status/{job_id}")]
-pub async fn query_status(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_status(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/search_job/cancel/{job_id}")]
-pub async fn cancel_query(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn cancel_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/search_job/result/{job_id}")]
-pub async fn get_query_result(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_job_result(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/search_job/delete/{job_id}")]
-pub async fn delete_query(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[post("/{org_id}/search_job/retry/{job_id}")]
-pub async fn retry_query(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn retry_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

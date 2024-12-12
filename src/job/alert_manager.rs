@@ -65,6 +65,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { run_background_jobs(i).await });
     }
     tokio::task::spawn(async move { run_check_running_background_jobs().await });
+    tokio::task::spawn(async move { run_delete_jobs().await });
 
     Ok(())
 }
@@ -137,6 +138,18 @@ async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
+async fn run_delete_jobs() -> Result<(), anyhow::Error> {
+    let interval = get_config().limit.background_job_delete_interval;
+    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
+    loop {
+        interval.tick().await; // trigger the first run
+        if let Err(e) = service::alerts::background_jobs::delete_jobs().await {
+            log::error!("[BACKGROUND JOB] run delete jobs error: {}", e);
+        }
+    }
+}
+
 #[cfg(not(feature = "enterprise"))]
 async fn run_background_jobs(_id: i64) -> Result<(), anyhow::Error> {
     Ok(())
@@ -144,5 +157,10 @@ async fn run_background_jobs(_id: i64) -> Result<(), anyhow::Error> {
 
 #[cfg(not(feature = "enterprise"))]
 async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn run_delete_jobs() -> Result<(), anyhow::Error> {
     Ok(())
 }

@@ -38,8 +38,8 @@ pub async fn get_trace_id(job_id: &str) -> Result<Option<String>, errors::Error>
     infra::table::background_jobs::get_trace_id(job_id).await
 }
 
-pub async fn cancel_job(job_id: &str) -> Result<i32, errors::Error> {
-    infra::table::background_jobs::cancel_job(job_id).await
+pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
+    infra::table::background_jobs::cancel_job_by_job_id(job_id).await
 }
 
 pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<(), errors::Error> {
@@ -68,6 +68,18 @@ pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), e
 
 pub async fn is_created_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
     Ok(infra::table::background_jobs::partition_num(job_id).await? != 0)
+}
+
+pub async fn get_deleted_jobs() -> Result<Vec<JobResult>, errors::Error> {
+    infra::table::background_jobs::get_deleted_jobs().await
+}
+
+pub async fn clean_deleted_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
+    infra::table::background_jobs::clean_deleted_jobs(job_ids).await
+}
+
+pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
+    infra::table::background_jobs::set_job_deleted(job_id).await
 }
 
 // query background_job_partitions table
@@ -109,4 +121,8 @@ pub async fn set_partition_job_error_message(
         error_message,
     )
     .await
+}
+
+pub async fn clean_deleted_partition_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
+    infra::table::background_job_partitions::clean_deleted_partition_jobs(job_ids).await
 }

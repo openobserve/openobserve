@@ -31,7 +31,8 @@ use tokio::sync::mpsc;
 
 use crate::service::{
     db::background_job::{
-        get_job, get_partition_jobs_by_job_id, is_created_partition_jobs, set_job_error_message,
+        clean_deleted_jobs, clean_deleted_partition_jobs, get_deleted_jobs, get_job,
+        get_partition_jobs_by_job_id, is_created_partition_jobs, set_job_error_message,
         set_job_finish, set_partition_job_error_message, set_partition_job_finish,
         set_partition_job_start, set_partition_num, submit_partitions, update_running_job,
     },
@@ -236,4 +237,35 @@ fn generate_result_path(
             "final".to_string()
         }
     )
+}
+
+pub async fn delete_jobs() -> Result<(), anyhow::Error> {
+    // 1. get deleted jobs from database
+    let jobs = get_deleted_jobs().await?;
+
+    // 2. delete the s3 result
+    let mut deleted_files = Vec::new();
+    for job in jobs.iter() {
+        let partition_num = job.partition_num;
+        if let Some(partition_num) = partition_num {
+            for i in 0..partition_num {
+                let path = generate_result_path(job.created_at, &job.trace_id, Some(i));
+                deleted_files.push(path);
+            }
+        }
+        if !job.path.is_empty() {
+            deleted_files.push(job.path.clone());
+        }
+        // delete all files
+        let deleted_files_str: Vec<&str> = deleted_files.iter().map(|s| s.as_str()).collect();
+        storage::del(&deleted_files_str).await?;
+    }
+
+    // 3. delete the partition jobs from database
+    clean_deleted_partition_jobs(&deleted_files).await?;
+
+    // 4. delete the job from database
+    clean_deleted_jobs(&deleted_files).await?;
+
+    Ok(())
 }

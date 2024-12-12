@@ -49,6 +49,10 @@ pub struct PartitionNum {
 
 #[derive(FromQueryResult, Debug)]
 pub struct JobResult {
+    pub job_id: String,
+    pub trace_id: String,
+    pub created_at: i64,
+    pub partition_num: Option<i32>,
     pub path: String,
     pub error_message: String,
 }
@@ -94,6 +98,7 @@ pub async fn get_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Er
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.ne(4))
         .all(client)
         .await;
 
@@ -109,6 +114,7 @@ pub async fn get_status_by_job_id(job_id: &str) -> Result<Vec<Model>, errors::Er
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::Id.eq(job_id))
+        .filter(Column::Status.ne(4))
         .all(client)
         .await;
 
@@ -138,7 +144,7 @@ pub async fn get_trace_id(job_id: &str) -> Result<Option<String>, errors::Error>
     Ok(res.map(|res| res.trace_id))
 }
 
-pub async fn cancel_job(job_id: &str) -> Result<i32, errors::Error> {
+pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -402,5 +408,62 @@ pub async fn partition_num(job_id: &str) -> Result<i32, errors::Error> {
         Ok(Some(num)) => Ok(num.partition_num.unwrap_or_default()),
         Ok(None) => Ok(0),
         Err(e) => orm_err!(format!("get partition num error: {e}")),
+    }
+}
+
+pub async fn get_deleted_jobs() -> Result<Vec<JobResult>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::PartitionNum)
+        .column(Column::ResultPath)
+        .column(Column::ErrorMessage)
+        .filter(Column::Status.eq(4))
+        .into_model::<JobResult>()
+        .all(client)
+        .await;
+
+    match res {
+        Ok(res) => Ok(res),
+        Err(e) => orm_err!(format!("get deleted jobs error: {e}")),
+    }
+}
+
+pub async fn clean_deleted_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::delete_many()
+        .filter(Column::Id.is_in(job_ids.iter()))
+        .exec(client)
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("clean deleted jobs error: {e}"));
+    }
+
+    Ok(())
+}
+
+pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(4))
+        .filter(Column::Id.eq(job_id))
+        .exec(client)
+        .await;
+
+    match res {
+        Ok(res) if res.rows_affected == 1 => Ok(true),
+        Ok(_) => Ok(false),
+        Err(e) => orm_err!(format!("set job deleted error: {e}")),
     }
 }
