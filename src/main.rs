@@ -232,6 +232,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await
                 .expect("migrate resource names into supported ofga format failed");
 
+            // migrate infra_sea_orm
+            if let Err(e) = infra::table::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("infra sea_orm migrate failed: {}", e);
+            }
+
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
