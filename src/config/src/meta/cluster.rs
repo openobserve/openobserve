@@ -181,3 +181,9 @@ impl std::fmt::Display for RoleGroup {
         }
     }
 }
+
+// CompactionJobType is used to distinguish between current and historical compaction jobs.
+pub enum CompactionJobType {
+    Current,
+    Historical,
+}

@@ -545,6 +545,6 @@ mod tests {
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
         let resp = call_service(&mut app, req).await;
-        assert_eq!(resp.status().as_u16(), 200);
+        assert_eq!(resp.status().as_u16(), 404);
     }
 }
