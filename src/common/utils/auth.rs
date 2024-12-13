@@ -226,12 +226,6 @@ impl FromRequest for AuthExtractor {
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
 
-        // TODO: fix me!!!
-        // Hack for next logic, must have at least 2 elements, but i am not sure why.
-        if path_columns.len() == 1 {
-            path_columns.push("");
-        }
-
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
             if let Some(auth_header) = req.headers().get("Authorization") {
                 if let Ok(auth_str) = auth_header.to_str() {
@@ -404,7 +398,7 @@ impl FromRequest for AuthExtractor {
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
-            if (method.eq("POST") && path_columns[1].starts_with("_search"))
+            if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")
                 || path.contains("/format_query")
@@ -455,7 +449,7 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 }));
             }
-            if object_type.contains("dashboard") {
+            if object_type.contains("dashboard") && url_len > 1 {
                 let object_type = if method.eq("POST") || method.eq("LIST") {
                     format!(
                         "{}:{}",
