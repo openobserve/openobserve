@@ -67,21 +67,19 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
         if let Some(val) = local_val.get(action) {
-            let local_val = val.as_object() else {
+            let Some(local_val) = val.as_object() else {
                 log::warn!("Invalid bulk index action: {}", action);
                 continue;
             };
-            let index = local_val
+            let Some(index) = local_val
                 .get("_index")
-                .map(|v| v.as_str().map(|v| v.to_string()))
-                .flatten();
-            let Some(index) = index else {
+                .and_then(|v| v.as_str().map(|v| v.to_string()))
+            else {
                 continue;
             };
             let doc_id = local_val
                 .get("_id")
-                .map(|v| v.as_str().map(|v| v.to_string()))
-                .flatten();
+                .and_then(|v| v.as_str().map(|v| v.to_string()));
             return Some((action.to_string(), index, doc_id));
         };
     }
