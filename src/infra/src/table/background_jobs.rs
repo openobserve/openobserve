@@ -151,22 +151,6 @@ pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::E
     Ok(res)
 }
 
-pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::Id.eq(job_id))
-        .filter(Column::Status.ne(4))
-        .one(client)
-        .await;
-
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("get background job by job_id error: {e}")),
-    };
-
-    Ok(res)
-}
-
 pub async fn get(job_id: &str) -> Result<Model, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()

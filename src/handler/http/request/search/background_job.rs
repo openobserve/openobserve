@@ -30,8 +30,8 @@ use {
             job::cancel_query_inner, utils::check_stream_premissions,
         },
         service::db::background_job::{
-            cancel_job_by_job_id, cancel_partition_job, get, get_status_by_job_id,
-            list_status_by_org_id, retry_background_job, set_job_deleted, submit,
+            cancel_job_by_job_id, cancel_partition_job, get, list_status_by_org_id,
+            retry_background_job, set_job_deleted, submit,
         },
     },
     actix_web::http::StatusCode,
@@ -187,10 +187,9 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 #[get("/{org_id}/search_job/status/{job_id}")]
 pub async fn get_status(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let job_id = path.1.clone();
-    let res = get_status_by_job_id(&job_id).await;
+    let res = get(&job_id).await;
     match res {
-        Ok(Some(res)) => Ok(HttpResponse::Ok().json(res)),
-        Ok(None) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

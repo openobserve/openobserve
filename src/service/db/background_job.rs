@@ -51,10 +51,6 @@ pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Job>, errors::Err
     infra::table::background_jobs::list_status_by_org_id(org_id).await
 }
 
-pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Job>, errors::Error> {
-    infra::table::background_jobs::get_status_by_job_id(job_id).await
-}
-
 pub async fn get_deleted_jobs() -> Result<Vec<Job>, errors::Error> {
     infra::table::background_jobs::get_deleted_jobs().await
 }
