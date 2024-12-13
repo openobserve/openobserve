@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::HashMap;
-use config::utils::json;
+use config::{ider, utils::json};
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
-use serde::{Deserialize, Serialize};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -29,108 +27,40 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let txn = manager.get_connection().begin().await?;
 
-        // Migrate one org at a time to avoid loading too many records into memory.
-        let meta_orgs = meta_org::Entity::find()
-            .column(meta_org::Column::Key1)
-            .filter(meta_org::Column::Key1.ne(""))
-            .group_by(meta_org::Column::Key1)
-            .order_by_asc(meta_org::Column::Key1)
-            .all(&txn)
-            .await?;
+        // Migrate pages of 100 records at a time to avoid loading too many
+        // records into memory.
+        let mut meta_pages = meta::Entity::find()
+            .filter(meta::Column::Module.eq("templates"))
+            .order_by_asc(meta::Column::Id)
+            .paginate(&txn, 100);
 
-        meta_orgs
-            .iter()
-            .for_each(|org| log::warn!("id: {}, org: {}", org.id, org.key1));
-
-        for org in &meta_orgs {
-            let meta_destination_results: Result<
-                HashMap<String, meta_destinations::Destination>,
-                DbErr,
-            > = meta::Entity::find()
-                .filter(meta::Column::Key1.eq(&org.key1))
-                .filter(meta::Column::Module.eq("destinations"))
-                .order_by_asc(meta::Column::Id)
-                .all(&txn)
-                .await?
+        while let Some(metas) = meta_pages.fetch_and_next().await? {
+            let new_temp_results: Result<Vec<_>, DbErr> = metas
                 .into_iter()
                 .map(|meta| {
-                    let dest: meta_destinations::Destination =
+                    let old_temp: meta_templates::Template =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
-                    Ok((dest.template.clone(), dest))
+                    let title =
+                        if let meta_templates::DestinationType::Email = old_temp.template_type {
+                            Some(old_temp.title)
+                        } else {
+                            None
+                        };
+                    Ok(template::ActiveModel {
+                        id: Set(ider::uuid()),
+                        org: Set(meta.key1),
+                        name: Set(old_temp.name),
+                        is_default: Set(old_temp.is_default.unwrap_or_default()),
+                        r#type: Set(old_temp.template_type.to_string()),
+                        body: Set(old_temp.body),
+                        title: Set(title),
+                    })
                 })
                 .collect();
-            let meta_destinations = meta_destination_results?;
-
-            let meta_template_results: Result<Vec<meta_destinations::Template>, DbErr> =
-                meta::Entity::find()
-                    .filter(meta::Column::Key1.eq(&org.key1))
-                    .filter(meta::Column::Module.eq("templates"))
-                    .order_by_asc(meta::Column::Id)
-                    .all(&txn)
-                    .await?
-                    .into_iter()
-                    .map(|meta| {
-                        let template: meta_destinations::Template = json::from_str(&meta.value)
-                            .map_err(|e| DbErr::Migration(e.to_string()))?;
-                        Ok(template)
-                    })
-                    .collect();
-            let meta_templates = meta_template_results?;
-
-            let mut new_templates = vec![];
-            for meta_template in meta_templates {
-                let meta_dest =
-                    meta_destinations
-                        .get(&meta_template.name)
-                        .ok_or(DbErr::Migration(
-                            "Destination without template found".to_string(),
-                        ))?;
-                let dest_type = match meta_dest.destination_type {
-                    meta_destinations::DestinationType::Http => {
-                        template::DestinationType::Http(template::Endpoint {
-                            url: meta_dest.url.clone(),
-                            method: meta_dest.method.clone(),
-                            skip_tls_verify: meta_dest.skip_tls_verify,
-                            headers: meta_dest.headers.clone(),
-                        })
-                    }
-                    meta_destinations::DestinationType::Email => {
-                        template::DestinationType::Email(template::Email {
-                            recipients: meta_dest.emails.clone(),
-                            title: meta_template.title.clone(),
-                        })
-                    }
-                    meta_destinations::DestinationType::Sns => {
-                        template::DestinationType::Sns(template::AwsSns {
-                            sns_topic_arn: meta_dest.sns_topic_arn.clone().ok_or(
-                                DbErr::Migration(
-                                    "SNS destination without sns_topic_arn found".to_string(),
-                                ),
-                            )?,
-                            aws_region: meta_dest.aws_region.clone().ok_or(DbErr::Migration(
-                                "SNS destination without aws_region found".to_string(),
-                            ))?,
-                        })
-                    }
-                };
-                new_templates.push(template::ActiveModel {
-                    id: Set(org.id.to_string()),
-                    org: Set(org.key1.to_string()),
-                    name: Set(meta_template.name),
-                    is_default: Set(meta_template.is_default.unwrap_or_default()),
-                    body: Set(meta_template.body),
-                    r#type: Set(json::to_value(dest_type).map_err(|e| {
-                        DbErr::Migration(format!(
-                            "Destination type failed to serialize to json value: {e}"
-                        ))
-                    })?),
-                });
-            }
-
-            template::Entity::insert_many(new_templates)
-                .exec(&txn)
-                .await?;
+            let new_temps = new_temp_results?;
+            template::Entity::insert_many(new_temps).exec(&txn).await?;
         }
+
         txn.commit().await?;
         Ok(())
     }
@@ -147,7 +77,7 @@ impl MigrationTrait for Migration {
 // remain unchanged rather than ORM models in the `entity` module that will be
 // updated to reflect the latest changes to table schemas.
 
-mod meta_destinations {
+mod meta_templates {
 
     use serde::{Deserialize, Serialize};
 
@@ -178,6 +108,16 @@ mod meta_destinations {
         #[serde(rename = "sns")]
         Sns,
     }
+
+    impl std::fmt::Display for DestinationType {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                DestinationType::Http => write!(f, "http"),
+                DestinationType::Email => write!(f, "email"),
+                DestinationType::Sns => write!(f, "sns"),
+            }
+        }
+    }
 }
 
 /// Representation of the meta table at the time this migration executes.
@@ -203,26 +143,10 @@ mod meta {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// Representation of the meta table at the time this migration executes.
-mod meta_org {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "meta")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: i64,
-        pub key1: String,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
 /// Representation of the templates table at the time this migration executes.
 mod template {
+
+    use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
     #[sea_orm(table_name = "templates")]
