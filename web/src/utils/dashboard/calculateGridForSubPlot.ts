@@ -74,6 +74,10 @@ export function getTrellisGrid(
     throw new Error("Left margin must be non-negative");
   }
 
+  if (typeof numGrids !== "number" || numGrids < 0) {
+    throw new Error("Number of grids must be a non-negative number");
+  }
+
   const gridArray: Array<{
     left: string;
     top: string;
