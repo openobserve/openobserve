@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
@@ -32,25 +32,27 @@ use crate::{
     service::{db, file_list},
 };
 
+/// Creates delete jobs for the stream based on the stream settings
+/// Returns the number of jobs created
 pub async fn delete_by_stream(
     lifecycle_end: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     red_days: &[TimeRange]
-) -> Result<(), anyhow::Error> {
+) -> Result<u32, anyhow::Error> {
     let cfg = get_config();
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
     if created_at == 0 {
-        return Ok(()); // no data, just skip
+        return Ok(0); // no data, just skip
     }
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
     let lifecycle_start = created_at.format("%Y-%m-%d").to_string();
     let lifecycle_start = lifecycle_start.as_str();
     if lifecycle_start.ge(lifecycle_end) {
-        return Ok(()); // created_at is after lifecycle_end, just skip
+        return Ok(0); // created_at is after lifecycle_end, just skip
     }
 
     log::debug!(
@@ -66,22 +68,22 @@ pub async fn delete_by_stream(
     if lifecycle_start.le("1970-01-01") {
         let lifecycle_end = created_at + Duration::try_days(1).unwrap();
         let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
-        return db::compact::retention::delete_stream(
+        db::compact::retention::delete_stream(
             org_id,
             stream_type,
             stream_name,
             Some((lifecycle_start, lifecycle_end.as_str())),
         )
-        .await;
+        .await?;
+        return Ok(1);
     }
 
     // Create tasks with break on red days
     let start = DateTime::parse_from_rfc3339(lifecycle_start)?.with_timezone(&Utc);
     let end = DateTime::parse_from_rfc3339(lifecycle_end)?.with_timezone(&Utc);
+    let original_time_range = TimeRange::new(start.timestamp_nanos_opt().expect("valid timestamp") / 1000, end.timestamp_nanos_opt().expect("valid timestamp") / 1000);
 
     let mut final_time_ranges = vec![];
-
-    let original_time_range = TimeRange::new(start.timestamp_nanos_opt().expect("valid timestamp") / 1000, end.timestamp_nanos_opt().expect("valid timestamp") / 1000);
     for time_range in red_days.iter() {
         // skip the time range from the start to end and create subsequent time ranges
         // for example if the red days fall between the start and end then there will be two tasks
@@ -92,6 +94,7 @@ pub async fn delete_by_stream(
         // In case if a red day is older than the red days retention period then skip the day, which will delete the data
         let allowed_red_day_retention_end = config::utils::time::now() - Duration::try_days(cfg.compact.red_data_retention_days).unwrap();
         if time_range_end < allowed_red_day_retention_end {
+            final_time_ranges.push(original_time_range.clone());
             continue
         } else if time_range_start < allowed_red_day_retention_end {
             time_range_start = allowed_red_day_retention_end;
@@ -99,12 +102,20 @@ pub async fn delete_by_stream(
         let time_range = TimeRange::new(time_range_start.timestamp_nanos_opt().expect("valid timestamp")/1000, time_range_end.timestamp_nanos_opt().expect("valid timestamp")/1000);
 
         if time_range.contains(&original_time_range) {
-            final_time_ranges.push(original_time_range.clone());
+            // skip the whole deletion as the red day consists of the whole time range
+            return Ok(0);
         }
 
         let mut ranges = original_time_range.split(&time_range);
         final_time_ranges.append(&mut ranges);
     }
+
+    // if red days is empty, then just delete the whole time range
+    if red_days.is_empty() {
+        final_time_ranges.push(original_time_range);
+    }
+
+    let job_nos = final_time_ranges.len();
 
     for time_range in final_time_ranges {
         let time_range_start = Utc.timestamp_nanos(time_range.start * 1000).format("%Y-%m-%d").to_string();
@@ -130,7 +141,7 @@ pub async fn delete_by_stream(
         .await?;
     }
 
-    return Ok(())
+    return Ok(job_nos as u32);
 }
 
 pub async fn delete_all(
@@ -284,18 +295,57 @@ pub async fn delete_by_date(
 
     let cfg = get_config();
     if is_local_disk_storage() {
+        let mut dirs_to_delete = vec![];
         while date_start <= date_end {
-            let data_dir = format!(
+            // Handle yearly chunks
+            if date_start.month() == 1 && date_start.day() == 1 && (date_start + Duration::days(365)).year() <= date_end.year() {
+                let year_dir = format!(
+                    "{}files/{org_id}/{stream_type}/{stream_name}/{}",
+                    cfg.common.data_stream_dir,
+                    date_start.format("%Y")
+                );
+                let year_path = std::path::Path::new(&year_dir);
+                if year_path.exists() {
+                    dirs_to_delete.push(year_path.to_path_buf());
+                }
+                date_start += Duration::days(365);
+                continue;
+            }
+
+            // Handle monthly chunks
+            if date_start.day() == 1 && (date_start + Duration::days(30)).month() != date_start.month() {
+                let month_dir = format!(
+                    "{}files/{org_id}/{stream_type}/{stream_name}/{}",
+                    cfg.common.data_stream_dir,
+                    date_start.format("%Y/%m")
+                );
+                let month_path = std::path::Path::new(&month_dir);
+                if month_path.exists() {
+                    dirs_to_delete.push(month_path.to_path_buf());
+                }
+                date_start += Duration::days(30); // Move to the next month
+                continue;
+            }
+
+            // Handle leftover day ranges
+            let day_dir = format!(
                 "{}files/{org_id}/{stream_type}/{stream_name}/{}",
                 cfg.common.data_stream_dir,
                 date_start.format("%Y/%m/%d")
             );
-            let path = std::path::Path::new(&data_dir);
-            if path.exists() {
-                tokio::fs::remove_dir_all(path).await?;
+            let day_path = std::path::Path::new(&day_dir);
+            if day_path.exists() {
+                dirs_to_delete.push(day_path.to_path_buf());
             }
-            date_start += Duration::try_days(1).unwrap();
+            date_start += Duration::days(1); // Move to the next day
         }
+
+        // Delete all collected directories in parallel
+        let mut delete_tasks = vec![];
+        for dir in dirs_to_delete {
+            delete_tasks.push(tokio::fs::remove_dir_all(dir));
+        }
+        futures::future::try_join_all(delete_tasks).await?;
     } else {
         // delete files from s3
         // first fetch file list from local cache
@@ -496,9 +546,7 @@ mod tests {
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
         let lifecycle_end = "2023-01-01";
-        delete_by_stream(lifecycle_end, org_id, stream_type, stream_name)
-            .await
-            .unwrap();
+        delete_by_stream(lifecycle_end, org_id, stream_type, stream_name, &[]).await.unwrap();
     }
 
     #[tokio::test]
