@@ -2,5 +2,5 @@
 
 pub use super::{
     alerts::Entity as Alerts, dashboards::Entity as Dashboards, folders::Entity as Folders,
-    search_queue::Entity as SearchQueue,
+    search_queue::Entity as SearchQueue, templates::Entity as Templates,
 };
