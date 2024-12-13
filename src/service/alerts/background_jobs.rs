@@ -31,18 +31,13 @@ use tokio::sync::mpsc;
 
 use crate::service::{
     db::background_job::{
-        clean_deleted_jobs, clean_deleted_partition_jobs, get_deleted_jobs, get_job,
-        get_partition_jobs_by_job_id, is_created_partition_jobs, set_job_error_message,
+        clean_deleted_job, clean_deleted_job_result, clean_deleted_partition_job, get_deleted_jobs,
+        get_job, get_job_result, get_partition_jobs_by_job_id, set_job_error_message,
         set_job_finish, set_partition_job_error_message, set_partition_job_finish,
         set_partition_job_start, set_partition_num, submit_partitions, update_running_job,
     },
     search as SearchService,
 };
-
-// the type of workers
-// 1. run query
-// 2. clean the query
-// 3. job for check `background_jobs` updated_at, to check if the job is alive or not
 
 // 1. get the oldest job from `background_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
@@ -92,8 +87,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
 
     // 3. check if the job is previous running (get error then retry, be cancel then retry) (case 1)
     //    or do not have previous run (case 2)
-    let have_partition_job = is_created_partition_jobs(&job.id).await?;
-    if !have_partition_job {
+    if job.partition_num.is_none() {
         let res = handle_search_partition(&job).await;
         if let Err(e) = res {
             set_job_error_message(&job.id, &e.to_string()).await?;
@@ -226,7 +220,7 @@ fn generate_result_path(
     let day = naive_datetime.day();
 
     format!(
-        "result/{year}/{month}/{day}/{trace_id}/{partition_id}.json",
+        "result/{year}/{month}/{day}/{trace_id}/{partition_id}.result.json",
         year = year,
         month = month,
         day = day,
@@ -242,10 +236,13 @@ fn generate_result_path(
 pub async fn delete_jobs() -> Result<(), anyhow::Error> {
     // 1. get deleted jobs from database
     let jobs = get_deleted_jobs().await?;
+    if jobs.is_empty() {
+        return Ok(());
+    }
 
     // 2. delete the s3 result
-    let mut deleted_files = Vec::new();
     for job in jobs.iter() {
+        let mut deleted_files = Vec::new();
         let partition_num = job.partition_num;
         if let Some(partition_num) = partition_num {
             for i in 0..partition_num {
@@ -257,20 +254,31 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
             deleted_files.push(job.result_path.clone().unwrap());
         }
 
-        // TODO: add result path from result table
+        // add old result path
+        let job_result = get_job_result(&job.id).await?;
+        for result in job_result.iter() {
+            if result.result_path.is_some() {
+                deleted_files.push(result.result_path.clone().unwrap());
+            }
+        }
 
         // delete all files
         let deleted_files_str: Vec<&str> = deleted_files.iter().map(|s| s.as_str()).collect();
-        storage::del(&deleted_files_str).await?;
+        if let Err(e) = storage::del(&deleted_files_str).await {
+            log::warn!(
+                "[BACKGROUND JOB] delete_jobs failed to delete files: {deleted_files_str:?}, error: {e}",
+            );
+        }
+
+        // 3. delete the partition jobs from database
+        clean_deleted_partition_job(&job.id).await?;
+
+        // 4. delete the job result from database
+        clean_deleted_job_result(&job.id).await?;
+
+        // 5. delete the job from database
+        clean_deleted_job(&job.id).await?;
     }
-
-    // 3. delete the partition jobs from database
-    clean_deleted_partition_jobs(&deleted_files).await?;
-
-    // 4. delete the job result from database
-
-    // 5. delete the job from database
-    clean_deleted_jobs(&deleted_files).await?;
 
     Ok(())
 }

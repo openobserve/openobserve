@@ -15,8 +15,8 @@
 
 use config::cluster::LOCAL_NODE;
 use sea_orm::{
-    prelude::Expr, sea_query::LockType, ActiveModelTrait, ColumnTrait, EntityTrait,
-    FromQueryResult, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    prelude::Expr, sea_query::LockType, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use super::{
@@ -37,31 +37,6 @@ use crate::{
 // status 2: finish
 // status 3: cancel
 // status 4: delete
-
-#[derive(FromQueryResult, Debug)]
-pub struct TraceId {
-    pub trace_id: String,
-}
-
-#[derive(FromQueryResult, Debug)]
-pub struct Status {
-    pub status: i32,
-}
-
-#[derive(FromQueryResult, Debug)]
-pub struct PartitionNum {
-    pub partition_num: Option<i32>,
-}
-
-#[derive(FromQueryResult, Debug)]
-pub struct JobResult {
-    pub id: String,
-    pub trace_id: String,
-    pub created_at: i64,
-    pub partition_num: Option<i32>,
-    pub result_path: Option<String>,
-    pub error_message: Option<String>,
-}
 
 pub async fn submit(
     trace_id: &str,
@@ -98,161 +73,6 @@ pub async fn submit(
     };
 
     Ok(job_id)
-}
-
-pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Status.ne(4))
-        .all(client)
-        .await;
-
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("get background job by org_id error: {e}")),
-    };
-
-    Ok(res)
-}
-
-pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::Id.eq(job_id))
-        .filter(Column::Status.ne(4))
-        .one(client)
-        .await;
-
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("get background job by job_id error: {e}")),
-    };
-
-    Ok(res)
-}
-
-pub async fn get_trace_id(job_id: &str) -> Result<Option<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .select_only()
-        .filter(Column::Id.eq(job_id))
-        .column(Column::TraceId)
-        .into_model::<TraceId>()
-        .one(client)
-        .await;
-
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("get trace_id by job_id error: {e}")),
-    };
-
-    Ok(res.map(|res| res.trace_id))
-}
-
-pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let tx = match client.begin().await {
-        Ok(tx) => tx,
-        Err(e) => return orm_err!(format!("cancel job start transaction error: {e}")),
-    };
-
-    let res = Entity::find()
-        .select_only()
-        .column(Column::Status)
-        .filter(Column::Id.eq(job_id))
-        .lock(LockType::Update)
-        .into_model::<Status>()
-        .one(&tx)
-        .await;
-
-    let res = match res {
-        Ok(status) => status,
-        Err(e) => {
-            if let Err(e) = tx.rollback().await {
-                return orm_err!(format!("cancel job rollback error: {e}"));
-            };
-            return orm_err!(format!("cancel job get status error: {e}"));
-        }
-    };
-
-    if let Some(res) = &res {
-        if res.status == 1 || res.status == 0 {
-            if let Err(e) = Entity::update_many()
-                .col_expr(Column::Status, Expr::value(3))
-                .filter(Column::Id.eq(job_id))
-                .exec(&tx)
-                .await
-            {
-                log::error!("cancel job update status error: {e}");
-                if let Err(e) = tx.rollback().await {
-                    return orm_err!(format!("cancel job rollback update status error: {e}"));
-                }
-                return orm_err!(format!("cancel job update status error: {e}"));
-            }
-        } else {
-            if let Err(e) = tx.rollback().await {
-                return orm_err!(format!("cancel job rollback error: {e}"));
-            }
-            return orm_err!(format!(
-                "job_id: {job_id} status is not pending or running, can not cancel"
-            ));
-        }
-    } else {
-        if let Err(e) = tx.rollback().await {
-            return orm_err!(format!("cancel job rollback error: {e}"));
-        }
-        return orm_err!(format!("job_id: {job_id} is not found"));
-    }
-
-    if let Err(e) = tx.commit().await {
-        return orm_err!(format!("cancel job commit error: {e}"));
-    }
-
-    Ok(res.unwrap().status)
-}
-
-pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .select_only()
-        .column(Column::Id)
-        .column(Column::TraceId)
-        .column(Column::CreatedAt)
-        .column(Column::PartitionNum)
-        .column(Column::ResultPath)
-        .column(Column::ErrorMessage)
-        .filter(Column::Id.eq(job_id))
-        .into_model::<JobResult>()
-        .one(client)
-        .await;
-
-    match res {
-        Ok(Some(res)) => Ok(res),
-        Ok(None) => orm_err!("job_id not found"),
-        Err(e) => orm_err!(format!("get result path error: {e}")),
-    }
-}
-
-pub async fn get_job_status(job_id: &str) -> Result<Status, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .select_only()
-        .column(Column::Status)
-        .filter(Column::Id.eq(job_id))
-        .into_model::<Status>()
-        .one(client)
-        .await;
-
-    match res {
-        Ok(Some(res)) => Ok(res),
-        Ok(None) => orm_err!("job_id not found"),
-        Err(e) => orm_err!(format!("get job status error: {e}")),
-    }
 }
 
 // get the job and update status
@@ -313,6 +133,115 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     }
 
     Ok(model)
+}
+
+pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.ne(4))
+        .all(client)
+        .await;
+
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return orm_err!(format!("get background job by org_id error: {e}")),
+    };
+
+    Ok(res)
+}
+
+pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .filter(Column::Status.ne(4))
+        .one(client)
+        .await;
+
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return orm_err!(format!("get background job by job_id error: {e}")),
+    };
+
+    Ok(res)
+}
+
+pub async fn get(job_id: &str) -> Result<Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .one(client)
+        .await;
+
+    match res {
+        Ok(Some(res)) => Ok(res),
+        Ok(None) => orm_err!(format!("job_id: {job_id} not found")),
+        Err(e) => orm_err!(format!("get background job by job_id: {job_id} error: {e}")),
+    }
+}
+
+pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let tx = match client.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return orm_err!(format!("cancel job start transaction error: {e}")),
+    };
+
+    let res = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .lock(LockType::Update)
+        .one(&tx)
+        .await;
+
+    let res = match res {
+        Ok(status) => status,
+        Err(e) => {
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("cancel job rollback error: {e}"));
+            };
+            return orm_err!(format!("cancel job get status error: {e}"));
+        }
+    };
+
+    if let Some(res) = &res {
+        if res.status == 1 || res.status == 0 {
+            if let Err(e) = Entity::update_many()
+                .col_expr(Column::Status, Expr::value(3))
+                .filter(Column::Id.eq(job_id))
+                .exec(&tx)
+                .await
+            {
+                log::error!("cancel job update status error: {e}");
+                if let Err(e) = tx.rollback().await {
+                    return orm_err!(format!("cancel job rollback update status error: {e}"));
+                }
+                return orm_err!(format!("cancel job update status error: {e}"));
+            }
+        } else {
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("cancel job rollback error: {e}"));
+            }
+            return orm_err!(format!(
+                "job_id: {job_id} status is not pending or running, can not cancel"
+            ));
+        }
+    } else {
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("cancel job rollback error: {e}"));
+        }
+        return orm_err!(format!("job_id: {job_id} is not found"));
+    }
+
+    if let Err(e) = tx.commit().await {
+        return orm_err!(format!("cancel job commit error: {e}"));
+    }
+
+    Ok(res.unwrap().status)
 }
 
 pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<(), errors::Error> {
@@ -422,35 +351,11 @@ pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), e
     Ok(())
 }
 
-pub async fn partition_num(job_id: &str) -> Result<i32, errors::Error> {
+pub async fn get_deleted_jobs() -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let res = Entity::find()
-        .select_only()
-        .column(Column::PartitionNum)
-        .filter(Column::Id.eq(job_id))
-        .into_model::<PartitionNum>()
-        .one(client)
-        .await;
-
-    match res {
-        Ok(Some(num)) => Ok(num.partition_num.unwrap_or_default()),
-        Ok(None) => Ok(0),
-        Err(e) => orm_err!(format!("get partition num error: {e}")),
-    }
-}
-
-pub async fn get_deleted_jobs() -> Result<Vec<JobResult>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::find()
-        .select_only()
-        .column(Column::Id)
-        .column(Column::PartitionNum)
-        .column(Column::ResultPath)
-        .column(Column::ErrorMessage)
         .filter(Column::Status.eq(4))
-        .into_model::<JobResult>()
         .all(client)
         .await;
 
@@ -460,14 +365,14 @@ pub async fn get_deleted_jobs() -> Result<Vec<JobResult>, errors::Error> {
     }
 }
 
-pub async fn clean_deleted_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
+pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let res = Entity::delete_many()
-        .filter(Column::Id.is_in(job_ids.iter()))
+        .filter(Column::Id.eq(job_id))
         .exec(client)
         .await;
 

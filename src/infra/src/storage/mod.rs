@@ -118,8 +118,9 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
                 }
                 Err(e) => {
                     // TODO: need a better solution for identifying the error
-                    if file.ends_with(".puffin") {
+                    if file.ends_with(".puffin") || file.ends_with(".result.json") {
                         // ignore puffin file deletion error
+                        // ignore background job file deletion error
                     } else {
                         log::error!("Failed to delete object: {:?}", e);
                     }

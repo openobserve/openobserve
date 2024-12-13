@@ -12,3 +12,47 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
+
+use super::{entity::background_job_results::*, get_lock};
+use crate::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors, orm_err,
+};
+
+pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::find()
+        .filter(Column::JobId.eq(job_id))
+        .order_by(Column::Id, Order::Asc)
+        .all(client)
+        .await;
+
+    match res {
+        Ok(res) => Ok(res),
+        Err(e) => orm_err!(format!("get_background_job_results failed: {}", e)),
+    }
+}
+
+pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::delete_many()
+        .filter(Column::JobId.eq(job_id))
+        .exec(client)
+        .await;
+
+    if let Err(e) = res {
+        return orm_err!(format!("delete_background_job_results failed: {}", e));
+    }
+
+    Ok(())
+}

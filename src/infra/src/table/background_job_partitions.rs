@@ -214,14 +214,14 @@ pub async fn set_partition_job_error_message(
     Ok(())
 }
 
-pub async fn clean_deleted_partition_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
+pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let res = Entity::delete_many()
-        .filter(Column::JobId.is_in(job_ids))
+        .filter(Column::JobId.eq(job_id))
         .exec(client)
         .await;
 

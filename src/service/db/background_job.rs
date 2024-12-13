@@ -15,11 +15,32 @@
 
 use infra::{
     errors,
-    table::{
-        background_jobs::{JobResult, Status},
-        entity::{background_job_partitions::Model as PartitionJob, background_jobs::Model as Job},
+    table::entity::{
+        background_job_partitions::Model as PartitionJob,
+        background_job_results::Model as JobResult, background_jobs::Model as Job,
     },
 };
+
+pub async fn submit(
+    trace_id: &str,
+    org_id: &str,
+    user_id: &str,
+    stream_type: &str,
+    payload: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<String, errors::Error> {
+    infra::table::background_jobs::submit(
+        trace_id,
+        org_id,
+        user_id,
+        stream_type,
+        payload,
+        start_time,
+        end_time,
+    )
+    .await
+}
 
 // get a oldest job and lock it
 pub async fn get_job() -> Result<Option<Job>, errors::Error> {
@@ -34,24 +55,12 @@ pub async fn get_status_by_job_id(job_id: &str) -> Result<Option<Job>, errors::E
     infra::table::background_jobs::get_status_by_job_id(job_id).await
 }
 
-pub async fn get_trace_id(job_id: &str) -> Result<Option<String>, errors::Error> {
-    infra::table::background_jobs::get_trace_id(job_id).await
-}
-
-pub async fn get_result_path(job_id: &str) -> Result<JobResult, errors::Error> {
-    infra::table::background_jobs::get_result_path(job_id).await
-}
-
-pub async fn is_created_partition_jobs(job_id: &str) -> Result<bool, errors::Error> {
-    Ok(infra::table::background_jobs::partition_num(job_id).await? != 0)
-}
-
-pub async fn get_deleted_jobs() -> Result<Vec<JobResult>, errors::Error> {
+pub async fn get_deleted_jobs() -> Result<Vec<Job>, errors::Error> {
     infra::table::background_jobs::get_deleted_jobs().await
 }
 
-pub async fn get_job_status(job_id: &str) -> Result<Status, errors::Error> {
-    infra::table::background_jobs::get_job_status(job_id).await
+pub async fn get(job_id: &str) -> Result<Job, errors::Error> {
+    infra::table::background_jobs::get(job_id).await
 }
 
 pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
@@ -82,8 +91,8 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
     infra::table::background_jobs::check_running_jobs(updated_at).await
 }
 
-pub async fn clean_deleted_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
-    infra::table::background_jobs::clean_deleted_jobs(job_ids).await
+pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
+    infra::table::background_jobs::clean_deleted_job(job_id).await
 }
 
 pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
@@ -131,6 +140,15 @@ pub async fn set_partition_job_error_message(
     .await
 }
 
-pub async fn clean_deleted_partition_jobs(job_ids: &[String]) -> Result<(), errors::Error> {
-    infra::table::background_job_partitions::clean_deleted_partition_jobs(job_ids).await
+pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Error> {
+    infra::table::background_job_partitions::clean_deleted_partition_job(job_id).await
+}
+
+// query background_job_results table
+pub async fn get_job_result(job_id: &str) -> Result<Vec<JobResult>, errors::Error> {
+    infra::table::background_job_results::get(job_id).await
+}
+
+pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error> {
+    infra::table::background_job_results::clean_deleted_job_result(job_id).await
 }

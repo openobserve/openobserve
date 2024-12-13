@@ -30,9 +30,8 @@ use {
             job::cancel_query_inner, utils::check_stream_premissions,
         },
         service::db::background_job::{
-            cancel_job_by_job_id, cancel_partition_job, get_job_status, get_result_path,
-            get_status_by_job_id, get_trace_id, list_status_by_org_id, retry_background_job,
-            set_job_deleted,
+            cancel_job_by_job_id, cancel_partition_job, get, get_status_by_job_id,
+            list_status_by_org_id, retry_background_job, set_job_deleted, submit,
         },
     },
     actix_web::http::StatusCode,
@@ -141,7 +140,7 @@ pub async fn submit_job(
     }
 
     // submit query to db
-    let res = infra::table::background_jobs::submit(
+    let res = submit(
         &trace_id,
         &org_id,
         &user_id,
@@ -210,7 +209,7 @@ pub async fn cancel_job(path: web::Path<(String, String)>) -> Result<HttpRespons
 #[get("/{org_id}/search_job/result/{job_id}")]
 pub async fn get_job_result(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let job_id = path.1.clone();
-    let res = get_result_path(&job_id).await;
+    let res = get(&job_id).await;
     match res {
         Ok(res) => {
             if res.error_message.is_some() {
@@ -265,7 +264,7 @@ pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse
     let job_id = path.1.clone();
 
     // 1. check the status of the job, only cancel, finish can be retry
-    let status = get_job_status(&job_id).await;
+    let status = get(&job_id).await;
     let status = match status {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -285,8 +284,8 @@ pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse
 #[cfg(feature = "enterprise")]
 async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Error> {
     // 1. use job_id to query the trace_id
-    let trace_id = get_trace_id(job_id).await;
-    if trace_id.is_err() || trace_id.as_ref().unwrap().is_none() {
+    let job = get(job_id).await;
+    if job.is_err() {
         return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
     }
 
@@ -305,7 +304,7 @@ async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Er
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(org_id, &[&trace_id.unwrap().unwrap()]).await
+    cancel_query_inner(org_id, &[&job.unwrap().trace_id]).await
 }
 
 #[cfg(not(feature = "enterprise"))]
