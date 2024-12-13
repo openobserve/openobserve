@@ -31,18 +31,23 @@ impl MigrationTrait for Migration {
 
         // Migrate one org at a time to avoid loading too many records into memory.
         let meta_orgs = meta_org::Entity::find()
-            .column(meta_org::Column::OrgId)
-            .group_by(meta_org::Column::OrgId)
-            .order_by_asc(meta_org::Column::OrgId)
+            .column(meta_org::Column::Key1)
+            .filter(meta_org::Column::Key1.ne(""))
+            .group_by(meta_org::Column::Key1)
+            .order_by_asc(meta_org::Column::Key1)
             .all(&txn)
             .await?;
+
+        meta_orgs
+            .iter()
+            .for_each(|org| log::warn!("id: {}, org: {}", org.id, org.key1));
 
         for org in &meta_orgs {
             let meta_destination_results: Result<
                 HashMap<String, meta_destinations::Destination>,
                 DbErr,
             > = meta::Entity::find()
-                .filter(meta::Column::Key1.eq(&org.org_id))
+                .filter(meta::Column::Key1.eq(&org.key1))
                 .filter(meta::Column::Module.eq("destinations"))
                 .order_by_asc(meta::Column::Id)
                 .all(&txn)
@@ -58,7 +63,7 @@ impl MigrationTrait for Migration {
 
             let meta_template_results: Result<Vec<meta_destinations::Template>, DbErr> =
                 meta::Entity::find()
-                    .filter(meta::Column::Key1.eq(&org.org_id))
+                    .filter(meta::Column::Key1.eq(&org.key1))
                     .filter(meta::Column::Module.eq("templates"))
                     .order_by_asc(meta::Column::Id)
                     .all(&txn)
@@ -110,7 +115,7 @@ impl MigrationTrait for Migration {
                 };
                 new_templates.push(template::ActiveModel {
                     id: Set(org.id.to_string()),
-                    org: Set(org.org_id.to_string()),
+                    org: Set(org.key1.to_string()),
                     name: Set(meta_template.name),
                     is_default: Set(meta_template.is_default.unwrap_or_default()),
                     body: Set(meta_template.body),
@@ -144,33 +149,7 @@ impl MigrationTrait for Migration {
 
 mod meta_destinations {
 
-    use std::collections::HashMap;
-
     use serde::{Deserialize, Serialize};
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct Destination {
-        #[serde(default)]
-        pub name: String,
-        #[serde(default)]
-        pub url: String,
-        #[serde(default)]
-        pub method: super::HTTPType,
-        #[serde(default)]
-        pub skip_tls_verify: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub headers: Option<HashMap<String, String>>,
-        pub template: String,
-        #[serde(default)]
-        pub emails: Vec<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub sns_topic_arn: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub aws_region: Option<String>,
-        #[serde(rename = "type")]
-        #[serde(default)]
-        pub destination_type: DestinationType,
-    }
 
     /// A result from querying for templates from the meta table.
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -233,7 +212,7 @@ mod meta_org {
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i64,
-        pub org_id: String,
+        pub key1: String,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -245,11 +224,6 @@ mod meta_org {
 /// Representation of the templates table at the time this migration executes.
 mod template {
 
-    use std::collections::HashMap;
-
-    use sea_orm::entity::prelude::*;
-    use serde::{Deserialize, Serialize};
-
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
     #[sea_orm(table_name = "templates")]
     pub struct Model {
@@ -258,53 +232,15 @@ mod template {
         pub org: String,
         pub name: String,
         pub is_default: bool,
+        pub r#type: String,
         #[sea_orm(column_type = "Text")]
         pub body: String,
-        pub r#type: Json,
+        #[sea_orm(column_type = "Text", nullable)]
+        pub title: Option<String>,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
-
-    #[derive(Serialize, Debug, Deserialize, Clone)]
-    #[serde(rename_all = "snake_case")]
-    pub enum DestinationType {
-        Http(Endpoint),
-        Email(Email),
-        Sns(AwsSns),
-    }
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct Email {
-        pub recipients: Vec<String>,
-        pub title: String,
-    }
-
-    #[derive(Serialize, Debug, PartialEq, Eq, Deserialize, Clone)]
-    pub struct Endpoint {
-        pub url: String,
-        #[serde(default)]
-        pub method: super::HTTPType,
-        #[serde(default)]
-        pub skip_tls_verify: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub headers: Option<HashMap<String, String>>,
-    }
-
-    #[derive(Clone, Debug, Serialize, Deserialize)]
-    pub struct AwsSns {
-        pub sns_topic_arn: String,
-        pub aws_region: String,
-    }
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum HTTPType {
-    #[default]
-    Post,
-    Put,
-    Get,
 }
