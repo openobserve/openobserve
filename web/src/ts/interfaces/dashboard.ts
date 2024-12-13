@@ -24,7 +24,7 @@ interface MarkLine {
   animation: boolean;
   data: any[];
 }
-interface SeriesObject {
+export interface SeriesObject {
   name: string;
   label: Label;
   markLine: MarkLine;
