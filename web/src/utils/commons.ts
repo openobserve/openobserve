@@ -141,9 +141,17 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     );
 
     const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
-      dashboard: convertDashboardSchemaVersion(
-        dashboard["v" + dashboard.version],
-      ),
+      dashboard: {
+        version: dashboard.version,
+        folderId: dashboard.folder_id,
+        folderName: dashboard.folder_name,
+        dashboardId: dashboard.dashboard_id,
+        title: dashboard.title,
+        description: dashboard.description,
+        role: dashboard.role,
+        owner: dashboard.owner,
+        created: dashboard.created,
+      },
       hash: dashboard.hash.toString(),
     }));
 
@@ -505,13 +513,33 @@ export const getDashboard = async (
   folderId: any,
 ) => {
   try {
+    console.log("dashboardId", dashboardId);
+
+    // check if dashboard data is present in store
     if (
-      !store.state.organizationData.allDashboardList[folderId] ||
-      store.state.organizationData.allDashboardList[folderId].length == 0
+      store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      await getAllDashboards(store, folderId);
+      return store.state.organizationData.allDashboardData[
+        dashboardId
+      ];
     }
-    return findDashboard(dashboardId, store, folderId);
+
+    const res = await dashboardService.get_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+    );
+
+    const version = res.data.version;
+    const dashboardKey = `v${version}`;
+    const dashboardData = res.data[dashboardKey];
+
+    const convertedData = convertDashboardSchemaVersion(dashboardData);
+    console.log("convertedData", convertedData);
+
+    store.dispatch("setDashboardData", {[dashboardId]: convertedData});
+    console.log("store", store.state.organizationData.allDashboardData);
+
+    return store.state.organizationData.allDashboardData[dashboardId];
   } catch (error) {
     throw error;
   }
@@ -752,11 +780,17 @@ export const movePanelToAnotherTab = async (
 
 export const getFoldersList = async (store: any) => {
   try {
+    console.log(
+      "inside getFoldersList",
+      store.state.selectedOrganization.identifier,
+    );
     let folders = (
       await dashboardService.list_Folders(
         store.state.selectedOrganization.identifier,
       )
     ).data.list;
+
+    console.log("folders", folders);
 
     // get default folder and append it to top
     let defaultFolder = folders.find((it: any) => it.folderId == "default");
@@ -770,10 +804,14 @@ export const getFoldersList = async (store: any) => {
       };
     }
 
+    console.log("defaultFolder", defaultFolder);
+
     store.dispatch("setFolders", [
       defaultFolder,
       ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
     ]);
+
+    console.log("folders after setting", store.state.organizationData.folders);
 
     return store.state.organizationData.folders;
   } catch (error) {
