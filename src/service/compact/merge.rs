@@ -433,7 +433,8 @@ pub async fn merge_by_stream(
             let cfg = get_config();
             // sort by file size
             let mut files_with_size = files_with_size.to_owned();
-            match MergeStrategy::from(&cfg.compact.strategy) {
+            let job_strategy = MergeStrategy::from(&cfg.compact.strategy);
+            match job_strategy {
                 MergeStrategy::FileSize => {
                     files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
                 }
@@ -455,6 +456,9 @@ pub async fn merge_by_stream(
             for file in files_with_size.iter() {
                 if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
                     if new_file_list.len() <= 1 {
+                        if job_strategy == MergeStrategy::FileSize {
+                            break;
+                        }
                         new_file_size = 0;
                         new_file_list.clear();
                         continue; // this batch don't need to merge, skip
