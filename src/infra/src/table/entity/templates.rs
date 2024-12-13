@@ -10,9 +10,11 @@ pub struct Model {
     pub org: String,
     pub name: String,
     pub is_default: bool,
+    pub r#type: String,
     #[sea_orm(column_type = "Text")]
     pub body: String,
-    pub r#type: Json,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub title: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

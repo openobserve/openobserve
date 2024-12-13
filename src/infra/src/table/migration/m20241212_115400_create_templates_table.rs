@@ -58,8 +58,9 @@ fn create_templates_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Templates::Org).string_len(100).not_null())
         .col(ColumnDef::new(Templates::Name).string_len(256).not_null())
         .col(ColumnDef::new(Templates::IsDefault).boolean().not_null())
+        .col(ColumnDef::new(Templates::Type).string_len(10).not_null())
         .col(ColumnDef::new(Templates::Body).text().not_null())
-        .col(ColumnDef::new(Templates::Type).json().not_null())
+        .col(ColumnDef::new(Templates::Title).text().null())
         .to_owned()
 }
 
@@ -79,10 +80,11 @@ enum Templates {
     Table,
     Id,
     Org,
-    IsDefault,
     Name,
-    Body,
+    IsDefault,
     Type,
+    Body,
+    Title,
 }
 
 #[cfg(test)]
@@ -95,7 +97,7 @@ mod tests {
     fn postgres() {
         collapsed_eq!(
             &create_templates_table_statement().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "templates" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "name" varchar(256) NOT NULL, "is_default" bool NOT NULL, "body" text NOT NULL, "type" json NOT NULL )"#
+            r#"CREATE TABLE IF NOT EXISTS "templates" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "name" varchar(256) NOT NULL, "is_default" bool NOT NULL, "type" varchar(10) NOT NULL, "body" text NOT NULL, "title" text NULL )"#
         );
     }
 
@@ -103,7 +105,7 @@ mod tests {
     fn mysql() {
         collapsed_eq!(
             &create_templates_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `templates` ( `id` char(27) NOT NULL PRIMARY KEY, `org` varchar(100) NOT NULL, `name` varchar(256) NOT NULL, `is_default` bool NOT NULL, `body` text NOT NULL, `type` json NOT NULL )"#
+            r#"CREATE TABLE IF NOT EXISTS `templates` ( `id` char(27) NOT NULL PRIMARY KEY, `org` varchar(100) NOT NULL, `name` varchar(256) NOT NULL, `is_default` bool NOT NULL, `type` varchar(10) NOT NULL, `body` text NOT NULL, `title` text NULL )"#
         );
     }
 
@@ -111,7 +113,7 @@ mod tests {
     fn sqlite() {
         collapsed_eq!(
             &create_templates_table_statement().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "templates" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "name" varchar(256) NOT NULL, "is_default" boolean NOT NULL, "body" text NOT NULL, "type" json_text NOT NULL )"#
+            r#"CREATE TABLE IF NOT EXISTS "templates" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "name" varchar(256) NOT NULL, "is_default" boolean NOT NULL, "type" varchar(10) NOT NULL, "body" text NOT NULL, "title" text NULL )"#
         );
     }
 }
