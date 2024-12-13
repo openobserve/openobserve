@@ -24,6 +24,11 @@ interface MarkLine {
   animation: boolean;
   data: any[];
 }
+
+export interface TrellisLayout {
+  layout: "vertical" | "horizontal" | "custom" | null;
+  num_of_columns: number;
+}
 export interface SeriesObject {
   name: string;
   label: Label;
