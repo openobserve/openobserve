@@ -841,6 +841,7 @@ mod meta {
     }
 
     #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
     pub enum QueryType {
         #[default]
         #[serde(rename = "custom")]
@@ -924,6 +925,7 @@ mod meta {
     }
 
     #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
     pub enum HTTPType {
         #[default]
         #[serde(rename = "post")]
@@ -953,6 +955,7 @@ mod meta {
 
     #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
     #[serde(rename_all = "lowercase")]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
     pub enum SearchEventType {
         UI,
         Dashboards,
