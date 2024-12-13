@@ -222,7 +222,7 @@ impl FromRequest for AuthExtractor {
             None => &local_path,
         };
 
-        let mut path_columns = path.split('/').collect::<Vec<&str>>();
+        let path_columns = path.split('/').collect::<Vec<&str>>();
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
 
