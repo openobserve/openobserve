@@ -699,7 +699,6 @@ export default defineComponent({
 
         await getStream(stream.name, stream.stream_type, true)
           .then((streamResponse) => {
-            console.log(streamResponse, "streamResponse");
             dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
             dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
           })
