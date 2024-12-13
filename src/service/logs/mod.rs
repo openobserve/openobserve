@@ -66,15 +66,22 @@ type LogJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
-        if local_val.contains_key(action) {
-            let local_val = local_val.get(action).unwrap().as_object().unwrap();
-            let index = match local_val.get("_index") {
-                Some(v) => v.as_str().unwrap().to_string(),
-                None => return None,
+        if let Some(val) = local_val.get(action) {
+            let local_val = val.as_object() else {
+                log::warn!("Invalid bulk index action: {}", action);
+                continue;
+            };
+            let index = local_val
+                .get("_index")
+                .map(|v| v.as_str().map(|v| v.to_string()))
+                .flatten();
+            let Some(index) = index else {
+                continue;
             };
             let doc_id = local_val
                 .get("_id")
-                .map(|v| v.as_str().unwrap().to_string());
+                .map(|v| v.as_str().map(|v| v.to_string()))
+                .flatten();
             return Some((action.to_string(), index, doc_id));
         };
     }
