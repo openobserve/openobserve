@@ -222,9 +222,15 @@ impl FromRequest for AuthExtractor {
             None => &local_path,
         };
 
-        let path_columns = path.split('/').collect::<Vec<&str>>();
+        let mut path_columns = path.split('/').collect::<Vec<&str>>();
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
+
+        // TODO: fix me!!!
+        // Hack for next logic, must have at least 2 elements, but i am not sure why.
+        if path_columns.len() == 1 {
+            path_columns.push("");
+        }
 
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
             if let Some(auth_header) = req.headers().get("Authorization") {
