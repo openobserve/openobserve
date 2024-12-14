@@ -317,7 +317,7 @@ impl Default for RequestStats {
 impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
-            size: (meta.original_size as f64 / SIZE_IN_MB),
+            size: meta.original_size as f64 / SIZE_IN_MB,
             records: meta.records,
             dropped_records: 0,
             response_time: 0.0,
