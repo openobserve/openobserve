@@ -154,7 +154,8 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       },
       hash: dashboard.hash.toString(),
     }));
-
+    console.log("getAllDashboards: migratedDashboards", migratedDashboards);
+    
     store.dispatch("setAllDashboardListHash", {
       ...store.state.organizationData.allDashboardListHash,
       [folderId]: Object.fromEntries(
@@ -192,7 +193,7 @@ export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
 
 function findDashboard(dashboardId: string, store: any, folderId: any) {
   try {
-    const dashboards = store.state.organizationData.allDashboardList[folderId];
+    const dashboards = store.state.organizationData.allDashboardData[dashboardId];
     const dashboard = dashboards.find(
       (it: any) => it.dashboardId === dashboardId,
     );
@@ -206,6 +207,8 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
 }
 
 export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
+  console.log("dashboardData", dashboardData);
+  
   // find tab from tabId
   return dashboardData?.tabs?.find((tab: any) => tab.tabId == tabId);
 };
@@ -238,13 +241,17 @@ export const addPanel = async (
     // call the update dashboard function
 
     if (
-      !store.state.organizationData.allDashboardList[folderId] ||
-      store.state.organizationData.allDashboardList[folderId].length == 0
+      !store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      await getAllDashboards(store, folderId);
+      console.log(
+        "addPanel: no dashboard list found. fetching and adding panel. " +
+          dashboardId);
+      
+      await getDashboard(store, dashboardId, folderId);
     }
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
-
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
+    console.log("addPanel: dashboard found", currentDashboard);
+    
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
 
@@ -302,13 +309,16 @@ export const addVariable = async (
 ) => {
   try {
     if (
-      !store.state.organizationData.allDashboardList[folderId] ||
-      store.state.organizationData.allDashboardList[folderId].length == 0
+      !store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      await getAllDashboards(store, folderId);
+      console.log(
+        "addVariable: no dashboard list found. fetching and adding panel. " +
+          dashboardId);
+      
+      await getDashboard(store, dashboardId, folderId);
     }
 
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard: any = await getDashboard(store, dashboardId, folderId);
     if (!currentDashboard.variables) {
       currentDashboard.variables = {};
       currentDashboard.variables.showDynamicFilters = false;
@@ -347,7 +357,7 @@ export const deleteVariable = async (
     // get the object of panel id
     // find the dashboard and remove the panel data to dashboard object
     // call the update dashboard function
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
     //remove panel from current dashboard
     const variableIndex = currentDashboard.variables.list.findIndex(
@@ -379,7 +389,7 @@ export const deletePanel = async (
     // get the object of panel id
     // find the dashboard and remove the panel data to dashboard object
     // call the update dashboard function
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
@@ -422,7 +432,7 @@ export const updateVariable = async (
     // find the dashboard and remove the panel data to dashboard object
     // call the update dashboard function
     // Get the current dashboard from the store
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
     // Find the index of the variable in the list
     const variableIndex = currentDashboard.variables.list.findIndex(
       (variable: any) => variable.name == variableName,
@@ -462,7 +472,7 @@ export const updatePanel = async (
     // get the object of panel id
     // find the dashboard and remove the panel data to dashboard object
     // call the update dashboard function
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
@@ -491,18 +501,36 @@ export const updateDashboard = async (
   currentDashboardData: any,
   folderId: any,
 ) => {
+  console.log(
+    "updateDashboard: updating dashboard",
+    dashboardId,
+    "in folder",
+    folderId
+  );
   try {
     const res = await dashboardService.save(
       org,
       dashboardId,
       currentDashboardData,
       folderId,
-      store.state.organizationData.allDashboardListHash[folderId][dashboardId],
+      store.state.organizationData.allDashboardData[dashboardId]
     );
-    await getAllDashboards(store, folderId);
+    console.log(
+      "updateDashboard: updated dashboard",
+      dashboardId,
+      "in folder",
+      folderId
+    );
+    await getDashboard(store, dashboardId, folderId);
 
     return res;
   } catch (error) {
+    console.log(
+      "updateDashboard: error occurred while updating dashboard",
+      dashboardId,
+      "in folder",
+      folderId
+    );
     throw error;
   }
 };
@@ -529,12 +557,18 @@ export const getDashboard = async (
       dashboardId,
     );
 
+    console.log("res", res.data);
+    
     const version = res.data.version;
     const dashboardKey = `v${version}`;
     const dashboardData = res.data[dashboardKey];
 
     const convertedData = convertDashboardSchemaVersion(dashboardData);
     console.log("convertedData", convertedData);
+
+    // Generate a hash for the converted data and add it inside the object
+    // const hash = res.data.hash;
+    // convertedData.hash = hash; // Add the hash directly to the data object
 
     store.dispatch("setDashboardData", {[dashboardId]: convertedData});
     console.log("store", store.state.organizationData.allDashboardData);
@@ -595,19 +629,30 @@ export const getPanel = async (
   folderId: any,
   tabId: any,
 ) => {
+  console.log("getPanel", dashboardId, panelId, folderId, tabId);
   try {
     if (
-      !store.state.organizationData.allDashboardList[folderId] ||
-      store.state.organizationData.allDashboardList[folderId].length == 0
+      !store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      await getAllDashboards(store, folderId);
+      console.log(
+        "addPanel: no dashboard list found. fetching and adding panel. " +
+          dashboardId);
+      
+      await getDashboard(store, dashboardId, folderId);
     }
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
+
+    console.log("getPanel: dashboard found", currentDashboard);
 
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
 
+    console.log("getPanel: tab found", tab);
+
     const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
+
+    console.log("getPanel: paneldata", paneldata);
+
     return paneldata;
   } catch (error) {
     throw error;
@@ -638,7 +683,7 @@ export const deleteTab = async (
   moveToTabId?: any,
 ) => {
   try {
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
     if (moveToTabId) {
       const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
@@ -680,13 +725,16 @@ export const editTab = async (
   tabId: any,
   tabData: any,
 ) => {
+  console.log("editTab: calling editTab");
   try {
-    const currentDashboardData = findDashboard(dashboardId, store, folderId);
+    const currentDashboardData = await getDashboard(store, dashboardId, folderId);
+    console.log("editTab: currentDashboardData", currentDashboardData);
     const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
     // only name will change
     tab.name = tabData.name;
 
+    console.log("editTab: calling updateDashboard");
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -695,12 +743,15 @@ export const editTab = async (
       folderId ?? "default",
     );
 
+    console.log("editTab: tab updated");
     // return updated tab
     return tab;
   } catch (error) {
+    console.log("editTab: error", error);
     throw error;
   }
 };
+
 
 export const addTab = async (
   store: any,
@@ -708,13 +759,19 @@ export const addTab = async (
   folderId: any,
   newTabData: any,
 ) => {
+  console.log("addTab: calling addTab");
   try {
     // generate tab id
     newTabData.tabId = getTabId();
 
-    const currentDashboardData = findDashboard(dashboardId, store, folderId);
+    console.log("addTab: newTabData", newTabData);
+
+    const currentDashboardData = await getDashboard(store, dashboardId, folderId);
+    console.log("addTab: currentDashboardData", currentDashboardData);
+
     currentDashboardData.tabs.push(newTabData);
 
+    console.log("addTab: calling updateDashboard");
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -723,9 +780,11 @@ export const addTab = async (
       folderId ?? "default",
     );
 
+    console.log("addTab: tab added");
     // return new tab data with new tab id
     return newTabData;
   } catch (error) {
+    console.log("addTab: error", error);
     throw error;
   }
 };
@@ -740,7 +799,7 @@ export const movePanelToAnotherTab = async (
   moveToTabId?: any,
 ) => {
   try {
-    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
     const currentTabData = getTabDataFromTabId(currentDashboard, currentTabId);
     const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
@@ -873,7 +932,8 @@ export const moveDashboardToAnotherFolder = async (
         to: to,
       },
     );
-
+    console.log("moveDashboardToAnotherFolder", dashboardId, from, to);
+    
     //update both folders dashboard
     await getAllDashboards(store, to);
     await getAllDashboards(store, from);
