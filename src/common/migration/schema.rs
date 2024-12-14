@@ -385,11 +385,15 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
             temp.name = into_ofga_supported_format(temp_name);
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
+
+            // [service::db] has been migrated to `template` table. This should continue to operate
+            // on the `meta` table, where values are read from
+
             // First create an alert copy with formatted template name
             match meta::set_template_in_meta(keys[0], &mut temp).await {
                 // Delete template with unsupported template name
                 Ok(_) => {
-                    if let Err(e) = db::alerts::templates::delete(keys[0], temp_name).await {
+                    if let Err(e) = db::delete(&db_key, false, db::NO_NEED_WATCH, None).await {
                         log::error!(
                             "[Template:Migration]: Error deleting unsupported template name {temp_name}: {e}"
                         );
