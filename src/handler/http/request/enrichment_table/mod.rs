@@ -56,8 +56,8 @@ pub async fn save_enrichment_table(
             content_length
                 .to_str()
                 .unwrap_or("0")
-                .parse::<i64>()
-                .unwrap_or(0) as f64
+                .parse::<f64>()
+                .unwrap_or(0.0)
                 / SIZE_IN_MB
         }
     };
