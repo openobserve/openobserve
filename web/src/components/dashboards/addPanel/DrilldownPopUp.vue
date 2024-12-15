@@ -309,6 +309,7 @@ import { useStore } from "vuex";
 import { computed } from "vue";
 import {
   getAllDashboardsByFolderId,
+  getDashboard,
   getFoldersList,
 } from "../../../utils/commons";
 import { onMounted, onUnmounted } from "vue";
@@ -349,7 +350,10 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey
     );
-
+    console.log("dashboardPanelData", dashboardPanelData);
+    console.log("props", props);
+    
+    
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -477,6 +481,8 @@ export default defineComponent({
     const getTabList = async () => {
       // get folder data
       // by using folder name, find folder data
+      console.log("getTabList: drilldownData.value.data.folder", store.state.organizationData.folders);
+      
       const folderData = store.state.organizationData.folders?.find(
         (folder: any) => folder.name === drilldownData.value.data.folder
       );
@@ -486,20 +492,33 @@ export default defineComponent({
         dashboardList.value = [];
         return;
       }
-
+      console.log("getTabList: folderData", drilldownData.value);
+      // want dashboardId from dashboard name
+      // by using dashboard name, find dashboard data
+      console.log("getTabList: drilldownData.value.data.dashboard", store.state.organizationData?.allDashboardData);
+      
+      
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
         folderData?.folderId
       );
-
-      // get dashboard data
-      // by using dashboard name, find dashboard data
-      const dashboardData = allDashboardList?.find(
+      
+      console.log("getTabList: allDashboardList", allDashboardList);
+      // get dashboardId from allDashboardList by dashboard name
+      const dashboardId = allDashboardList?.find(
         (dashboard: any) =>
           dashboard.title === drilldownData.value.data.dashboard
-      );
+      )?.dashboardId;
+      
+      console.log("getTabList: dashboardId", dashboardId);
+      
+      // get dashboard data
+      // by using dashboard name, find dashboard data
+      const dashboardData = await getDashboard(store, dashboardId, folderData?.folderId);
 
+      console.log("getTabList: dashboardData", dashboardData);
+      
       // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
         dashboardList.value = [];
@@ -624,6 +643,8 @@ export default defineComponent({
     const variableNamesFn = ref([]);
 
     const getvariableNames = async () => {
+      console.log("drilldownData.value", drilldownData.value);
+      
       if (
         drilldownData.value.data.folder &&
         drilldownData.value.data.dashboard
@@ -636,10 +657,13 @@ export default defineComponent({
           store,
           folder.folderId
         );
-        const dashboardData = allDashboardData.find(
-          (dashboard: any) =>
-            dashboard.title === drilldownData.value.data.dashboard
-        );
+
+        const dashboardId = allDashboardData?.find(
+        (dashboard: any) =>
+          dashboard.title === drilldownData.value.data.dashboard
+      )?.dashboardId;
+
+        const dashboardData = await getDashboard(store, dashboardId, folder?.folderId);
 
         if (dashboardData) {
           const optionsList = dashboardData.variables.list.map(
