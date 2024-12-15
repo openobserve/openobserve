@@ -15,8 +15,8 @@
 
 use config::{ider, meta::alerts::templates::Template};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, Set, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, Set,
+    TryIntoModel,
 };
 
 use crate::{
@@ -45,21 +45,30 @@ pub async fn put(org_id: &str, template: Template) -> Result<Template, errors::E
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let mut active: ActiveModel = match get_model(client, org_id, &template.name).await? {
-        Some(model) => model.into(),
-        None => ActiveModel {
-            id: Set(ider::uuid()),
-            org: Set(org_id.to_string()),
-            name: NotSet,
-            is_default: Set(template.is_default.unwrap_or_default()),
-            r#type: Set(template.template_type.to_string()),
-            body: Set(template.body),
-            title: Set(template.title.is_empty().then_some(template.title)),
-        },
+    let model: Model = match get_model(client, org_id, &template.name).await? {
+        Some(model) => {
+            let mut active: ActiveModel = model.into();
+            active.org = Set(org_id.to_string());
+            active.name = Set(template.name);
+            active.is_default = Set(template.is_default.unwrap_or_default());
+            active.r#type = Set(template.template_type.to_string());
+            active.body = Set(template.body);
+            active.title = Set((!template.title.is_empty()).then_some(template.title));
+            active.update(client).await?.try_into_model()?
+        }
+        None => {
+            let active = ActiveModel {
+                id: Set(ider::uuid()),
+                org: Set(org_id.to_string()),
+                name: Set(template.name),
+                is_default: Set(template.is_default.unwrap_or_default()),
+                r#type: Set(template.template_type.to_string()),
+                body: Set(template.body),
+                title: Set((!template.title.is_empty()).then_some(template.title)),
+            };
+            active.insert(client).await?.try_into_model()?
+        }
     };
-
-    active.name = Set(template.name);
-    let model: Model = active.save(client).await?.try_into_model()?;
     Ok(model.into())
 }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::alerts::templates::Template;
+use config::meta::alerts::{destinations::DestinationType, templates::Template};
 
 use crate::{
     common::{
@@ -44,6 +44,13 @@ pub async fn save(
         return Err(TemplateError::InvalidName);
     }
     template.is_default = Some(org_id == DEFAULT_ORG);
+    if matches!(template.template_type, DestinationType::Email) {
+        if template.title.is_empty() {
+            return Err(TemplateError::EmptyTitle);
+        }
+    } else {
+        template.title = String::default();
+    }
 
     match db::alerts::templates::get(org_id, &template.name).await {
         Ok(_) => {

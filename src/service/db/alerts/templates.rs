@@ -37,6 +37,8 @@ pub enum TemplateError {
         "Template name cannot contain ':', '#', '?', '&', '%', '/', quotes and space characters"
     )]
     InvalidName,
+    #[error("Email Template cannot have empty title")]
+    EmptyTitle,
     #[error("Template body cannot be empty")]
     EmptyBody,
     #[error("Template with the same name already exists")]
