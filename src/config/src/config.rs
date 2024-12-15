@@ -703,7 +703,7 @@ pub struct Common {
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
     #[env_config(
-        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        name = "ZO_MMDB_GEOLITE_ASNDB_SHA256_URL",
         default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
     )]
     pub mmdb_geolite_asndb_sha256_url: String,
@@ -841,7 +841,7 @@ pub struct Common {
     )]
     pub self_metrics_consumption_interval: u64,
     #[env_config(
-        name = "ZO_SELF_METRIC_CONSUMPTION_WHITELIST",
+        name = "ZO_SELF_METRIC_CONSUMPTION_ACCEPTLIST",
         default = "",
         help = "only these metrics will be self-consumed, comma separated"
     )]
