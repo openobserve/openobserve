@@ -221,11 +221,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
-            // migrate dashboards
-            if let Err(e) = migration::dashboards::run().await {
-                job_init_tx.send(false).ok();
-                panic!("migrate dashboards failed: {}", e);
-            }
 
             #[allow(deprecated)]
             migration::upgrade_resource_names()
@@ -236,6 +231,12 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Err(e) = infra::table::migrate().await {
                 job_init_tx.send(false).ok();
                 panic!("infra sea_orm migrate failed: {}", e);
+            }
+
+            // migrate dashboards
+            if let Err(e) = migration::dashboards::run().await {
+                job_init_tx.send(false).ok();
+                panic!("migrate dashboards failed: {}", e);
             }
 
             // ingester init
