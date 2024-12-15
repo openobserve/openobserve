@@ -508,12 +508,15 @@ export const updateDashboard = async (
     folderId
   );
   try {
+    await getAllDashboards(store, folderId);
+    console.log("store-----------", store.state.organizationData);
+    
     const res = await dashboardService.save(
       org,
       dashboardId,
       currentDashboardData,
       folderId,
-      store.state.organizationData.allDashboardData[dashboardId]
+      store.state.organizationData.allDashboardListHash[folderId][dashboardId]
     );
     console.log(
       "updateDashboard: updated dashboard",
@@ -565,10 +568,6 @@ export const getDashboard = async (
 
     const convertedData = convertDashboardSchemaVersion(dashboardData);
     console.log("convertedData", convertedData);
-
-    // Generate a hash for the converted data and add it inside the object
-    // const hash = res.data.hash;
-    // convertedData.hash = hash; // Add the hash directly to the data object
 
     store.dispatch("setDashboardData", {[dashboardId]: convertedData});
     console.log("store", store.state.organizationData.allDashboardData);
