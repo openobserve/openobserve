@@ -841,7 +841,7 @@ pub struct Common {
     )]
     pub self_metrics_consumption_interval: u64,
     #[env_config(
-        name = "ZO_SELF_METRIC_CONSUMPTION_WHITELIST",
+        name = "ZO_SELF_METRIC_CONSUMPTION_ACCEPTLIST",
         default = "",
         help = "only these metrics will be self-consumed, comma separated"
     )]
