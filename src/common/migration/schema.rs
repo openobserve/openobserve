@@ -390,7 +390,14 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
             // on the `meta` table, where values are read from
 
             // First create an alert copy with formatted template name
-            match meta::set_template_in_meta(keys[0], &mut temp).await {
+            match db::put(
+                &db_key,
+                json::to_vec(&temp).unwrap().into(),
+                db::NO_NEED_WATCH,
+                None,
+            )
+            .await
+            {
                 // Delete template with unsupported template name
                 Ok(_) => {
                     if let Err(e) = db::delete(&db_key, false, db::NO_NEED_WATCH, None).await {
@@ -586,8 +593,6 @@ mod meta {
 
     use super::*;
 
-    const DEFAULT_ORG: &str = "default";
-
     /// Inserts the alert into the meta table if it doesn't already exist or updates
     /// it if it does already exist.
     pub async fn set_alert(
@@ -602,7 +607,7 @@ mod meta {
         match db::put(
             &key,
             json::to_vec(alert).unwrap().into(),
-            db::NEED_WATCH,
+            db::NO_NEED_WATCH,
             None,
         )
         .await
@@ -661,7 +666,7 @@ mod meta {
     ) -> Result<(), anyhow::Error> {
         let schedule_key = format!("{stream_type}/{stream_name}/{name}");
         let key = format!("/alerts/{org_id}/{}", &schedule_key);
-        match db::delete(&key, false, db::NEED_WATCH, None).await {
+        match db::delete(&key, false, db::NO_NEED_WATCH, None).await {
             Ok(_) => {
                 match db::scheduler::delete(
                     org_id,
@@ -691,24 +696,7 @@ mod meta {
         Ok(db::put(
             &key,
             json::to_vec(destination).unwrap().into(),
-            db::NEED_WATCH,
-            None,
-        )
-        .await?)
-    }
-
-    /// Inserts the template into the meta table if it doesn't already exist or
-    /// updates it if it does already exist.
-    pub async fn set_template_in_meta(
-        org_id: &str,
-        template: &mut Template,
-    ) -> Result<(), anyhow::Error> {
-        template.is_default = Some(org_id == DEFAULT_ORG);
-        let key = format!("/templates/{org_id}/{}", template.name);
-        Ok(db::put(
-            &key,
-            json::to_vec(template).unwrap().into(),
-            db::NEED_WATCH,
+            db::NO_NEED_WATCH,
             None,
         )
         .await?)
