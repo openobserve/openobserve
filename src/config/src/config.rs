@@ -703,7 +703,7 @@ pub struct Common {
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
     #[env_config(
-        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        name = "ZO_MMDB_GEOLITE_ASNDB_SHA256_URL",
         default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
     )]
     pub mmdb_geolite_asndb_sha256_url: String,
