@@ -656,7 +656,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-  test.skip("should upload an enrichment table under functions with VRL", async ({
+  test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);

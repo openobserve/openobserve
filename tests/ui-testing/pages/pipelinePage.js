@@ -66,6 +66,7 @@ class PipelinePage {
     this.confirmButton = page.locator('[data-test="confirm-button"]');
     this.functionNameInput = page.locator('[data-test="add-function-node-routing-section"] input[aria-label="Name"]');
     this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+    this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
     this.enrichmentTableTab =
       '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
     this.addEnrichmentTableButton = 'text=Add Enrichment Table';
@@ -273,7 +274,7 @@ async verifyFieldRequiredError() {
 }
 
 async navigateToAddEnrichmentTable() {
-  await this.page.locator(this.pipelineMenuLink).click();
+  await this.page.locator(this.pipelineMenu).click();
   await this.page.click(this.enrichmentTableTab, { force: true });
   await this.page.getByText("Add Enrichment Table").click();
 }
