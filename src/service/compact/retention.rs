@@ -32,6 +32,33 @@ use crate::{
     service::{db, file_list},
 };
 
+fn populate_time_ranges_for_deletion(res_time_ranges: &mut Vec<TimeRange>, exclude_range: &TimeRange, original_time_range: &TimeRange) -> u32 {
+    let cfg = get_config();
+    let mut time_range_start: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.start * 1000);
+    let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.end * 1000);
+
+    // In case if a red day is older than the red days retention period then skip the day, which will delete the data
+    let allowed_red_day_retention_end = config::utils::time::now() - Duration::try_days(cfg.compact.red_data_retention_days).unwrap();
+    // print the time
+    if time_range_end < allowed_red_day_retention_end {
+        res_time_ranges.push(original_time_range.clone());
+        return 1;
+    } else if time_range_start < allowed_red_day_retention_end {
+        time_range_start = allowed_red_day_retention_end;
+    }
+    let time_range = TimeRange::new(time_range_start.timestamp_nanos_opt().expect("valid timestamp")/1000, time_range_end.timestamp_nanos_opt().expect("valid timestamp")/1000);
+
+    if time_range.contains(&original_time_range) {
+        // skip the whole deletion as the red day consists of the whole time range
+        return 0;
+    }
+
+    let mut ranges = original_time_range.split(&time_range);
+    let job_nos = ranges.len() as u32;
+    res_time_ranges.append(&mut ranges);
+
+    job_nos
+}
 /// Creates delete jobs for the stream based on the stream settings
 /// Returns the number of jobs created
 pub async fn delete_by_stream(
@@ -41,7 +68,6 @@ pub async fn delete_by_stream(
     stream_name: &str,
     red_days: &[TimeRange]
 ) -> Result<u32, anyhow::Error> {
-    let cfg = get_config();
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
@@ -64,19 +90,6 @@ pub async fn delete_by_stream(
         lifecycle_end
     );
 
-    // Hack for 1970-01-01
-    if lifecycle_start.le("1970-01-01") {
-        let lifecycle_end = created_at + Duration::try_days(1).unwrap();
-        let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
-        db::compact::retention::delete_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            Some((lifecycle_start, lifecycle_end.as_str())),
-        )
-        .await?;
-        return Ok(1);
-    }
 
     // Create tasks with break on red days
     let start = DateTime::parse_from_rfc3339(lifecycle_start)?.with_timezone(&Utc);
@@ -84,31 +97,9 @@ pub async fn delete_by_stream(
     let original_time_range = TimeRange::new(start.timestamp_nanos_opt().expect("valid timestamp") / 1000, end.timestamp_nanos_opt().expect("valid timestamp") / 1000);
 
     let mut final_time_ranges = vec![];
-    for time_range in red_days.iter() {
-        // skip the time range from the start to end and create subsequent time ranges
-        // for example if the red days fall between the start and end then there will be two tasks
-        // one from start to red_day.start and another from red_day.end to end
-        let mut time_range_start: DateTime<Utc> = Utc.timestamp_nanos(time_range.start * 1000);
-        let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(time_range.end * 1000);
-
-        // In case if a red day is older than the red days retention period then skip the day, which will delete the data
-        let allowed_red_day_retention_end = config::utils::time::now() - Duration::try_days(cfg.compact.red_data_retention_days).unwrap();
-        if time_range_end < allowed_red_day_retention_end {
-            final_time_ranges.push(original_time_range.clone());
-            continue
-        } else if time_range_start < allowed_red_day_retention_end {
-            time_range_start = allowed_red_day_retention_end;
-        }
-        let time_range = TimeRange::new(time_range_start.timestamp_nanos_opt().expect("valid timestamp")/1000, time_range_end.timestamp_nanos_opt().expect("valid timestamp")/1000);
-
-        if time_range.contains(&original_time_range) {
-            // skip the whole deletion as the red day consists of the whole time range
-            return Ok(0);
-        }
-
-        let mut ranges = original_time_range.split(&time_range);
-        final_time_ranges.append(&mut ranges);
-    }
+    red_days.iter().for_each(|red_day| {
+        let _ranges_added = populate_time_ranges_for_deletion(&mut final_time_ranges, &red_day, &original_time_range);
+    });
 
     // if red days is empty, then just delete the whole time range
     if red_days.is_empty() {
@@ -556,5 +547,18 @@ mod tests {
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
         delete_all(org_id, stream_type, stream_name).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_populate_time_ranges() {
+        let now = Utc::now();
+        let exclude_range = TimeRange::new((now - Duration::try_days(1).unwrap()).timestamp_nanos_opt().unwrap() / 1000, now.timestamp_nanos_opt().unwrap() / 1000);
+        let original_time_range = TimeRange::new((now - Duration::try_days(15).unwrap()).timestamp_nanos_opt().unwrap()/1000, now.timestamp_nanos_opt().unwrap()/1000);
+        let mut res_time_ranges = vec![];
+        assert_eq!(populate_time_ranges_for_deletion(&mut res_time_ranges, &exclude_range, &original_time_range), 1);
+        assert!(original_time_range.contains(res_time_ranges.first().unwrap()));
+
+        let exclude_range = TimeRange::new((now - Duration::try_days(3).unwrap()).timestamp_nanos_opt().unwrap() / 1000, (now - Duration::try_days(2).unwrap()).timestamp_nanos_opt().unwrap() / 1000);
+        assert_eq!(populate_time_ranges_for_deletion(&mut res_time_ranges, &exclude_range, &original_time_range), 2);
     }
 }

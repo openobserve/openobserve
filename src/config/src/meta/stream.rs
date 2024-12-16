@@ -503,10 +503,17 @@ pub struct UpdateStreamPartition {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateSettingsWrapper<D> {
+    pub add: Vec<D>,
+    pub remove: Vec<D>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStringSettingsArray {
     pub add: Vec<String>,
     pub remove: Vec<String>,
 }
+
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStreamSettings {
@@ -514,13 +521,13 @@ pub struct UpdateStreamSettings {
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    pub partition_keys: UpdateStreamPartition,
+    pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
-    pub full_text_search_keys: UpdateStringSettingsArray,
+    pub full_text_search_keys: UpdateSettingsWrapper<String>,
     #[serde(default)]
-    pub index_fields: UpdateStringSettingsArray,
+    pub index_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
-    pub bloom_filter_fields: UpdateStringSettingsArray,
+    pub bloom_filter_fields: UpdateSettingsWrapper<String>,
     #[serde(skip_serializing_if = "Option::None")]
     #[serde(default)]
     pub data_retention: Option<i64>,
@@ -528,15 +535,17 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
-    pub defined_schema_fields: UpdateStringSettingsArray,
+    pub defined_schema_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
-    pub distinct_value_fields: UpdateStringSettingsArray,
+    pub distinct_value_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
+    #[serde(default)]
+    pub red_days: UpdateSettingsWrapper<TimeRange>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -554,7 +563,7 @@ impl PartialEq for DistinctField {
 }
 impl Eq for DistinctField {}
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TimeRange {
     pub start: i64,
     pub end: i64,

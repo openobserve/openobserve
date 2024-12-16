@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, http::StatusCode, HttpResponse};
+use chrono::Duration;
 use config::{
     is_local_disk_storage,
     meta::stream::{
@@ -269,6 +270,23 @@ pub async fn save_stream_settings(
     }
     settings.partition_keys = old_partition_keys;
 
+    for range in settings.red_days.iter() {
+        if range.start > range.end {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "start day should be less than end day".to_string(),
+            )));
+        }
+
+        let last_retained = config::utils::time::now() - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+        if range.start < last_retained.timestamp_nanos_opt().unwrap() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "start day should be less than the last data retention day {last_retained}".to_string(),
+            )));
+        }
+    }
+
     let mut metadata = schema.metadata.clone();
     metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     if !metadata.contains_key("created_at") {
@@ -287,81 +305,89 @@ pub async fn save_stream_settings(
     )))
 }
 
-#[tracing::instrument(skip(update_settings))]
+#[tracing::instrument(skip(new_settings))]
 pub async fn update_stream_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    update_settings: UpdateStreamSettings,
+    new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
     match infra::schema::get_settings(org_id, stream_name, stream_type).await {
         Some(mut settings) => {
-            if let Some(max_query_range) = update_settings.max_query_range {
+            if let Some(max_query_range) = new_settings.max_query_range {
                 settings.max_query_range = max_query_range;
             }
-            if let Some(store_original_data) = update_settings.store_original_data {
+            if let Some(store_original_data) = new_settings.store_original_data {
                 settings.store_original_data = store_original_data;
             }
-            if let Some(approx_partition) = update_settings.approx_partition {
+            if let Some(approx_partition) = new_settings.approx_partition {
                 settings.approx_partition = approx_partition;
             }
 
-            if let Some(flatten_level) = update_settings.flatten_level {
+            if let Some(flatten_level) = new_settings.flatten_level {
                 settings.flatten_level = Some(flatten_level);
             }
 
-            if let Some(data_retention) = update_settings.data_retention {
+            if let Some(data_retention) = new_settings.data_retention {
                 settings.data_retention = data_retention;
             }
 
-            if !update_settings.defined_schema_fields.add.is_empty() {
+            if !new_settings.defined_schema_fields.add.is_empty() {
                 settings.defined_schema_fields =
                     if let Some(mut schema_fields) = settings.defined_schema_fields {
-                        schema_fields.extend(update_settings.defined_schema_fields.add);
+                        schema_fields.extend(new_settings.defined_schema_fields.add);
                         Some(schema_fields)
                     } else {
-                        Some(update_settings.defined_schema_fields.add)
+                        Some(new_settings.defined_schema_fields.add)
                     }
             }
 
-            if !update_settings.defined_schema_fields.remove.is_empty() {
+            if !new_settings.defined_schema_fields.remove.is_empty() {
                 if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
                     schema_fields.retain(|field| {
-                        !update_settings.defined_schema_fields.remove.contains(field)
+                        !new_settings.defined_schema_fields.remove.contains(field)
                     });
                 }
             }
 
-            if !update_settings.bloom_filter_fields.add.is_empty() {
+            if !new_settings.bloom_filter_fields.add.is_empty() {
                 settings
                     .bloom_filter_fields
-                    .extend(update_settings.bloom_filter_fields.add);
+                    .extend(new_settings.bloom_filter_fields.add);
             }
 
-            if !update_settings.bloom_filter_fields.remove.is_empty() {
+            if !new_settings.bloom_filter_fields.remove.is_empty() {
                 settings
                     .bloom_filter_fields
-                    .retain(|field| !update_settings.bloom_filter_fields.remove.contains(field));
+                    .retain(|field| !new_settings.bloom_filter_fields.remove.contains(field));
             }
 
-            if !update_settings.index_fields.add.is_empty() {
+            if !new_settings.index_fields.add.is_empty() {
                 settings
                     .index_fields
-                    .extend(update_settings.index_fields.add);
+                    .extend(new_settings.index_fields.add);
                 settings.index_updated_at = now_micros();
             }
 
-            if !update_settings.index_fields.remove.is_empty() {
+            if !new_settings.index_fields.remove.is_empty() {
                 settings
                     .index_fields
-                    .retain(|field| !update_settings.index_fields.remove.contains(field));
+                    .retain(|field| !new_settings.index_fields.remove.contains(field));
             }
 
-            if !update_settings.distinct_value_fields.add.is_empty() {
-                for f in &update_settings.distinct_value_fields.add {
+            if !new_settings.red_days.add.is_empty() {
+                settings.red_days.extend(new_settings.red_days.add);
+            }
+
+            if !new_settings.red_days.remove.is_empty() {
+                settings.red_days.retain(|range| !new_settings.red_days.remove.contains(range));
+            }
+
+            if !new_settings.distinct_value_fields.add.is_empty() {
+                for f in &new_settings.distinct_value_fields.add {
                     // we ignore full text search fields
                     if settings.full_text_search_keys.contains(f)
-                        || update_settings.full_text_search_keys.add.contains(f)
+                        || new_settings.full_text_search_keys.add.contains(f)
                     {
                         continue;
                     }
@@ -392,8 +418,8 @@ pub async fn update_stream_settings(
                 }
             }
 
-            if !update_settings.distinct_value_fields.remove.is_empty() {
-                for f in &update_settings.distinct_value_fields.remove {
+            if !new_settings.distinct_value_fields.remove.is_empty() {
+                for f in &new_settings.distinct_value_fields.remove {
                     let usage = match distinct_values::check_field_use(
                         org_id,
                         stream_name,
@@ -436,40 +462,40 @@ pub async fn update_stream_settings(
                 // here we are sure that all fields to be removed can be removed,
                 // so we bulk filter
                 settings.distinct_value_fields.retain(|field| {
-                    !update_settings
+                    !new_settings
                         .distinct_value_fields
                         .remove
                         .contains(&field.name)
                 });
             }
 
-            if !update_settings.full_text_search_keys.add.is_empty() {
+            if !new_settings.full_text_search_keys.add.is_empty() {
                 settings
                     .full_text_search_keys
-                    .extend(update_settings.full_text_search_keys.add);
+                    .extend(new_settings.full_text_search_keys.add);
                 settings.index_updated_at = now_micros();
             }
 
-            if !update_settings.full_text_search_keys.remove.is_empty() {
+            if !new_settings.full_text_search_keys.remove.is_empty() {
                 settings
                     .full_text_search_keys
-                    .retain(|field| !update_settings.full_text_search_keys.remove.contains(field));
+                    .retain(|field| !new_settings.full_text_search_keys.remove.contains(field));
             }
 
-            if !update_settings.partition_keys.add.is_empty() {
+            if !new_settings.partition_keys.add.is_empty() {
                 settings
                     .partition_keys
-                    .extend(update_settings.partition_keys.add);
+                    .extend(new_settings.partition_keys.add);
             }
 
-            if !update_settings.partition_keys.remove.is_empty() {
+            if !new_settings.partition_keys.remove.is_empty() {
                 settings
                     .partition_keys
-                    .retain(|field| !update_settings.partition_keys.remove.contains(field));
+                    .retain(|field| !new_settings.partition_keys.remove.contains(field));
             }
 
             // TODO: What to do if partition time level is intentionally None?
-            if let Some(partition_time_level) = update_settings.partition_time_level {
+            if let Some(partition_time_level) = new_settings.partition_time_level {
                 settings.partition_time_level = Some(partition_time_level);
             }
             save_stream_settings(org_id, stream_name, stream_type, settings).await
