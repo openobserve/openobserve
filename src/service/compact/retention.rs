@@ -43,7 +43,8 @@ fn populate_time_ranges_for_deletion(
     // In case if a red day is older than the red days retention period then skip the day, which
     // will delete the data
     let allowed_red_day_retention_end = config::utils::time::now()
-        - Duration::try_days(cfg.compact.red_data_retention_days).unwrap();
+        - Duration::try_days(cfg.compact.red_data_retention_days).unwrap()
+        - Duration::try_days(cfg.compact.data_retention_days).unwrap();
     // print the time
     if time_range_end < allowed_red_day_retention_end {
         res_time_ranges.push(original_time_range.clone());
@@ -62,7 +63,7 @@ fn populate_time_ranges_for_deletion(
             / 1000,
     );
 
-    if time_range.contains(&original_time_range) {
+    if time_range.contains(original_time_range) {
         // skip the whole deletion as the red day consists of the whole time range
         return 0;
     }
@@ -91,9 +92,6 @@ pub async fn delete_by_stream(
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
     let lifecycle_start = created_at.format("%Y-%m-%d").to_string();
     let lifecycle_start = lifecycle_start.as_str();
-    if lifecycle_start.ge(lifecycle_end) {
-        return Ok(0); // created_at is after lifecycle_end, just skip
-    }
 
     log::debug!(
         "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
@@ -105,8 +103,14 @@ pub async fn delete_by_stream(
     );
 
     // Create tasks with break on red days
-    let start = DateTime::parse_from_rfc3339(lifecycle_start)?.with_timezone(&Utc);
-    let end = DateTime::parse_from_rfc3339(lifecycle_end)?.with_timezone(&Utc);
+    let lifecycle_start = format!("{}T00:00:00Z", lifecycle_start);
+    let lifecycle_end = format!("{}T00:00:00Z", lifecycle_end);
+    let start = DateTime::parse_from_rfc3339(&lifecycle_start)?.with_timezone(&Utc);
+    let end = DateTime::parse_from_rfc3339(&lifecycle_end)?.with_timezone(&Utc);
+    if start.ge(&end) {
+        return Ok(0); // created_at is after lifecycle_end, just skip
+    }
+
     let original_time_range = TimeRange::new(
         start.timestamp_nanos_opt().expect("valid timestamp") / 1000,
         end.timestamp_nanos_opt().expect("valid timestamp") / 1000,
@@ -116,7 +120,7 @@ pub async fn delete_by_stream(
     red_days.iter().for_each(|red_day| {
         let _ranges_added = populate_time_ranges_for_deletion(
             &mut final_time_ranges,
-            &red_day,
+            red_day,
             &original_time_range,
         );
     });
@@ -155,7 +159,7 @@ pub async fn delete_by_stream(
         .await?;
     }
 
-    return Ok(job_nos as u32);
+    Ok(job_nos as u32)
 }
 
 pub async fn delete_all(
@@ -606,6 +610,7 @@ mod tests {
             1
         );
         assert!(original_time_range.contains(res_time_ranges.first().unwrap()));
+        res_time_ranges.clear();
 
         let exclude_range = TimeRange::new(
             (now - Duration::try_days(3).unwrap())
@@ -625,5 +630,6 @@ mod tests {
             ),
             2
         );
+        assert!(!res_time_ranges[0].intersects(&res_time_ranges[1]));
     }
 }

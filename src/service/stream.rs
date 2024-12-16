@@ -280,11 +280,13 @@ pub async fn save_stream_settings(
 
         let last_retained = config::utils::time::now()
             - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-        if range.start < last_retained.timestamp_nanos_opt().unwrap() {
+        if dbg!(range.start * 1000) < dbg!(last_retained.timestamp_nanos_opt().unwrap()) {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                "start day should be less than the last data retention day {last_retained}"
-                    .to_string(),
+                format!(
+                    "start day should be less than the last data retention day {}",
+                    last_retained
+                ),
             )));
         }
     }
