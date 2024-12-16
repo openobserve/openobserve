@@ -78,13 +78,12 @@ impl MigrationTrait for Migration {
                             })
                         }
                     };
-                    // let new_type =
-                    //     json::to_value(new_type).map_err(|e| DbErr::Migration(e.to_string()))?;
+                    let new_type =
+                        json::to_value(new_type).map_err(|e| DbErr::Migration(e.to_string()))?;
 
                     let template_id = templates
                         .get(&format!("{}-{}", meta.key1, old_dest.template))
                         .cloned();
-
                     Ok(destinations::ActiveModel {
                         id: Set(ider::uuid()),
                         org: Set(meta.key1),
@@ -311,22 +310,6 @@ mod destinations {
     pub struct AwsSns {
         pub sns_topic_arn: String,
         pub aws_region: String,
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use config::utils::json;
-
-        use super::*;
-
-        #[test]
-        fn test_enum() {
-            let obj: DestinationType = DestinationType::Email(Email {
-                recipients: vec!["hello".to_string()],
-            });
-            let json = json::to_value(obj).unwrap();
-            println!("{:?}", json);
-        }
     }
 }
 
