@@ -131,7 +131,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill('streamslogsnavigate');
+    await page.locator('[data-test="add-alert-name-input"]').fill('streamslognav');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click({ force: true });
     await page.waitForTimeout(5000);
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
