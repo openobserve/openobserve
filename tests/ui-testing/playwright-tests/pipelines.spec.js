@@ -656,7 +656,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-  test.skip("should upload an enrichment table under functions with VRL", async ({
+  test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -734,6 +734,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         '[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]'
       )
       .click();
+      await page.waitForTimeout(1000);
     await page
       .locator('[data-test="log-expand-detail-key-protocol_keyword-text"]')
       .click();
@@ -757,7 +758,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
   })
 
 
-  test.skip("should append an enrichment table under functions", async ({ page }) => {
+  test("should append an enrichment table under functions", async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
   
