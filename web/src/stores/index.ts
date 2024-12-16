@@ -130,7 +130,7 @@ export default createStore({
     setDashboardData(state, { dashboardId, data }) { 
        state.organizationData.allDashboardData = { 
         ...state.organizationData.allDashboardData, [dashboardId]: data, 
-      },
+      }
     },
     setAllDashboardListHash(state, payload) {
       state.organizationData.allDashboardListHash = payload;
