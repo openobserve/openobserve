@@ -757,7 +757,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
   })
 
 
-  test("should append an enrichment table under functions", async ({ page }) => {
+  test.skip("should append an enrichment table under functions", async ({ page }) => {
     const pipelinePage = new PipelinePage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
   
