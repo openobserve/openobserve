@@ -85,7 +85,6 @@ export class IamPage {
     async enterEmailServiceAccount(emailName) {
 
         await this.page.getByLabel('Email *').click();
-        // const emailName = `email${Date.now()}@gmail.com`;
         await this.page.getByLabel('Email *').fill(emailName);
 
     }
@@ -131,20 +130,6 @@ export class IamPage {
         await expect(this.alertMessage).toContainText(expectedMessage);
 
     }
-    async validateServiceAccount() {
-
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.page.locator('role=alert').first()).toContainText('Service Account created successfully.');
-
-    }
-
-
-    async validateAlreadyServiceAccount() {
-
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.page.locator('role=alert').first()).toContainText('User already exists');
-
-    }
 
     async validateServiceAccountToken() {
 
@@ -168,14 +153,7 @@ export class IamPage {
 
     }
 
-    async validateCopyToken() {
 
-        // await this.page.locator('#q-portal--dialog--2').getByRole('button', { name: 'Copy Token' }).click();
-        // await this.page.locator('#q-portal--dialog--3').getByRole('button', { name: 'Copy Token' }).click();
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.page.locator('role=alert').first()).toContainText('token Copied Successfully!');
-
-    }
 
     async clickDownloadToken() {
 
