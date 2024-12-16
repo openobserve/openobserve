@@ -465,8 +465,7 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
 
     // reset all finish job's status, result_path, error_message in partition job table
     if res.result_path.is_some() {
-        let mut query = generate_reset_partition_job_query(job_id);
-        query = query.filter(PartitionJobColumn::ResultPath.is_null());
+        let query = generate_reset_partition_job_query(job_id);
         let result = query.exec(&tx).await;
         if let Err(e) = result {
             if let Err(e) = tx.rollback().await {
