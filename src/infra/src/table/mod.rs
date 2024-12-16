@@ -35,6 +35,10 @@ pub mod users;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
+    Ok(())
+}
+
+pub async fn migrate() -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Migrator::up(client, None).await?;
     Ok(())

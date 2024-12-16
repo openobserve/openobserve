@@ -1253,7 +1253,7 @@ export default defineComponent({
         }
       }
 
-      if(parsedSQL?._next) {
+      if (parsedSQL?._next) {
         columnNames = getColumnNames(parsedSQL._next);
       }
       return columnNames;
@@ -1315,7 +1315,10 @@ export default defineComponent({
 
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
-        if (Object.hasOwn(parsedSQL, "from")) {
+        if (
+          Object.hasOwn(parsedSQL, "from") ||
+          Object.hasOwn(parsedSQL, "select")
+        ) {
           setSelectedStreams(value);
           // onStreamChange(value);
         }
@@ -1326,18 +1329,19 @@ export default defineComponent({
         if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
+            const tableName: string =
+              searchObj.data.parsedQuery.from[0].table ||
+              searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table;
             if (
-              !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table,
-              ) &&
-              searchObj.data.parsedQuery.from[0].table !== streamName
+              !searchObj.data.stream.selectedStream.includes(tableName) &&
+              tableName !== streamName
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
 
-              streamName = searchObj.data.parsedQuery.from[0].table;
+              streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
-                if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+                if (stream.name == streamName) {
                   streamFound = true;
                   let itemObj = {
                     label: stream.name,

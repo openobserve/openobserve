@@ -491,7 +491,7 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 }));
             }
-            if object_type.contains("dashboard") {
+            if object_type.contains("dashboard") && url_len > 1 {
                 let object_type = if method.eq("POST") || method.eq("LIST") {
                     format!(
                         "{}:{}",
