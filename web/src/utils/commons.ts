@@ -156,15 +156,15 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     }));
     console.log("getAllDashboards: migratedDashboards", migratedDashboards);
     
-    store.dispatch("setAllDashboardListHash", {
-      ...store.state.organizationData.allDashboardListHash,
-      [folderId]: Object.fromEntries(
-        migratedDashboards.map((dashboard: any) => [
-          dashboard.dashboard.dashboardId,
-          dashboard.hash,
-        ]),
-      ),
-    });
+    // store.dispatch("setAllDashboardListHash", {
+    //   ...store.state.organizationData.allDashboardListHash,
+    //   [folderId]: Object.fromEntries(
+    //     migratedDashboards.map((dashboard: any) => [
+    //       dashboard.dashboard.dashboardId,
+    //       dashboard.hash,
+    //     ])
+    //   ),
+    // });
 
     // save to store
     store.dispatch("setAllDashboardList", {
@@ -508,7 +508,7 @@ export const updateDashboard = async (
     folderId
   );
   try {
-    await getAllDashboards(store, folderId);
+
     console.log("store-----------", store.state.organizationData);
     
     const res = await dashboardService.save(
@@ -516,7 +516,7 @@ export const updateDashboard = async (
       dashboardId,
       currentDashboardData,
       folderId,
-      store.state.organizationData.allDashboardListHash[folderId][dashboardId]
+      store.state.organizationData.allDashboardListHash[dashboardId]
     );
     console.log(
       "updateDashboard: updated dashboard",
@@ -525,7 +525,7 @@ export const updateDashboard = async (
       folderId
     );
     await getDashboard(store, dashboardId, folderId);
-
+    await getAllDashboards(store, folderId);
     return res;
   } catch (error) {
     console.log(
@@ -561,16 +561,22 @@ export const getDashboard = async (
     );
 
     console.log("res", res.data);
+    console.log("hash", res.data.hash);
     
     const version = res.data.version;
     const dashboardKey = `v${version}`;
     const dashboardData = res.data[dashboardKey];
+    const hash = res.data.hash.toString();
 
     const convertedData = convertDashboardSchemaVersion(dashboardData);
     console.log("convertedData", convertedData);
 
-    store.dispatch("setDashboardData", {[dashboardId]: convertedData});
-    console.log("store", store.state.organizationData.allDashboardData);
+    store.dispatch("setAllDashboardListHash", {
+      [dashboardId]: hash
+    });
+
+    store.dispatch("setDashboardData", {[dashboardId]: convertedData, hash});
+    console.log("store", store.state.organizationData);
 
     return store.state.organizationData.allDashboardData[dashboardId];
   } catch (error) {
@@ -606,8 +612,23 @@ export const deleteDashboardById = async (
         [folderId]: newDashboards,
       });
 
+      // // remove current dashboard hash from allDashboardListHash
+      // delete store.state.organizationData.allDashboardListHash[folderId][
+      //   dashboardId
+      // ];
+
+      // // update the allDashboardList in the store
+      // store.dispatch("setAllDashboardListHash", {
+      //   ...store.state.organizationData.allDashboardListHash,
+      // });
+    }
+
+
+    const allDashboardData = store.state.organizationData.allDashboardData;
+
+    if (allDashboardData[dashboardId]) {
       // remove current dashboard hash from allDashboardListHash
-      delete store.state.organizationData.allDashboardListHash[folderId][
+      delete store.state.organizationData.allDashboardListHash[
         dashboardId
       ];
 
@@ -616,6 +637,7 @@ export const deleteDashboardById = async (
         ...store.state.organizationData.allDashboardListHash,
       });
     }
+
   } catch (error) {
     throw error;
   }
