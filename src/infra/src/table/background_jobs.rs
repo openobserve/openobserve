@@ -15,12 +15,15 @@
 
 use config::cluster::LOCAL_NODE;
 use sea_orm::{
-    prelude::Expr, sea_query::LockType, ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
+    prelude::Expr,
+    sea_query::{Keyword, LockType, SimpleExpr},
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait, UpdateMany,
 };
 
 use super::{
     entity::{
+        background_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
         background_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
         background_jobs::*,
     },
@@ -266,14 +269,15 @@ pub async fn set_job_finish(job_id: &str, result_path: &str) -> Result<(), error
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::Id.eq(job_id))
+        .filter(Column::Status.eq(1)) // make sure the job is running
         .exec(client)
         .await;
 
-    if let Err(e) = res {
-        return orm_err!(format!("set job finish error: {e}"));
+    match res {
+        Ok(res) if res.rows_affected == 1 => Ok(()),
+        Ok(_) => orm_err!("job_id not found or status is not running"),
+        Err(e) => orm_err!(format!("set job finish error: {e}")),
     }
-
-    Ok(())
 }
 
 pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
@@ -393,6 +397,9 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
 // 4. generate the new trace_id,
 // 5. make the job as pending status
 // 6. commit the transaction
+// NOTE: this function can ensure,
+// 1. for finished job, it reset all partition job's status, result_path, error_message
+// 2. for failed job, it reset faild job and all pending job's status, result_path, error_message
 pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -404,7 +411,11 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
         Err(e) => return orm_err!(format!("retry job start transaction error: {e}")),
     };
 
-    let res = Entity::find().filter(Column::Id.eq(job_id)).one(&tx).await;
+    let res = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .lock(LockType::Update)
+        .one(&tx)
+        .await;
 
     let res = match res {
         Ok(Some(res)) => res,
@@ -441,6 +452,30 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
         return orm_err!(format!("retry job insert job result error: {e}"));
     };
 
+    // reset all error job's status, result_path, error_message
+    let mut query = generate_reset_partition_job_query(job_id);
+    query = query.filter(PartitionJobColumn::ErrorMessage.is_not_null());
+    let result = query.exec(&tx).await;
+    if let Err(e) = result {
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("retry job rollback error: {e}"));
+        }
+        return orm_err!(format!("retry job update partition job error: {e}"));
+    }
+
+    // reset all finish job's status, result_path, error_message in partition job table
+    if res.result_path.is_some() {
+        let mut query = generate_reset_partition_job_query(job_id);
+        query = query.filter(PartitionJobColumn::ResultPath.is_null());
+        let result = query.exec(&tx).await;
+        if let Err(e) = result {
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("retry job rollback error: {e}"));
+            }
+            return orm_err!(format!("retry job update partition job error: {e}"));
+        }
+    }
+
     let mut model: ActiveModel = res.into();
     model.trace_id = Set(config::ider::uuid());
     model.status = Set(0);
@@ -465,4 +500,26 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
     }
 
     Ok(())
+}
+
+fn generate_reset_partition_job_query(job_id: &str) -> UpdateMany<PartitionJobEntity> {
+    PartitionJobEntity::update_many()
+        .col_expr(
+            PartitionJobColumn::StartedAt,
+            SimpleExpr::Keyword(Keyword::Null),
+        )
+        .col_expr(
+            PartitionJobColumn::EndedAt,
+            SimpleExpr::Keyword(Keyword::Null),
+        )
+        .col_expr(PartitionJobColumn::Status, Expr::value(0))
+        .col_expr(
+            PartitionJobColumn::ResultPath,
+            SimpleExpr::Keyword(Keyword::Null),
+        )
+        .col_expr(
+            PartitionJobColumn::ErrorMessage,
+            SimpleExpr::Keyword(Keyword::Null),
+        )
+        .filter(PartitionJobColumn::JobId.eq(job_id))
 }

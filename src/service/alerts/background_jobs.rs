@@ -31,8 +31,8 @@ use tokio::sync::mpsc;
 
 use crate::service::{
     db::background_job::{
-        clean_deleted_job, clean_deleted_job_result, clean_deleted_partition_job, get_deleted_jobs,
-        get_job, get_job_result, get_partition_jobs_by_job_id, set_job_error_message,
+        clean_deleted_job, clean_deleted_job_result, clean_deleted_partition_job, get,
+        get_deleted_jobs, get_job, get_job_result, get_partition_jobs, set_job_error_message,
         set_job_finish, set_partition_job_error_message, set_partition_job_finish,
         set_partition_job_start, set_partition_num, submit_partitions, update_running_job,
     },
@@ -100,21 +100,37 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     }
 
     // 4. get all partition jobs from `background_job_partitions` table
-    let partition_jobs = get_partition_jobs_by_job_id(&job.id).await?;
-    for partition_job in partition_jobs.iter() {
-        log::info!(
-            "[BACKGROUND JOB {id}] running job_id: {}, partition id: {}",
-            job.id,
-            partition_job.partition_id
-        );
-        let res = run_partition_job(&job, partition_job).await;
-        if let Err(e) = res {
-            set_job_error_message(&job.id, &e.to_string()).await?;
-            log::error!(
-                "[BACKGROUND JOB {id}] job_id: {}, run_partition_job error: {e}",
-                job.id
-            );
-            return Err(e);
+    let req: search::Request = json::from_str(&job.payload)?;
+    let limit = if req.query.size > 0 {
+        req.query.size
+    } else {
+        config::get_config().limit.query_default_limit
+    };
+    let offset = req.query.from;
+    let partition_jobs = get_partition_jobs(&job.id).await?;
+    let (partition_jobs, mut need) = filter_partition_job(partition_jobs, limit, offset).await?;
+
+    // if need <= 0, means all partition jobs are done, but not generate the final result
+    if need > 0 {
+        for partition_job in partition_jobs.iter() {
+            // check if the job is still running
+            check_status(id, &job.id).await?;
+            let res = run_partition_job(id, &job, partition_job, req.clone()).await;
+            let total = match res {
+                Ok(total) => total,
+                Err(e) => {
+                    set_job_error_message(&job.id, &e.to_string()).await?;
+                    log::error!(
+                        "[BACKGROUND JOB {id}] job_id: {}, run_partition_job error: {e}",
+                        job.id
+                    );
+                    return Err(e);
+                }
+            };
+            need -= total;
+            if need <= 0 {
+                break;
+            }
         }
     }
 
@@ -124,15 +140,22 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     );
 
     // 5. after run on partition, write result to s3
-    // TODO: handle from and size
     let mut reponse = Response::default();
     reponse.set_trace_id(job.trace_id.clone());
-    for i in 0..partition_jobs.len() {
-        let path = generate_result_path(job.created_at, &job.trace_id, Some(i as i32));
-        let buf = storage::get(&path).await?;
+
+    let partition_jobs = get_partition_jobs(&job.id).await?;
+    let mut need = limit + offset;
+    for partition_job in partition_jobs.iter() {
+        let path = partition_job.result_path.as_ref().unwrap();
+        let buf = storage::get(path).await?;
         let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
         reponse.merge(&res);
+        need -= res.total as i64;
+        if need <= 0 {
+            break;
+        }
     }
+    // TODO: skip the offest records in the final result
     let buf = bytes::Bytes::from(json::to_string(&reponse)?);
     let path = generate_result_path(job.created_at, &job.trace_id, None);
     storage::put(&path, buf).await?;
@@ -171,9 +194,20 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
 // 3. run the query
 // 4. write the result to s3
 // 5. set the partition status to finish
-async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<(), anyhow::Error> {
+async fn run_partition_job(
+    id: i64,
+    job: &Job,
+    partition_job: &PartitionJob,
+    req: search::Request,
+) -> Result<i64, anyhow::Error> {
+    log::info!(
+        "[BACKGROUND JOB {id}] running job_id: {}, partition id: {}",
+        job.id,
+        partition_job.partition_id
+    );
+
     // 1. rewrite the start_time and end_time to the query
-    let mut req: search::Request = json::from_str(&job.payload)?;
+    let mut req = req;
     req.query.start_time = partition_job.start_time;
     req.query.end_time = partition_job.end_time;
     let partition_id = partition_job.partition_id;
@@ -198,6 +232,7 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
 
     // 4. write the result to s3
     let result = res.unwrap();
+    let hits = result.total;
     let buf = bytes::Bytes::from(json::to_string(&result)?);
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
     storage::put(&path, buf).await?;
@@ -205,12 +240,41 @@ async fn run_partition_job(job: &Job, partition_job: &PartitionJob) -> Result<()
     // 5. set the partition status to finish
     set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
 
-    Ok(())
+    log::info!(
+        "[BACKGROUND JOB {id}] finish job_id: {}, partition id: {}",
+        job.id,
+        partition_job.partition_id
+    );
+
+    Ok(hits as i64)
+}
+
+// get all partition jobs that need run
+async fn filter_partition_job(
+    partition_jobs: Vec<PartitionJob>,
+    limit: i64,
+    offest: i64,
+) -> Result<(Vec<PartitionJob>, i64), anyhow::Error> {
+    let mut need = limit + offest;
+    let mut needed_partitions_jobs = Vec::new();
+    for partition_job in partition_jobs.iter() {
+        // if the result_path is not none, means the partition job is done
+        if partition_job.result_path.is_some() {
+            let path = partition_job.result_path.as_ref().unwrap();
+            let buf = storage::get(path).await?;
+            let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
+            need -= res.total as i64;
+        } else {
+            needed_partitions_jobs.push(partition_job.clone());
+        }
+    }
+
+    Ok((needed_partitions_jobs, need))
 }
 
 fn generate_result_path(
-    created_at: i64,
-    trace_id: &str,
+    created_at: i64,           // the job's created_at
+    trace_id: &str,            // the job's trace_id
     partition_id: Option<i32>, // None means it is the final result
 ) -> String {
     let naive_datetime = DateTime::from_timestamp_micros(created_at)
@@ -280,5 +344,19 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
         clean_deleted_job(&job.id).await?;
     }
 
+    Ok(())
+}
+
+async fn check_status(id: i64, job_id: &str) -> Result<(), anyhow::Error> {
+    let job = get(job_id).await?;
+    if job.status != 1 {
+        let message = format!(
+            "[BACKGROUND JOB {id}] job_id: {}, status is not running when running background job, current status: {}",
+            job.id, job.status
+        );
+        set_job_error_message(&job.id, message.as_str()).await?;
+        log::error!("{}", message);
+        return Err(anyhow::anyhow!(message));
+    }
     Ok(())
 }

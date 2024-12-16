@@ -104,10 +104,8 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
     infra::table::background_job_partitions::submit_partitions(job_id, partitions).await
 }
 
-pub async fn get_partition_jobs_by_job_id(
-    job_id: &str,
-) -> Result<Vec<PartitionJob>, errors::Error> {
-    infra::table::background_job_partitions::get_partition_jobs_by_job_id(job_id).await
+pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<PartitionJob>, errors::Error> {
+    infra::table::background_job_partitions::get_partition_jobs(job_id).await
 }
 
 pub async fn set_partition_job_start(job_id: &str, partition_id: i32) -> Result<(), errors::Error> {

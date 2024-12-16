@@ -114,18 +114,12 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
     Ok(())
 }
 
-pub async fn get_partition_jobs_by_job_id(job_id: &str) -> Result<Vec<Model>, errors::Error> {
+pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // sql: select * from background_job_partitions where job_id = job_id and status = 0
+    // sql: select * from background_job_partitions where job_id = job_id
     let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
-        .filter(
-            Column::Status
-                .eq(0)
-                .or(Column::Status.eq(2))
-                .or(Column::Status.eq(3)),
-        )
         .order_by(Column::PartitionId, Order::Asc)
         .all(client)
         .await;
