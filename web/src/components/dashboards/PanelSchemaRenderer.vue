@@ -188,6 +188,7 @@ import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -685,54 +686,56 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
-    watch(
-      resultMetaData,
-      () => {
-        emit("result-metadata-update", resultMetaData.value);
-        console.log("resultMetaData interval", resultMetaData.value);
-        const interval = resultMetaData?.value?.map(
-          (it: any) => it.histogram_interval,
-        )[0];
-        console.log("interval", interval);
+    const drilldownHoverSeriesRef: any = ref(null);
 
-        const intervalMillis = interval * 1000;
-
-        console.log("intervalMillis", intervalMillis);
-      },
-      { deep: true },
+    const interval = computed(
+      () => resultMetaData?.value?.[0]?.histogram_interval || 0,
     );
 
-    const drilldownHoverSeriesRef = ref(null);
+    const intervalMillis = computed(() => interval.value * 1000);
 
-    watch(hoveredSeriesState.value, () => {
+    watch(
+      () => resultMetaData.value, 
+      (newVal) => {
+        emit("result-metadata-update", newVal);
+        console.log("resultMetaData interval", newVal);
+        console.log("interval", interval.value);
+        console.log("intervalMillis", intervalMillis.value);
+      },
+      { deep: true }, 
+    );
+
+    const updateDrilldownHoverSeries = useLoading(() => {
       console.log("inside watch");
 
-      // if hoveredSeriesState is present store it in drilldown ref
       if (hoveredSeriesState.value) {
         drilldownHoverSeriesRef.value = hoveredSeriesState.value;
-      }
-      console.log(
-        "drilldownArray",
-        drilldownHoverSeriesRef.value.hoveredSeriesName,
-        drilldownHoverSeriesRef.value.hoveredTime,
-      );
-      // convert hoveredTime to getTime format
-      if (drilldownHoverSeriesRef.value.hoveredTime) {
-        drilldownHoverSeriesRef.value.hoveredTime =
-          new Date(drilldownHoverSeriesRef.value.hoveredTime).getTime() * 1000;
-      }
-      console.log("drilldownArray----", drilldownHoverSeriesRef.value);
 
-      // add hoveredTime with intervalMillis
-      if (drilldownHoverSeriesRef.value.hoveredTime) {
-        drilldownHoverSeriesRef.value.hoveredTime =
-          drilldownHoverSeriesRef.value.hoveredTime + intervalMillis;
+        console.log(
+          "drilldownArray",
+          drilldownHoverSeriesRef.value.hoveredSeriesName,
+          drilldownHoverSeriesRef.value.hoveredTime,
+        );
+
+        if (drilldownHoverSeriesRef.value.hoveredTime) {
+          drilldownHoverSeriesRef.value.hoveredTime =
+            new Date(drilldownHoverSeriesRef.value.hoveredTime).getTime() *
+            1000;
+
+          drilldownHoverSeriesRef.value.hoveredTime += intervalMillis.value;
+
+          console.log(
+            "drilldownArray with intervalMillis",
+            drilldownHoverSeriesRef.value,
+          );
+        }
       }
-      console.log(
-        "drilldownArray---- intervalMillis",
-        drilldownHoverSeriesRef.value,
-      );
-    });
+    }); 
+
+    watch(
+      () => hoveredSeriesState.value,
+      () => updateDrilldownHoverSeries.execute(),
+    );
 
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
