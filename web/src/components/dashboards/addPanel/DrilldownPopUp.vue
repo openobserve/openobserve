@@ -501,6 +501,11 @@ export default defineComponent({
           dashboard.title === drilldownData.value.data.dashboard
       )?.dashboardId;
             
+      if (!dashboardId) {  
+        tabList.value = [];  
+        return;  
+      }  
+
       // get dashboard data
       // by using dashboard name, find dashboard data
       const dashboardData = await getDashboard(store, dashboardId, folderData?.folderId);
@@ -646,7 +651,11 @@ export default defineComponent({
         (dashboard: any) =>
           dashboard.title === drilldownData.value.data.dashboard
       )?.dashboardId;
-
+      
+      if (!dashboardId) {  
+        variableNamesFn.value = [];  
+        return;  
+      } 
         const dashboardData = await getDashboard(store, dashboardId, folder?.folderId);
 
         if (dashboardData) {
