@@ -233,6 +233,7 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      provider.value?.dispose();
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
 
@@ -274,6 +275,9 @@ export default defineComponent({
       if (!editorObj) {
         setupEditor();
         editorObj?.layout();
+      } else {
+        provider.value?.dispose();
+        registerAutoCompleteProvider();
       }
     });
 
