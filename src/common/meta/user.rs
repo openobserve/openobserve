@@ -101,7 +101,7 @@ pub struct UserOrgRole {
     #[serde(rename = "role")]
     pub base_role: UserRole,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub custom_role: Option<String>,
+    pub custom_role: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
@@ -375,7 +375,7 @@ pub struct UserRoleRequest {
         skip_serializing_if = "Option::is_none",
         rename = "custom_role"
     )]
-    pub custom: Option<String>,
+    pub custom: Option<Vec<String>>,
 }
 
 impl From<&UserRoleRequest> for UserOrgRole {
@@ -391,7 +391,7 @@ impl From<&UserRoleRequest> for UserOrgRole {
             }
         }
         if !is_role_name_standard && custom_role.is_none() {
-            custom_role = Some(role.role.clone());
+            custom_role = Some(vec![role.role.clone()]);
         }
         UserOrgRole {
             base_role: standard_role,

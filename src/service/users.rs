@@ -81,11 +81,13 @@ pub async fn post_user(
                 .await
             {
                 Ok(res) => {
-                    if res.contains(usr_req.role.custom_role.as_ref().unwrap()) {
-                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            "Custom role not found".to_string(),
-                        )));
+                    for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
+                        if res.contains(custom_role) {
+                            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                                http::StatusCode::BAD_REQUEST.into(),
+                                "Custom role not found".to_string(),
+                            )));
+                        }
                     }
                 }
                 Err(_) => {
@@ -187,7 +189,9 @@ pub async fn post_user(
                     }
                     if usr_req.role.custom_role.is_some() {
                         let custom_role = usr_req.role.custom_role.unwrap();
-                        tuples.push(get_user_crole_tuple(&org_id, &custom_role, &usr_req.email));
+                        custom_role.iter().for_each(|crole| {
+                            tuples.push(get_user_crole_tuple(&org_id, crole, &usr_req.email));
+                        });
                     }
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
@@ -263,6 +267,8 @@ pub async fn update_user(
         let mut is_updated = false;
         let mut is_org_updated = false;
         let mut message = "";
+        #[cfg(feature = "enterprise")]
+        let mut custom_roles = vec![];
         match existing_user.unwrap() {
             Some(local_user) => {
                 if local_user.is_external {
@@ -348,6 +354,10 @@ pub async fn update_user(
                     old_role = Some(new_user.role);
                     new_user.role = new_org_role.base_role;
                     new_role = Some(new_user.role.clone());
+                    #[cfg(feature = "enterprise")]
+                    if new_org_role.custom_role.is_some() {
+                        custom_roles.extend(new_org_role.custom_role.unwrap());
+                    }
                     is_org_updated = true;
                 }
                 if user.token.is_some() {
@@ -421,7 +431,12 @@ pub async fn update_user(
 
                     #[cfg(feature = "enterprise")]
                     {
-                        use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
+                        use o2_enterprise::enterprise::openfga::authorizer::{
+                            authz::{get_user_crole_tuple, update_tuples, update_user_role},
+                            roles::{
+                                get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples,
+                            },
+                        };
 
                         if get_o2_config().openfga.enabled
                             && old_role.is_some()
@@ -443,6 +458,35 @@ pub async fn update_user(
                                         "updating openfga role for {email} from {old_str} to {new_str}"
                                     );
                                     update_user_role(&old_str, &new_str, email, org_id).await;
+                                }
+                            }
+                            if !custom_roles.is_empty() {
+                                let existing_roles = get_roles_for_org_user(email, org_id).await;
+                                let mut write_tuples = vec![];
+                                let mut delete_tuples = vec![];
+                                custom_roles.iter().for_each(|crole| {
+                                    if !existing_roles.contains(crole) {
+                                        write_tuples
+                                            .push(get_user_crole_tuple(org_id, crole, email));
+                                    }
+                                });
+                                existing_roles.iter().for_each(|crole| {
+                                    if !custom_roles.contains(crole) {
+                                        get_user_crole_removal_tuples(
+                                            email,
+                                            &get_role_key(org_id, crole),
+                                            &mut delete_tuples,
+                                        );
+                                    }
+                                });
+                                if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
+                                    log::error!("Error updating custom roles for user {email} in {org_id} org : {}", e);
+                                    return Ok(HttpResponse::InternalServerError().json(
+                                        MetaHttpResponse::error(
+                                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                            "Failed to update custom roles for user".to_string(),
+                                        ),
+                                    ));
                                 }
                             }
                         }
@@ -582,7 +626,9 @@ pub async fn add_user_to_org(
                     get_user_role_tuple(&base_role.to_string(), email, org_id, &mut tuples);
                     if role.custom_role.is_some() {
                         let custom_role = role.custom_role.unwrap();
-                        tuples.push(get_user_crole_tuple(org_id, &custom_role, email));
+                        custom_role.iter().for_each(|crole| {
+                            tuples.push(get_user_crole_tuple(org_id, crole, email));
+                        });
                     }
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
