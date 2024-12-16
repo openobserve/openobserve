@@ -180,22 +180,7 @@ export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
   }
 };
 
-function findDashboard(dashboardId: string, store: any, folderId: any) {
-  try {
-    const dashboards = store.state.organizationData.allDashboardData[dashboardId];
-    const dashboard = dashboards.find(
-      (it: any) => it.dashboardId === dashboardId,
-    );
-    // return the deep cody of the dashboard object to prevent it from being modified
-    return dashboard && typeof dashboard === "object"
-      ? JSON.parse(JSON.stringify(dashboard))
-      : {};
-  } catch (error) {
-    throw error;
-  }
-}
-
-export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {  
+export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
   // find tab from tabId
   return dashboardData?.tabs?.find((tab: any) => tab.tabId == tabId);
 };
@@ -228,7 +213,7 @@ export const addPanel = async (
     // call the update dashboard function
 
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
-    
+
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
 
@@ -285,7 +270,11 @@ export const addVariable = async (
   folderId: any,
 ) => {
   try {
-    const currentDashboard: any = await getDashboard(store, dashboardId, folderId);
+    const currentDashboard: any = await getDashboard(
+      store,
+      dashboardId,
+      folderId,
+    );
     if (!currentDashboard.variables) {
       currentDashboard.variables = {};
       currentDashboard.variables.showDynamicFilters = false;
@@ -469,21 +458,24 @@ export const updateDashboard = async (
   folderId: any,
 ) => {
   try {
-     // before save remove dashboard from store
-     if (store.state.organizationData.allDashboardData[dashboardId]) {
-      delete store.state.organizationData.allDashboardData[dashboardId];
-    }
-    
     const res = await dashboardService.save(
       org,
       dashboardId,
       currentDashboardData,
       folderId,
-      store.state.organizationData.allDashboardListHash[dashboardId]
+      store.state.organizationData.allDashboardListHash[dashboardId],
     );
-    const dashboard = await getDashboard(store, dashboardId, folderId);
-    
+
+    const updatedDashboard = await getDashboard(store, dashboardId, folderId);
+
+    // Update the store with the latest dashboard data
+    store.dispatch("setDashboardData", {
+      dashboardId,
+      data: updatedDashboard,
+    });
+
     await getAllDashboards(store, folderId);
+
     return res;
   } catch (error) {
     throw error;
@@ -497,12 +489,8 @@ export const getDashboard = async (
 ) => {
   try {
     // check if dashboard data is present in store
-    if (
-      store.state.organizationData.allDashboardData[dashboardId]
-    ) {
-      return store.state.organizationData.allDashboardData[
-        dashboardId
-      ];
+    if (store.state.organizationData.allDashboardData[dashboardId]) {
+      return store.state.organizationData.allDashboardData[dashboardId];
     }
 
     const res = await dashboardService.get_Dashboard(
@@ -518,10 +506,10 @@ export const getDashboard = async (
     const convertedData = convertDashboardSchemaVersion(dashboardData);
 
     store.dispatch("setAllDashboardListHash", {
-      [dashboardId]: hash
+      [dashboardId]: hash,
     });
 
-    store.dispatch("setDashboardData", {[dashboardId]: convertedData, hash});
+    store.dispatch("setDashboardData", { [dashboardId]: convertedData, hash });
 
     return store.state.organizationData.allDashboardData[dashboardId];
   } catch (error) {
@@ -546,12 +534,11 @@ export const deleteDashboardById = async (
     const allDashboardList = store.state.organizationData.allDashboardList;
 
     if (allDashboardList[folderId]) {
-      
       // Filter out the deleted dashboard from the list
       const newDashboards = allDashboardList[folderId].filter(
         (dashboard: any) => dashboard.dashboardId !== dashboardId,
       );
-      
+
       // Update the allDashboardList in the store with the new list
       store.dispatch("setAllDashboardList", {
         ...allDashboardList,
@@ -560,24 +547,21 @@ export const deleteDashboardById = async (
     }
 
     const allDashboardData = store.state.organizationData.allDashboardData;
-    
-    if (allDashboardData[dashboardId]) {
-      const newDashboardData = { ...allDashboardData };  
-      delete newDashboardData[dashboardId];  
 
-      store.dispatch("setDashboardData", newDashboardData); 
-      
+    if (allDashboardData[dashboardId]) {
+      const newDashboardData = { ...allDashboardData };
+      delete newDashboardData[dashboardId];
+
+      store.dispatch("setDashboardData", newDashboardData);
+
       // remove current dashboard hash from allDashboardListHash
-      delete store.state.organizationData.allDashboardListHash[
-        dashboardId
-      ];
-      
+      delete store.state.organizationData.allDashboardListHash[dashboardId];
+
       // update the allDashboardList in the store
       store.dispatch("setAllDashboardListHash", {
         ...store.state.organizationData.allDashboardListHash,
       });
     }
-
   } catch (error) {
     throw error;
   }
@@ -671,7 +655,11 @@ export const editTab = async (
   tabData: any,
 ) => {
   try {
-    const currentDashboardData = await getDashboard(store, dashboardId, folderId);
+    const currentDashboardData = await getDashboard(
+      store,
+      dashboardId,
+      folderId,
+    );
     const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
     // only name will change
@@ -692,7 +680,6 @@ export const editTab = async (
   }
 };
 
-
 export const addTab = async (
   store: any,
   dashboardId: any,
@@ -703,7 +690,11 @@ export const addTab = async (
     // generate tab id
     newTabData.tabId = getTabId();
 
-    const currentDashboardData = await getDashboard(store, dashboardId, folderId);
+    const currentDashboardData = await getDashboard(
+      store,
+      dashboardId,
+      folderId,
+    );
 
     currentDashboardData.tabs.push(newTabData);
 
@@ -855,7 +846,7 @@ export const moveDashboardToAnotherFolder = async (
         to: to,
       },
     );
-    
+
     //update both folders dashboard
     await getAllDashboards(store, to);
     await getAllDashboards(store, from);
