@@ -695,46 +695,49 @@ export default defineComponent({
     const intervalMillis = computed(() => interval.value * 1000);
 
     watch(
-      () => resultMetaData.value, 
+      () => resultMetaData.value,
       (newVal) => {
         emit("result-metadata-update", newVal);
         console.log("resultMetaData interval", newVal);
         console.log("interval", interval.value);
         console.log("intervalMillis", intervalMillis.value);
       },
-      { deep: true }, 
+      { deep: true },
     );
 
-    const updateDrilldownHoverSeries = useLoading(() => {
+    // Separate reactive refs for startTime and endTime
+    const startTime: any = ref(null);
+    const endTime: any = ref(null);
+
+    const updateDrilldownHoverSeries = async() => {
       console.log("inside watch");
 
-      if (hoveredSeriesState.value) {
-        drilldownHoverSeriesRef.value = hoveredSeriesState.value;
-
-        console.log(
-          "drilldownArray",
-          drilldownHoverSeriesRef.value.hoveredSeriesName,
+      if (drilldownHoverSeriesRef.value?.hoveredTime) {
+        const hoveredTimestamp = new Date(
           drilldownHoverSeriesRef.value.hoveredTime,
-        );
+        ).getTime();
 
-        if (drilldownHoverSeriesRef.value.hoveredTime) {
-          drilldownHoverSeriesRef.value.hoveredTime =
-            new Date(drilldownHoverSeriesRef.value.hoveredTime).getTime() *
-            1000;
+        const calculatedStartTime = hoveredTimestamp * 1000; // Convert to milliseconds
+        const calculatedEndTime = calculatedStartTime + intervalMillis.value; // Add intervalMillis
 
-          drilldownHoverSeriesRef.value.hoveredTime += intervalMillis.value;
+        await nextTick(() => {
+          startTime.value = calculatedStartTime;
+          endTime.value = calculatedEndTime;
+        });
 
-          console.log(
-            "drilldownArray with intervalMillis",
-            drilldownHoverSeriesRef.value,
-          );
-        }
+        console.log("Start Time:", calculatedStartTime);
+        console.log("End Time:", calculatedEndTime);
       }
-    }); 
+    };
 
-    watch(
-      () => hoveredSeriesState.value,
-      () => updateDrilldownHoverSeries.execute(),
+    watch( hoveredSeriesState.value,
+      () => {
+        if (hoveredSeriesState.value) {
+          drilldownHoverSeriesRef.value = { ...hoveredSeriesState.value };
+
+          updateDrilldownHoverSeries();
+        }
+      },
     );
 
     const openDrilldown = async (index: any) => {
