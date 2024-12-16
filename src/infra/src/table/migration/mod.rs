@@ -23,11 +23,11 @@ mod m20241119_000001_create_dashboards_table;
 mod m20241119_000002_populate_dashboards_table;
 mod m20241119_000003_delete_metas;
 mod m20241204_143100_create_table_search_queue;
-mod m20241205_085111_background_jobs;
-mod m20241205_085135_background_job_partitions;
-mod m20241205_085148_background_job_results;
 mod m20241209_120000_create_alerts_table;
 mod m20241215_190333_delete_metas;
+mod m20241216_085111_background_jobs;
+mod m20241216_085135_background_job_partitions;
+mod m20241216_085148_background_job_results;
 
 pub struct Migrator;
 
@@ -43,11 +43,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20241119_000002_populate_dashboards_table::Migration),
             Box::new(m20241119_000003_delete_metas::Migration),
             Box::new(m20241204_143100_create_table_search_queue::Migration),
-            Box::new(m20241205_085111_background_jobs::Migration),
-            Box::new(m20241205_085135_background_job_partitions::Migration),
-            Box::new(m20241205_085148_background_job_results::Migration),
             Box::new(m20241209_120000_create_alerts_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
+            Box::new(m20241216_085111_background_jobs::Migration),
+            Box::new(m20241216_085135_background_job_partitions::Migration),
+            Box::new(m20241216_085148_background_job_results::Migration),
         ]
     }
 }
