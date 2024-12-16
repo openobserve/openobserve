@@ -510,6 +510,10 @@ export const updateDashboard = async (
   try {
 
     console.log("store-----------", store.state.organizationData);
+     // before save remove dashboard from store
+     if (store.state.organizationData.allDashboardData[dashboardId]) {
+      delete store.state.organizationData.allDashboardData[dashboardId];
+    }
     
     const res = await dashboardService.save(
       org,
@@ -524,7 +528,10 @@ export const updateDashboard = async (
       "in folder",
       folderId
     );
-    await getDashboard(store, dashboardId, folderId);
+
+    const dashboard = await getDashboard(store, dashboardId, folderId);
+    console.log("dashboard----------", dashboard);
+    
     await getAllDashboards(store, folderId);
     return res;
   } catch (error) {
@@ -589,6 +596,12 @@ export const deleteDashboardById = async (
   dashboardId: any,
   folderId: any,
 ) => {
+  console.log(
+    "deleteDashboardById: deleting dashboard",
+    dashboardId,
+    "in folder",
+    folderId
+  );
   try {
     // Delete the dashboard using the dashboardService
     await dashboardService.delete(
@@ -601,37 +614,50 @@ export const deleteDashboardById = async (
     const allDashboardList = store.state.organizationData.allDashboardList;
 
     if (allDashboardList[folderId]) {
+      console.log("deleteDashboardById: allDashboardList[folderId]", allDashboardList[folderId]);
+      
       // Filter out the deleted dashboard from the list
       const newDashboards = allDashboardList[folderId].filter(
         (dashboard: any) => dashboard.dashboardId !== dashboardId,
       );
 
+      console.log("deleteDashboardById: newDashboards", newDashboards);
+      
       // Update the allDashboardList in the store with the new list
       store.dispatch("setAllDashboardList", {
         ...allDashboardList,
         [folderId]: newDashboards,
       });
 
-      // // remove current dashboard hash from allDashboardListHash
-      // delete store.state.organizationData.allDashboardListHash[folderId][
-      //   dashboardId
-      // ];
-
-      // // update the allDashboardList in the store
-      // store.dispatch("setAllDashboardListHash", {
-      //   ...store.state.organizationData.allDashboardListHash,
-      // });
+      console.log("deleteDashboardById: store.state.organizationData.allDashboardList", store.state.organizationData.allDashboardList);
     }
 
 
     const allDashboardData = store.state.organizationData.allDashboardData;
-
+    console.log("deleteDashboardById: addDashboardData", allDashboardData);
+    
     if (allDashboardData[dashboardId]) {
+      const newDashboardData = {
+        ...allDashboardData,
+        [dashboardId]: {},
+      }
+      console.log("deleteDashboardById: allDashboardData[dashboardId]", allDashboardData[dashboardId]);
+      
+      // update DashboardData in the store
+      store.dispatch("setDashboardData", {
+        ...allDashboardData,
+        [dashboardId]: newDashboardData,
+      })
+
+      console.log("deleteDashboardById: store.state.organizationData.allDashboardData", store.state.organizationData.allDashboardData);
+      
       // remove current dashboard hash from allDashboardListHash
       delete store.state.organizationData.allDashboardListHash[
         dashboardId
       ];
 
+      console.log("deleteDashboardById: store.state.organizationData.allDashboardListHash", store.state.organizationData.allDashboardListHash);
+      
       // update the allDashboardList in the store
       store.dispatch("setAllDashboardListHash", {
         ...store.state.organizationData.allDashboardListHash,
