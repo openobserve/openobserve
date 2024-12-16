@@ -512,7 +512,7 @@ export default defineComponent({
       
       // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
-        dashboardList.value = [];
+        tabList.value = [];
         return;
       }
 
