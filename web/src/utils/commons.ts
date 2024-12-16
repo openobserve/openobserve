@@ -509,7 +509,7 @@ export const getDashboard = async (
       [dashboardId]: hash,
     });
 
-    store.dispatch("setDashboardData", { [dashboardId]: convertedData, hash });
+    store.dispatch("setDashboardData", {[dashboardId]: convertedData, hash: hash});
 
     return store.state.organizationData.allDashboardData[dashboardId];
   } catch (error) {
