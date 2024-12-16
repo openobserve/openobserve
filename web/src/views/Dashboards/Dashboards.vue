@@ -542,12 +542,9 @@ export default defineComponent({
             store,
             activeFolderId.value,
           );
-          console.log("Dashboards for folder:", response);
 
           dashboardList.value = response || [];
         } catch (error) {
-          console.log("Error loading dashboards:", error);
-
           console.error("Error loading dashboards:", error);
           showErrorNotification(
             error?.message ||
@@ -651,11 +648,6 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      console.log("row", row);
-
-      console.log("activeFolderId", activeFolderId.value);
-      console.log("row.id", row.id);
-      
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -675,10 +667,8 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading dashboards...",
         });
-        console.log("activeFolderId", activeFolderId.value);
 
         const response = await getAllDashboards(store, activeFolderId.value ?? "default");
-        console.log("response", response);
 
         dashboardList.value = response;
         dismiss();
@@ -693,8 +683,6 @@ export default defineComponent({
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
           [],
       );
-
-      console.log("dashboardList", dashboardList);
       
       return dashboardList.map((board: any, index) => {
         return {

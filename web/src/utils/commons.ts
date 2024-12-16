@@ -154,17 +154,6 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       },
       hash: dashboard.hash.toString(),
     }));
-    console.log("getAllDashboards: migratedDashboards", migratedDashboards);
-    
-    // store.dispatch("setAllDashboardListHash", {
-    //   ...store.state.organizationData.allDashboardListHash,
-    //   [folderId]: Object.fromEntries(
-    //     migratedDashboards.map((dashboard: any) => [
-    //       dashboard.dashboard.dashboardId,
-    //       dashboard.hash,
-    //     ])
-    //   ),
-    // });
 
     // save to store
     store.dispatch("setAllDashboardList", {
@@ -206,9 +195,7 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
   }
 }
 
-export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
-  console.log("dashboardData", dashboardData);
-  
+export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {  
   // find tab from tabId
   return dashboardData?.tabs?.find((tab: any) => tab.tabId == tabId);
 };
@@ -242,15 +229,10 @@ export const addPanel = async (
 
     if (
       !store.state.organizationData.allDashboardData[dashboardId]
-    ) {
-      console.log(
-        "addPanel: no dashboard list found. fetching and adding panel. " +
-          dashboardId);
-      
+    ) {    
       await getDashboard(store, dashboardId, folderId);
     }
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
-    console.log("addPanel: dashboard found", currentDashboard);
     
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
@@ -311,10 +293,6 @@ export const addVariable = async (
     if (
       !store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      console.log(
-        "addVariable: no dashboard list found. fetching and adding panel. " +
-          dashboardId);
-      
       await getDashboard(store, dashboardId, folderId);
     }
 
@@ -501,15 +479,7 @@ export const updateDashboard = async (
   currentDashboardData: any,
   folderId: any,
 ) => {
-  console.log(
-    "updateDashboard: updating dashboard",
-    dashboardId,
-    "in folder",
-    folderId
-  );
   try {
-
-    console.log("store-----------", store.state.organizationData);
      // before save remove dashboard from store
      if (store.state.organizationData.allDashboardData[dashboardId]) {
       delete store.state.organizationData.allDashboardData[dashboardId];
@@ -522,25 +492,11 @@ export const updateDashboard = async (
       folderId,
       store.state.organizationData.allDashboardListHash[dashboardId]
     );
-    console.log(
-      "updateDashboard: updated dashboard",
-      dashboardId,
-      "in folder",
-      folderId
-    );
-
     const dashboard = await getDashboard(store, dashboardId, folderId);
-    console.log("dashboard----------", dashboard);
     
     await getAllDashboards(store, folderId);
     return res;
   } catch (error) {
-    console.log(
-      "updateDashboard: error occurred while updating dashboard",
-      dashboardId,
-      "in folder",
-      folderId
-    );
     throw error;
   }
 };
@@ -551,8 +507,6 @@ export const getDashboard = async (
   folderId: any,
 ) => {
   try {
-    console.log("dashboardId", dashboardId);
-
     // check if dashboard data is present in store
     if (
       store.state.organizationData.allDashboardData[dashboardId]
@@ -567,23 +521,18 @@ export const getDashboard = async (
       dashboardId,
     );
 
-    console.log("res", res.data);
-    console.log("hash", res.data.hash);
-    
     const version = res.data.version;
     const dashboardKey = `v${version}`;
     const dashboardData = res.data[dashboardKey];
     const hash = res.data.hash.toString();
 
     const convertedData = convertDashboardSchemaVersion(dashboardData);
-    console.log("convertedData", convertedData);
 
     store.dispatch("setAllDashboardListHash", {
       [dashboardId]: hash
     });
 
     store.dispatch("setDashboardData", {[dashboardId]: convertedData, hash});
-    console.log("store", store.state.organizationData);
 
     return store.state.organizationData.allDashboardData[dashboardId];
   } catch (error) {
@@ -596,12 +545,6 @@ export const deleteDashboardById = async (
   dashboardId: any,
   folderId: any,
 ) => {
-  console.log(
-    "deleteDashboardById: deleting dashboard",
-    dashboardId,
-    "in folder",
-    folderId
-  );
   try {
     // Delete the dashboard using the dashboardService
     await dashboardService.delete(
@@ -614,49 +557,37 @@ export const deleteDashboardById = async (
     const allDashboardList = store.state.organizationData.allDashboardList;
 
     if (allDashboardList[folderId]) {
-      console.log("deleteDashboardById: allDashboardList[folderId]", allDashboardList[folderId]);
       
       // Filter out the deleted dashboard from the list
       const newDashboards = allDashboardList[folderId].filter(
         (dashboard: any) => dashboard.dashboardId !== dashboardId,
       );
-
-      console.log("deleteDashboardById: newDashboards", newDashboards);
       
       // Update the allDashboardList in the store with the new list
       store.dispatch("setAllDashboardList", {
         ...allDashboardList,
         [folderId]: newDashboards,
       });
-
-      console.log("deleteDashboardById: store.state.organizationData.allDashboardList", store.state.organizationData.allDashboardList);
     }
 
-
     const allDashboardData = store.state.organizationData.allDashboardData;
-    console.log("deleteDashboardById: addDashboardData", allDashboardData);
     
     if (allDashboardData[dashboardId]) {
       const newDashboardData = {
         ...allDashboardData,
         [dashboardId]: {},
       }
-      console.log("deleteDashboardById: allDashboardData[dashboardId]", allDashboardData[dashboardId]);
       
       // update DashboardData in the store
       store.dispatch("setDashboardData", {
         ...allDashboardData,
         [dashboardId]: newDashboardData,
       })
-
-      console.log("deleteDashboardById: store.state.organizationData.allDashboardData", store.state.organizationData.allDashboardData);
       
       // remove current dashboard hash from allDashboardListHash
       delete store.state.organizationData.allDashboardListHash[
         dashboardId
       ];
-
-      console.log("deleteDashboardById: store.state.organizationData.allDashboardListHash", store.state.organizationData.allDashboardListHash);
       
       // update the allDashboardList in the store
       store.dispatch("setAllDashboardListHash", {
@@ -676,29 +607,18 @@ export const getPanel = async (
   folderId: any,
   tabId: any,
 ) => {
-  console.log("getPanel", dashboardId, panelId, folderId, tabId);
   try {
     if (
       !store.state.organizationData.allDashboardData[dashboardId]
     ) {
-      console.log(
-        "addPanel: no dashboard list found. fetching and adding panel. " +
-          dashboardId);
-      
       await getDashboard(store, dashboardId, folderId);
     }
     const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-    console.log("getPanel: dashboard found", currentDashboard);
-
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-    console.log("getPanel: tab found", tab);
-
     const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
-
-    console.log("getPanel: paneldata", paneldata);
 
     return paneldata;
   } catch (error) {
@@ -772,16 +692,13 @@ export const editTab = async (
   tabId: any,
   tabData: any,
 ) => {
-  console.log("editTab: calling editTab");
   try {
     const currentDashboardData = await getDashboard(store, dashboardId, folderId);
-    console.log("editTab: currentDashboardData", currentDashboardData);
     const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
     // only name will change
     tab.name = tabData.name;
 
-    console.log("editTab: calling updateDashboard");
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -790,11 +707,9 @@ export const editTab = async (
       folderId ?? "default",
     );
 
-    console.log("editTab: tab updated");
     // return updated tab
     return tab;
   } catch (error) {
-    console.log("editTab: error", error);
     throw error;
   }
 };
@@ -806,19 +721,14 @@ export const addTab = async (
   folderId: any,
   newTabData: any,
 ) => {
-  console.log("addTab: calling addTab");
   try {
     // generate tab id
     newTabData.tabId = getTabId();
 
-    console.log("addTab: newTabData", newTabData);
-
     const currentDashboardData = await getDashboard(store, dashboardId, folderId);
-    console.log("addTab: currentDashboardData", currentDashboardData);
 
     currentDashboardData.tabs.push(newTabData);
 
-    console.log("addTab: calling updateDashboard");
     await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -827,11 +737,9 @@ export const addTab = async (
       folderId ?? "default",
     );
 
-    console.log("addTab: tab added");
     // return new tab data with new tab id
     return newTabData;
   } catch (error) {
-    console.log("addTab: error", error);
     throw error;
   }
 };
@@ -886,17 +794,11 @@ export const movePanelToAnotherTab = async (
 
 export const getFoldersList = async (store: any) => {
   try {
-    console.log(
-      "inside getFoldersList",
-      store.state.selectedOrganization.identifier,
-    );
     let folders = (
       await dashboardService.list_Folders(
         store.state.selectedOrganization.identifier,
       )
     ).data.list;
-
-    console.log("folders", folders);
 
     // get default folder and append it to top
     let defaultFolder = folders.find((it: any) => it.folderId == "default");
@@ -910,14 +812,10 @@ export const getFoldersList = async (store: any) => {
       };
     }
 
-    console.log("defaultFolder", defaultFolder);
-
     store.dispatch("setFolders", [
       defaultFolder,
       ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
     ]);
-
-    console.log("folders after setting", store.state.organizationData.folders);
 
     return store.state.organizationData.folders;
   } catch (error) {
@@ -979,7 +877,6 @@ export const moveDashboardToAnotherFolder = async (
         to: to,
       },
     );
-    console.log("moveDashboardToAnotherFolder", dashboardId, from, to);
     
     //update both folders dashboard
     await getAllDashboards(store, to);
