@@ -28,13 +28,6 @@ fn create_table_stmt() -> TableCreateStatement {
         .table(BackgroundJobPartitions::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(BackgroundJobPartitions::Id)
-                .big_integer()
-                .not_null()
-                .auto_increment()
-                .primary_key(),
-        )
-        .col(
             ColumnDef::new(BackgroundJobPartitions::JobId)
                 .string_len(64)
                 .not_null(),
@@ -68,13 +61,18 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(ColumnDef::new(BackgroundJobPartitions::ResultPath).string_len(512))
         .col(ColumnDef::new(BackgroundJobPartitions::ErrorMessage).text())
+        .primary_key(
+            Index::create()
+                .name("pk_background_job_partitions")
+                .col(BackgroundJobPartitions::JobId)
+                .col(BackgroundJobPartitions::PartitionId),
+        )
         .to_owned()
 }
 
 #[derive(DeriveIden)]
 enum BackgroundJobPartitions {
     Table,
-    Id,
     JobId,
     PartitionId,
     StartTime,

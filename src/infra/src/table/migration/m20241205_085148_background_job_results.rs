@@ -24,13 +24,6 @@ fn create_table_stmt() -> TableCreateStatement {
         .table(BackgroundJobResults::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(BackgroundJobResults::Id)
-                .big_integer()
-                .not_null()
-                .auto_increment()
-                .primary_key(),
-        )
-        .col(
             ColumnDef::new(BackgroundJobResults::JobId)
                 .string_len(64)
                 .not_null(),
@@ -44,13 +37,18 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(BackgroundJobResults::EndedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobResults::ResultPath).string_len(512))
         .col(ColumnDef::new(BackgroundJobResults::ErrorMessage).text())
+        .primary_key(
+            Index::create()
+                .name("pk_background_job_results")
+                .col(BackgroundJobResults::JobId)
+                .col(BackgroundJobResults::TraceId),
+        )
         .to_owned()
 }
 
 #[derive(DeriveIden)]
 enum BackgroundJobResults {
     Table,
-    Id,
     JobId,
     TraceId,
     StartedAt,

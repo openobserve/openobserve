@@ -29,7 +29,7 @@ pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
 
     let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
-        .order_by(Column::Id, Order::Asc)
+        .order_by(Column::StartedAt, Order::Asc)
         .all(client)
         .await;
 

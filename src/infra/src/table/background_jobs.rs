@@ -441,7 +441,6 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
         ended_at: Set(res.ended_at),
         result_path: Set(res.result_path.clone()),
         error_message: Set(res.error_message.clone()),
-        ..Default::default()
     };
 
     // insert into job result table
