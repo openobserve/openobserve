@@ -21,8 +21,6 @@ use sea_orm::{
 };
 use sea_orm_migration::prelude::*;
 
-use crate::table::entity::templates;
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -220,23 +218,9 @@ mod destinations {
         pub r#type: Json,
     }
 
+    // There are relations but they are not important to this migration.
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {
-        #[sea_orm(
-            belongs_to = "super::super::super::entity::templates::Entity",
-            from = "Column::TemplateId",
-            to = "super::super::super::entity::templates::Column::Id",
-            on_update = "NoAction",
-            on_delete = "NoAction"
-        )]
-        Templates,
-    }
-
-    impl Related<super::super::super::entity::templates::Entity> for Entity {
-        fn to() -> RelationDef {
-            Relation::Templates.def()
-        }
-    }
+    pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
 
@@ -311,6 +295,31 @@ mod destinations {
         pub sns_topic_arn: String,
         pub aws_region: String,
     }
+}
+
+mod templates {
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "templates")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub org: String,
+        pub name: String,
+        pub is_default: bool,
+        pub r#type: String,
+        #[sea_orm(column_type = "Text")]
+        pub body: String,
+        #[sea_orm(column_type = "Text", nullable)]
+        pub title: Option<String>,
+    }
+
+    // There are relations but they are not important to this migration.
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
 }
 
 impl From<meta_destinations::HTTPType> for destinations::HTTPType {
