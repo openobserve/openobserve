@@ -5,9 +5,9 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "background_job_partitions")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub job_id: String,
+    #[sea_orm(primary_key, auto_increment = false)]
     pub partition_id: i32,
     pub start_time: i64,
     pub end_time: i64,
