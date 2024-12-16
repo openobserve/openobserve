@@ -689,7 +689,7 @@ export default defineComponent({
     const drilldownHoverSeriesRef: any = ref(null);
 
     const interval = computed(
-      () => resultMetaData?.value?.[0]?.histogram_interval || 0,
+      () => resultMetaData?.value?.[0]?.histogram_interval,
     );
 
     const intervalMillis = computed(() => interval.value * 1000);
@@ -711,7 +711,8 @@ export default defineComponent({
 
     const updateDrilldownHoverSeries = async() => {
       console.log("inside watch");
-
+      const hoveredSeriesName = drilldownHoverSeriesRef.value?.hoveredSeriesName;
+      
       if (drilldownHoverSeriesRef.value?.hoveredTime) {
         const hoveredTimestamp = new Date(
           drilldownHoverSeriesRef.value.hoveredTime,
@@ -725,8 +726,9 @@ export default defineComponent({
           endTime.value = calculatedEndTime;
         });
 
-        console.log("Start Time:", calculatedStartTime);
-        console.log("End Time:", calculatedEndTime);
+        console.log("object",  { startTime: calculatedStartTime, endTime: calculatedEndTime, hoveredSeriesName });
+        
+        return { startTime: calculatedStartTime, endTime: calculatedEndTime, hoveredSeriesName };
       }
     };
 
@@ -734,7 +736,6 @@ export default defineComponent({
       () => {
         if (hoveredSeriesState.value) {
           drilldownHoverSeriesRef.value = { ...hoveredSeriesState.value };
-
           updateDrilldownHoverSeries();
         }
       },
