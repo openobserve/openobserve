@@ -22,7 +22,7 @@ export class IamPage {
         // this.deleteButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
         this.deleteButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Delete Service Account']`;
 
-        this.confirmOkButton = "//div[@class='q-card']/div[2]/button/span[text()='Ok']";
+        this.confirmOkButton = "//div[@class='q-card']/div[2]/button/span[text()='OK']";
         this.cancelButton = "//div[@class='q-card']/div[2]/button/span[text()='Cancel']";
 
         this.refreshButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Refresh Service Token']`;
@@ -40,18 +40,18 @@ export class IamPage {
 
 
     async iamPageDefaultOrg() {
-       await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
         await this.page.getByText('default', { exact: true }).click();
     }
 
     async iamPageDefaultMultiOrg() {
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-  }
+    }
 
     async iamPageURLValidation() {
-     await expect(this.page).toHaveURL(/defaulttestmulti/);
-  }
+        await expect(this.page).toHaveURL(/defaulttestmulti/);
+    }
 
     async iamURLValidation() {
 
@@ -114,16 +114,9 @@ export class IamPage {
     }
 
     async clickSaveServiceAccount() {
-           await this.page.getByRole('button', { name: 'Save' }).click();
-           }
-
-    async waitResSaveServiceAccount() {
-           await this.page.waitForResponse(
-            (response) =>
-                response.url().includes("/api/default/service_accounts") && response.status() === 200
-        );
-
+        await this.page.getByRole('button', { name: 'Save' }).click();
     }
+
 
     async verifySuccessMessage(expectedMessage) {
         await expect(this.page.locator('role=alert').first()).toBeVisible();
@@ -139,7 +132,7 @@ export class IamPage {
     }
 
     async waitResEmailServiceAccount(emailName) {
-           await this.page.waitForResponse(
+        await this.page.waitForResponse(
             (response) =>
                 response.url().includes("/api/default/service_accounts/${emailName}") && response.status() === 200
         );
@@ -194,7 +187,7 @@ export class IamPage {
         await this.page.waitForTimeout(2000);
     }
 
-    
+
 
     async requestServiceAccountCancel() {
         // Wait for the cancel confirmation button to be visible and click it

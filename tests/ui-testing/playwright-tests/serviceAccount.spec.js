@@ -13,10 +13,10 @@ test.describe("Service Account for API access", () => {
         iamPage = new IamPage(page);
         await loginPage.gotoLoginPage();
         await loginPage.login();
-        
+
     });
 
-   
+
     test("Error Message displayed if Email Blank", async ({ page }) => {
 
         await iamPage.gotoIamPage();
@@ -34,7 +34,6 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
 
     });
@@ -68,10 +67,9 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickCopyToken();
-     
+
 
     });
 
@@ -82,11 +80,10 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickDownloadToken();
 
-       
+
     });
     test("Service Account Token Pop Up Closed", async ({ page }) => {
 
@@ -95,7 +92,6 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickServiceAccountPopUpClosed();
 
@@ -108,7 +104,6 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickServiceAccountPopUpClosed();
         await iamPage.reloadServiceAccountPage();
@@ -125,7 +120,6 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickServiceAccountPopUpClosed();
         await iamPage.reloadServiceAccountPage();
@@ -141,12 +135,10 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickServiceAccountPopUpClosed();
         await iamPage.reloadServiceAccountPage();
         await iamPage.updatedServiceAccount(emailName);
-
         await iamPage.enterFirstLastNameServiceAccount();
         await iamPage.clickSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account updated successfully.');
@@ -160,7 +152,6 @@ test.describe("Service Account for API access", () => {
         await iamPage.iamPageAddServiceAccount();
         await iamPage.enterEmailServiceAccount(emailName);
         await iamPage.clickSaveServiceAccount();
-        await iamPage.waitResSaveServiceAccount();
         await iamPage.verifySuccessMessage('Service Account created successfully.');
         await iamPage.clickServiceAccountPopUpClosed();
         await iamPage.reloadServiceAccountPage();
