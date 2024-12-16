@@ -213,7 +213,7 @@ impl TraceListIndex {
                 approx_partition: false,
                 distinct_value_fields: vec![],
                 index_updated_at: 0,
-                red_days: vec![]
+                red_days: vec![],
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

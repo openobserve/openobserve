@@ -514,7 +514,6 @@ pub struct UpdateStringSettingsArray {
     pub remove: Vec<String>,
 }
 
-
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
@@ -634,7 +633,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub index_updated_at: i64,
     #[serde(default)]
-    pub red_days: Vec<TimeRange>
+    pub red_days: Vec<TimeRange>,
 }
 
 impl Serialize for StreamSettings {
@@ -792,10 +791,12 @@ impl From<&str> for StreamSettings {
             .unwrap_or_default();
 
         let mut red_days = vec![];
-        if let Some(values) = settings.get("red_days")
-            .and_then(|v| v.as_array()) {
+        if let Some(values) = settings.get("red_days").and_then(|v| v.as_array()) {
             for item in values {
-                let start = item.get("start").and_then(|v| v.as_i64()).unwrap_or_default();
+                let start = item
+                    .get("start")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or_default();
                 let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
                 red_days.push(TimeRange::new(start, end));
             }
@@ -815,7 +816,7 @@ impl From<&str> for StreamSettings {
             approx_partition,
             distinct_value_fields,
             index_updated_at,
-            red_days
+            red_days,
         }
     }
 }

@@ -80,7 +80,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                     &org_id,
                     stream_type,
                     &stream_name,
-                    red_days
+                    red_days,
                 )
                 .await
                 {

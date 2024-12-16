@@ -278,11 +278,13 @@ pub async fn save_stream_settings(
             )));
         }
 
-        let last_retained = config::utils::time::now() - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+        let last_retained = config::utils::time::now()
+            - Duration::try_days(cfg.compact.data_retention_days).unwrap();
         if range.start < last_retained.timestamp_nanos_opt().unwrap() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                "start day should be less than the last data retention day {last_retained}".to_string(),
+                "start day should be less than the last data retention day {last_retained}"
+                    .to_string(),
             )));
         }
     }
@@ -344,9 +346,8 @@ pub async fn update_stream_settings(
 
             if !new_settings.defined_schema_fields.remove.is_empty() {
                 if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
-                    schema_fields.retain(|field| {
-                        !new_settings.defined_schema_fields.remove.contains(field)
-                    });
+                    schema_fields
+                        .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
                 }
             }
 
@@ -363,9 +364,7 @@ pub async fn update_stream_settings(
             }
 
             if !new_settings.index_fields.add.is_empty() {
-                settings
-                    .index_fields
-                    .extend(new_settings.index_fields.add);
+                settings.index_fields.extend(new_settings.index_fields.add);
                 settings.index_updated_at = now_micros();
             }
 
@@ -380,7 +379,9 @@ pub async fn update_stream_settings(
             }
 
             if !new_settings.red_days.remove.is_empty() {
-                settings.red_days.retain(|range| !new_settings.red_days.remove.contains(range));
+                settings
+                    .red_days
+                    .retain(|range| !new_settings.red_days.remove.contains(range));
             }
 
             if !new_settings.distinct_value_fields.add.is_empty() {
