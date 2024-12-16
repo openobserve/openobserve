@@ -221,15 +221,23 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
+
+            #[allow(deprecated)]
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
+
+            // migrate infra_sea_orm
+            if let Err(e) = infra::table::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("infra sea_orm migrate failed: {}", e);
+            }
+
             // migrate dashboards
             if let Err(e) = migration::dashboards::run().await {
                 job_init_tx.send(false).ok();
                 panic!("migrate dashboards failed: {}", e);
             }
-
-            migration::upgrade_resource_names()
-                .await
-                .expect("migrate resource names into supported ofga format failed");
 
             // ingester init
             if let Err(e) = ingester::init().await {
