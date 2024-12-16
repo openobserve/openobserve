@@ -12,7 +12,7 @@ test('Relative Seconds on Logs page', async ({ page }) => {
   const logsPage = new LogsPage(page);
   // Step 1: Navigate to the application and login
   await loginPage.gotoLoginPage();
-  await loginPage.loginAuto();
+  await loginPage.login();
   // Step 2: Navigate to Logs Page
  // await page.waitForTimeout(4000);  // Wait for login process 
   await logsPage.navigateToLogs();

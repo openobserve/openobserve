@@ -15,7 +15,7 @@ export class LoginPage {
   async loginAsInternalUser() {
   
     await this.page.getByText('Login as internal user').click();
-    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
        waitUntil: "networkidle",
        });
     
@@ -30,52 +30,10 @@ export class LoginPage {
     await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     await this.waitForLogin;
     await this.loginButton.click();
-    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
       waitUntil: "networkidle",
     });
   
     
   }
-
-
-  async loginAuto() {
-    const isVisible = await this.page.getByText('Login as internal user').isVisible();
-    if (isVisible) {
-      await this.page.getByText('Login as internal user').click();
-      await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
-         waitUntil: "networkidle",
-         });
-
-         await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
-         const waitForLogin = this.page.waitForResponse(
-           (response) =>
-             response.url().includes("/auth/login") && response.status() === 200
-         );
-         await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-         await this.waitForLogin;
-         await this.loginButton.click();
-         await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
-           waitUntil: "networkidle",
-         });   
-
-    }
-    
-    else {
-      await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
-      const waitForLogin = this.page.waitForResponse(
-        (response) =>
-          response.url().includes("/auth/login") && response.status() === 200
-      );
-      await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-      await this.waitForLogin;
-      await this.loginButton.click();
-      await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
-        waitUntil: "networkidle",
-      });
-    }
-
- 
-
-}
-
 }
