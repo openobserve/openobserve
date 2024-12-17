@@ -603,7 +603,6 @@ pub struct CancelQueryResponse {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SubmitQueryResponse {
     pub job_id: String,
-    pub range_error: String,
 }
 
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]

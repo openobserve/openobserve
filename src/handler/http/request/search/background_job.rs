@@ -50,7 +50,6 @@ pub async fn submit_job(
     let cfg = get_config();
 
     let org_id = org_id.into_inner();
-    let mut range_error = String::new();
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
@@ -107,23 +106,8 @@ pub async fn submit_job(
         }
     };
 
-    // get stream settings
+    // Check permissions on stream
     for stream_name in stream_names.iter() {
-        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
-        {
-            let max_query_range = settings.max_query_range;
-            if max_query_range > 0
-                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
-            {
-                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
-                range_error = format!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
-                );
-            }
-        }
-
-        // Check permissions on stream
         if let Some(res) =
             check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
@@ -148,11 +132,8 @@ pub async fn submit_job(
     .await;
 
     match res {
-        Ok(res) => {
-            let ret = SubmitQueryResponse {
-                job_id: res,
-                range_error,
-            };
+        Ok(job_id) => {
+            let ret = SubmitQueryResponse { job_id };
             Ok(HttpResponse::Ok().json(ret))
         }
         Err(err) => {
@@ -169,33 +150,14 @@ pub async fn submit_job(
 
 // 2. status_all
 #[get("/{org_id}/search_job/status_all")]
-pub async fn list_status(
-    org_id: web::Path<String>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-
+pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = list_status_by_org_id(&org_id).await;
     let res = match res {
         Ok(res) => res,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    // check permissions
-    let mut models = Vec::new();
-    for model in res.iter() {
-        if check_permissions(model, &org_id, &user_id).await.is_some() {
-            continue;
-        }
-        models.push(model);
-    }
-
-    Ok(HttpResponse::Ok().json(models))
+    Ok(HttpResponse::Ok().json(res))
 }
 
 // 3. status
@@ -227,7 +189,7 @@ pub async fn get_status(
 }
 
 // 4. cancel
-#[delete("/{org_id}/search_job/cancel/{job_id}")]
+#[post("/{org_id}/search_job/cancel/{job_id}")]
 pub async fn cancel_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
