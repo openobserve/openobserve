@@ -1,8 +1,23 @@
 <template>
-  <div></div>
-  <div class="tw-flex tw-items-center tw-flex-wrap q-pb-sm">
+  <div class="tw-flex tw-items-center tw-pb-3">
+    <span class="tw-text-[16px]">Test Function on</span>
+    <app-tabs
+      class="test-function-option-tabs tw-border tw-text-gray-700 tw-border-gray-300 tw-w-max tw-ml-2"
+      style="border-radius: 4px; overflow: hidden"
+      data-test="test-function-option-tabs"
+      :tabs="tabs"
+      :active-tab="activeTab"
+      @update:active-tab="updateActiveTab"
+    />
+  </div>
+  <div
+    v-if="activeTab === 'stream'"
+    class="tw-flex tw-items-center tw-flex-wrap q-pb-sm"
+  >
     <div class="function-stream-select-input tw-w-[35%] q-pr-md">
-      <div class="tw-text-[12px]">{{ t("alerts.streamType") + " *" }}</div>
+      <div class="tw-text-[12px] tw-text-gray-700">
+        {{ t("alerts.streamType") + " *" }}
+      </div>
       <q-select
         v-model="selectedStream.type"
         :options="streamTypes"
@@ -20,11 +35,15 @@
       />
     </div>
     <div class="functions-duration-input tw-w-[65%]">
-      <div class="tw-text-[12px]">{{ t("common.duration") + " *" }}</div>
+      <div class="tw-text-[12px] tw-text-gray-700">
+        {{ t("common.duration") + " *" }}
+      </div>
       <DateTime label="Start Time" class="q-py-sm tw-w-full" />
     </div>
     <div class="function-stream-select-input tw-w-[100%]">
-      <div class="tw-text-[12px]">{{ t("alerts.stream_name") + " *" }}</div>
+      <div class="tw-text-[12px] tw-text-gray-700">
+        {{ t("alerts.stream_name") + " *" }}
+      </div>
       <q-select
         v-model="selectedStream.name"
         :options="streams"
@@ -42,9 +61,8 @@
         @update:model-value="updateQuery"
       />
     </div>
-  </div>
-  <div>
-    <div class="test-function-query-container">
+
+    <div class="test-function-query-container tw-w-[100%] tw-mt-1">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.query"
@@ -83,7 +101,9 @@
         </div>
       </div>
     </div>
-    <div class="q-mt-sm">
+  </div>
+  <div>
+    <div>
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.events"
@@ -94,7 +114,7 @@
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
       >
         <div
-          v-if="!inputEvents"
+          v-if="activeTab === 'stream' && !inputEvents"
           class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-bg-white tw-opacity-90"
         >
           <q-icon
@@ -103,7 +123,7 @@
             class="tw-text-orange-400"
           />
           <div class="tw-text-[15px] tw-text-gray-600">
-            Run Query to view events
+            {{ eventsMessage }}
           </div>
         </div>
         <query-editor
@@ -122,12 +142,26 @@
         v-model:is-expanded="expandState.output"
         :label="t('common.output')"
       />
+
       <div
         v-show="expandState.output"
-        class="tw-border-[1px] tw-border-gray-200"
+        class="tw-border-[1px] tw-border-gray-200 tw-relative"
       >
+        <div
+          v-if="!outputEvents"
+          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-bg-white tw-opacity-90"
+        >
+          <q-icon
+            :name="outlinedLightbulb"
+            size="40px"
+            class="tw-text-orange-400"
+          />
+          <div class="tw-text-[15px] tw-text-gray-600">
+            {{ outputMessage }}
+          </div>
+        </div>
         <pre class="test-output-container tw-p-2 tw-text-sm tw-text-gray-600">{{
-          output
+          outputEvents
         }}</pre>
       </div>
     </div>
@@ -135,7 +169,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onBeforeMount, ref, defineProps, defineExpose } from "vue";
+import { onBeforeMount, ref, defineProps, defineExpose, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -146,18 +180,26 @@ import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { event, useQuasar } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
-const output = ref<string>("");
+const outputEvents = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const dateTime = ref<any>({});
+
+const tabs = [
+  { label: "Stream/Query", value: "stream" },
+  { label: "Data", value: "data" },
+];
+
+const activeTab = ref("stream");
 
 const selectedStream = ref<{
   name: string;
@@ -200,6 +242,34 @@ const streams = ref([]);
 onBeforeMount(async () => {
   await importSqlParser();
   await updateStreams();
+});
+
+const eventsMessage = computed(() => {
+  if (activeTab.value === "stream" && !selectedStream.value.name) {
+    return "Please select a stream and Run Query to see the events";
+  }
+
+  if (activeTab.value === "stream" && !inputQuery.value) {
+    return "Please enter Query and click Run Query to see the events";
+  }
+
+  if (activeTab.value === "stream" && !inputEvents.value) {
+    return "Click Run Query to see the events";
+  }
+
+  return "";
+});
+
+const outputMessage = computed(() => {
+  if (activeTab.value === "stream" && eventsMessage.value) {
+    return eventsMessage.value;
+  }
+
+  if (!outputEvents.value) {
+    return "Please click Test Function to see the events";
+  }
+
+  return "";
 });
 
 const importSqlParser = async () => {
@@ -305,6 +375,14 @@ const getResults = async () => {
     });
 };
 
+const updateActiveTab = (tab: string) => {
+  activeTab.value = tab;
+  if (tab === "data" && !inputEvents.value) {
+    expandState.value.events = true;
+    inputEvents.value = JSON.stringify(JSON.parse(JSON.stringify([])));
+  }
+};
+
 defineExpose({
   getResults,
 });
@@ -316,6 +394,20 @@ defineExpose({
   width: 100%;
   min-height: 15rem;
   border-radius: 5px;
+}
+
+.test-function-option-tabs {
+  :deep(.rum-tab) {
+    width: auto !important;
+    font-size: 12px;
+    padding: 4px 12px;
+    border: none !important;
+  }
+
+  :deep(.active) {
+    background-color: $primary !important;
+    color: white !important;
+  }
 }
 .test-function-query-container {
   :deep(.test-function-run-query-btn) {
