@@ -686,13 +686,13 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
-    const drilldownHoverSeriesRef: any = ref(null);
-
+    // get interval from resultMetaData if it exists
     const interval = computed(
       () => resultMetaData?.value?.[0]?.histogram_interval,
     );
 
-    const intervalMillis = computed(() => interval.value * 1000);
+    // get interval in micro seconds
+    const intervalMicro = computed(() => interval.value * 1000 * 1000);
 
     watch(
       () => resultMetaData.value,
@@ -700,50 +700,16 @@ export default defineComponent({
         emit("result-metadata-update", newVal);
         console.log("resultMetaData interval", newVal);
         console.log("interval", interval.value);
-        console.log("intervalMillis", intervalMillis.value);
+        console.log("intervalMillis", intervalMicro.value);
       },
       { deep: true },
     );
 
-    // Separate reactive refs for startTime and endTime
-    const startTime: any = ref(null);
-    const endTime: any = ref(null);
-
-    const updateDrilldownHoverSeries = async() => {
-      console.log("inside watch");
-      const hoveredSeriesName = drilldownHoverSeriesRef.value?.hoveredSeriesName;
-      
-      if (drilldownHoverSeriesRef.value?.hoveredTime) {
-        const hoveredTimestamp = new Date(
-          drilldownHoverSeriesRef.value.hoveredTime,
-        ).getTime();
-
-        const calculatedStartTime = hoveredTimestamp * 1000; // Convert to milliseconds
-        const calculatedEndTime = calculatedStartTime + intervalMillis.value; // Add intervalMillis
-
-        await nextTick(() => {
-          startTime.value = calculatedStartTime;
-          endTime.value = calculatedEndTime;
-        });
-
-        console.log("object",  { startTime: calculatedStartTime, endTime: calculatedEndTime, hoveredSeriesName });
-        
-        return { startTime: calculatedStartTime, endTime: calculatedEndTime, hoveredSeriesName };
-      }
-    };
-
-    watch( hoveredSeriesState.value,
-      () => {
-        if (hoveredSeriesState.value) {
-          drilldownHoverSeriesRef.value = { ...hoveredSeriesState.value };
-          updateDrilldownHoverSeries();
-        }
-      },
-    );
 
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
+
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -758,7 +724,10 @@ export default defineComponent({
         const drilldownData = panelSchema.value.config.drilldown[index];
 
         const navigateToLogs = async () => {
-          console.log("navigateToLogs: Initializing navigation to logs.");
+          console.log(
+            "navigateToLogs: Initializing navigation to logs. hoveredSeriesState",
+            drilldownParams[0],
+          );
 
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
@@ -777,6 +746,30 @@ export default defineComponent({
             console.error("navigateToLogs: Missing query or stream name.");
             return;
           }
+
+          // Extract hovered time and calculate start and end time
+          const hoveredTime = drilldownParams[0]?.value?.[0]; // Extract time from value array
+          console.log("hoverTime", hoveredTime, typeof hoveredTime);
+          if (!hoveredTime) {
+            console.error(
+              "navigateToLogs: Missing hovered time in drilldownParams.",
+            );
+            return;
+          }
+
+          const hoveredTimestamp = new Date(hoveredTime).getTime(); // Convert to milliseconds
+          if (!intervalMicro.value) {
+            console.error("navigateToLogs: intervalMillis is not defined.");
+            return;
+          }
+
+          const calculatedStartTime = hoveredTimestamp * 1000; // Convert to microseconds
+          const calculatedEndTime = calculatedStartTime + intervalMicro.value; // Add intervalMillis
+
+          console.log("navigateToLogs: Calculated start and end time", {
+            calculatedStartTime,
+            calculatedEndTime,
+          });
 
           // Initialize SQL parser if not already done
           if (!parser) {
