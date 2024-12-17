@@ -278,9 +278,10 @@ pub async fn save_stream_settings(
             )));
         }
 
-        let last_retained = config::utils::time::now()
-            - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-        if dbg!(range.start * 1000) < dbg!(last_retained.timestamp_nanos_opt().unwrap()) {
+        let last_retained =
+            config::utils::time::now() - Duration::try_days(dbg!(settings.data_retention)).unwrap();
+
+        if range.start * 1000 < last_retained.timestamp_nanos_opt().unwrap() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(
