@@ -771,6 +771,12 @@ export default defineComponent({
             calculatedEndTime,
           });
 
+          const hoverName = drilldownParams[0]?.seriesName;
+          console.log("navigateToLogs: Hovered series name", hoverName);
+          const breakdown = panelSchema.value.queries[0].fields?.breakdown;
+          console.log("navigateToLogs: Breakdown", breakdown);
+          
+          
           // Initialize SQL parser if not already done
           if (!parser) {
             await importSqlParser();
