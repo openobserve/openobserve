@@ -19,7 +19,7 @@ use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpRespo
 use config::{
     get_config,
     meta::{
-        search::{Response, SubmitQueryResponse},
+        search::{Response, SearchEventType, SubmitQueryResponse},
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -33,7 +33,7 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::{
             get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request,
+            get_stream_type_from_request,
         },
     },
     handler::http::request::search::{job::cancel_query_inner, utils::check_stream_premissions},
@@ -86,12 +86,7 @@ pub async fn submit_job(
     }
 
     // set search event type
-    if req.search_type.is_none() {
-        req.search_type = match get_search_type_from_request(&query) {
-            Ok(v) => v,
-            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-        };
-    };
+    req.search_type = Some(SearchEventType::BackgroundJob);
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
