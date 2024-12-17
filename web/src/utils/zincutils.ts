@@ -246,10 +246,7 @@ export const getSessionStorageVal = (key: string) => {
   }
 };
 
-export const useLocalOrganization = (
-  val:any = {},
-  isDelete = false,
-) => {
+export const useLocalOrganization = (val: any = {}, isDelete = false) => {
   try {
     if (typeof val === "object") {
       if (Object.keys(val).length > 0) {
@@ -962,4 +959,8 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
   }
 
   return true;
+};
+
+export const deepCopy = (value: any) => {
+  return JSON.parse(JSON.stringify(value));
 };
