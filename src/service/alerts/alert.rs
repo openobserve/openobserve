@@ -31,6 +31,7 @@ use config::{
         },
         folder::{Folder, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
+        sql::resolve_stream_names,
         stream::StreamType,
     },
     utils::{
@@ -40,7 +41,10 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use infra::table::{self, folders::FolderType};
+use infra::{
+    schema::unwrap_stream_settings,
+    table::{self, folders::FolderType},
+};
 use lettre::{message::MultiPart, AsyncTransport, Message};
 
 use crate::{
@@ -185,6 +189,19 @@ pub async fn save(
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 
+    // Alerts must follow the max_query_range of the stream as set in the schema
+    if let Some(settings) = unwrap_stream_settings(&schema) {
+        let max_query_range = settings.max_query_range;
+        if max_query_range > 0
+            && !alert.is_real_time
+            && alert.trigger_condition.period > max_query_range * 60
+        {
+            return Err(anyhow::anyhow!(
+                "Alert period is greater than max query range of {max_query_range} hours for stream \"{stream_name}\""
+            ));
+        }
+    }
+
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(anyhow::anyhow!(
             "Realtime alert should use Custom query type"
@@ -211,6 +228,36 @@ pub async fn save(
                 return Err(anyhow::anyhow!(
                     "Alert with SQL can not contain SELECT * in the SQL query"
                 ));
+            }
+
+            let sql = alert.query_condition.sql.as_ref().unwrap();
+            let stream_names = match resolve_stream_names(sql) {
+                Ok(stream_names) => stream_names,
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Error resolving stream names in SQL query: {e}"
+                    ));
+                }
+            };
+
+            // SQL may contain multiple stream names, check for each stream
+            // if the alert period is greater than the max query range
+            for stream in stream_names.iter() {
+                if !stream.eq(stream_name) {
+                    if let Some(settings) =
+                        infra::schema::get_settings(org_id, stream, stream_type).await
+                    {
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && !alert.is_real_time
+                            && alert.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(anyhow::anyhow!(
+                                "Alert period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                            ));
+                        }
+                    }
+                }
             }
         }
         QueryType::PromQL => {
