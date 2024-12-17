@@ -56,6 +56,7 @@ use crate::{
 
 #[cfg(feature = "enterprise")]
 pub mod background_job;
+#[cfg(feature = "enterprise")]
 pub mod job;
 pub mod multi_streams;
 pub mod saved_view;

@@ -389,9 +389,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(prom::format_query_post)
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
-        .service(search::job::cancel_multiple_query)
-        .service(search::job::cancel_query)
-        .service(search::job::query_status)
         .service(search::search_partition)
         .service(search::around)
         .service(search::values)
@@ -502,7 +499,10 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::background_job::get_job_result)
         .service(search::background_job::cancel_job)
         .service(search::background_job::delete_job)
-        .service(search::background_job::retry_job);
+        .service(search::background_job::retry_job)
+        .service(search::job::cancel_multiple_query)
+        .service(search::job::cancel_query)
+        .service(search::job::query_status);
 
     cfg.service(service);
 }
