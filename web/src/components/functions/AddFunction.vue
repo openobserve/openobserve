@@ -15,115 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="add-function-header row items-center no-wrap">
-      <div class="col">
-        <div v-if="beingUpdated" class="text-h6">
-          {{ t("function.updateTitle") }}
-        </div>
-        <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
-      </div>
+  <div class="add-functions-section">
+    <div class="add-function-actions tw-pb-4">
+      <FunctionsToolbar @test-function="onTestFunction" />
+      <q-separator />
     </div>
 
-    <q-separator />
-    <div>
-      <q-form id="addFunctionForm" ref="addJSTransformForm" @submit="onSubmit">
-        <div
-          class="add-function-name-input row q-pb-sm q-pt-md q-col-gutter-md"
+    <div class="tw-flex">
+      <div class="tw-w-2/4 tw-pr-2">
+        <q-form
+          id="addFunctionForm"
+          ref="addJSTransformForm"
+          @submit="onSubmit"
         >
-          <q-input
-            v-model="formData.name"
-            :label="t('function.name')"
-            color="input-border"
-            bg-color="input-bg"
-            class="col-4 q-py-md showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
-            tabindex="0"
-          />
-        </div>
+          <div class="add-function-name-input q-pb-sm q-pt-md">
+            <q-input
+              v-model="formData.name"
+              :label="t('function.name')"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop tw-w-full"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
+              :rules="[
+                (val: any) => !!val || 'Field is required!',
+                isValidMethodName,
+              ]"
+              tabindex="0"
+            />
 
-        <div v-if="store.state.zoConfig.lua_fn_enabled" class="q-gutter-sm">
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.transType"
-            :checked="formData.transType === '0'"
-            val="0"
-            :label="t('function.vrl')"
-            class="q-ml-none"
-            @update:model-value="updateEditorContent"
-          />
-          <q-radio
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            v-model="formData.transType"
-            :checked="formData.transType === '1'"
-            val="1"
-            :label="t('function.lua')"
-            class="q-ml-none"
-            @update:model-value="updateEditorContent"
-          />
-        </div>
+            <q-input
+              v-if="formData.transType === '0'"
+              v-model="formData.params"
+              :label="t('function.params')"
+              :placeholder="t('function.paramsHint')"
+              color="input-border"
+              bg-color="input-bg"
+              class="col-4 q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="beingUpdated"
+              v-bind:disable="beingUpdated"
+              :rules="[
+                (val: any) => !!val || 'Field is required!',
+                isValidParam,
+              ]"
+              tabindex="0"
+            />
 
-        <q-input
-          v-if="formData.transType === '0'"
-          v-model="formData.params"
-          :label="t('function.params')"
-          :placeholder="t('function.paramsHint')"
-          color="input-border"
-          bg-color="input-bg"
-          class="col-4 q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated"
-          :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
-          tabindex="0"
-        />
+            <FullViewContainer
+              name="function"
+              v-model:is-expanded="expandState.functions"
+              :label="t('function.jsfunction') + '*'"
+            />
+            <div
+              v-show="expandState.functions"
+              class="tw-border-[1px] tw-border-gray-200"
+            >
+              <query-editor
+                data-test="logs-vrl-function-editor"
+                ref="editorRef"
+                editor-id="add-function-editor"
+                class="monaco-editor"
+                v-model:query="formData.function"
+                language="vrl"
+              />
+            </div>
 
-        <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <query-editor
-          data-test="logs-vrl-function-editor"
-          ref="editorRef"
-          editor-id="add-function-editor"
-          class="monaco-editor"
-          v-model:query="formData.function"
-          language="vrl"
-        />
-
-        <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
+            <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
-        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
-          compilationErr
-        }}</pre>
-        <div class="add-function-actions flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold"
-            :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            :label="t('function.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
-        </div>
-      </q-form>
+            <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
+              compilationErr
+            }}</pre>
+          </div>
+          <div></div>
+        </q-form>
+      </div>
+      <div
+        class="tw-w-2/4 tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max"
+      >
+        <TestFunction ref="testFunctionRef" :vrlFunction="formData.function" />
+      </div>
     </div>
   </div>
 </template>
@@ -137,6 +115,9 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import QueryEditor from "@/components/QueryEditor.vue";
+import TestFunction from "@/components/functions/TestFunction.vue";
+import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
+import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 
 const defaultValue: any = () => {
   return {
@@ -163,6 +144,9 @@ export default defineComponent({
   },
   components: {
     QueryEditor,
+    FunctionsToolbar,
+    FullViewContainer,
+    TestFunction,
   },
   emits: ["update:list", "cancel:hideform"],
   setup(props, { emit }) {
@@ -178,12 +162,17 @@ export default defineComponent({
     let editorobj: any = null;
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
+    const testFunctionRef = ref(null);
+
+    const expandState = ref({
+      functions: true,
+    });
 
     let compilationErr = ref("");
 
     const beingUpdated = computed(() => props.isUpdated);
 
-    const streamTypes = ["logs", "metrics"];
+    const streamTypes = ["logs", "metrics", "traces"];
 
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
@@ -236,7 +225,7 @@ end`;
 
           callTransform = jsTransformService.create(
             store.state.selectedOrganization.identifier,
-            formData.value
+            formData.value,
           );
         } else {
           formData.value.transType = parseInt(formData.value.transType);
@@ -247,7 +236,7 @@ end`;
 
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
-            formData.value
+            formData.value,
           );
         }
 
@@ -286,6 +275,10 @@ end`;
       });
     };
 
+    const onTestFunction = () => {
+      testFunctionRef.value.getResults();
+    };
+
     return {
       t,
       $q,
@@ -307,6 +300,9 @@ end`;
       isValidParam,
       isValidMethodName,
       onSubmit,
+      expandState,
+      testFunctionRef,
+      onTestFunction,
     };
   },
   created() {
@@ -326,11 +322,76 @@ end`;
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+.add-functions-section {
+  :deep(.monaco-editor-background),
+  :deep(.test-output-container) {
+    background-color: #ffffff !important;
+  }
+
+  :deep(.monaco-editor .margin),
+  :deep(.monaco-editor) {
+    background-color: #ffffff !important;
+  }
+}
+
 .monaco-editor {
   width: 100%;
   min-height: 15rem;
   border-radius: 5px;
+}
+
+.add-function-name-input {
+  :deep(.q-field--dense .q-field__control) {
+    height: 36px;
+    min-height: auto;
+    border-radius: 3px;
+
+    .q-field__control-container {
+      height: 32px;
+
+      .q-field__native {
+        height: 32px !important;
+      }
+    }
+
+    .q-field__marginal {
+      height: 32px;
+      min-height: auto;
+    }
+  }
+
+  :deep(.q-field__bottom) {
+    padding-top: 4px !important;
+    min-height: auto;
+  }
+}
+
+.function-stream-select-input {
+  :deep(.q-field--auto-height .q-field__control) {
+    height: 32px;
+    min-height: auto;
+
+    .q-field__control-container {
+      height: 32px;
+
+      .q-field__native {
+        min-height: 32px !important;
+        height: 32px !important;
+      }
+    }
+
+    .q-field__marginal {
+      height: 32px;
+      min-height: auto;
+    }
+  }
+}
+
+.functions-duration-input {
+  :deep(.date-time-button) {
+    width: 100%;
+  }
 }
 </style>
 <style>
