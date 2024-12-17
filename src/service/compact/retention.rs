@@ -58,7 +58,7 @@ fn populate_time_ranges_for_deletion(
         red_day_range_start = allowed_red_day_retention_end;
     }
 
-    // TODO: Improve this logic. Since the compactor works on days granularity, we can safely add
+    // Improve this logic. Since the compactor works on days granularity, we can safely add
     // day but this should be changed when the granularity is changed
     red_day_range_end += Duration::days(1); // add one day to make it exclusive
 
@@ -577,8 +577,10 @@ mod tests {
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
-        let lifecycle_end = "2023-01-01";
-        delete_by_stream(lifecycle_end, org_id, stream_type, stream_name, &[])
+        let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .to_utc();
+        delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[])
             .await
             .unwrap();
     }
