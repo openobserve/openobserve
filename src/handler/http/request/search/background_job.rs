@@ -25,7 +25,7 @@ use config::{
     },
     utils::json,
 };
-use infra::storage;
+use infra::{storage, table::entity::background_jobs::Model as JobModel};
 use tracing::Span;
 
 use crate::{
@@ -113,9 +113,8 @@ pub async fn submit_job(
     };
 
     // get stream settings
-    for stream_name in stream_names {
-        if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+    for stream_name in stream_names.iter() {
+        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
@@ -131,11 +130,14 @@ pub async fn submit_job(
 
         // Check permissions on stream
         if let Some(res) =
-            check_stream_premissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_premissions(stream_name, &org_id, &user_id, &stream_type).await
         {
             return Ok(res);
         }
     }
+
+    // add stream_names for rbac
+    let stream_names = json::to_string(&stream_names).unwrap();
 
     // submit query to db
     let res = submit(
@@ -143,6 +145,7 @@ pub async fn submit_job(
         &org_id,
         &user_id,
         &stream_type.to_string(),
+        &stream_names,
         &json::to_string(&req).unwrap(),
         req.query.start_time,
         req.query.end_time,
@@ -175,7 +178,7 @@ pub async fn list_status(
     org_id: web::Path<String>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
+    let user_id = in_req
         .headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())
@@ -183,10 +186,21 @@ pub async fn list_status(
         .to_string();
 
     let res = list_status_by_org_id(&org_id).await;
-    match res {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // check permissions
+    let mut models = Vec::new();
+    for model in res.iter() {
+        if check_permissions(model, &org_id, &user_id).await.is_some() {
+            continue;
+        }
+        models.push(model);
     }
+
+    Ok(HttpResponse::Ok().json(models))
 }
 
 // 3. status
@@ -195,28 +209,7 @@ pub async fn get_status(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-
-    let job_id = path.1.clone();
-    let res = get(&job_id).await;
-    match res {
-        Ok(res) => Ok(HttpResponse::Ok().json(res)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
-}
-
-// 4. cancel
-#[delete("/{org_id}/search_job/cancel/{job_id}")]
-pub async fn cancel_job(
-    path: web::Path<(String, String)>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
+    let user_id = in_req
         .headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())
@@ -225,7 +218,35 @@ pub async fn cancel_job(
 
     let org_id = path.0.clone();
     let job_id = path.1.clone();
-    cancel_job_inner(&org_id, &job_id).await
+    let res = get(&job_id, &org_id).await;
+    let model = match res {
+        Ok(res) => res,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // check permissions
+    if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
+        return Ok(res);
+    }
+    Ok(HttpResponse::Ok().json(model))
+}
+
+// 4. cancel
+#[delete("/{org_id}/search_job/cancel/{job_id}")]
+pub async fn cancel_job(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let org_id = path.0.clone();
+    let job_id = path.1.clone();
+    cancel_job_inner(&org_id, &job_id, &user_id).await
 }
 
 // 5. get
@@ -234,34 +255,40 @@ pub async fn get_job_result(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
+    let user_id = in_req
         .headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
 
+    let org_id = path.0.clone();
     let job_id = path.1.clone();
-    let res = get(&job_id).await;
-    match res {
-        Ok(res) => {
-            if res.error_message.is_some() {
-                Ok(HttpResponse::Ok().json(format!(
-                    "job_id: {} error: {}",
-                    job_id,
-                    res.error_message.unwrap()
-                )))
-            } else if res.result_path.is_none() {
-                Ok(HttpResponse::NotFound().json(format!("job_id: {} don't have result", job_id)))
-            } else {
-                let result = storage::get(&res.result_path.unwrap()).await?;
-                let res = String::from_utf8(result.to_vec())
-                    .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
-                let response: Response = json::from_str(&res)?;
-                Ok(HttpResponse::Ok().json(response))
-            }
-        }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    let res = get(&job_id, &org_id).await;
+    let model = match res {
+        Ok(res) => res,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // check permissions
+    if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
+        return Ok(res);
+    }
+
+    if model.error_message.is_some() {
+        Ok(HttpResponse::Ok().json(format!(
+            "job_id: {} error: {}",
+            job_id,
+            model.error_message.unwrap()
+        )))
+    } else if model.result_path.is_none() {
+        Ok(HttpResponse::NotFound().json(format!("job_id: {} don't have result", job_id)))
+    } else {
+        let result = storage::get(&model.result_path.unwrap()).await?;
+        let model = String::from_utf8(result.to_vec())
+            .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
+        let response: Response = json::from_str(&model)?;
+        Ok(HttpResponse::Ok().json(response))
     }
 }
 
@@ -271,7 +298,7 @@ pub async fn delete_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
+    let user_id = in_req
         .headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())
@@ -282,7 +309,7 @@ pub async fn delete_job(
     let job_id = path.1.clone();
 
     // 1. cancel the query
-    match cancel_job_inner(&org_id, &job_id).await {
+    match cancel_job_inner(&org_id, &job_id, &user_id).await {
         Ok(res) if res.status() != StatusCode::OK && res.status() != StatusCode::BAD_REQUEST => {
             return Ok(res)
         }
@@ -304,23 +331,29 @@ pub async fn retry_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let _user_id = in_req
+    let user_id = in_req
         .headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
 
-    let _org_id = path.0.clone();
+    let org_id = path.0.clone();
     let job_id = path.1.clone();
 
     // 1. check the status of the job, only cancel, finish can be retry
-    let status = get(&job_id).await;
-    let status = match status {
+    let status = get(&job_id, &org_id).await;
+    let model = match status {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    if status.status != 2 && status.status != 3 {
+
+    // check permissions
+    if let Some(res) = check_permissions(&model, &org_id, &user_id).await {
+        return Ok(res);
+    }
+
+    if model.status != 2 && model.status != 3 {
         return Ok(HttpResponse::Forbidden().json("Only canceled, finished job can be retry"));
     }
 
@@ -332,11 +365,21 @@ pub async fn retry_job(
     }
 }
 
-async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Error> {
+async fn cancel_job_inner(
+    org_id: &str,
+    job_id: &str,
+    user_id: &str,
+) -> Result<HttpResponse, Error> {
     // 1. use job_id to query the trace_id
-    let job = get(job_id).await;
+    let job = get(job_id, org_id).await;
     if job.is_err() {
         return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
+    }
+    let job = job.unwrap();
+
+    // check permissions
+    if let Some(res) = check_permissions(&job, org_id, user_id).await {
+        return Ok(res);
     }
 
     // 2. use job_id to make background_job cancel
@@ -354,5 +397,19 @@ async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Er
     }
 
     // 4. use cancel query function to cancel the query
-    cancel_query_inner(org_id, &[&job.unwrap().trace_id]).await
+    cancel_query_inner(org_id, &[&job.trace_id]).await
+}
+
+// check permissions
+async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Option<HttpResponse> {
+    let stream_type = StreamType::from(job.stream_type.as_str());
+    let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
+    for stream_name in stream_names.iter() {
+        if let Some(res) =
+            check_stream_premissions(stream_name, org_id, user_id, &stream_type).await
+        {
+            return Some(res);
+        }
+    }
+    None
 }

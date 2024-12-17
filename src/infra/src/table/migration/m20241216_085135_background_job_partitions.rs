@@ -34,7 +34,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(BackgroundJobPartitions::PartitionId)
-                .integer()
+                .big_integer()
                 .not_null(),
         )
         .col(
@@ -56,7 +56,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(BackgroundJobPartitions::EndedAt).big_integer())
         .col(
             ColumnDef::new(BackgroundJobPartitions::Status)
-                .integer()
+                .big_integer()
                 .not_null(),
         )
         .col(ColumnDef::new(BackgroundJobPartitions::ResultPath).string_len(512))

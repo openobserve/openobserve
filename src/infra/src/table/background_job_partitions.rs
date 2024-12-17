@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    prelude::Expr, ColumnTrait, EntityTrait, FromQueryResult, Order, QueryFilter, QueryOrder, Set,
-    TransactionTrait,
+    prelude::Expr, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 
 use super::{entity::background_job_partitions::*, get_lock};
@@ -30,11 +29,6 @@ use crate::{
 // status 2: finish
 // status 3: cancel
 // status 4: delete
-
-#[derive(FromQueryResult, Debug)]
-pub struct Status {
-    pub status: i32,
-}
 
 pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
@@ -65,7 +59,7 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
     for (idx, partition) in partitions.iter().enumerate() {
         jobs.push(ActiveModel {
             job_id: Set(job_id.to_string()),
-            partition_id: Set(idx as i32),
+            partition_id: Set(idx as i64),
             start_time: Set(partition[0]),
             end_time: Set(partition[1]),
             created_at: Set(chrono::Utc::now().timestamp_micros()),
@@ -130,7 +124,7 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
     }
 }
 
-pub async fn set_partition_job_start(job_id: &str, partition_id: i32) -> Result<(), errors::Error> {
+pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -156,7 +150,7 @@ pub async fn set_partition_job_start(job_id: &str, partition_id: i32) -> Result<
 
 pub async fn set_partition_job_finish(
     job_id: &str,
-    partition_id: i32,
+    partition_id: i64,
     path: &str,
 ) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
@@ -185,7 +179,7 @@ pub async fn set_partition_job_finish(
 
 pub async fn set_partition_job_error_message(
     job_id: &str,
-    partition_id: i32,
+    partition_id: i64,
     error_message: &str,
 ) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)

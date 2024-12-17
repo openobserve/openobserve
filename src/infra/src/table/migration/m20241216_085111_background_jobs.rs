@@ -49,6 +49,11 @@ fn create_table_stmt() -> TableCreateStatement {
                 .string_len(256)
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(BackgroundJobs::StreamNames)
+                .string_len(256)
+                .not_null(),
+        )
         .col(ColumnDef::new(BackgroundJobs::Payload).text().not_null())
         .col(
             ColumnDef::new(BackgroundJobs::StartTime)
@@ -73,10 +78,14 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(BackgroundJobs::StartedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobs::EndedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobs::Node).string_len(256))
-        .col(ColumnDef::new(BackgroundJobs::Status).integer().not_null())
+        .col(
+            ColumnDef::new(BackgroundJobs::Status)
+                .big_integer()
+                .not_null(),
+        )
         .col(ColumnDef::new(BackgroundJobs::ResultPath).string_len(512))
         .col(ColumnDef::new(BackgroundJobs::ErrorMessage).text())
-        .col(ColumnDef::new(BackgroundJobs::PartitionNum).integer())
+        .col(ColumnDef::new(BackgroundJobs::PartitionNum).big_integer())
         .to_owned()
 }
 
@@ -88,6 +97,7 @@ enum BackgroundJobs {
     OrgId,
     UserId,
     StreamType,
+    StreamNames,
     Payload,
     StartTime,
     EndTime,

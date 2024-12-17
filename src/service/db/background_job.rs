@@ -21,11 +21,13 @@ use infra::{
     },
 };
 
+#[allow(clippy::too_many_arguments)]
 pub async fn submit(
     trace_id: &str,
     org_id: &str,
     user_id: &str,
     stream_type: &str,
+    stream_names: &str,
     payload: &str,
     start_time: i64,
     end_time: i64,
@@ -35,6 +37,7 @@ pub async fn submit(
         org_id,
         user_id,
         stream_type,
+        stream_names,
         payload,
         start_time,
         end_time,
@@ -55,11 +58,11 @@ pub async fn get_deleted_jobs() -> Result<Vec<Job>, errors::Error> {
     infra::table::background_jobs::get_deleted_jobs().await
 }
 
-pub async fn get(job_id: &str) -> Result<Job, errors::Error> {
-    infra::table::background_jobs::get(job_id).await
+pub async fn get(job_id: &str, org_id: &str) -> Result<Job, errors::Error> {
+    infra::table::background_jobs::get(job_id, org_id).await
 }
 
-pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
+pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
     infra::table::background_jobs::cancel_job_by_job_id(job_id).await
 }
 
@@ -71,7 +74,7 @@ pub async fn set_job_finish(job_id: &str, path: &str) -> Result<(), errors::Erro
     infra::table::background_jobs::set_job_finish(job_id, path).await
 }
 
-pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), errors::Error> {
+pub async fn set_partition_num(job_id: &str, partition_num: i64) -> Result<(), errors::Error> {
     infra::table::background_jobs::set_partition_num(job_id, partition_num).await
 }
 
@@ -108,13 +111,13 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<PartitionJob>, error
     infra::table::background_job_partitions::get_partition_jobs(job_id).await
 }
 
-pub async fn set_partition_job_start(job_id: &str, partition_id: i32) -> Result<(), errors::Error> {
+pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<(), errors::Error> {
     infra::table::background_job_partitions::set_partition_job_start(job_id, partition_id).await
 }
 
 pub async fn set_partition_job_finish(
     job_id: &str,
-    partition_id: i32,
+    partition_id: i64,
     path: &str,
 ) -> Result<(), errors::Error> {
     infra::table::background_job_partitions::set_partition_job_finish(job_id, partition_id, path)
@@ -123,7 +126,7 @@ pub async fn set_partition_job_finish(
 
 pub async fn set_partition_job_error_message(
     job_id: &str,
-    partition_id: i32,
+    partition_id: i64,
     error_message: &str,
 ) -> Result<(), errors::Error> {
     infra::table::background_job_partitions::set_partition_job_error_message(

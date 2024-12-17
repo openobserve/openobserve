@@ -106,7 +106,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     if need > 0 {
         for partition_job in partition_jobs.iter() {
             // check if the job is still running
-            check_status(id, &job.id).await?;
+            check_status(id, &job.id, &job.org_id).await?;
             let res = run_partition_job(id, &job, partition_job, req.clone()).await;
             let total = match res {
                 Ok(total) => total,
@@ -163,7 +163,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
 
     submit_partitions(&job.id, res.partitions.as_slice()).await?;
 
-    set_partition_num(&job.id, res.partitions.len() as i32)
+    set_partition_num(&job.id, res.partitions.len() as i64)
         .await
         .map_err(|e| e.into())
 }
@@ -257,7 +257,7 @@ async fn filter_partition_job(
 fn generate_result_path(
     created_at: i64,           // the job's created_at
     trace_id: &str,            // the job's trace_id
-    partition_id: Option<i32>, // None means it is the final result
+    partition_id: Option<i64>, // None means it is the final result
 ) -> String {
     let datetime: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
 
@@ -325,8 +325,8 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn check_status(id: i64, job_id: &str) -> Result<(), anyhow::Error> {
-    let job = get(job_id).await?;
+async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow::Error> {
+    let job = get(job_id, org_id).await?;
     if job.status != 1 {
         let message = format!(
             "[BACKGROUND JOB {id}] job_id: {}, status is not running when running background job, current status: {}",

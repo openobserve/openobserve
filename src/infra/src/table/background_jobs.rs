@@ -41,11 +41,13 @@ use crate::{
 // status 3: cancel
 // status 4: delete
 
+#[allow(clippy::too_many_arguments)]
 pub async fn submit(
     trace_id: &str,
     org_id: &str,
     user_id: &str,
     stream_type: &str,
+    stream_names: &str,
     payload: &str,
     start_time: i64,
     end_time: i64,
@@ -57,6 +59,7 @@ pub async fn submit(
         org_id: Set(org_id.to_string()),
         user_id: Set(user_id.to_string()),
         stream_type: Set(stream_type.to_string()),
+        stream_names: Set(stream_names.to_string()),
         payload: Set(payload.to_string()),
         start_time: Set(start_time),
         end_time: Set(end_time),
@@ -154,10 +157,11 @@ pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::E
     Ok(res)
 }
 
-pub async fn get(job_id: &str) -> Result<Model, errors::Error> {
+pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
         .filter(Column::Id.eq(job_id))
+        .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await;
 
@@ -168,7 +172,7 @@ pub async fn get(job_id: &str) -> Result<Model, errors::Error> {
     }
 }
 
-pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i32, errors::Error> {
+pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -320,7 +324,7 @@ pub async fn check_running_jobs(update_at: i64) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn set_partition_num(job_id: &str, partition_num: i32) -> Result<(), errors::Error> {
+pub async fn set_partition_num(job_id: &str, partition_num: i64) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 

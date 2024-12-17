@@ -12,6 +12,7 @@ pub struct Model {
     pub org_id: String,
     pub user_id: String,
     pub stream_type: String,
+    pub stream_names: String,
     #[sea_orm(column_type = "Text")]
     pub payload: String,
     pub start_time: i64,
@@ -21,11 +22,11 @@ pub struct Model {
     pub started_at: Option<i64>,
     pub ended_at: Option<i64>,
     pub node: Option<String>,
-    pub status: i32,
+    pub status: i64,
     pub result_path: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub error_message: Option<String>,
-    pub partition_num: Option<i32>,
+    pub partition_num: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
