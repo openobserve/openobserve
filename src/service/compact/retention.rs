@@ -31,33 +31,43 @@ use crate::{
     service::{db, file_list},
 };
 
+/// This function will split the original time range based on the exclude range
+/// It expects a mutable reference to a Vec which will be populated with the split time ranges
+/// The limit for the red day retention period considered is red_data_retention_days +
+/// data_retention_days.
+/// Returns the number of jobs created
 fn populate_time_ranges_for_deletion(
-    res_time_ranges: &mut Vec<TimeRange>,
+    time_ranges_for_deletion: &mut Vec<TimeRange>,
     exclude_range: &TimeRange,
     original_time_range: &TimeRange,
 ) -> u32 {
     let cfg = get_config();
-    let mut time_range_start: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.start * 1000);
-    let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.end * 1000);
+    let mut red_day_range_start: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.start * 1000);
+    let mut red_day_range_end: DateTime<Utc> = Utc.timestamp_nanos(exclude_range.end * 1000);
 
-    // In case if a red day is older than the red days retention period then skip the day, which
-    // will delete the data
+    // In case if a red day is older than the red days retention period and the normal data
+    // retention period then skip the day, which will delete the data
     let allowed_red_day_retention_end = config::utils::time::now()
         - Duration::try_days(cfg.compact.red_data_retention_days).unwrap()
         - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-    // print the time
-    if time_range_end < allowed_red_day_retention_end {
-        res_time_ranges.push(original_time_range.clone());
+
+    if red_day_range_end < allowed_red_day_retention_end {
+        time_ranges_for_deletion.push(original_time_range.clone());
         return 1;
-    } else if time_range_start < allowed_red_day_retention_end {
-        time_range_start = allowed_red_day_retention_end;
+    } else if red_day_range_start < allowed_red_day_retention_end {
+        red_day_range_start = allowed_red_day_retention_end;
     }
+
+    // TODO: Improve this logic. Since the compactor works on days granularity, we can safely add
+    // day but this should be changed when the granularity is changed
+    red_day_range_end += Duration::days(1); // add one day to make it exclusive
+
     let time_range = TimeRange::new(
-        time_range_start
+        red_day_range_start
             .timestamp_nanos_opt()
             .expect("valid timestamp")
             / 1000,
-        time_range_end
+        red_day_range_end
             .timestamp_nanos_opt()
             .expect("valid timestamp")
             / 1000,
@@ -70,14 +80,14 @@ fn populate_time_ranges_for_deletion(
 
     let mut ranges = original_time_range.split(&time_range);
     let job_nos = ranges.len() as u32;
-    res_time_ranges.append(&mut ranges);
+    time_ranges_for_deletion.append(&mut ranges);
 
     job_nos
 }
 /// Creates delete jobs for the stream based on the stream settings
 /// Returns the number of jobs created
 pub async fn delete_by_stream(
-    lifecycle_end: &str,
+    lifecycle_end: &DateTime<Utc>,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -90,49 +100,48 @@ pub async fn delete_by_stream(
         return Ok(0); // no data, just skip
     }
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
-    let lifecycle_start = created_at.format("%Y-%m-%d").to_string();
-    let lifecycle_start = lifecycle_start.as_str();
 
     log::debug!(
         "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
         org_id,
         stream_type,
         stream_name,
-        lifecycle_start,
-        lifecycle_end
+        created_at.format("%Y-%m-%d").to_string().as_str(),
+        lifecycle_end.format("%Y-%m-%d").to_string().as_str(),
     );
 
-    // Create tasks with break on red days
-    let lifecycle_start = format!("{}T00:00:00Z", lifecycle_start);
-    let lifecycle_end = format!("{}T00:00:00Z", lifecycle_end);
-    let start = DateTime::parse_from_rfc3339(&lifecycle_start)?.with_timezone(&Utc);
-    let end = DateTime::parse_from_rfc3339(&lifecycle_end)?.with_timezone(&Utc);
-    if start.ge(&end) {
-        return Ok(0); // created_at is after lifecycle_end, just skip
+    if created_at.ge(lifecycle_end) {
+        return Ok(0); // created_at is after lifecycle end, just skip
     }
 
-    let original_time_range = TimeRange::new(
-        start.timestamp_nanos_opt().expect("valid timestamp") / 1000,
-        end.timestamp_nanos_opt().expect("valid timestamp") / 1000,
+    let original_deletion_time_range = TimeRange::new(
+        created_at.timestamp_nanos_opt().expect("valid timestamp") / 1000,
+        lifecycle_end
+            .timestamp_nanos_opt()
+            .expect("valid timestamp")
+            / 1000,
     );
 
-    let mut final_time_ranges = vec![];
+    // flatten out the overlapping red days before we create deletion ranges
+    let red_days = TimeRange::flatten_overlapping_ranges(red_days.to_vec());
+    // create deletion ranges from red days
+    let mut final_deletion_time_ranges = vec![];
     red_days.iter().for_each(|red_day| {
         let _ranges_added = populate_time_ranges_for_deletion(
-            &mut final_time_ranges,
+            &mut final_deletion_time_ranges,
             red_day,
-            &original_time_range,
+            &original_deletion_time_range,
         );
     });
 
-    // if red days is empty, then just delete the whole time range
+    // no red days
     if red_days.is_empty() {
-        final_time_ranges.push(original_time_range);
+        final_deletion_time_ranges.push(original_deletion_time_range);
     }
 
-    let job_nos = final_time_ranges.len();
+    let job_nos = final_deletion_time_ranges.len();
 
-    for time_range in final_time_ranges {
+    for time_range in final_deletion_time_ranges {
         let time_range_start = Utc
             .timestamp_nanos(time_range.start * 1000)
             .format("%Y-%m-%d")

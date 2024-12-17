@@ -497,21 +497,9 @@ impl std::fmt::Display for PartitionTimeLevel {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
-pub struct UpdateStreamPartition {
-    pub add: Vec<StreamPartition>,
-    pub remove: Vec<StreamPartition>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateSettingsWrapper<D> {
     pub add: Vec<D>,
     pub remove: Vec<D>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
-pub struct UpdateStringSettingsArray {
-    pub add: Vec<String>,
-    pub remove: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -582,9 +570,14 @@ impl TimeRange {
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        self.start <= other.end && self.end >= other.start
+        if self != other {
+            self.start <= other.end && self.end >= other.start
+        } else {
+            false
+        }
     }
 
+    /// `exclude_end_dates` is used to exclude the end date from the range
     pub fn split(&self, other: &Self) -> Vec<Self> {
         if !self.intersects(other) {
             return vec![self.clone()];
@@ -598,6 +591,23 @@ impl TimeRange {
             ranges.push(Self::new(other.end, self.end));
         }
         ranges
+    }
+
+    pub fn flatten_overlapping_ranges(ranges: Vec<Self>) -> Vec<Self> {
+        let mut ranges = ranges;
+        ranges.sort_by(|a, b| a.start.cmp(&b.start));
+        let mut result = Vec::new();
+        let mut current = ranges[0].clone();
+        for range in ranges.iter().skip(1) {
+            if current.intersects(range) {
+                current.end = range.end;
+            } else {
+                result.push(current.clone());
+                current = range.clone();
+            }
+        }
+        result.push(current);
+        result
     }
 }
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -1121,5 +1131,15 @@ mod tests {
         map.insert(param2, 2);
         map.insert(param3, 2);
         assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn test_split_ranges() {
+        let range = TimeRange::new(0, 400);
+        let other = TimeRange::new(50, 150);
+        let ranges = range.split(&other);
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0], TimeRange::new(0, 50));
+        assert_eq!(ranges[1], TimeRange::new(150, 400));
     }
 }

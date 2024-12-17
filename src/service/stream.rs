@@ -279,7 +279,7 @@ pub async fn save_stream_settings(
         }
 
         let last_retained =
-            config::utils::time::now() - Duration::try_days(dbg!(settings.data_retention)).unwrap();
+            config::utils::time::now() - Duration::try_days(settings.data_retention).unwrap();
 
         if range.start * 1000 < last_retained.timestamp_nanos_opt().unwrap() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
