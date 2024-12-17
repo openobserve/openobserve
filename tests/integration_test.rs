@@ -120,13 +120,15 @@ mod tests {
         });
 
         // register node
-        openobserve::common::infra::cluster::register_and_keepalive()
+        openobserve::common::infra::cluster::register_and_keep_alive()
             .await
             .unwrap();
         // init config
         config::init().await.unwrap();
         // init infra
         infra::init().await.unwrap();
+        // db migration steps, since it's separated out
+        infra::table::migrate().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();

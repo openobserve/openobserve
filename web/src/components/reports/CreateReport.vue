@@ -1101,7 +1101,8 @@ const setDashboardOptions = (id: string) => {
         false,
         "",
         store.state.selectedOrganization.identifier,
-        id
+        id,
+        ""
       )
       .then((response: any) => {
         response.data.dashboards
@@ -1368,6 +1369,9 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
+      if(error.response.status == 403){
+        return;
+      }
       q.notify({
         type: "negative",
         message:

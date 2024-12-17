@@ -283,9 +283,9 @@ pub struct StreamStats {
     pub doc_time_max: i64,
     pub doc_num: i64,
     pub file_num: i64,
-    pub storage_size: i64,
-    pub compressed_size: i64,
-    pub index_size: i64,
+    pub storage_size: f64,
+    pub compressed_size: f64,
+    pub index_size: f64,
 }
 
 impl StreamStats {
@@ -322,20 +322,20 @@ impl StreamStats {
         self.doc_num = max(0, self.doc_num + meta.records);
         self.doc_time_min = self.doc_time_min.min(meta.min_ts);
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size;
-        self.compressed_size += meta.compressed_size;
-        self.index_size += meta.index_size;
+        self.storage_size += meta.original_size as f64;
+        self.compressed_size += meta.compressed_size as f64;
+        self.index_size += meta.index_size as f64;
         if self.doc_time_min == 0 {
             self.doc_time_min = meta.min_ts;
         }
-        if self.storage_size < 0 {
-            self.storage_size = 0;
+        if self.storage_size < 0.0 {
+            self.storage_size = 0.0;
         }
-        if self.compressed_size < 0 {
-            self.compressed_size = 0;
+        if self.compressed_size < 0.0 {
+            self.compressed_size = 0.0;
         }
-        if self.index_size < 0 {
-            self.index_size = 0;
+        if self.index_size < 0.0 {
+            self.index_size = 0.0;
         }
     }
 
@@ -379,9 +379,9 @@ impl From<Stats> for StreamStats {
             doc_time_max: meta.max_ts,
             doc_num: meta.records,
             file_num: 0,
-            storage_size: meta.original_size as i64,
-            compressed_size: meta.compressed_size.unwrap_or_default() as i64,
-            index_size: meta.index_size.unwrap_or_default() as i64,
+            storage_size: meta.original_size,
+            compressed_size: meta.compressed_size.unwrap_or_default(),
+            index_size: meta.index_size.unwrap_or_default(),
         }
     }
 }
@@ -396,9 +396,9 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             doc_num: self.doc_num - rhs.records,
             doc_time_min: self.doc_time_min.min(rhs.min_ts),
             doc_time_max: self.doc_time_max.max(rhs.max_ts),
-            storage_size: self.storage_size - rhs.original_size,
-            compressed_size: self.compressed_size - rhs.compressed_size,
-            index_size: self.index_size - rhs.index_size,
+            storage_size: self.storage_size - rhs.original_size as f64,
+            compressed_size: self.compressed_size - rhs.compressed_size as f64,
+            index_size: self.index_size - rhs.index_size as f64,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;
@@ -585,7 +585,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
-    pub index_setting_timestamp: i64,
+    pub index_updated_at: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -606,11 +606,12 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("index_fields", &self.index_fields)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
+        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
-        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
+        state.serialize_field("index_updated_at", &self.index_updated_at)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -735,8 +736,8 @@ impl From<&str> for StreamSettings {
             }
         }
 
-        let index_setting_timestamp = settings
-            .get("index_setting_timestamp")
+        let index_updated_at = settings
+            .get("index_updated_at")
             .and_then(|v| v.as_i64())
             .unwrap_or_default();
 
@@ -753,7 +754,7 @@ impl From<&str> for StreamSettings {
             store_original_data,
             approx_partition,
             distinct_value_fields,
-            index_setting_timestamp,
+            index_updated_at,
         }
     }
 }
