@@ -82,7 +82,7 @@ pub async fn post_user(
             {
                 Ok(res) => {
                     for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
-                        if res.contains(custom_role) {
+                        if !res.contains(custom_role) {
                             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                                 http::StatusCode::BAD_REQUEST.into(),
                                 "Custom role not found".to_string(),
@@ -90,7 +90,8 @@ pub async fn post_user(
                         }
                     }
                 }
-                Err(_) => {
+                Err(e) => {
+                    log::error!("Error fetching custom roles during post user: {}", e);
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST.into(),
                         "Custom role not found".to_string(),
