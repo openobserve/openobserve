@@ -36,7 +36,7 @@ use crate::{
             get_stream_type_from_request,
         },
     },
-    handler::http::request::search::{job::cancel_query_inner, utils::check_stream_premissions},
+    handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
     service::db::background_job::*,
 };
 
@@ -125,7 +125,7 @@ pub async fn submit_job(
 
         // Check permissions on stream
         if let Some(res) =
-            check_stream_premissions(stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(stream_name, &org_id, &user_id, &stream_type).await
         {
             return Ok(res);
         }
@@ -314,8 +314,8 @@ pub async fn delete_job(
 
     // 2. make the job_id in background_job table delete
     match set_job_deleted(job_id.as_str()).await {
-        Ok(res) if res => Ok(HttpResponse::Ok().json(format!("job_id: {} delete success", job_id))),
-        Ok(_) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
+        Ok(true) => Ok(HttpResponse::Ok().json(format!("job_id: {} delete success", job_id))),
+        Ok(false) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -401,7 +401,7 @@ async fn check_permissions(job: &JobModel, org_id: &str, user_id: &str) -> Optio
     let stream_names: Vec<String> = json::from_str(&job.stream_names).unwrap();
     for stream_name in stream_names.iter() {
         if let Some(res) =
-            check_stream_premissions(stream_name, org_id, user_id, &stream_type).await
+            check_stream_permissions(stream_name, org_id, user_id, &stream_type).await
         {
             return Some(res);
         }

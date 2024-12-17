@@ -33,7 +33,7 @@ use config::{
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
-use utils::check_stream_premissions;
+use utils::check_stream_permissions;
 
 use crate::{
     common::{
@@ -251,7 +251,7 @@ pub async fn search(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) =
-            check_stream_premissions(&stream_name, &org_id, &user_id, &stream_type).await
+            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
         {
             return Ok(res);
         }

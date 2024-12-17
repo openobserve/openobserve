@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    prelude::Expr, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, Set, TransactionTrait,
+    prelude::Expr, sea_query::LockType, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 
 use super::{entity::background_job_partitions::*, get_lock};
@@ -37,7 +38,7 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(1))
+        .col_expr(Column::Status, Expr::value(3))
         .filter(Column::JobId.eq(job_id))
         .exec(client)
         .await;
@@ -76,6 +77,7 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
     // sql: select * from background_job_partitions where job_id = job_id limit 1
     let status = Entity::find()
         .filter(Column::JobId.eq(job_id))
+        .lock(LockType::Update)
         .one(client)
         .await;
 
@@ -87,8 +89,13 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
             }
             return Ok(());
         }
+        Err(e) => {
+            if let Err(tx_err) = tx.rollback().await {
+                return orm_err!(format!("submit partition job rollback error: {tx_err}"));
+            }
+            return orm_err!(format!("submit partition job check job_id error: {e}"));
+        }
         Ok(None) => {}
-        Err(e) => return orm_err!(format!("submit partition job check job_id error: {e}")),
     };
 
     let res = Entity::insert_many(jobs).exec(&tx).await;

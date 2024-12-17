@@ -24,7 +24,7 @@ use crate::common::{
 };
 
 // Check permissions on stream
-pub async fn check_stream_premissions(
+pub async fn check_stream_permissions(
     stream_name: &str,
     org_id: &str,
     user_id: &str,

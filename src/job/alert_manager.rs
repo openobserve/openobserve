@@ -127,14 +127,16 @@ async fn run_background_jobs(id: i64) -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
+    let time = get_config().limit.background_job_run_timeout;
+    let mut interval = time::interval(time::Duration::from_secs(time as u64));
+    interval.tick().await; // trigger the first run
     loop {
-        let time = get_config().limit.background_job_run_timeout;
-        log::debug!("[BACKGROUND JOB] Running check running jobs");
-        let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
+        interval.tick().await;
+        log::debug!("[BACKGROUND JOB] Running check on running jobs");
+        let updated_at = config::utils::time::now_micros() - (time * 1_000_000);
         if let Err(e) = service::db::background_job::check_running_jobs(updated_at).await {
-            log::error!("[BACKGROUND JOB] run check running jobs error: {e}");
+            log::error!("[BACKGROUND JOB] Error checking running jobs: {e}");
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
 }
 
