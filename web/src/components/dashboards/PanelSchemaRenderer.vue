@@ -705,7 +705,6 @@ export default defineComponent({
       { deep: true },
     );
 
-
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
@@ -724,20 +723,13 @@ export default defineComponent({
         const drilldownData = panelSchema.value.config.drilldown[index];
 
         const navigateToLogs = async () => {
-          console.log(
-            "navigateToLogs: Initializing navigation to logs. hoveredSeriesState",
-            drilldownParams[0],
-          );
+          console.log("navigateToLogs: Initializing navigation to logs.");
 
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
             console.error("navigateToLogs: Panel schema is undefined.");
             return;
           }
-          console.log(
-            "navigateToLogs: Panel schema: metadata",
-            metadata?.value,
-          );
 
           const originalQuery = metadata?.value?.queries[0]?.query;
           const streamName = queryDetails?.queries[0]?.fields?.stream;
@@ -747,36 +739,33 @@ export default defineComponent({
             return;
           }
 
-          // Extract hovered time and calculate start and end time
-          const hoveredTime = drilldownParams[0]?.value?.[0]; // Extract time from value array
-          console.log("hoverTime", hoveredTime, typeof hoveredTime);
-          if (!hoveredTime) {
-            console.error(
-              "navigateToLogs: Missing hovered time in drilldownParams.",
-            );
-            return;
-          }
+          const hoveredTime = drilldownParams[0]?.value?.[0];
+          const hoveredTimestamp = hoveredTime
+            ? new Date(hoveredTime).getTime()
+            : null;
+          const breakdown = queryDetails.queries[0].fields?.breakdown || [];
+          console.log("navigateToLogs: Breakdown:", breakdown);
 
-          const hoveredTimestamp = new Date(hoveredTime).getTime(); // Convert to milliseconds
-          if (!intervalMicro.value) {
-            console.error("navigateToLogs: intervalMillis is not defined.");
-            return;
-          }
+          // Determine time-series presence
+          const hasInterval = !!intervalMicro.value;
+          console.log("navigateToLogs: Has interval:", hasInterval);
 
-          const calculatedStartTime = hoveredTimestamp * 1000; // Convert to microseconds
-          const calculatedEndTime = calculatedStartTime + intervalMicro.value; // Add intervalMillis
+          // Calculate start and end time
+          let calculatedStartTime, calculatedEndTime;
+
+          if (hasInterval && hoveredTimestamp) {
+            calculatedStartTime = hoveredTimestamp * 1000; // Convert to microseconds
+            calculatedEndTime = calculatedStartTime + intervalMicro.value;
+          } else {
+            calculatedStartTime = selectedTimeObj.value.start_time.getTime();
+            calculatedEndTime = selectedTimeObj.value.end_time.getTime();
+          }
 
           console.log("navigateToLogs: Calculated start and end time", {
             calculatedStartTime,
             calculatedEndTime,
           });
 
-          const hoverName = drilldownParams[0]?.seriesName;
-          console.log("navigateToLogs: Hovered series name", hoverName);
-          const breakdown = panelSchema.value.queries[0].fields?.breakdown;
-          console.log("navigateToLogs: Breakdown", breakdown);
-          
-          
           // Initialize SQL parser if not already done
           if (!parser) {
             await importSqlParser();
@@ -796,22 +785,37 @@ export default defineComponent({
             ? parser.sqlify({ type: "select", where: ast.where })
             : null;
 
-          // whereClause will be `SELECT WHERE <whereClause>`
-          // slice where condition(ie WHERE <whereClause>)
           if (whereClause) {
+            // Remove unwanted SELECT part and retain only WHERE clause
             const whereIndex = whereClause.indexOf("WHERE");
-            if (whereIndex !== -1) {
-              whereClause = whereClause.slice(whereIndex);
+            whereClause = whereClause.slice(whereIndex);
+          }
+
+          // Build condition for breakdown if applicable
+          let breakdownCondition = "";
+          if (breakdown.length > 0) {
+            const breakdownColumn = breakdown[0].column;
+            const breakdownValue = drilldownParams[0]?.seriesName;
+
+            if (breakdownColumn && breakdownValue) {
+              breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
             }
           }
 
-          // Construct new query
+          // Append breakdown condition with AND if WHERE exists
+          let finalWhereClause = whereClause || "";
+          if (breakdownCondition) {
+            finalWhereClause += whereClause
+              ? ` AND ${breakdownCondition}`
+              : ` WHERE ${breakdownCondition}`;
+          }
+
           const modifiedQuery =
             drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}"${whereClause ? ` ${whereClause}` : ""}`
+              ? `SELECT * FROM "${streamName}" ${finalWhereClause}`
               : drilldownData.data.logsQuery;
 
-          console.log("navigateToLogs: Modified query:", modifiedQuery);
+          console.log("navigateToLogs: Modified Query:", modifiedQuery);
 
           // Encode the modified query
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
@@ -823,16 +827,8 @@ export default defineComponent({
             queryDetails.queries[0]?.fields?.stream_type,
           );
           logsUrl.searchParams.set("stream", streamName);
-          logsUrl.searchParams.set(
-            "from",
-            new Date(
-              selectedTimeObj?.value?.start_time?.toISOString(),
-            ).getTime(),
-          );
-          logsUrl.searchParams.set(
-            "to",
-            new Date(selectedTimeObj?.value?.end_time?.toISOString()).getTime(),
-          );
+          logsUrl.searchParams.set("from", calculatedStartTime);
+          logsUrl.searchParams.set("to", calculatedEndTime);
           logsUrl.searchParams.set("sql_mode", "true");
           logsUrl.searchParams.set("query", encodedQuery);
           logsUrl.searchParams.set(
