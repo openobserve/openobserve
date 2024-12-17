@@ -698,9 +698,6 @@ export default defineComponent({
       () => resultMetaData.value,
       (newVal) => {
         emit("result-metadata-update", newVal);
-        console.log("resultMetaData interval", newVal);
-        console.log("interval", interval.value);
-        console.log("intervalMillis", intervalMicro.value);
       },
       { deep: true },
     );
@@ -723,7 +720,6 @@ export default defineComponent({
         const drilldownData = panelSchema.value.config.drilldown[index];
 
         const navigateToLogs = async () => {
-          console.log("navigateToLogs: Initializing navigation to logs.");
 
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
@@ -744,11 +740,9 @@ export default defineComponent({
             ? new Date(hoveredTime).getTime()
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
-          console.log("navigateToLogs: Breakdown:", breakdown);
 
           // Determine time-series presence
           const hasInterval = !!intervalMicro.value;
-          console.log("navigateToLogs: Has interval:", hasInterval);
 
           // Calculate start and end time
           let calculatedStartTime, calculatedEndTime;
@@ -761,11 +755,6 @@ export default defineComponent({
             calculatedEndTime = selectedTimeObj.value.end_time.getTime();
           }
 
-          console.log("navigateToLogs: Calculated start and end time", {
-            calculatedStartTime,
-            calculatedEndTime,
-          });
-
           // Initialize SQL parser if not already done
           if (!parser) {
             await importSqlParser();
@@ -774,7 +763,6 @@ export default defineComponent({
           let ast;
           try {
             ast = parser.astify(originalQuery);
-            console.log("navigateToLogs: Parsed AST:", ast);
           } catch (error) {
             console.error("navigateToLogs: Failed to parse query:", error);
             return;
@@ -815,7 +803,6 @@ export default defineComponent({
               ? `SELECT * FROM "${streamName}" ${finalWhereClause}`
               : drilldownData.data.logsQuery;
 
-          console.log("navigateToLogs: Modified Query:", modifiedQuery);
 
           // Encode the modified query
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
@@ -840,18 +827,13 @@ export default defineComponent({
 
           try {
             if (drilldownData.targetBlank) {
-              console.log("navigateToLogs: Navigating to logs in a new tab.");
               window.open(logsUrl.toString(), "_blank");
             } else {
-              console.log(
-                "navigateToLogs: Navigating to logs in the same tab.",
-              );
               await router.push({
                 path: "/logs",
                 query: Object.fromEntries(logsUrl.searchParams.entries()),
               });
             }
-            console.log("navigateToLogs: Successfully navigated to logs.");
           } catch (error) {
             console.error("navigateToLogs: Failed to navigate to logs:", error);
           }
@@ -958,7 +940,6 @@ export default defineComponent({
             );
           } catch (error) {}
         } else if (drilldownData.type == "logs") {
-          console.log("navigateToLogs: Navigating to logs.");
 
           try {
             navigateToLogs();
