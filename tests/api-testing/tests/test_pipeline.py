@@ -92,10 +92,13 @@ def test_pipeline_creation_and_action(create_session, base_url, pipeline_name, s
     resp_get_pipeline = session.get(f"{url}api/{org_id}/pipelines")
     print(resp_get_pipeline.json())
     assert resp_get_pipeline.status_code == 200
+    pipeline_list = resp_get_pipeline.json()["list"]
+    target_pipeline = next((p for p in pipeline_list if p["pipeline_id"] == pipeline_id), None)
+    assert target_pipeline is not None, f"Pipeline {pipeline_id} not found in the list"
     if action == "enable":
-       assert resp_get_pipeline.json()["list"][0]["enabled"] is True
+       assert target_pipeline["enabled"] is True
     if action == "disable":
-       assert resp_get_pipeline.json()["list"][0]["enabled"] is False
+       assert target_pipeline["enabled"] is False
 
     # Delete the pipeline
     resp_delete_pipeline = session.delete(f"{url}api/{org_id}/pipelines/{pipeline_id}")
