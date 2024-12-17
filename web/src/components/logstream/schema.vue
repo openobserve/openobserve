@@ -186,40 +186,27 @@ class="indexDetailsContainer" style="height: 100vh">
               </span>
             </div>
           </template>
+          <div>
+            <div class="flex justify-start">
+              <q-tabs v-model="activeMainTab" inline-label dense>
+                <!-- Schema Settings Tab with conditional class -->
+                <q-tab
+                  :class="{ 'text-primary': activeMainTab === 'schemaSettings' }"
+                  name="schemaSettings"
+                  icon="settings"
+                  label="Schema Settings"
+                />
 
-          <div class="flex q-mb-md justify-end" style="">
-            <q-item
-              :class="{
-                'q-router-link--active': activeMainTab === 'schemaSettings',
-              }"
-              clickable
-              @click="activeMainTab = 'schemaSettings'"
-              :ripple="true"
-            >
-              <q-item-section avatar>
-                <span class="flex"
-                  ><q-icon size="16px"
-class="q-mr-xs" name="settings" />
-                  <q-item-label>Stream Settings</q-item-label></span
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              :class="{
-                'q-router-link--active': activeMainTab === 'redButton',
-              }"
-              @click="activeMainTab = 'redButton'"
-              clickable
-              :ripple="true"
-            >
-              <q-item-section avatar>
-                <span class="flex"
-                  ><q-icon size="16px"
-class="q-mr-xs" name="backup" />
-                  <q-item-label>Extended Retention</q-item-label></span
-                >
-              </q-item-section>
-            </q-item>
+                <!-- Red Button Tab -->
+                <q-tab
+                :class="{ 'text-primary': activeMainTab === 'redButton' }"
+                  name="redButton"
+                  icon="backup"
+                  label="Extended Retention"
+                />
+              </q-tabs>
+
+            </div>
           </div>
           <!-- schema settings tab -->
           <div v-if="activeMainTab == 'schemaSettings'">
@@ -227,7 +214,7 @@ class="q-mr-xs" name="backup" />
               class="title flex tw-justify-between tw-items-center"
               data-test="schema-log-stream-mapping-title-text"
             >
-              <div style="font-weight: 400">
+              <div style="font-weight: 400" class="q-mt-md">
                 <label
                   v-show="indexData.defaultFts"
                   style="font-weight: 600"
@@ -473,19 +460,19 @@ class="q-mr-xs" name="backup" />
           </div>
           <!-- red button tab -->
           <div v-else>
-            <div class="q-mt-md">
-              <div
-                class="mapping-warning-msg q-mb-sm"
-                style="width: fit-content"
-              >
-                <span style="font-weight: 600">
-                  <q-icon name="info"
-class="q-mr-xs" size="16px" />
-                  An additional {VALUE_FROM_CONFIG}10-day extension will be
-                  applied to the selected date ranges.</span
-                >
-              </div>
+            <div
+              class="mapping-warning-msg q-mb-sm q-mt-sm"
+              style="width: fit-content"
+            >
+              <span style="font-weight: 600">
+                <q-icon name="info" class="q-mr-xs" size="16px" />
 
+                An additional
+                {{ store.state.zoConfig.data_retention_days }} days of extension
+                will be applied to the selected ranges</span
+              >
+            </div>
+            <div class="q-mt-sm">
               <div class="text-center q-mt-sm tw-flex items-center">
                 <span class="text-bold"> Select Date</span>
                 <date-time
@@ -496,7 +483,7 @@ class="q-mr-xs" size="16px" />
                 />
               </div>
 
-              <div class="q-mt-md" style="margin-bottom: 30px">
+              <div class="q-mt-sm" style="margin-bottom: 30px">
                 <q-table
                   ref="qTable"
                   :row-key="(row, index) => 'tr_' + row.index"
@@ -521,15 +508,32 @@ class="q-mr-xs" size="16px" />
                     </q-td>
                   </template>
 
+                  <!-- Body Slot for Selection -->
                   <template v-slot:body-selection="scope">
                     <q-td class="text-center q-td--no-hover">
-                      <q-checkbox
-                        :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                        v-model="scope.selected"
-                        size="sm"
-                      />
+                      <template
+                        v-if="
+                          scope.row.hasOwnProperty('isCreated') &&
+                          scope.row.isCreated == false
+                        "
+                      >
+                        <q-icon
+                          name="close"
+                          color="negative"
+                          @click="handleNotCreatedRow(scope.row)"
+                          size="md"
+                        />
+                      </template>
+                      <template v-else>
+                        <q-checkbox
+                          :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                          v-model="scope.selected"
+                          size="sm"
+                        />
+                      </template>
                     </q-td>
                   </template>
+
 
                   <template #bottom="scope">
                     <QTablePagination
@@ -584,8 +588,11 @@ class="q-mr-xs" size="16px" />
                       : t("logStream.addSchemaField")
                   }}
                 </q-btn>
+                {{   }}
                 <q-btn
-                  v-bind:disable="!selectedFields.length"
+                  v-bind:disable="
+                  !selectedFields.length &&  (!selectedDateFields.length) 
+                  "
                   data-test="schema-delete-button"
                   class="q-my-sm text-bold btn-delete"
                   text-color="red"
@@ -594,7 +601,7 @@ class="q-mr-xs" size="16px" />
                   dense
                   flat
                   style="border: 1px red solid"
-                  @click="confirmQueryModeChangeDialog = true"
+                  @click="activeMainTab == 'schemaSettings' ? confirmQueryModeChangeDialog = true : confirmDeleteDatesDialog = true"
                 >
                   <span class="flex items-center tw-gap-1">
                     <q-icon size="14px" :name="outlinedDelete" />
@@ -644,6 +651,13 @@ class="q-mr-xs" size="16px" />
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
+  <ConfirmDialog
+    title="Delete Dates"
+    :message="'Are you sure to delete the selected dates this cannot be done ' "
+    @update:ok="deleteDates()"
+    @update:cancel="confirmDeleteDatesDialog = false"
+    v-model="confirmDeleteDatesDialog"
+  />
 </template>
 
 <script lang="ts">
@@ -666,6 +680,7 @@ import {
   formatSizeFromMB,
   getImageURL,
   timestampToTimezoneDate,
+  convertDateToTimestamp,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -720,6 +735,7 @@ export default defineComponent({
     const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
     const confirmQueryModeChangeDialog = ref(false);
+    const confirmDeleteDatesDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
@@ -728,69 +744,8 @@ export default defineComponent({
     const qTable = ref(null);
     const minDate = ref(null);
     const selectedDateFields = ref([]);
-    const redBtnRows = ref(
-      [
-        {
-          start_time: "2024-12-06T16:44:43+05:30",
-          end_time: "2024-12-06T13:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T11:44:43+05:30",
-          end_time: "2024-12-06T10:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T09:44:43+05:30",
-          end_time: "2024-12-06T08:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T10:44:43+05:30",
-          end_time: "2024-12-06T12:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T12:44:43+05:30",
-          end_time: "2024-12-06T11:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T13:44:43+05:30",
-          end_time: "2024-12-06T12:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T10:44:43+05:30",
-          end_time: "2024-12-06T09:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T16:44:43+05:30",
-          end_time: "2024-12-06T13:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T11:44:43+05:30",
-          end_time: "2024-12-06T10:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T09:44:43+05:30",
-          end_time: "2024-12-06T08:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T10:44:43+05:30",
-          end_time: "2024-12-06T12:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T12:44:43+05:30",
-          end_time: "2024-12-06T11:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T13:44:43+05:30",
-          end_time: "2024-12-06T12:44:43+05:30",
-        },
-        {
-          start_time: "2024-12-06T10:44:43+05:30",
-          end_time: "2024-12-06T09:44:43+05:30",
-        },
-      ].map((row, index) => ({
-        ...row,
-        index: index + 1, // Add index starting from 1
-      })),
-    );
+    const IsdeleteBtnVisible = ref(false);
+    const redBtnRows = ref([]);
 
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
@@ -798,8 +753,9 @@ export default defineComponent({
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
+    const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
-    const perPageOptions: any = [
+    const perPageOptions : any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
       { label: "20", value: 20 },
@@ -843,13 +799,13 @@ export default defineComponent({
     ]);
     const mainTabs = computed(() => [
       {
-        value: "redButton",
-        label: `Data Prolongation`,
+        value: "schemaSettings",
+        label: `Schema Settings`,
         disabled: false,
       },
       {
-        value: "schemaSettings",
-        label: `Schema Settings`,
+        value: "redButton",
+        label: `Extended Retention`,
         disabled: false,
       },
     ]);
@@ -980,6 +936,7 @@ export default defineComponent({
 
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
+
       if (streamResponse?.settings) {
         // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
@@ -996,6 +953,19 @@ export default defineComponent({
               index_type: [],
             });
           });
+      }
+      if (streamResponse.settings.red_days.length >= 0) {
+        redBtnRows.value = [];
+        indexData.value.red_days = streamResponse.settings.red_days;
+        streamResponse.settings.red_days.forEach((field, index) => {
+          redBtnRows.value.push({
+            index: index,
+            original_start: field.start,
+            original_end: field.end,
+            start: convertUnixToQuasarFormat(field.start),
+            end: convertUnixToQuasarFormat(field.end),
+          });
+        });
       }
 
       if (
@@ -1100,6 +1070,7 @@ export default defineComponent({
         full_text_search_keys: [],
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
+        red_days: [...indexData.value.red_days],
       };
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
@@ -1129,9 +1100,24 @@ export default defineComponent({
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
         ),
       );
-
+      
       // Push unique and normalized field names to settings.defined_schema_fields
       settings.defined_schema_fields.push(...newSchemaFieldsSet);
+
+      redDaysList.value.forEach((field) => {
+        settings.red_days.push({
+          start: field.start,
+          end: field.end,
+        });
+      });
+      if (selectedDateFields.value.length > 0) {
+        selectedDateFields.value.forEach((field) => {
+          // Filter out the items that match the condition
+          settings.red_days = settings.red_days.filter((item) => {
+            return item.start !== field.start && item.end !== field.end;
+          });
+        });
+      }
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -1197,10 +1183,15 @@ export default defineComponent({
         settings.partition_keys =
           settings.partition_keys.concat(added_part_keys);
       }
-
       loadingState.value = true;
 
       newSchemaFields.value = [];
+
+      redDaysList.value = [];
+
+      selectedDateFields.value = [];
+
+      console.log(previousSchemaVersion, settings);
 
       let modifiedSettings = getUpdatedSettings(
         previousSchemaVersion,
@@ -1373,18 +1364,18 @@ export default defineComponent({
 
     const redBtnColumns = [
       {
-        name: "start_time",
+        name: "start",
         label: "Start Date",
         align: "center",
         sortable: true,
-        field: "start_time",
+        field: "start",
       },
       {
-        name: "end_time",
+        name: "end",
         label: "End Date",
         align: "center",
         sortable: true,
-        field: "end_time",
+        field: "end",
       },
     ];
 
@@ -1514,19 +1505,37 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+      return date.formatDate(formattedDate, "YYYY-MM-DD");
     }
+    function convertToMidnightUTCTimestamp(timestamp) {
+      const date = new Date(timestamp);
+      // Create a new date object for 12:00 AM UTC
+      const midnightUTC = Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        0,
+        0,
+        0,
+      );
+      return midnightUTC;
+    };
+
+
     const dateChangeValue = (value) => {
       if (value.relativeTimePeriod == null) {
-        redBtnRows.value.push({
-          start_time: convertUnixToQuasarFormat(value.startTime),
-          end_time: convertUnixToQuasarFormat(value.endTime),
+        redDaysList.value.push({
+          start: convertToMidnightUTCTimestamp(value.startTime),
+          end: convertToMidnightUTCTimestamp(value.endTime),
         });
-        q.notify({
-          color: "positive",
-          message: "Date added Successfully",
-          timeout: 2000,
+        redBtnRows.value.unshift({
+          start: convertUnixToQuasarFormat(value.startTime),
+          end: convertUnixToQuasarFormat(value.endTime),
+          original_start: convertToMidnightUTCTimestamp(value.startTime),
+          original_end: convertToMidnightUTCTimestamp(value.endTime),
+          isCreated: false,
         });
+        formDirtyFlag.value = true;
       }
     };
     const calculateDateRange = () => {
@@ -1546,6 +1555,34 @@ export default defineComponent({
         store.state.timezone,
         "yyyy/MM/dd", // Desired format
       );
+    };
+
+
+    const deleteDates = () => {
+      selectedDateFields.value = selectedDateFields.value.map((field) => {
+        return {
+          start: field.original_start,
+          end: field.original_end,
+        };
+      });
+      formDirtyFlag.value = true;
+      onSubmit();
+      };
+
+    const handleNotCreatedRow = (row) => {
+      // Re-assign filtered rows to redBtnRows.value to update the array
+      redBtnRows.value = redBtnRows.value.filter(
+        (field) =>
+          field.original_start !== row.original_start ||
+          field.original_end !== row.original_end,
+      );
+
+      redDaysList.value = redDaysList.value.filter(
+        (field) =>
+          field.start !== row.original_start || field.end !== row.original_end,
+      );
+      console.log(row, "redDaysList 111 row");
+      console.log(redDaysList.value, "redDaysList 111");
     };
 
     return {
@@ -1569,6 +1606,7 @@ export default defineComponent({
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
+      confirmDeleteDatesDialog,
       deleteFields,
       markFormDirty,
       formDirtyFlag,
@@ -1612,6 +1650,11 @@ export default defineComponent({
       redBtnColumns,
       redBtnRows,
       selectedDateFields,
+      redDaysList,
+      deleteDates,
+      IsdeleteBtnVisible,
+      handleNotCreatedRow
+
     };
   },
   created() {
@@ -1811,6 +1854,9 @@ export default defineComponent({
 //     box-shadow: 6px 6px 18px var(--q-dark);
 //   }
 // }
+.single-line-tab {
+  display: inline-flex;
+}
 </style>
 
 <style lang="scss">
