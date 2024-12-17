@@ -12,9 +12,10 @@
         <div class="tw-text-gray-500 tw-text-[14px] tw-font-bold">
           {{ label }}
         </div>
+        <slot name="left" />
       </div>
       <div>
-        <slot name="actions" />
+        <slot name="right" />
         <q-icon
           name="fullscreen"
           size="18px"

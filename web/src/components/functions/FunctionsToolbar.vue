@@ -21,15 +21,15 @@
         padding="sm md"
         type="submit"
         no-caps
-        @click="emit('test-function')"
+        @click="emit('test')"
       />
       <q-btn
         :label="t('function.save')"
         class="text-bold no-border tw-ml-[12px]"
         color="secondary"
         padding="sm md"
-        type="submit"
         no-caps
+        @click="emit('save')"
       />
       <q-btn
         v-close-popup="true"
@@ -55,7 +55,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-const emit = defineEmits(["test-function"]);
+const emit = defineEmits(["test", "save"]);
 </script>
 <style scoped lang="scss">
 .add-function-actions {

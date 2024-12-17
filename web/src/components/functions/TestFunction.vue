@@ -68,7 +68,23 @@
         v-model:is-expanded="expandState.query"
         :label="t('common.query') + '*'"
       >
-        <template #actions>
+        <template #left>
+          <q-icon
+            v-if="!!sqlQueryErrorMsg"
+            name="info"
+            class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
+            size="16px"
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              :offset="[10, 10]"
+            >
+              {{ sqlQueryErrorMsg }}
+            </q-tooltip>
+          </q-icon>
+        </template>
+        <template #right>
           <q-btn
             :label="t('search.runQuery')"
             class="test-function-run-query-btn text-bold tw-ml-[12px] no-border"
