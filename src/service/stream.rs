@@ -278,8 +278,12 @@ pub async fn save_stream_settings(
             )));
         }
 
-        let last_retained =
-            config::utils::time::now() - Duration::try_days(settings.data_retention).unwrap();
+        let last_retained = config::utils::time::now()
+            - if settings.data_retention == 0 {
+                Duration::try_days(cfg.compact.data_retention_days).unwrap()
+            } else {
+                Duration::try_days(settings.data_retention).unwrap()
+            };
 
         if range.start * 1000 < last_retained.timestamp_nanos_opt().unwrap() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
