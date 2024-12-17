@@ -51,6 +51,10 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
+    if partitions.is_empty() {
+        return orm_err!("partitions array cannot be empty");
+    }
+
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 

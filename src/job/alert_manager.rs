@@ -133,7 +133,8 @@ async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         log::debug!("[BACKGROUND JOB] Running check on running jobs");
-        let updated_at = config::utils::time::now_micros() - (time * 1_000_000);
+        let now = config::utils::time::now_micros();
+        let updated_at = now - (time * 1_000_000);
         if let Err(e) = service::db::background_job::check_running_jobs(updated_at).await {
             log::error!("[BACKGROUND JOB] Error checking running jobs: {e}");
         }
@@ -144,8 +145,9 @@ async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
 async fn run_delete_jobs() -> Result<(), anyhow::Error> {
     let interval = get_config().limit.background_job_delete_interval;
     let mut interval = time::interval(time::Duration::from_secs(interval as u64));
+    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await; // trigger the first run
+        interval.tick().await;
         if let Err(e) = service::alerts::background_jobs::delete_jobs().await {
             log::error!("[BACKGROUND JOB] run delete jobs error: {}", e);
         }
