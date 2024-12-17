@@ -93,9 +93,16 @@ def test_pipeline_creation_and_action(create_session, base_url, pipeline_name, s
         assert resp_enable_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_enable_pipeline.status_code}"
         print(f"Pipeline {pipeline_id} disabled successfully.")
 
+     
+    resp_get_pipeline = session.get(f"{url}api/{org_id}/pipelines")
+    print(resp_get_pipeline.json())
+    assert resp_get_pipeline.status_code == 200
+    if action == "enable":
+       assert resp_get_pipeline.json()["list"][0]["enabled"] is True
+    if action == "disable":
+       assert resp_get_pipeline.json()["list"][0]["enabled"] is False
+
     # Delete the pipeline
     resp_delete_pipeline = session.delete(f"{url}api/{org_id}/pipelines/{pipeline_id}")
     assert resp_delete_pipeline.status_code == 200, f"Expected status code 200 but got {resp_delete_pipeline.status_code}"
     print(f"Pipeline {pipeline_id} deleted successfully.")
-
-    
