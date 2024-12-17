@@ -50,6 +50,8 @@ pub(crate) async fn verify_decode_token(
                     validation.validate_exp = true;
                     validation.set_audience(&[aud]);
                 } else {
+                    // we are decoding the token for the service account, which is issued by the dex
+                    // hence we don't need to validate the exp and aud
                     validation.validate_exp = false;
                     validation.validate_aud = false;
                 };
