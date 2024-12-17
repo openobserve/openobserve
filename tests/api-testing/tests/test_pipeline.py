@@ -103,4 +103,8 @@ def test_pipeline_creation_and_action(create_session, base_url, pipeline_name, s
     # Delete the pipeline
     resp_delete_pipeline = session.delete(f"{url}api/{org_id}/pipelines/{pipeline_id}")
     assert resp_delete_pipeline.status_code == 200, f"Expected status code 200 but got {resp_delete_pipeline.status_code}"
-    print(f"Pipeline {pipeline_id} deleted successfully.")
+    # Verify pipeline is deleted
+    resp_verify_deletion = session.get(f"{url}api/{org_id}/pipelines")
+    assert resp_verify_deletion.status_code == 200
+    deleted_pipeline = next((p for p in resp_verify_deletion.json()["list"] if p["pipeline_id"] == pipeline_id), None)
+    assert deleted_pipeline is None, f"Pipeline {pipeline_id} still exists after deletion"
