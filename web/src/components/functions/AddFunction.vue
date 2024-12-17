@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="add-functions-section">
     <div class="add-function-actions tw-pb-4">
-      <FunctionsToolbar @test-function="onTestFunction" />
+      <FunctionsToolbar @test="onTestFunction" @save="onSubmit" />
       <q-separator />
     </div>
 
