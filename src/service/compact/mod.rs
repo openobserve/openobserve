@@ -286,7 +286,6 @@ pub async fn run_merge(
     // why 1/4 of job_run_timeout?
     // because the timeout is for the entire job, we need to update the job status
     // before it timeout, using 1/2 might still risk a timeout, so we use 1/4 for safety
-    // TODO: background_job should have this feature
     let ttl = std::cmp::max(60, cfg.compact.job_run_timeout / 4) as u64;
     let job_ids = jobs.iter().map(|job| job.id).collect::<Vec<_>>();
     let (_tx, mut rx) = mpsc::channel::<()>(1);

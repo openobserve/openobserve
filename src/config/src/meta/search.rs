@@ -217,7 +217,7 @@ pub struct ResponseTook {
 }
 
 impl ResponseTook {
-    pub fn merge(&mut self, other: &ResponseTook) {
+    pub fn add(&mut self, other: &ResponseTook) {
         self.total += other.total;
         self.idx_took += other.idx_took;
         self.wait_queue += other.wait_queue;
@@ -336,21 +336,6 @@ impl Response {
 
     pub fn set_work_group(&mut self, val: Option<String>) {
         self.work_group = val;
-    }
-
-    pub fn merge(&mut self, other: &Response) {
-        self.took += other.took;
-        self.total += other.total;
-        self.file_count += other.file_count;
-        self.scan_size += other.scan_size;
-        self.idx_scan_size += other.idx_scan_size;
-        self.scan_records += other.scan_records;
-        self.hits.extend(other.hits.clone());
-        if let Some(took_detail) = &mut self.took_detail {
-            if let Some(other_took_detail) = &other.took_detail {
-                took_detail.merge(other_took_detail);
-            }
-        }
     }
 }
 

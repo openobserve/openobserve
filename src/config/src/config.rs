@@ -1010,10 +1010,20 @@ pub struct Limit {
     pub background_job_workers: i64,
     #[env_config(name = "ZO_BACKGROUND_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub background_job_scheduler_interval: i64,
-    #[env_config(name = "ZO_BACKGROUND_JOB_RUM_TIMEOUT", default = 1200)]
+    #[env_config(
+        name = "ZO_BACKGROUND_JOB_RUM_TIMEOUT",
+        default = 600, // seconds
+        help = "Timeout for update check"
+    )]
     pub background_job_run_timeout: i64,
-    #[env_config(name = "ZO_BACKGROUND_JOB_DELETE_INTERVAL", default = 3600)]
+    #[env_config(name = "ZO_BACKGROUND_JOB_DELETE_INTERVAL", default = 600)] // seconds
     pub background_job_delete_interval: i64,
+    #[env_config(
+        name = "ZO_BACKGROUND_JOB_TIMEOUT",
+        default = 36000, // seconds
+        help = "Timeout for query"
+    )]
+    pub background_job_timeout: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]

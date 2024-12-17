@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike};
+use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
         search::{self, Response, SearchPartitionRequest},
@@ -29,15 +29,7 @@ use infra::{
 };
 use tokio::sync::mpsc;
 
-use crate::service::{
-    db::background_job::{
-        clean_deleted_job, clean_deleted_job_result, clean_deleted_partition_job, get,
-        get_deleted_jobs, get_job, get_job_result, get_partition_jobs, set_job_error_message,
-        set_job_finish, set_partition_job_error_message, set_partition_job_finish,
-        set_partition_job_start, set_partition_num, submit_partitions, update_running_job,
-    },
-    search as SearchService,
-};
+use crate::service::{db::background_job::*, search as SearchService};
 
 // 1. get the oldest job from `background_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
@@ -140,23 +132,10 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     );
 
     // 5. after run on partition, write result to s3
-    let mut reponse = Response::default();
-    reponse.set_trace_id(job.trace_id.clone());
-
     let partition_jobs = get_partition_jobs(&job.id).await?;
-    let mut need = limit + offset;
-    for partition_job in partition_jobs.iter() {
-        let path = partition_job.result_path.as_ref().unwrap();
-        let buf = storage::get(path).await?;
-        let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
-        reponse.merge(&res);
-        need -= res.total as i64;
-        if need <= 0 {
-            break;
-        }
-    }
-    // TODO: skip the offest records in the final result
-    let buf = bytes::Bytes::from(json::to_string(&reponse)?);
+    let mut response = merge_response(partition_jobs, limit, offset).await?;
+    response.set_trace_id(job.trace_id.clone());
+    let buf = bytes::Bytes::from(json::to_string(&response)?);
     let path = generate_result_path(job.created_at, &job.trace_id, None);
     storage::put(&path, buf).await?;
 
@@ -207,6 +186,7 @@ async fn run_partition_job(
     );
 
     // 1. rewrite the start_time and end_time to the query
+    let start = std::time::Instant::now();
     let mut req = req;
     req.query.start_time = partition_job.start_time;
     req.query.end_time = partition_job.end_time;
@@ -229,9 +209,11 @@ async fn run_partition_job(
         set_partition_job_error_message(&job.id, partition_id, &e.to_string()).await?;
         return Err(e.into());
     }
+    let mut result = res.unwrap();
+    let took = start.elapsed().as_millis();
+    result.set_local_took(took as usize, 0);
 
     // 4. write the result to s3
-    let result = res.unwrap();
     let hits = result.total;
     let buf = bytes::Bytes::from(json::to_string(&result)?);
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
@@ -277,17 +259,13 @@ fn generate_result_path(
     trace_id: &str,            // the job's trace_id
     partition_id: Option<i32>, // None means it is the final result
 ) -> String {
-    let naive_datetime = DateTime::from_timestamp_micros(created_at)
-        .unwrap_or_else(|| panic!("Invalid timestamp for created_at for trace_id: {trace_id}"));
-    let year = naive_datetime.year();
-    let month = naive_datetime.month();
-    let day = naive_datetime.day();
+    let datetime: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
 
     format!(
         "result/{year}/{month}/{day}/{trace_id}/{partition_id}.result.json",
-        year = year,
-        month = month,
-        day = day,
+        year = datetime.year(),
+        month = datetime.month(),
+        day = datetime.day(),
         trace_id = trace_id,
         partition_id = if partition_id.is_some() {
             partition_id.unwrap().to_string()
@@ -359,4 +337,63 @@ async fn check_status(id: i64, job_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(message));
     }
     Ok(())
+}
+
+async fn merge_response(
+    jobs: Vec<PartitionJob>,
+    limit: i64,
+    offset: i64,
+) -> Result<Response, anyhow::Error> {
+    let mut response = Vec::new();
+    for job in jobs.iter() {
+        if job.result_path.is_none() {
+            continue;
+        }
+        let path = job.result_path.as_ref().unwrap();
+        let buf = storage::get(path).await?;
+        let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
+        response.push(res);
+    }
+
+    // if only one partition job, return directly
+    if response.len() == 1 {
+        return Ok(response.remove(0));
+    }
+
+    // merge all response
+    let mut resp = response.remove(0);
+    for r in response {
+        resp.took += r.took;
+        resp.took_detail = match (resp.took_detail, r.took_detail.as_ref()) {
+            (Some(mut a), Some(b)) => {
+                a.add(b);
+                Some(a)
+            }
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
+        resp.hits.extend(r.hits);
+        resp.total += r.total;
+        resp.file_count += r.file_count;
+        resp.scan_size += r.scan_size;
+        resp.idx_scan_size += r.idx_scan_size;
+        resp.scan_records += r.scan_records;
+        if !r.function_error.is_empty() {
+            resp.function_error = format!("{} \n {}", resp.function_error, r.function_error);
+            resp.is_partial = true;
+        }
+    }
+    resp.from = offset;
+    resp.size = limit;
+
+    resp.hits = resp
+        .hits
+        .into_iter()
+        .skip(offset as usize)
+        .take(limit as usize)
+        .collect();
+    resp.total = resp.hits.len();
+
+    Ok(resp)
 }

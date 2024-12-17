@@ -13,41 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
-#[cfg(feature = "enterprise")]
-use {
-    crate::{
-        common::{
-            meta::{self, http::HttpResponse as MetaHttpResponse},
-            utils::http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-            },
-        },
-        handler::http::request::search::{
-            job::cancel_query_inner, utils::check_stream_premissions,
-        },
-        service::db::background_job::{
-            cancel_job_by_job_id, cancel_partition_job, get, list_status_by_org_id,
-            retry_background_job, set_job_deleted, submit,
+use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpResponse};
+use config::{
+    get_config,
+    meta::{
+        search::{Response, SubmitQueryResponse},
+        sql::resolve_stream_names,
+        stream::StreamType,
+    },
+    utils::json,
+};
+use infra::storage;
+use tracing::Span;
+
+use crate::{
+    common::{
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::http::{
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request,
         },
     },
-    actix_web::http::StatusCode,
-    config::meta::search::Response,
-    config::{
-        get_config,
-        meta::{search::SubmitQueryResponse, sql::resolve_stream_names, stream::StreamType},
-        utils::json,
-    },
-    infra::storage,
-    std::collections::HashMap,
-    tracing::Span,
+    handler::http::request::search::{job::cancel_query_inner, utils::check_stream_premissions},
+    service::db::background_job::*,
 };
 
 // 1. submit
-#[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/submit")]
 pub async fn submit_job(
     org_id: web::Path<String>,
@@ -85,6 +78,11 @@ pub async fn submit_job(
     };
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
+    }
+
+    // update timeout
+    if req.timeout == 0 {
+        req.timeout = cfg.limit.background_job_timeout;
     }
 
     // set search event type
@@ -172,9 +170,18 @@ pub async fn submit_job(
 }
 
 // 2. status_all
-#[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status_all")]
-pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_status(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let res = list_status_by_org_id(&org_id).await;
     match res {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
@@ -183,9 +190,18 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 }
 
 // 3. status
-#[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/status/{job_id}")]
-pub async fn get_status(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_status(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let job_id = path.1.clone();
     let res = get(&job_id).await;
     match res {
@@ -195,18 +211,36 @@ pub async fn get_status(path: web::Path<(String, String)>) -> Result<HttpRespons
 }
 
 // 4. cancel
-#[cfg(feature = "enterprise")]
 #[delete("/{org_id}/search_job/cancel/{job_id}")]
-pub async fn cancel_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn cancel_job(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let org_id = path.0.clone();
     let job_id = path.1.clone();
     cancel_job_inner(&org_id, &job_id).await
 }
 
 // 5. get
-#[cfg(feature = "enterprise")]
 #[get("/{org_id}/search_job/result/{job_id}")]
-pub async fn get_job_result(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_job_result(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let job_id = path.1.clone();
     let res = get(&job_id).await;
     match res {
@@ -232,9 +266,18 @@ pub async fn get_job_result(path: web::Path<(String, String)>) -> Result<HttpRes
 }
 
 // 6. delete
-#[cfg(feature = "enterprise")]
 #[delete("/{org_id}/search_job/delete/{job_id}")]
-pub async fn delete_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_job(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let org_id = path.0.clone();
     let job_id = path.1.clone();
 
@@ -256,9 +299,18 @@ pub async fn delete_job(path: web::Path<(String, String)>) -> Result<HttpRespons
 }
 
 // 7. retry
-#[cfg(feature = "enterprise")]
 #[post("/{org_id}/search_job/retry/{job_id}")]
-pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn retry_job(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let _user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
     let _org_id = path.0.clone();
     let job_id = path.1.clone();
 
@@ -280,7 +332,6 @@ pub async fn retry_job(path: web::Path<(String, String)>) -> Result<HttpResponse
     }
 }
 
-#[cfg(feature = "enterprise")]
 async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Error> {
     // 1. use job_id to query the trace_id
     let job = get(job_id).await;
@@ -304,50 +355,4 @@ async fn cancel_job_inner(org_id: &str, job_id: &str) -> Result<HttpResponse, Er
 
     // 4. use cancel query function to cancel the query
     cancel_query_inner(org_id, &[&job.unwrap().trace_id]).await
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[post("/{org_id}/search_job/submit")]
-pub async fn submit_job(
-    _org_id: web::Path<String>,
-    _in_req: HttpRequest,
-    _body: web::Bytes,
-) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[get("/{org_id}/search_job/status_all")]
-pub async fn list_status(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[get("/{org_id}/search_job/status/{job_id}")]
-pub async fn get_status(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[delete("/{org_id}/search_job/cancel/{job_id}")]
-pub async fn cancel_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[get("/{org_id}/search_job/result/{job_id}")]
-pub async fn get_job_result(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[delete("/{org_id}/search_job/delete/{job_id}")]
-pub async fn delete_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[post("/{org_id}/search_job/retry/{job_id}")]
-pub async fn retry_job(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

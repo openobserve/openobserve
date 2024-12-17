@@ -825,7 +825,6 @@ pub async fn merge_files(
 
     // upload file to storage
     let buf = Bytes::from(buf);
-
     storage::put(&new_file_key, buf.clone()).await?;
 
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
