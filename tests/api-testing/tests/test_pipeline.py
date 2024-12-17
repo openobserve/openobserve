@@ -1,9 +1,4 @@
-import json
-import requests
 import pytest
-from datetime import datetime, timezone, timedelta
-import time
-
 
 @pytest.mark.parametrize(
     "pipeline_name, stream_name, action, expected_status",
