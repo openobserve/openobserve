@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{ider, meta::alerts::templates::Template};
+use config::{
+    ider,
+    meta::destinations::{Template, TemplateType},
+};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter, Set,
-    TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
+    ModelTrait, QueryFilter, Set, TryIntoModel,
 };
 
 use crate::{
@@ -30,12 +33,20 @@ use crate::{
 
 impl From<Model> for Template {
     fn from(value: Model) -> Self {
+        let template_type = match value.title {
+            Some(title) => TemplateType::Email { title },
+            None => match value.r#type.to_lowercase().as_str() {
+                "http" => TemplateType::Http,
+                _ => TemplateType::Sns,
+            },
+        };
         Self {
+            id: value.id,
+            org_id: value.org,
             name: value.name,
+            is_default: value.is_default,
+            template_type,
             body: value.body,
-            is_default: value.is_default.then_some(true),
-            template_type: value.r#type.as_str().into(),
-            title: value.title.unwrap_or_default(),
         }
     }
 }
@@ -45,27 +56,26 @@ pub async fn put(org_id: &str, template: Template) -> Result<Template, errors::E
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let title = match &template.template_type {
+        TemplateType::Email { title } => Some(title.to_string()),
+        _ => None,
+    };
+    let mut active: ActiveModel = ActiveModel {
+        id: NotSet,
+        org: Set(org_id.to_string()),
+        name: Set(template.name.to_string()),
+        is_default: Set(template.is_default),
+        r#type: Set(template.template_type.to_string()),
+        body: Set(template.body),
+        title: Set(title),
+    };
     let model: Model = match get_model(client, org_id, &template.name).await? {
         Some(model) => {
-            let mut active: ActiveModel = model.into();
-            active.org = Set(org_id.to_string());
-            active.name = Set(template.name);
-            active.is_default = Set(template.is_default.unwrap_or_default());
-            active.r#type = Set(template.template_type.to_string());
-            active.body = Set(template.body);
-            active.title = Set((!template.title.is_empty()).then_some(template.title));
+            active.id = Set(model.id);
             active.update(client).await?.try_into_model()?
         }
         None => {
-            let active = ActiveModel {
-                id: Set(ider::uuid()),
-                org: Set(org_id.to_string()),
-                name: Set(template.name),
-                is_default: Set(template.is_default.unwrap_or_default()),
-                r#type: Set(template.template_type.to_string()),
-                body: Set(template.body),
-                title: Set((!template.title.is_empty()).then_some(template.title)),
-            };
+            active.id = Set(ider::uuid());
             active.insert(client).await?.try_into_model()?
         }
     };

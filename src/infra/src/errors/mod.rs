@@ -92,6 +92,8 @@ pub enum DbError {
     GetDashboardError(#[from] GetDashboardError),
     #[error("PutDashbord# {0}")]
     PutDashboard(#[from] PutDashboardError),
+    #[error("PutDashbord# {0}")]
+    GetDestinationError(#[from] GetDestinationError),
 }
 
 #[derive(ThisError, Debug)]
@@ -110,10 +112,22 @@ pub enum PutDashboardError {
     MissingTitle,
     #[error("error putting dashboard with missing owner")]
     MissingOwner,
+    #[error("error putting dashboard with missing owner")]
+    AlertDestEmptyTemplateId,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
     #[error("error converting created timestamp with timezone to Unix timestamp")]
     ConvertingCreatedTimestamp,
+}
+
+#[derive(ThisError, Debug)]
+pub enum GetDestinationError {
+    #[error("alert destination template not found")]
+    AlertDestTemplateNotFound,
+    #[error("alert destination in DB has empty template id")]
+    AlertDestEmptyTemplateId,
+    #[error("pipeline destination in DB has empty pipeline id")]
+    PipelineDestEmptyPipelineId,
 }
 
 #[derive(ThisError, Debug)]
@@ -145,6 +159,12 @@ impl From<GetDashboardError> for Error {
 
 impl From<PutDashboardError> for Error {
     fn from(value: PutDashboardError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
+impl From<GetDestinationError> for Error {
+    fn from(value: GetDestinationError) -> Self {
         Error::DbError(value.into())
     }
 }

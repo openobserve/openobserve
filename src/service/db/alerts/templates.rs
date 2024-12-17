@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use config::{meta::alerts::templates::Template, utils::json};
+use config::{
+    meta::destinations::{Module, Template},
+    utils::json,
+};
 use infra::table;
 use itertools::Itertools;
 
@@ -43,8 +46,6 @@ pub enum TemplateError {
     EmptyBody,
     #[error("Template with the same name already exists")]
     AlreadyExists,
-    // #[error("Can't update default folder")]
-    // UpdateDefaultFolder,
     #[error("Template is in use for destination# {0}")]
     DeleteWithDestination(String),
     #[error("Template not found")]
@@ -78,7 +79,10 @@ pub async fn set(org_id: &str, template: Template) -> Result<Template, TemplateE
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     for dest in ALERTS_DESTINATIONS.iter() {
-        if dest.key().starts_with(org_id) && dest.value().template.eq(name) {
+        let d = dest.value();
+        if dest.key().starts_with(org_id)
+            && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
+        {
             return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
         }
     }
