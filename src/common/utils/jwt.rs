@@ -26,9 +26,8 @@ pub(crate) async fn verify_decode_token(
     ),
     anyhow::Error,
 > {
+    use config::meta::user::UserRole;
     use infra::errors::JwtError;
-
-    use crate::common::meta::user::UserRole;
 
     let jwks: jwk::JwkSet = serde_json::from_str(jwks).unwrap();
     let header = decode_header(token)?;
@@ -75,7 +74,7 @@ pub(crate) async fn verify_decode_token(
                 let user_email = if let Some(email) = final_claims.get("email") {
                     email.as_str().unwrap().to_lowercase()
                 } else if let Some(user_id) = final_claims.get("user_id") {
-                    user_id.as_str().unwrap()
+                    user_id.as_str().unwrap().to_lowercase()
                 } else {
                     "".to_string()
                 };
