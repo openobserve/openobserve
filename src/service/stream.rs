@@ -270,6 +270,11 @@ pub async fn save_stream_settings(
     }
     settings.partition_keys = old_partition_keys;
 
+    let old_data_retention_days = if let Some(old_settings) = unwrap_stream_settings(&schema) {
+        old_settings.data_retention
+    } else {
+        0
+    };
     for range in settings.red_days.iter() {
         if range.start > range.end {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -282,7 +287,7 @@ pub async fn save_stream_settings(
             - if settings.data_retention == 0 {
                 Duration::try_days(cfg.compact.data_retention_days).unwrap()
             } else {
-                Duration::try_days(settings.data_retention).unwrap()
+                Duration::try_days(old_data_retention_days).unwrap()
             };
 
         if range.start * 1000 < last_retained.timestamp_nanos_opt().unwrap() {
