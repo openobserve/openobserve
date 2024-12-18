@@ -27,9 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
-      :class="selectedType + 'type'"
+      :class="{
+          [selectedType + 'type']: showRelative,
+          'hideRelative': !showRelative
+        }"
       :disable="disable"
-      @click="showOnlyAbsolute"
     >
       <q-menu
         id="date-time-menu"
@@ -392,7 +394,7 @@ export default defineComponent({
     minDate: {
       type: String,
       default: null,
-    }
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change"],
@@ -435,8 +437,11 @@ export default defineComponent({
       useLocalTimezone(selectedTimezone);
       store.dispatch("setTimezone", selectedTimezone);
       await nextTick();
-      if (selectedType.value == "absolute") saveDate("absolute");
-      else saveDate("relative");
+      if (props.autoApply) {
+        if (selectedType.value == "absolute") saveDate("absolute");
+        else saveDate("relative");
+      }
+
       emit("on:timezone-change");
     };
 
@@ -546,7 +551,6 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
-
         saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
@@ -585,7 +589,6 @@ export default defineComponent({
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
-
       if (props.autoApply) saveDate("relative");
     };
 
@@ -897,8 +900,18 @@ export default defineComponent({
           // Here as if multiple dates is selected we get object with from and to keys
           // If single date is selected we get string with date value
           // So have added check for from and to
-          if (selectedDate.value?.from && selectedDate.value?.to) {
+          if (
+            selectedDate.value?.from &&
+            selectedDate.value?.to &&
+            props.showRelative
+          ) {
             return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+          } else if (
+            selectedDate.value?.from &&
+            selectedDate.value?.to &&
+            !props.showRelative
+          ) {
+            return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
             return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
           }
@@ -946,7 +959,6 @@ export default defineComponent({
     const setDateType = (type) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
-
       if (props.autoApply)
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
@@ -1110,6 +1122,10 @@ export default defineComponent({
     }
     &.absolutetype {
       min-width: 286px;
+    }
+    &.hideRelative{
+      background-color: red;
+      width: fit-content;
     }
   }
 }
