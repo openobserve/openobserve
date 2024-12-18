@@ -468,7 +468,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 <q-icon name="info" class="q-mr-xs" size="16px" />
 
                 An additional
-                {{ store.state.zoConfig.data_retention_days }} days of extension
+                {{ store.state.zoConfig.extended_data_retention_days }} days of extension
                 will be applied to the selected date ranges</span
               >
             </div>
@@ -1542,10 +1542,9 @@ export default defineComponent({
     };
     const calculateDateRange = () => {
       const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - dataRetentionDays.value); // Adjust to the desired number of days (10 days in this case)
+      const currentDate = new Date(today);
+      currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
 
-      // If no min/max date is provided, default to 30 days ago and today
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(), // Current timestamp
         store.state.timezone, // Get the timezone from the store
@@ -1553,7 +1552,7 @@ export default defineComponent({
       );
       // Format minDate using timestampToTimezoneDate for a custom format
       minDate.value = timestampToTimezoneDate(
-        thirtyDaysAgo.getTime(),
+        currentDate.getTime(),
         store.state.timezone,
         "yyyy/MM/dd", // Desired format
       );
