@@ -290,7 +290,7 @@ pub async fn save_stream_settings(
                 Duration::try_days(old_data_retention_days).unwrap()
             };
 
-        if range.start * 1000 < last_retained.timestamp_nanos_opt().unwrap() {
+        if range.start < last_retained.timestamp_micros() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(

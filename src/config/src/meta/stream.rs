@@ -552,7 +552,9 @@ impl Eq for DistinctField {}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TimeRange {
+    /// Start timestamp in microseconds
     pub start: i64,
+    /// End timestamp in microseconds
     pub end: i64,
 }
 

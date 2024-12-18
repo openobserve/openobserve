@@ -22,7 +22,7 @@ use config::{
     meta::stream::{
         FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType, TimeRange,
     },
-    utils::time::BASE_TIME,
+    utils::time::{hour_micros, BASE_TIME},
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
 use itertools::Itertools;
@@ -50,16 +50,16 @@ fn populate_time_ranges_for_deletion(
     original_time_range: &mut TimeRange,
 ) -> u32 {
     let cfg = get_config();
-    let mut extended_retention_range_start: DateTime<Utc> =
-        Utc.timestamp_nanos(exclude_range.start * 1000);
-    let mut extended_retention_range_end: DateTime<Utc> =
-        Utc.timestamp_nanos(exclude_range.end * 1000);
+    let mut extended_retention_range_start = exclude_range.start;
+    let mut extended_retention_range_end = exclude_range.end;
 
     // In case if a red day is older than the red days retention period and the normal data
     // retention period then skip the day, which will delete the data
     let allowed_extended_retention_retention_end = config::utils::time::now()
         - Duration::try_days(cfg.compact.extended_data_retention_days).unwrap()
         - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+    let allowed_extended_retention_retention_end =
+        allowed_extended_retention_retention_end.timestamp_micros();
 
     if extended_retention_range_end < allowed_extended_retention_retention_end {
         time_ranges_for_deletion.push(original_time_range.clone());
@@ -71,18 +71,9 @@ fn populate_time_ranges_for_deletion(
 
     // Improve this logic. Since the compactor works on days granularity, we can safely add
     // day but this should be changed when the granularity is changed
-    extended_retention_range_end += Duration::days(1); // add one day to make it exclusive
+    extended_retention_range_end += hour_micros(24); // add one day to make it exclusive
 
-    let time_range = TimeRange::new(
-        extended_retention_range_start
-            .timestamp_nanos_opt()
-            .expect("valid timestamp")
-            / 1000,
-        extended_retention_range_end
-            .timestamp_nanos_opt()
-            .expect("valid timestamp")
-            / 1000,
-    );
+    let time_range = TimeRange::new(extended_retention_range_start, extended_retention_range_end);
 
     if time_range.contains(original_time_range) {
         // skip the whole deletion as the red day consists of the whole time range
@@ -143,11 +134,8 @@ pub async fn delete_by_stream(
     }
 
     let mut original_deletion_time_range = TimeRange::new(
-        created_at.timestamp_nanos_opt().expect("valid timestamp") / 1000,
-        lifecycle_end
-            .timestamp_nanos_opt()
-            .expect("valid timestamp")
-            / 1000,
+        created_at.timestamp_micros(),
+        lifecycle_end.timestamp_micros(),
     );
 
     // flatten out the overlapping red days before we create deletion ranges
@@ -633,18 +621,12 @@ mod tests {
     async fn test_populate_time_ranges() {
         let now = Utc::now();
         let exclude_range = TimeRange::new(
-            (now - Duration::try_days(1).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            now.timestamp_nanos_opt().unwrap() / 1000,
+            (now - Duration::try_days(1).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
         );
         let original_time_range = TimeRange::new(
-            (now - Duration::try_days(15).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            now.timestamp_nanos_opt().unwrap() / 1000,
+            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
         );
         let mut res_time_ranges = vec![];
         println!("original time range : {}", original_time_range);
@@ -666,21 +648,12 @@ mod tests {
         let now = Utc::now();
         let mut res_time_ranges = vec![];
         let mut original_time_range = TimeRange::new(
-            (now - Duration::try_days(15).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            now.timestamp_nanos_opt().unwrap() / 1000,
+            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
         );
         let exclude_range = TimeRange::new(
-            (now - Duration::try_days(3).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            (now - Duration::try_days(2).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
+            (now - Duration::try_days(3).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
         );
         println!("original time range : {}", original_time_range);
         println!("red day time range : {}", exclude_range);
@@ -701,24 +674,12 @@ mod tests {
     async fn test_populate_time_ranges_intersecting_ext_ret_days() {
         let now = Utc::now();
         let exclude_range_1 = TimeRange::new(
-            (now - Duration::try_days(20).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            (now - Duration::try_days(10).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
+            (now - Duration::try_days(20).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(10).unwrap()).timestamp_micros(),
         );
         let exclude_range_2 = TimeRange::new(
-            (now - Duration::try_days(15).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            (now - Duration::try_days(5).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
+            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(5).unwrap()).timestamp_micros(),
         );
 
         let time_range =
@@ -732,24 +693,12 @@ mod tests {
         let now = Utc::now();
         let mut res_time_ranges = vec![];
         let exclude_range_1 = TimeRange::new(
-            (now - Duration::try_days(20).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            (now - Duration::try_days(10).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
+            (now - Duration::try_days(20).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(10).unwrap()).timestamp_micros(),
         );
         let exclude_range_2 = TimeRange::new(
-            (now - Duration::try_days(8).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            (now - Duration::try_days(5).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
+            (now - Duration::try_days(8).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(5).unwrap()).timestamp_micros(),
         );
 
         let time_range = TimeRange::flatten_overlapping_ranges(vec![
@@ -760,11 +709,8 @@ mod tests {
         assert_eq!(time_range.len(), 2);
 
         let mut original_time_range = TimeRange::new(
-            (now - Duration::try_days(30).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            now.timestamp_nanos_opt().unwrap() / 1000,
+            (now - Duration::try_days(30).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
         );
 
         populate_time_ranges_for_deletion(
@@ -774,11 +720,8 @@ mod tests {
         );
 
         let expected_range = TimeRange::new(
-            (now - Duration::try_days(9).unwrap())
-                .timestamp_nanos_opt()
-                .unwrap()
-                / 1000,
-            now.timestamp_nanos_opt().unwrap() / 1000,
+            (now - Duration::try_days(9).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
         );
 
         println!("original time range : {}", original_time_range);
@@ -797,11 +740,8 @@ mod tests {
         assert_eq!(
             original_time_range,
             TimeRange::new(
-                (now - Duration::try_days(4).unwrap())
-                    .timestamp_nanos_opt()
-                    .unwrap()
-                    / 1000,
-                now.timestamp_nanos_opt().unwrap() / 1000,
+                (now - Duration::try_days(4).unwrap()).timestamp_micros(),
+                now.timestamp_micros(),
             )
         );
         assert_eq!(res_time_ranges.len(), 2);
