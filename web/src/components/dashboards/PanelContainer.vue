@@ -335,7 +335,7 @@ export default defineComponent({
     "searchType",
     "folderId",
     "reportId",
-    "refreshVariableData",,
+    "refreshVariableData",
   ],
   components: {
     PanelSchemaRenderer,
