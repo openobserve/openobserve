@@ -15,7 +15,8 @@
 
 use std::sync::Arc;
 
-use config::{meta::alerts::templates::Template, utils::json};
+use bytes::Bytes;
+use config::meta::destinations::{Module, Template};
 use infra::table;
 use itertools::Itertools;
 
@@ -26,6 +27,9 @@ use crate::{
     },
     service::db,
 };
+
+// db cache watcher prefix
+const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";
 
 #[derive(Debug, thiserror::Error)]
 pub enum TemplateError {
@@ -43,8 +47,6 @@ pub enum TemplateError {
     EmptyBody,
     #[error("Template with the same name already exists")]
     AlreadyExists,
-    // #[error("Can't update default folder")]
-    // UpdateDefaultFolder,
     #[error("Template is in use for destination# {0}")]
     DeleteWithDestination(String),
     #[error("Template not found")]
@@ -71,22 +73,47 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
 
 pub async fn set(org_id: &str, template: Template) -> Result<Template, TemplateError> {
     let saved = table::templates::put(org_id, template).await?;
-    let key = format!("{}/{}", org_id, saved.name);
-    ALERTS_TEMPLATES.insert(key, saved.clone());
+
+    // trigger watch event by putting empty value to cluster coordinator
+    let cluster_coordinator = db::get_coordinator().await;
+    cluster_coordinator
+        .put(
+            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", org_id, saved.name),
+            Bytes::new(),
+            db::NEED_WATCH,
+            None,
+        )
+        .await?;
+
     Ok(saved)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     for dest in ALERTS_DESTINATIONS.iter() {
-        if dest.key().starts_with(org_id) && dest.value().template.eq(name) {
+        let d = dest.value();
+        if dest.key().starts_with(org_id)
+            && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
+        {
             return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
         }
     }
     if table::templates::get(org_id, name).await?.is_none() {
         return Err(TemplateError::NotFound);
     };
-    ALERTS_TEMPLATES.remove(&format!("{org_id}/{name}"));
-    Ok(table::templates::delete(org_id, name).await?)
+
+    table::templates::delete(org_id, name).await?;
+
+    // trigger watch event to delete from cache
+    let cluster_coordinator = db::get_coordinator().await;
+    cluster_coordinator
+        .delete(
+            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", org_id, name),
+            false,
+            db::NEED_WATCH,
+            None,
+        )
+        .await?;
+    Ok(())
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
@@ -102,15 +129,12 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
             .collect());
     }
 
-    let mut items = table::templates::list(org_id).await?;
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
+    Ok(table::templates::list(org_id).await?)
 }
 
-pub async fn _watch() -> Result<(), anyhow::Error> {
-    let key = "/templates/";
+pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator.watch(TEMPLATE_WATCHER_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert templates");
     loop {
@@ -123,28 +147,29 @@ pub async fn _watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Template = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                let (org_id, name) =
+                    match super::destinations::parse_event_key(TEMPLATE_WATCHER_PREFIX, &ev.key) {
+                        Ok(parsed) => parsed,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("{e}");
                             continue;
                         }
+                    };
+                let item_value: Template = match table::templates::get(org_id, name).await {
+                    Ok(Some(val)) => val,
+                    Ok(None) => {
+                        log::error!("Template not found in db");
+                        continue;
                     }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
+                    Err(e) => {
+                        log::error!("Error getting from db: {}", e);
+                        continue;
+                    }
                 };
-                ALERTS_TEMPLATES.insert(item_key.to_owned(), item_value);
+                ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
+                let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
                 ALERTS_TEMPLATES.remove(item_key);
             }
             db::Event::Empty => {}
