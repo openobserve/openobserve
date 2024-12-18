@@ -146,6 +146,12 @@ pub async fn delete_by_stream(
         final_deletion_time_ranges.push(original_deletion_time_range);
     }
 
+    log::debug!(
+        "[COMPACT] red_days: {}, final_deletion_time_ranges: {}",
+        red_days.iter().join(", "),
+        final_deletion_time_ranges.iter().join(", ")
+    );
+
     let job_nos = final_deletion_time_ranges.len();
 
     for time_range in final_deletion_time_ranges {
