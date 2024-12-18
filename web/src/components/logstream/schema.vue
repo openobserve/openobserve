@@ -962,8 +962,8 @@ export default defineComponent({
             index: index,
             original_start: field.start,
             original_end: field.end,
-            start: convertUnixToQuasarFormat(field.start),
-            end: convertUnixToQuasarFormat(field.end),
+            start: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(field.start),"00:00",'UTC').timestamp),
+            end: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(field.end),"00:00",'UTC').timestamp),
           });
         });
       }
@@ -1505,15 +1505,17 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DD");
+      return date.formatDate(formattedDate, "DD-MM-YYYY");
     }
     function convertToMidnightUTCTimestamp(timestamp) {
       const date = new Date(timestamp);
+      console.log(date.getFullYear(),'date')
       // Create a new date object for 12:00 AM UTC
       const midnightUTC = Date.UTC(
         date.getUTCFullYear(),
         date.getUTCMonth(),
         date.getUTCDate(),
+        0,
         0,
         0,
         0,
@@ -1523,16 +1525,17 @@ export default defineComponent({
 
 
     const dateChangeValue = (value) => {
+
       if (value.relativeTimePeriod == null) {
         redDaysList.value.push({
-          start: convertToMidnightUTCTimestamp(value.startTime),
-          end: convertToMidnightUTCTimestamp(value.endTime),
+          start: convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp,
+          end: convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp,
         });
         redBtnRows.value.unshift({
-          start: convertUnixToQuasarFormat(value.startTime),
-          end: convertUnixToQuasarFormat(value.endTime),
-          original_start: convertToMidnightUTCTimestamp(value.startTime),
-          original_end: convertToMidnightUTCTimestamp(value.endTime),
+          start: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp),
+          end: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp),
+          original_start: convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp,
+          original_end: convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp,
           isCreated: false,
         });
         formDirtyFlag.value = true;
@@ -1572,17 +1575,17 @@ export default defineComponent({
     const handleNotCreatedRow = (row) => {
       // Re-assign filtered rows to redBtnRows.value to update the array
       redBtnRows.value = redBtnRows.value.filter(
-        (field) =>
-          field.original_start !== row.original_start ||
-          field.original_end !== row.original_end,
-      );
+          (field) =>
+            field.isCreated !== undefined ? ( // Check if `isCreated` exists
+              field.isCreated === false && // Only check for `isCreated === false`
+              (field.original_start !== row.original_start || field.original_end !== row.original_end) // Check `original_start` and `original_end`
+            ) : true // If `isCreated` does not exist, keep the row
+        );
 
       redDaysList.value = redDaysList.value.filter(
         (field) =>
           field.start !== row.original_start || field.end !== row.original_end,
       );
-      console.log(row, "redDaysList 111 row");
-      console.log(redDaysList.value, "redDaysList 111");
     };
 
     return {
