@@ -467,7 +467,7 @@ class="indexDetailsContainer" style="height: 100vh">
               <span style="font-weight: 600">
                 <q-icon name="info" class="q-mr-xs" size="16px" />
 
-                An additional
+                Additional
                 {{ store.state.zoConfig.extended_data_retention_days }} days of extension
                 will be applied to the selected date ranges</span
               >
