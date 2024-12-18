@@ -84,6 +84,7 @@ export const convertPanelData = async (
               hoveredSeriesState,
               resultMetaData,
               metadata,
+              chartPanelStyle,
             )),
           };
         } catch (error) {
