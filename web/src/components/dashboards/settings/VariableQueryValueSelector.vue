@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
+      @blur="applyChanges"
     >
       <template v-slot:no-option>
         <q-item>
@@ -94,6 +95,10 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+
+    const variableName = props.variableItem?.label || props.variableItem?.name
+
+    console.log(variableName, ": rendering variable");
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -130,10 +135,27 @@ export default defineComponent({
       }
     };
 
+    const applyChanges = () => {
+      console.log(variableName, ': blur: apply changes')
+      if(props.variableItem.multiSelect) {
+        console.log(variableName, ': blur: multiselect, emit selected value')
+        emitSelectedValues();
+      }
+    }
+
     // update selected value
     watch(selectedValue, () => {
-      emit("update:modelValue", selectedValue.value);
+      console.log(variableName, ": watch: selected value changed: ", selectedValue.value);
+      if(!props.variableItem.multiSelect) {
+        console.log(variableName, ": not multiselect, emit selected value");
+        emitSelectedValues()
+      }
     });
+
+    const emitSelectedValues = () => {
+      console.log(variableName, ": emit selected value: ", selectedValue.value);
+      emit("update:modelValue", selectedValue.value);
+    }
 
     // Display the selected value
     const displayValue = computed(() => {
@@ -172,6 +194,7 @@ export default defineComponent({
       isAllSelected,
       toggleSelectAll,
       displayValue,
+      applyChanges
     };
   },
 });
