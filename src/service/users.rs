@@ -465,7 +465,7 @@ pub async fn update_user(
                                 }
                             }
                             if custom_roles_need_change {
-                                let existing_roles = get_roles_for_org_user(email, org_id).await;
+                                let existing_roles = get_roles_for_org_user(org_id, email).await;
                                 let mut write_tuples = vec![];
                                 let mut delete_tuples = vec![];
                                 custom_roles.iter().for_each(|crole| {
