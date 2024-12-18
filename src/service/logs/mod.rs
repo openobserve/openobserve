@@ -77,6 +77,10 @@ fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
             else {
                 continue;
             };
+            if index.is_empty() || index == "_" || index == "/" {
+                log::warn!("Invalid bulk index action: {}", action);
+                continue;
+            }
             let doc_id = local_val
                 .get("_id")
                 .and_then(|v| v.as_str().map(|v| v.to_string()));
