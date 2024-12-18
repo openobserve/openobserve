@@ -4881,6 +4881,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "svix-ksuid",
  "thiserror",
  "tokio",
  "tokio-stream",

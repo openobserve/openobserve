@@ -90,10 +90,12 @@ pub enum DbError {
     SeaORMError(String),
     #[error("error getting dashboard")]
     GetDashboardError(#[from] GetDashboardError),
-    #[error("PutDashbord# {0}")]
+    #[error("PutDashboard# {0}")]
     PutDashboard(#[from] PutDashboardError),
-    #[error("PutDashbord# {0}")]
-    GetDestinationError(#[from] GetDestinationError),
+    #[error("DestinationError# {0}")]
+    DestinationError(#[from] DestinationError),
+    #[error("TemplateError# {0}")]
+    TemplateError(#[from] TemplateError),
 }
 
 #[derive(ThisError, Debug)]
@@ -112,8 +114,6 @@ pub enum PutDashboardError {
     MissingTitle,
     #[error("error putting dashboard with missing owner")]
     MissingOwner,
-    #[error("error putting dashboard with missing owner")]
-    AlertDestEmptyTemplateId,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
     #[error("error converting created timestamp with timezone to Unix timestamp")]
@@ -121,13 +121,19 @@ pub enum PutDashboardError {
 }
 
 #[derive(ThisError, Debug)]
-pub enum GetDestinationError {
+pub enum DestinationError {
     #[error("alert destination template not found")]
     AlertDestTemplateNotFound,
     #[error("alert destination in DB has empty template id")]
     AlertDestEmptyTemplateId,
-    #[error("pipeline destination in DB has empty pipeline id")]
-    PipelineDestEmptyPipelineId,
+    #[error("error converting destination id: {0}")]
+    ConvertingId(String),
+}
+
+#[derive(ThisError, Debug)]
+pub enum TemplateError {
+    #[error("error converting template id: {0}")]
+    ConvertingId(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -163,8 +169,14 @@ impl From<PutDashboardError> for Error {
     }
 }
 
-impl From<GetDestinationError> for Error {
-    fn from(value: GetDestinationError) -> Self {
+impl From<DestinationError> for Error {
+    fn from(value: DestinationError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
+impl From<TemplateError> for Error {
+    fn from(value: TemplateError) -> Self {
         Error::DbError(value.into())
     }
 }

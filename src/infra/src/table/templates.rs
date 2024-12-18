@@ -13,26 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use config::{
     ider,
     meta::destinations::{Template, TemplateType},
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors,
+    errors::{Error, TemplateError},
     table::{
         entity::templates::{ActiveModel, Column, Entity, Model},
         get_lock,
     },
 };
 
-impl From<Model> for Template {
-    fn from(value: Model) -> Self {
+impl TryFrom<Model> for Template {
+    type Error = TemplateError;
+
+    fn try_from(value: Model) -> Result<Self, Self::Error> {
         let template_type = match value.title {
             Some(title) => TemplateType::Email { title },
             None => match value.r#type.to_lowercase().as_str() {
@@ -40,18 +44,20 @@ impl From<Model> for Template {
                 _ => TemplateType::Sns,
             },
         };
-        Self {
-            id: value.id,
+        let id = svix_ksuid::Ksuid::from_str(&value.id)
+            .map_err(|e| TemplateError::ConvertingId(e.to_string()))?;
+        Ok(Self {
+            id: Some(id),
             org_id: value.org,
             name: value.name,
             is_default: value.is_default,
             template_type,
             body: value.body,
-        }
+        })
     }
 }
 
-pub async fn put(org_id: &str, template: Template) -> Result<Template, errors::Error> {
+pub async fn put(org_id: &str, template: Template) -> Result<Template, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -79,21 +85,21 @@ pub async fn put(org_id: &str, template: Template) -> Result<Template, errors::E
             active.insert(client).await?.try_into_model()?
         }
     };
-    Ok(model.into())
+    Ok(model.try_into()?)
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, errors::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let template = get_model(client, org_id, name)
-        .await
-        .map(|model| model.map(Template::from))?;
-    Ok(template)
+    match get_model(client, org_id, name).await? {
+        Some(model) => Ok(Some(Template::try_from(model)?)),
+        None => Ok(None),
+    }
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Template>, errors::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -101,12 +107,12 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, errors::Error> {
     let templates = list_models(client, Some(org_id))
         .await?
         .into_iter()
-        .map(Template::from)
-        .collect();
+        .map(|model| Ok(Template::try_from(model)?))
+        .collect::<Result<_, Error>>()?;
     Ok(templates)
 }
 
-pub async fn list_all() -> Result<Vec<(String, Template)>, errors::Error> {
+pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -114,12 +120,12 @@ pub async fn list_all() -> Result<Vec<(String, Template)>, errors::Error> {
     let templates = list_models(client, None)
         .await?
         .into_iter()
-        .map(|model| (model.org.to_string(), Template::from(model)))
-        .collect();
+        .map(|model| Ok((model.org.to_string(), Template::try_from(model)?)))
+        .collect::<Result<_, Error>>()?;
     Ok(templates)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), errors::Error> {
+pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -153,5 +159,8 @@ async fn list_models(
     if let Some(org) = org_id {
         query = query.filter(Column::Org.eq(org));
     }
-    query.all(db).await
+    query
+        .order_by(Column::Name, sea_orm::Order::Asc)
+        .all(db)
+        .await
 }

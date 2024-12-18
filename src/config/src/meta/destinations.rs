@@ -22,7 +22,7 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Destination {
-    pub id: String,
+    pub id: Option<svix_ksuid::Ksuid>,
     pub org_id: String,
     pub name: String,
     pub module: Module,
@@ -36,7 +36,6 @@ pub enum Module {
         destination_type: DestinationType,
     },
     Pipeline {
-        pipeline_id: String,
         endpoint: Endpoint,
     },
 }
@@ -96,7 +95,7 @@ impl fmt::Display for HTTPType {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Template {
-    pub id: String,
+    pub id: Option<svix_ksuid::Ksuid>,
     pub org_id: String,
     pub name: String,
     pub is_default: bool,

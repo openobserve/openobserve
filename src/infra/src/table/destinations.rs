@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, GetDestinationError},
+    errors::{DestinationError, Error},
     table::{
         entity::{
             destinations::{ActiveModel, Column, Entity, Model},
@@ -32,33 +34,26 @@ use crate::{
 };
 
 impl Model {
-    fn try_into(
-        self,
-        template: Option<String>,
-    ) -> Result<destinations::Destination, errors::Error> {
+    fn try_into(self, template: Option<String>) -> Result<destinations::Destination, Error> {
         let module = match self.module.to_lowercase().as_str() {
             "alert" => {
                 let destination_type: destinations::DestinationType =
                     json::from_value(self.r#type)?;
-                let template = template.ok_or(GetDestinationError::AlertDestTemplateNotFound)?;
+                let template = template.ok_or(DestinationError::AlertDestTemplateNotFound)?;
                 destinations::Module::Alert {
                     template,
                     destination_type,
                 }
             }
             _ => {
-                let pipeline_id = self
-                    .pipeline_id
-                    .ok_or(GetDestinationError::PipelineDestEmptyPipelineId)?;
                 let endpoint: destinations::Endpoint = json::from_value(self.r#type)?;
-                destinations::Module::Pipeline {
-                    pipeline_id,
-                    endpoint,
-                }
+                destinations::Module::Pipeline { endpoint }
             }
         };
+        let id = svix_ksuid::Ksuid::from_str(&self.id)
+            .map_err(|e| DestinationError::ConvertingId(e.to_string()))?;
         Ok(destinations::Destination {
-            id: self.id,
+            id: Some(id),
             org_id: self.org,
             name: self.name,
             module,
@@ -69,11 +64,11 @@ impl Model {
 pub async fn put(
     org_id: &str,
     destination: destinations::Destination,
-) -> Result<destinations::Destination, errors::Error> {
+) -> Result<destinations::Destination, Error> {
     let template_id = if let destinations::Module::Alert { template, .. } = &destination.module {
         super::templates::get(org_id, template)
             .await?
-            .map(|temp| temp.id)
+            .and_then(|temp| temp.id.map(|id| id.to_string()))
     } else {
         None
     };
@@ -94,19 +89,14 @@ pub async fn put(
                         destination_type,
                     } => {
                         let template_id =
-                            template_id.ok_or(GetDestinationError::AlertDestEmptyTemplateId)?;
+                            template_id.ok_or(DestinationError::AlertDestEmptyTemplateId)?;
                         active.template_id = Set(Some(template_id));
-                        active.pipeline_id = Set(None);
                         active.module = Set("alert".to_string());
                         active.r#type = Set(json::to_value(destination_type)?);
                         Some(new_template)
                     }
-                    destinations::Module::Pipeline {
-                        pipeline_id,
-                        endpoint,
-                    } => {
+                    destinations::Module::Pipeline { endpoint } => {
                         active.template_id = Set(None);
-                        active.pipeline_id = Set(Some(pipeline_id));
                         active.module = Set("pipeline".to_string());
                         active.r#type = Set(json::to_value(endpoint)?);
                         None
@@ -121,7 +111,6 @@ pub async fn put(
                         org: Set(destination.org_id),
                         name: Set(destination.name),
                         template_id: Set(None),
-                        pipeline_id: Set(None),
                         r#type: NotSet,
                         module: NotSet,
                     };
@@ -131,18 +120,14 @@ pub async fn put(
                             destination_type,
                         } => {
                             let template_id =
-                                template_id.ok_or(GetDestinationError::AlertDestEmptyTemplateId)?;
+                                template_id.ok_or(DestinationError::AlertDestEmptyTemplateId)?;
                             active.module = Set("alert".to_string());
                             active.template_id = Set(Some(template_id));
                             active.r#type = Set(json::to_value(destination_type)?);
                             Some(new_template)
                         }
-                        destinations::Module::Pipeline {
-                            pipeline_id,
-                            endpoint,
-                        } => {
+                        destinations::Module::Pipeline { endpoint } => {
                             active.module = Set("pipeline".to_string());
-                            active.pipeline_id = Set(Some(pipeline_id));
                             active.r#type = Set(json::to_value(endpoint)?);
                             None
                         }
@@ -155,10 +140,7 @@ pub async fn put(
     model.try_into(template)
 }
 
-pub async fn get(
-    org_id: &str,
-    name: &str,
-) -> Result<Option<destinations::Destination>, errors::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destination>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -169,7 +151,7 @@ pub async fn get(
     }
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<destinations::Destination>, errors::Error> {
+pub async fn list(org_id: &str) -> Result<Vec<destinations::Destination>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -178,11 +160,11 @@ pub async fn list(org_id: &str) -> Result<Vec<destinations::Destination>, errors
         .await?
         .into_iter()
         .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, errors::Error>>()?;
+        .collect::<Result<_, Error>>()?;
     Ok(destinations)
 }
 
-pub async fn list_all() -> Result<Vec<destinations::Destination>, errors::Error> {
+pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -191,11 +173,11 @@ pub async fn list_all() -> Result<Vec<destinations::Destination>, errors::Error>
         .await?
         .into_iter()
         .map(|(model, template)| model.try_into(template))
-        .collect::<Result<_, errors::Error>>()?;
+        .collect::<Result<_, Error>>()?;
     Ok(destinations)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), errors::Error> {
+pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -232,6 +214,7 @@ async fn list_models(
         query = query.filter(Column::Org.eq(org));
     }
     Ok(query
+        .order_by(Column::Name, sea_orm::Order::Asc)
         .all(db)
         .await?
         .into_iter()

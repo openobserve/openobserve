@@ -119,9 +119,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, DestinationError> {
             .collect());
     }
 
-    let mut items: Vec<Destination> = table::destinations::list(org_id).await?;
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
+    Ok(table::destinations::list(org_id).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -141,14 +139,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
-                let keys = item_key.split('/').collect::<Vec<_>>();
-                if keys.len() != 2 {
-                    log::error!("Error event key not formatted correctly. Should be org_id/name, but got {}", item_key);
-                    continue;
-                }
-                let item_value: Destination = match table::destinations::get(keys[0], keys[1]).await
-                {
+                let (org_id, name) = match parse_event_key(DESTINATION_WATCHER_PREFIX, &ev.key) {
+                    Ok(parsed) => parsed,
+                    Err(e) => {
+                        log::error!("{e}");
+                        continue;
+                    }
+                };
+                let item_value: Destination = match table::destinations::get(org_id, name).await {
                     Ok(Some(dest)) => dest,
                     Ok(None) => {
                         log::error!("Destination not found in db");
@@ -159,7 +157,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
+                ALERTS_DESTINATIONS.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
@@ -179,4 +177,29 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("{} destinations Cached", ALERTS_DESTINATIONS.len());
     Ok(())
+}
+
+pub(super) fn parse_event_key<'a>(
+    prefix: &'static str,
+    event_key: &'a str,
+) -> Result<(&'a str, &'a str), anyhow::Error> {
+    let item_key = event_key
+        .strip_prefix(prefix)
+        .ok_or(anyhow::anyhow!("event key missing prefix"))?;
+    let mut keys = item_key.split('/');
+    let org_id = keys
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Missing org_id in event key"))?;
+    let name = keys
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Missing name in event key"))?;
+
+    if keys.next().is_some() {
+        return Err(anyhow::anyhow!(
+            "Error: event key not formatted correctly. Should be org_id/name, but got {}",
+            item_key
+        ));
+    }
+
+    Ok((org_id, name))
 }

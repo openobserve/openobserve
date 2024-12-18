@@ -18,7 +18,7 @@
 
 use std::fmt;
 
-use config::{ider, meta::destinations as meta_dest};
+use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -58,16 +58,12 @@ impl From<meta_dest::Destination> for Destination {
                     ..Default::default()
                 },
             },
-            meta_dest::Module::Pipeline {
-                pipeline_id,
-                endpoint,
-            } => Self {
+            meta_dest::Module::Pipeline { endpoint } => Self {
                 name: value.name,
                 url: endpoint.url,
                 method: endpoint.method,
                 skip_tls_verify: endpoint.skip_tls_verify,
                 headers: endpoint.headers,
-                pipeline_id: Some(pipeline_id),
                 destination_type: DestinationType::Http,
                 ..Default::default()
             },
@@ -77,7 +73,6 @@ impl From<meta_dest::Destination> for Destination {
 
 impl Destination {
     pub fn into(self, org_id: &str) -> Result<meta_dest::Destination, DestinationError> {
-        let id = String::new(); // placeholder, set at db layer
         if let Some(template) = self.template {
             let destination_type = match self.destination_type {
                 DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
@@ -95,7 +90,7 @@ impl Destination {
                 }),
             };
             Ok(meta_dest::Destination {
-                id,
+                id: None,
                 org_id: org_id.to_string(),
                 name: self.name,
                 module: meta_dest::Module::Alert {
@@ -103,7 +98,7 @@ impl Destination {
                     destination_type,
                 },
             })
-        } else if let Some(pipeline_id) = self.pipeline_id {
+        } else {
             let endpoint = meta_dest::Endpoint {
                 url: self.url,
                 method: self.method,
@@ -111,16 +106,11 @@ impl Destination {
                 headers: self.headers,
             };
             Ok(meta_dest::Destination {
-                id,
+                id: None,
                 org_id: org_id.to_string(),
                 name: self.name,
-                module: meta_dest::Module::Pipeline {
-                    pipeline_id,
-                    endpoint,
-                },
+                module: meta_dest::Module::Pipeline { endpoint },
             })
-        } else {
-            Err(DestinationError::UnsupportedType)
         }
     }
 }
@@ -151,7 +141,7 @@ impl Template {
             DestinationType::Http => meta_dest::TemplateType::Http,
         };
         meta_dest::Template {
-            id: ider::uuid(),
+            id: None,
             org_id: org_id.to_string(),
             name: self.name,
             is_default: self.is_default.unwrap_or_default(),
@@ -177,8 +167,6 @@ pub struct Destination {
     pub headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pipeline_id: Option<String>,
     /// Required when `destination_type` is `Email`
     #[serde(default)]
     pub emails: Vec<String>,

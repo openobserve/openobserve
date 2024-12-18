@@ -11,7 +11,6 @@ pub struct Model {
     pub name: String,
     pub module: String,
     pub template_id: Option<String>,
-    pub pipeline_id: Option<String>,
     pub r#type: Json,
 }
 
