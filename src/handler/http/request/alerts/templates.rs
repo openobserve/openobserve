@@ -16,10 +16,10 @@
 use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::alerts::templates::Template;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::destinations::Template,
     service::{alerts::templates, db::alerts::templates::TemplateError},
 };
 
@@ -27,11 +27,9 @@ impl From<TemplateError> for HttpResponse {
     fn from(value: TemplateError) -> Self {
         match value {
             TemplateError::InfraError(e) => MetaHttpResponse::internal_error(e),
-            TemplateError::NotFound => {
-                MetaHttpResponse::not_found(TemplateError::NotFound.to_string())
-            }
+            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
             TemplateError::DeleteWithDestination(e) => MetaHttpResponse::conflict(e),
-            other_err => MetaHttpResponse::bad_request(other_err.to_string()),
+            other_err => MetaHttpResponse::bad_request(other_err),
         }
     }
 }
@@ -59,7 +57,7 @@ pub async fn save_template(
     tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let tmpl = tmpl.into_inner();
+    let tmpl = tmpl.into_inner().into(&org_id);
     match templates::save(&org_id, "", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
         Err(e) => Ok(e.into()),
@@ -90,7 +88,7 @@ pub async fn update_template(
     tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let tmpl = tmpl.into_inner();
+    let tmpl = tmpl.into_inner().into(&org_id);
     match templates::save(&org_id, &name, tmpl, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Template updated")),
         Err(e) => Ok(e.into()),
@@ -118,7 +116,7 @@ pub async fn update_template(
 async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match templates::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => Ok(MetaHttpResponse::json(Template::from(data))),
         Err(e) => Ok(e.into()),
     }
 }
@@ -169,7 +167,9 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     }
 
     match templates::list(&org_id, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => Ok(MetaHttpResponse::json(
+            data.into_iter().map(Template::from).collect::<Vec<_>>(),
+        )),
         Err(e) => Ok(e.into()),
     }
 }

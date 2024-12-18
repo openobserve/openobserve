@@ -27,7 +27,10 @@ mod m20241209_120000_create_alerts_table;
 mod m20241212_115400_create_templates_table;
 mod m20241212_132500_populate_templates_table;
 mod m20241212_172300_delete_metas;
+mod m20241213_102300_create_destinations_table;
+mod m20241213_133700_populate_destinations_table;
 mod m20241215_190333_delete_metas;
+mod m20241216_153005_delete_metas_destinations;
 
 pub struct Migrator;
 
@@ -47,7 +50,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20241212_115400_create_templates_table::Migration),
             Box::new(m20241212_132500_populate_templates_table::Migration),
             Box::new(m20241212_172300_delete_metas::Migration),
+            Box::new(m20241213_102300_create_destinations_table::Migration),
+            Box::new(m20241213_133700_populate_destinations_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
+            Box::new(m20241216_153005_delete_metas_destinations::Migration),
         ]
     }
 }

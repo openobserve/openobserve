@@ -3,29 +3,32 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "templates")]
+#[sea_orm(table_name = "destinations")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org: String,
     pub name: String,
-    pub is_default: bool,
-    pub r#type: String,
-    #[sea_orm(column_type = "Text")]
-    pub body: String,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub title: Option<String>,
+    pub module: String,
+    pub template_id: Option<String>,
+    pub r#type: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::destinations::Entity")]
-    Destinations,
+    #[sea_orm(
+        belongs_to = "super::templates::Entity",
+        from = "Column::TemplateId",
+        to = "super::templates::Column::Id",
+        on_update = "NoAction",
+        on_delete = "NoAction"
+    )]
+    Templates,
 }
 
-impl Related<super::destinations::Entity> for Entity {
+impl Related<super::templates::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Destinations.def()
+        Relation::Templates.def()
     }
 }
 

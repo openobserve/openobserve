@@ -32,6 +32,7 @@ zstd.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
+svix-ksuid.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true

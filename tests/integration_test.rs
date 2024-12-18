@@ -25,11 +25,7 @@ mod tests {
     use config::{
         get_config,
         meta::{
-            alerts::{
-                alert::Alert,
-                destinations::{Destination, DestinationType},
-                Operator, QueryCondition, TriggerCondition,
-            },
+            alerts::{alert::Alert, Operator, QueryCondition, TriggerCondition},
             dashboards::{v1, Dashboard},
         },
         utils::json,
@@ -38,7 +34,10 @@ mod tests {
     use openobserve::{
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
-            http::router::*,
+            http::{
+                models::destinations::{Destination, DestinationType},
+                router::*,
+            },
         },
         service::{alerts::scheduler::handle_triggers, search::SEARCH_SERVER},
     };
