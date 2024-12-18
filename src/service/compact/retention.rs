@@ -25,6 +25,7 @@ use config::{
     utils::time::BASE_TIME,
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
+use itertools::Itertools;
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
@@ -82,6 +83,12 @@ fn populate_time_ranges_for_deletion(
     let job_nos = ranges.len() as u32;
     time_ranges_for_deletion.append(&mut ranges);
 
+    log::debug!(
+        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}, time_ranges_for_deletion: {}",
+        exclude_range,
+        original_time_range,
+        time_ranges_for_deletion.iter().join(", ")
+    );
     job_nos
 }
 /// Creates delete jobs for the stream based on the stream settings
