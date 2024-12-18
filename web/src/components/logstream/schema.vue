@@ -480,6 +480,8 @@ class="indexDetailsContainer" style="height: 100vh">
                   class="q-ml-sm"
                   @on:date-change="dateChangeValue"
                   disable-relative
+                  hide-relative-time
+                  hide-relative-timezone
                   :minDate="minDate"
                 />
                 </div>
