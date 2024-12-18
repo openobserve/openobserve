@@ -47,8 +47,22 @@ pub struct TestVRLRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct TestVRLResponse {
-    pub results: Vec<String>, // Transformed events
-    pub errors: Vec<String>,  // Any errors encountered during processing
+    pub results: Vec<VRLResult>, // Transformed events
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct VRLResult {
+    pub success: bool,
+    pub message: String,
+}
+
+impl VRLResult {
+    pub fn new(success: bool, message: &str) -> Self {
+        Self {
+            success,
+            message: message.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

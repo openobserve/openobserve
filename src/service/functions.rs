@@ -20,7 +20,7 @@ use actix_web::{
     HttpResponse,
 };
 use config::meta::{
-    function::{FunctionList, TestVRLResponse, Transform},
+    function::{FunctionList, TestVRLResponse, Transform, VRLResult},
     pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
 };
 
@@ -78,7 +78,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 }
 
 #[tracing::instrument(skip(org_id, function))]
-pub async fn test_function(
+pub async fn test_run_function(
     org_id: &str,
     function: String,
     events: Vec<String>,
@@ -105,13 +105,12 @@ pub async fn test_function(
     let program = runtime_config.program;
 
     let mut transformed_events = vec![];
-    let mut errors = vec![];
 
     events.into_iter().for_each(|event| {
         let event = match serde_json::from_str(&event) {
             Ok(event) => event,
-            Err(e) => {
-                errors.push(e.to_string());
+            Err(err) => {
+                transformed_events.push(VRLResult::new(false, err.to_string().as_str()));
                 return;
             }
         };
@@ -126,7 +125,7 @@ pub async fn test_function(
             &[String::new()],
         );
         if let Some(err) = err {
-            errors.push(err);
+            transformed_events.push(VRLResult::new(false, err.to_string().as_str()));
             return;
         }
 
@@ -137,12 +136,11 @@ pub async fn test_function(
         } else {
             "".into()
         };
-        transformed_events.push(transform);
+        transformed_events.push(VRLResult::new(true, &transform));
     });
 
     let results = TestVRLResponse {
         results: transformed_events,
-        errors,
     };
 
     Ok(HttpResponse::Ok().json(results))
@@ -427,22 +425,24 @@ mod tests {
             "invalid_json".to_string(), // To simulate an error scenario
         ];
 
-        let response = test_function(org_id, function, events).await.unwrap();
+        let response = test_run_function(org_id, function, events).await.unwrap();
         assert_eq!(response.status(), http::StatusCode::OK);
 
         let body: TestVRLResponse =
             serde_json::from_slice(&*to_bytes(response.into_body()).await.unwrap()).unwrap();
 
         // Validate transformed events
-        assert_eq!(body.results.len(), 1);
+        assert_eq!(body.results.len(), 2);
+        assert!(body.results[0].success,);
         assert_eq!(
-            body.results[0],
+            body.results[0].message,
             r#"{"nested_key":42,"new_field":"new_value"}"#
         );
 
         // Validate errors
-        assert_eq!(body.errors.len(), 1);
-        assert!(body.errors[0].contains("expected value at line 1 column 1")); // Error from invalid
-                                                                               // JSON parsing
+        assert!(!body.results[1].success);
+        assert!(body.results[1]
+            .message
+            .contains("expected value at line 1 column 1")); // Error from invalid
     }
 }
