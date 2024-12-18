@@ -40,6 +40,18 @@ pub struct Transform {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TestVRLRequest {
+    pub function: String,    // VRL function as a string
+    pub events: Vec<String>, // List of events (JSON objects)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TestVRLResponse {
+    pub results: Vec<String>, // Transformed events
+    pub errors: Vec<String>,  // Any errors encountered during processing
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamOrder {
     #[serde(default)]
