@@ -112,11 +112,6 @@ pub fn apply_vrl_fn(
             runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
         }
     };
-    let log_lvl = if stream_name.len() == 1 && stream_name[0].eq("pipeline") {
-        log::Level::Warn
-    } else {
-        log::Level::Error
-    };
     match result {
         Ok(res) => match res.try_into() {
             Ok(val) => (val, None),
@@ -133,7 +128,7 @@ pub fn apply_vrl_fn(
                     "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
                     org_id, stream_name, err, row
                 );
-                log::log!(log_lvl, "{err_msg}");
+                log::warn!("{err_msg}");
                 (row, Some(err_msg))
             }
         },
@@ -150,7 +145,7 @@ pub fn apply_vrl_fn(
                 "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
                 org_id, stream_name, err, row
             );
-            log::log!(log_lvl, "{err_msg}");
+            log::warn!("{err_msg}");
             (row, Some(err_msg))
         }
     }
