@@ -53,8 +53,9 @@ def test_e2e_bulk_ingest(create_session, base_url):
         f"Expected status code 200 for invalid bulk request, but got {resp_invalid_bulk_1.status_code}. "
         f"Response: {resp_invalid_bulk_1.content}"
     )
-    assert not resp_invalid_bulk_1.json().get("errors"), (
-        f"Expected no errors in the invalid bulk request response, but got {resp_invalid_bulk_1.json()}"
+    # Assert that errors is true
+    assert resp_invalid_bulk_1.json().get("errors"), (
+        f"Expected errors in the invalid bulk request response, but got {resp_invalid_bulk_1.json()}"
     )
 
     # **Negative Test Case 2: Invalid Bulk Payload (Empty Index)**
@@ -80,13 +81,13 @@ def test_e2e_bulk_ingest(create_session, base_url):
         print("Error parsing JSON response:", str(e))
 
     # Assert that we get a 200 status code (as observed in Postman behavior)
-    assert resp_invalid_bulk_2.status_code == 422, (
+    assert resp_invalid_bulk_2.status_code == 200, (
         f"Expected status code 200 for invalid bulk request, but got {resp_invalid_bulk_2.status_code}. "
         f"Response: {resp_invalid_bulk_2.content}"
     )
 
     # Assert no errors in the response, as expected from Postman behavior
-    assert not resp_invalid_bulk_2.json().get("errors"), (
+    assert resp_invalid_bulk_2.json().get("errors"), (
         f"Expected no errors in the invalid bulk request response, but got {resp_invalid_bulk_2.json()}"
     )
 
@@ -103,7 +104,7 @@ def test_e2e_bulk_ingest(create_session, base_url):
     print("Negative Test Response:", resp_valid_bulk.content)
 
     # Assert positive case
-    assert resp_valid_bulk.status_code == 422, (
+    assert resp_valid_bulk.status_code == 200, (
         f"Expected status code 200 for valid bulk request, but got {resp_valid_bulk.status_code}. "
         f"Response: {resp_valid_bulk.content}"
     )
