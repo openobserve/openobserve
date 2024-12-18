@@ -602,6 +602,9 @@ impl TimeRange {
     }
 
     pub fn flatten_overlapping_ranges(ranges: Vec<Self>) -> Vec<Self> {
+        if ranges.is_empty() {
+            return ranges;
+        }
         let mut ranges = ranges;
         ranges.sort_by(|a, b| a.start.cmp(&b.start));
         let mut result = Vec::new();
