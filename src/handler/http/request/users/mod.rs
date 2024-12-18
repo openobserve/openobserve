@@ -50,6 +50,8 @@ use crate::{
     service::users,
 };
 
+pub mod service_accounts;
+
 /// ListUsers
 #[utoipa::path(
     context_path = "/api",

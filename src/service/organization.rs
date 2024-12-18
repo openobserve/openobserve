@@ -19,7 +19,10 @@ use chrono::{Duration, Utc};
 use config::{get_config, SMTP_CLIENT};
 use config::{
     ider,
-    meta::{stream::StreamType, user::UserRole},
+    meta::{
+        stream::StreamType,
+        user::{UserOrg, UserRole},
+    },
     utils::rand::generate_random_string,
 };
 #[cfg(feature = "enterprise")]
@@ -80,6 +83,11 @@ pub async fn get_passcode(
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
+    if user.role.eq(&UserRole::ServiceAccount) && user.is_external {
+        return Err(anyhow::Error::msg(
+            "Not allowed for external service accounts",
+        ));
+    }
     Ok(IngestionPasscode {
         user: user.email,
         passcode: user.token,
@@ -117,6 +125,7 @@ pub async fn update_passcode(
     let is_rum_update = false;
     match update_passcode_inner(org_id, user_id, is_rum_update).await {
         Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
+        Err(e) => Err(e),
         _ => Err(anyhow::Error::msg("User not found")),
     }
 }
@@ -136,6 +145,22 @@ async fn update_passcode_inner(
     }
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
+
+    if !is_root_user(user_id) {
+        let orgs = db_user
+            .organizations
+            .filter(|org| org.org_id.eq(local_org_id))
+            .collect::<Vec<UserOrg>>();
+        if orgs.is_empty() {
+            return Err(anyhow::Error::msg("User not found"));
+        }
+        let org_to_update = &orgs[0];
+        if org_to_update.role.eq(&UserRole::ServiceAccount) && db_user.is_external {
+            return Err(anyhow::Error::msg(
+                "Not allowed for external service accounts",
+            ));
+        }
+    }
 
     // Update the org with the new token
     if is_rum_update {
