@@ -1207,8 +1207,6 @@ export default defineComponent({
 
       selectedDateFields.value = [];
 
-      console.log(previousSchemaVersion, settings);
-
       let modifiedSettings = getUpdatedSettings(
         previousSchemaVersion,
         settings,
@@ -1523,21 +1521,6 @@ export default defineComponent({
       const formattedDate = dateToFormat.toISOString();
       return date.formatDate(formattedDate, "DD-MM-YYYY");
     }
-    function convertToMidnightUTCTimestamp(timestamp) {
-      const date = new Date(timestamp);
-      console.log(date.getFullYear(),'date')
-      // Create a new date object for 12:00 AM UTC
-      const midnightUTC = Date.UTC(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate(),
-        0,
-        0,
-        0,
-        0,
-      );
-      return midnightUTC;
-    };
 
 
     const dateChangeValue = (value) => {
