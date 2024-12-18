@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::function::Transform;
+use config::meta::function::{TestVRLRequest, Transform};
 
 /// CreateFunction
 #[utoipa::path(
@@ -174,4 +174,37 @@ pub async fn list_pipeline_dependencies(
 ) -> Result<HttpResponse, Error> {
     let (org_id, fn_name) = path.into_inner();
     crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await
+}
+
+/// Test a Function
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Functions",
+    operation_id = "testFunction",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name" = String, Path, description = "Function name"),
+    ),
+    request_body(content = FunctionTest, description = "Function test data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = FunctionTestResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/functions/test")]
+pub async fn test_function(
+    path: web::Path<String>,
+    req_body: web::Json<TestVRLRequest>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let TestVRLRequest { function, events } = req_body.into_inner();
+
+    // Assuming `test_function` applies the VRL function to each event
+    match crate::service::functions::test_function(&org_id, function, events).await {
+        Ok(result) => Ok(result),
+        Err(err) => Ok(HttpResponse::BadRequest().body(err.to_string())),
+    }
 }

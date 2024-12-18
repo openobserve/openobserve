@@ -20,11 +20,12 @@ use actix_web::{
     HttpResponse,
 };
 use config::meta::{
-    function::{FunctionList, Transform},
+    function::{FunctionList, TestVRLResponse, Transform},
     pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
 };
 
 use crate::{
+    common,
     common::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
@@ -74,6 +75,76 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             )))
         }
     }
+}
+
+#[tracing::instrument(skip(org_id, function))]
+pub async fn test_function(
+    org_id: &str,
+    function: String,
+    events: Vec<String>,
+) -> Result<HttpResponse, Error> {
+    let runtime_config = match compile_vrl_function(&function, org_id) {
+        Ok(program) => {
+            let registry = program
+                .config
+                .get_custom::<vector_enrichment::TableRegistry>()
+                .unwrap();
+            registry.finish_load();
+            program
+        }
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )))
+        }
+    };
+
+    let mut runtime = common::utils::functions::init_vrl_runtime();
+    let fields = runtime_config.fields;
+    let program = runtime_config.program;
+
+    let mut transformed_events = vec![];
+    let mut errors = vec![];
+
+    events.into_iter().for_each(|event| {
+        let event = if let Ok(event) = serde_json::from_str(&event) {
+            event
+        } else {
+            errors.push("no value".into());
+            return;
+        };
+        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+            &mut runtime,
+            &config::meta::function::VRLResultResolver {
+                program: program.clone(),
+                fields: fields.clone(),
+            },
+            event,
+            org_id,
+            &[String::new()],
+        );
+        if let Some(err) = err {
+            errors.push(err);
+            return;
+        }
+
+        let transform = if !ret_val.is_null() {
+            config::utils::flatten::flatten(ret_val)
+                .unwrap()
+                .to_string()
+        } else {
+            "".into()
+        };
+        transformed_events.push(transform);
+    });
+
+    let results = TestVRLResponse {
+        results: transformed_events,
+        errors,
+    };
+
+    Ok(HttpResponse::Ok().json(results))
 }
 
 #[tracing::instrument(skip(func))]
@@ -281,6 +352,7 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
 
 #[cfg(test)]
 mod tests {
+    use actix_http::body::to_bytes;
     use config::meta::{function::StreamOrder, stream::StreamType};
 
     use super::*;
@@ -328,5 +400,49 @@ mod tests {
         assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
             .await
             .is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_test_function_processing() {
+        use serde_json::json;
+
+        let org_id = "test_org";
+        let function = r#"
+        . = {
+            "new_field": "new_value",
+            "nested": {
+                "key": 42
+            }
+        }
+        .
+    "#
+        .to_string();
+
+        let events = vec![
+            json!({
+                "original_field": "original_value"
+            })
+            .to_string(),
+            "invalid_json".to_string(), // To simulate an error scenario
+        ];
+
+        let response = test_function(org_id, function, events).await.unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        let body: TestVRLResponse =
+            serde_json::from_slice(&*to_bytes(response.into_body()).await.unwrap()).unwrap();
+
+        // Validate transformed events
+        assert_eq!(body.results.len(), 2);
+        assert_eq!(
+            body.results[0],
+            r#"{"new_field":"new_value","nested":{"key":42}}"#
+        );
+        assert_eq!(body.results[1], ""); // The invalid JSON won't produce a result
+
+        // Validate errors
+        assert_eq!(body.errors.len(), 1);
+        assert!(body.errors[0].contains("expected value at line 1 column 1")); // Error from invalid
+                                                                               // JSON parsing
     }
 }
