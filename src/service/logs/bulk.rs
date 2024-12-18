@@ -105,14 +105,14 @@ pub async fn ingest(
             (action, stream_name, doc_id) = ret.unwrap();
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
-                log::warn!("Invalid stream name: '{}'", stream_name);
+                let err_msg = format!("Invalid stream name: {}", line);
+                log::warn!("{}", err_msg);
                 bulk_res.errors = true;
-                let err_msg = format!("Invalid stream name: {}", stream_name);
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
                     stream_name.clone(),
                     err_msg,
-                    "0".to_string(), // TODO check
+                    "0".to_string(),
                 );
                 let mut item = HashMap::new();
                 item.insert(
@@ -559,7 +559,7 @@ pub fn add_record_status(
                 failure_type,
                 stream_name.clone(),
                 failure_reason.unwrap(),
-                "0".to_owned(), // TODO check
+                "0".to_owned(),
             );
 
             item.insert(
