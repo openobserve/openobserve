@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
+  <div style="height: calc(100vh - 42px); overflow-y: auto" class="scroll">
     <!-- <div class="flex justify-between items-center q-pa-sm">
        <div class="flex items-center q-table__title q-mr-md">
         <span>
@@ -111,19 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator></q-separator> -->
     <div class="row">
-      <div
-        class="text-left col-2 auto q-px-sm q-py-xs flex justify-start metrics-date-time"
-      >
+      <div class="flex items-center col">
         <syntax-guide-metrics class="q-mr-sm" />
       </div>
-      <div
-        class="text-right col q-px-sm q-py-xs flex justify-end metrics-date-time"
-      >
+      <div class="text-right col flex justify-end">
         <DateTimePickerDashboard
           v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          style="margin: 4px 0px"
         />
         <!-- <auto-refresh-interval
           class="q-pr-sm"
@@ -172,9 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mx-sm download-logs-btn q-px-sm q-py-xs"
             size="sm"
             icon="share"
-            :title="t('search.shareLink')"
+            :title="
+              promqlMode ? t('search.shareLink') : t('search.disableShareLink')
+            "
             @click="shareLink.execute()"
             :loading="shareLink.isLoading.value"
+            :disable="!promqlMode"
           />
         </template>
       </div>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="col scroll"
+              class="col scroll tw-border-t-2"
               style="height: calc(100vh - 105px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
@@ -538,6 +538,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       removeXYFilters,
+      promqlMode,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -646,18 +647,24 @@ export default defineComponent({
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
       // need to remove the xy filters
       removeXYFilters();
-      dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.queries[0].customQuery = true;
 
-      // set the value of the query after the reset
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream = route.query?.stream;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].query = decodeURIComponent(
-        route.query?.query ?? dashboardPanelData.data.queries[0].query ?? "",
-      );
+      if (route?.query?.query) {
+        dashboardPanelData.data.queryType = "promql";
+        dashboardPanelData.data.queries[0].customQuery = true;
+
+        // set the value of the query after the reset
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream = route.query?.stream;
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = route?.query?.query
+          ? decodeURIComponent(route.query.query as string)
+          : (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].query ?? "");
+      }
 
       chartData.value = {};
       // set the value of the date time after the reset
@@ -798,9 +805,15 @@ export default defineComponent({
         const query: any = {
           org_identifier: store.state.selectedOrganization.identifier,
           stream: dashboardPanelData.data.queries[0].fields.stream,
-          query: b64EncodeUnicode(dashboardPanelData.data.queries[0].query),
           ...getQueryParamsForDuration(selectedDate.value),
         };
+
+        // if promql mode, query will be used in url
+        if (promqlMode.value) {
+          query.query = encodeURIComponent(
+            dashboardPanelData.data.queries[0].query,
+          );
+        }
 
         return query;
       } catch (err) {
@@ -1287,6 +1300,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      promqlMode,
     };
   },
 });

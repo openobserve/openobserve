@@ -109,6 +109,7 @@
     "savedViewDropdownLabel": "Saved Views",
     "savedViewName": "View Name",
     "shareLink": "Share Link",
+    "disableShareLink": "Share Link is unavailable for SQL mode",
     "downloadTable": "Download Table",
     "customRange": "Custom Range",
     "initialNumber": "Initial Number",
