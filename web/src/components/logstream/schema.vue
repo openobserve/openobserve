@@ -669,7 +669,7 @@ class="indexDetailsContainer" style="height: 100vh">
   />
   <ConfirmDialog
     title="Delete Dates"
-    :message="'Are you sure to delete the selected dates this cannot be done ' "
+    :message="t('logStream.deleteDatesMessage')"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
@@ -1381,14 +1381,14 @@ export default defineComponent({
     const redBtnColumns = [
       {
         name: "start",
-        label: "Start Date",
+        label: t("logStream.extendedStartDate"),
         align: "center",
         sortable: true,
         field: "start",
       },
       {
         name: "end",
-        label: "End Date",
+        label: t("logStream.extendedEndDate"),
         align: "center",
         sortable: true,
         field: "end",

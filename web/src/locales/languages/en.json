@@ -414,6 +414,7 @@
     "timezone": "Timezone",
     "deleteActionLabel": "Delete",
     "deleteActionMessage": "Are you sure you want to delete the selected fields? This action cannot be undone.",
+    "deleteDatesMessage": "Are you sure you want to delete the selected dates? This action cannot be undone.",
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
@@ -430,7 +431,9 @@
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
-    "indexSize": "Index Size"
+    "indexSize": "Index Size",
+    "extendedStartDate":"Start Date",
+    "extendedEndDate":"End Date"
   },
   "pipeline": {
     "header": "Pipelines",

@@ -525,9 +525,6 @@ export default defineComponent({
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
-    onBeforeMount(()=>{
-      if(props.disableRelative) setDateType("absolute");
-    })
 
     onMounted(() => {
       // updateDisplayValue();
