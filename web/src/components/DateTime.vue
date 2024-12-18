@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon-right="arrow_drop_down"
       class="date-time-button"
       :class="{
-          [selectedType + 'type']: showRelative,
-          'hideRelative': !showRelative
+          [selectedType + 'type']: !disableRelative,
+          'hideRelative': disableRelative
         }"
       :disable="disable"
     >
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
       >
-        <div v-if="showRelative" class="flex justify-evenly q-py-sm">
+        <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
           <q-btn
             data-test="date-time-relative-tab"
             size="md"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel v-if="showRelative" name="relative" class="q-pa-none">
+          <q-tab-panel v-if="!disableRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
               <div
                 class="relative-row q-px-md q-py-sm"
@@ -194,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div  class="notePara">* You can choose multiple date</div>
-              <q-separator v-if="showRelative" class="q-my-sm" />
+              <q-separator v-if="!disableRelative" class="q-my-sm" />
 
-              <table v-if="showRelative" class="q-px-md startEndTime">
+              <table class="q-px-md startEndTime">
                 <tr>
                   <td class="label tw-px-2">Start time</td>
                   <td class="label tw-px-2">End time</td>
@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <tr>
                   <td>
                     <q-input
+                      :disable="disableRelative"
                       v-model="selectedTime.startTime"
                       dense
                       filled
@@ -240,6 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </td>
                   <td>
                     <q-input
+                      :disable="disableRelative"
                       v-model="selectedTime.endTime"
                       dense
                       filled
@@ -302,6 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="`Timezone: ${timezone}`"
           class="timezone-select"
           popup-content-style="z-index: 10002"
+          :disable="disableRelative"
         >
         </q-select>
         <div v-if="!autoApply " class="flex justify-end q-py-sm q-px-md">
@@ -387,9 +390,9 @@ export default defineComponent({
       type: String,
       default: "date-time-btn",
     },
-    showRelative: {
+    disableRelative: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     minDate: {
       type: String,
@@ -517,12 +520,12 @@ export default defineComponent({
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
     onBeforeMount(()=>{
-      if(!props.showRelative) setDateType("absolute");
+      if(props.disableRelative) setDateType("absolute");
     })
 
     onMounted(() => {
       // updateDisplayValue();
-      if(!props.showRelative) setDateType("absolute");
+      if(props.disableRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -890,7 +893,7 @@ export default defineComponent({
     };
 
     const getDisplayValue = computed(() => {
-      if(!props.showRelative){
+      if(props.disableRelative){
         selectedType.value = "absolute";
       }
       if (selectedType.value === "relative") {
@@ -903,13 +906,13 @@ export default defineComponent({
           if (
             selectedDate.value?.from &&
             selectedDate.value?.to &&
-            props.showRelative
+            !props.disableRelative
           ) {
             return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
           } else if (
             selectedDate.value?.from &&
             selectedDate.value?.to &&
-            !props.showRelative
+            props.disableRelative
           ) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
@@ -950,7 +953,7 @@ export default defineComponent({
         store.state.timezone,
         "yyyy/MM/dd",
       );
-      if(!props.showRelative){
+      if(props.disableRelative){
         return date >= props.minDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
@@ -1057,7 +1060,7 @@ export default defineComponent({
     };
 
     const showOnlyAbsolute = () =>{
-      if(!props.showRelative){
+      if(props.disableRelative){
         setDateType("absolute");
       }
     }

@@ -469,18 +469,32 @@ class="indexDetailsContainer" style="height: 100vh">
 
                 An additional
                 {{ store.state.zoConfig.data_retention_days }} days of extension
-                will be applied to the selected ranges</span
+                will be applied to the selected date ranges</span
               >
             </div>
             <div class="q-mt-sm">
-              <div class="text-center q-mt-sm tw-flex items-center">
-                <span class="text-bold"> Select Date</span>
+              <div class="text-center q-mt-sm tw-flex items-center justify-between">
+                <div class="flex items-center">
+                  <span class="text-bold"> Select Date</span>
                 <date-time
                   class="q-ml-sm"
                   @on:date-change="dateChangeValue"
-                  :show-relative="false"
+                  disable-relative
                   :minDate="minDate"
                 />
+                </div>
+                <div
+             class="mapping-warning-msg q-mb-sm q-mt-sm"
+                  style="width: fit-content; cursor: pointer;"
+                >
+          <span style="font-weight: 600">
+            <q-icon name="info" class="q-mr-xs" size="16px" />
+            Date Ranges are converted to UTC timezone
+            <q-tooltip max-width="320px" anchor="top middle" self="bottom middle">
+                    <span style="font-size: 16px;"> By Default all the date ranges are converted to UTC timezone please adjust the date ranges accordingly</span>
+            </q-tooltip>
+          </span>
+            </div>
               </div>
 
               <div class="q-mt-sm" style="margin-bottom: 30px">
