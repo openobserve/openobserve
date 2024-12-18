@@ -60,6 +60,26 @@ pub enum DestinationType {
     Sns,
 }
 
+impl From<&str> for DestinationType {
+    fn from(value: &str) -> Self {
+        match value.to_lowercase().as_str() {
+            "email" => DestinationType::Email,
+            "http" => DestinationType::Http,
+            _ => DestinationType::Sns,
+        }
+    }
+}
+
+impl fmt::Display for DestinationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DestinationType::Email => write!(f, "email"),
+            DestinationType::Http => write!(f, "http"),
+            DestinationType::Sns => write!(f, "sns"),
+        }
+    }
+}
+
 impl Destination {
     pub fn with_template(&self, template: Template) -> DestinationWithTemplate {
         DestinationWithTemplate {

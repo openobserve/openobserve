@@ -15,15 +15,31 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::alerts::templates::Template;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::templates};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    service::{alerts::templates, db::alerts::templates::TemplateError},
+};
+
+impl From<TemplateError> for HttpResponse {
+    fn from(value: TemplateError) -> Self {
+        match value {
+            TemplateError::InfraError(e) => MetaHttpResponse::internal_error(e),
+            TemplateError::NotFound => {
+                MetaHttpResponse::not_found(TemplateError::NotFound.to_string())
+            }
+            TemplateError::DeleteWithDestination(e) => MetaHttpResponse::conflict(e),
+            other_err => MetaHttpResponse::bad_request(other_err.to_string()),
+        }
+    }
+}
 
 /// CreateTemplate
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "CreateTemplate",
     security(
         ("Authorization"= [])
@@ -45,15 +61,15 @@ pub async fn save_template(
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner();
     match templates::save(&org_id, "", tmpl, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// UpdateTemplate
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "UpdateTemplate",
     security(
         ("Authorization"= [])
@@ -76,15 +92,15 @@ pub async fn update_template(
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner();
     match templates::save(&org_id, &name, tmpl, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => Ok(MetaHttpResponse::ok("Template updated")),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// GetTemplateByName
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "GetTemplate",
     security(
         ("Authorization"= [])
@@ -103,14 +119,14 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     let (org_id, name) = path.into_inner();
     match templates::get(&org_id, &name).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// ListTemplates
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "ListTemplates",
     security(
         ("Authorization"= [])
@@ -154,14 +170,14 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 
     match templates::list(&org_id, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => Ok(e.into()),
     }
 }
 
 /// DeleteTemplate
 #[utoipa::path(
     context_path = "/api",
-    tag = "Alerts",
+    tag = "Templates",
     operation_id = "DeleteAlertTemplate",
     security(
         ("Authorization"= [])
@@ -181,11 +197,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
 async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match templates::delete(&org_id, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template deleted")),
-        Err(e) => match e {
-            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
+        Ok(_) => Ok(MetaHttpResponse::ok("Template deleted")),
+        Err(e) => Ok(e.into()),
     }
 }
