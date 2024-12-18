@@ -203,7 +203,7 @@ pub async fn test_function(
     let TestVRLRequest { function, events } = req_body.into_inner();
 
     // Assuming `test_function` applies the VRL function to each event
-    match crate::service::functions::test_function(&org_id, function, events).await {
+    match crate::service::functions::test_run_function(&org_id, function, events).await {
         Ok(result) => Ok(result),
         Err(err) => Ok(HttpResponse::BadRequest().body(err.to_string())),
     }
