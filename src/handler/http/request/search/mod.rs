@@ -947,17 +947,23 @@ async fn values_v1(
             sql_where.clone()
         };
 
-        let distinct_prefix = if use_distinct_stream {
-            format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
-        } else {
-            "".to_owned()
-        };
+        let distinct_prefix;
+        let count_fn;
+        let actual_stream_type;
 
-        let actual_stream_type = if use_distinct_stream {
-            StreamType::Metadata
+        if use_distinct_stream {
+            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+            // if we are using distinct stream, we have already partially aggregated
+            // the counts, so we need to sum over that field
+            count_fn = "SUM(count)";
+            // distinct_values_* stream is metadata
+            actual_stream_type = StreamType::Metadata;
         } else {
-            stream_type
-        };
+            distinct_prefix = "".to_owned();
+            // for non-distinct fields, we need the actual count
+            count_fn = "COUNT(*)";
+            actual_stream_type = stream_type;
+        }
 
         let sql = if no_count {
             format!(
@@ -965,7 +971,7 @@ async fn values_v1(
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
