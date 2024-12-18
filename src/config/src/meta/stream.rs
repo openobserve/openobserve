@@ -15,7 +15,7 @@
 
 use std::{cmp::max, fmt::Display};
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
@@ -556,6 +556,13 @@ pub struct TimeRange {
     pub end: i64,
 }
 
+impl Display for TimeRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let time_range_start: DateTime<Utc> = Utc.timestamp_nanos(self.start * 1000);
+        let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(self.end * 1000);
+        write!(f, "{} to {}", time_range_start, time_range_end)
+    }
+}
 impl TimeRange {
     pub fn new(start: i64, end: i64) -> Self {
         Self { start, end }

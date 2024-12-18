@@ -569,6 +569,8 @@ async fn write_file_list(
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
 
     #[tokio::test]
@@ -612,6 +614,8 @@ mod tests {
             now.timestamp_nanos_opt().unwrap() / 1000,
         );
         let mut res_time_ranges = vec![];
+        println!("original time range : {}", original_time_range);
+        println!("red day time range : {}", exclude_range);
         assert_eq!(
             populate_time_ranges_for_deletion(
                 &mut res_time_ranges,
@@ -620,6 +624,7 @@ mod tests {
             ),
             1
         );
+        println!("res time ranges : {}", res_time_ranges.first().unwrap());
         assert!(original_time_range.contains(res_time_ranges.first().unwrap()));
         res_time_ranges.clear();
 
@@ -633,6 +638,8 @@ mod tests {
                 .unwrap()
                 / 1000,
         );
+        println!("original time range : {}", original_time_range);
+        println!("red day time range : {}", exclude_range);
         assert_eq!(
             populate_time_ranges_for_deletion(
                 &mut res_time_ranges,
@@ -641,6 +648,7 @@ mod tests {
             ),
             2
         );
+        println!("res time ranges : {}", res_time_ranges.iter().join(", "));
         assert!(!res_time_ranges[0].intersects(&res_time_ranges[1]));
     }
 }

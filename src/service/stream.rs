@@ -289,7 +289,7 @@ pub async fn save_stream_settings(
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(
-                    "start day should be less than the last data retention day {}",
+                    "start day should be greater than the last data retention day {}",
                     last_retained
                 ),
             )));
