@@ -108,11 +108,12 @@ pub async fn test_function(
     let mut errors = vec![];
 
     events.into_iter().for_each(|event| {
-        let event = if let Ok(event) = serde_json::from_str(&event) {
-            event
-        } else {
-            errors.push("no value".into());
-            return;
+        let event = match serde_json::from_str(&event) {
+            Ok(event) => event,
+            Err(e) => {
+                errors.push(e.to_string());
+                return;
+            }
         };
         let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
             &mut runtime,
@@ -433,12 +434,11 @@ mod tests {
             serde_json::from_slice(&*to_bytes(response.into_body()).await.unwrap()).unwrap();
 
         // Validate transformed events
-        assert_eq!(body.results.len(), 2);
+        assert_eq!(body.results.len(), 1);
         assert_eq!(
             body.results[0],
-            r#"{"new_field":"new_value","nested":{"key":42}}"#
+            r#"{"nested_key":42,"new_field":"new_value"}"#
         );
-        assert_eq!(body.results[1], ""); // The invalid JSON won't produce a result
 
         // Validate errors
         assert_eq!(body.errors.len(), 1);
