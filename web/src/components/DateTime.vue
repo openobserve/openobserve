@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div  class="notePara">* You can choose multiple date</div>
               <q-separator v-if="!disableRelative" class="q-my-sm" />
 
-              <table class="q-px-md startEndTime">
+              <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tr>
                   <td class="label tw-px-2">Start time</td>
                   <td class="label tw-px-2">End time</td>
@@ -204,7 +204,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <tr>
                   <td>
                     <q-input
-                      :disable="disableRelative"
                       v-model="selectedTime.startTime"
                       dense
                       filled
@@ -241,7 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </td>
                   <td>
                     <q-input
-                      :disable="disableRelative"
                       v-model="selectedTime.endTime"
                       dense
                       filled
@@ -282,6 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
         </q-tab-panels>
         <q-select
+        v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
           v-model="timezone"
           :options="filteredTimezone"
@@ -304,7 +303,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="`Timezone: ${timezone}`"
           class="timezone-select"
           popup-content-style="z-index: 10002"
-          :disable="disableRelative"
         >
         </q-select>
         <div v-if="!autoApply " class="flex justify-end q-py-sm q-px-md">
@@ -391,6 +389,14 @@ export default defineComponent({
       default: "date-time-btn",
     },
     disableRelative: {
+      type: Boolean,
+      default: false,
+    },
+    hideRelativeTime:{
+      type: Boolean,
+      default: false,
+    },
+    hideRelativeTimezone:{
       type: Boolean,
       default: false,
     },
