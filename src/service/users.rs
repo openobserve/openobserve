@@ -270,6 +270,8 @@ pub async fn update_user(
         let mut message = "";
         #[cfg(feature = "enterprise")]
         let mut custom_roles = vec![];
+        #[cfg(feature = "enterprise")]
+        let mut custom_roles_need_change = false;
         match existing_user.unwrap() {
             Some(local_user) => {
                 if local_user.is_external {
@@ -357,6 +359,7 @@ pub async fn update_user(
                     new_role = Some(new_user.role.clone());
                     #[cfg(feature = "enterprise")]
                     if new_org_role.custom_role.is_some() {
+                        custom_roles_need_change = true;
                         custom_roles.extend(new_org_role.custom_role.unwrap());
                     }
                     is_org_updated = true;
@@ -461,7 +464,7 @@ pub async fn update_user(
                                     update_user_role(&old_str, &new_str, email, org_id).await;
                                 }
                             }
-                            if !custom_roles.is_empty() {
+                            if custom_roles_need_change {
                                 let existing_roles = get_roles_for_org_user(email, org_id).await;
                                 let mut write_tuples = vec![];
                                 let mut delete_tuples = vec![];
