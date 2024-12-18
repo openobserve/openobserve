@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:selected="selected"
       :rows="logStream"
       :columns="columns"
-      row-key="name"
+      :row-key="getRowKey"
       :selected-rows-label="getSelectedString"
       selection="multiple"
       :pagination="pagination"
@@ -774,6 +774,10 @@ export default defineComponent({
       // });
     };
 
+    const getRowKey = (row: any) => {
+      return `${row.name}-${row.stream_type}`; // Unique key by combining `name` and `stream_type`
+    };
+
     return {
       t,
       qTable,
@@ -815,6 +819,7 @@ export default defineComponent({
       getSelectedString,
       getSelectedItems,
       isDeleting,
+      getRowKey,
     };
   },
 });
