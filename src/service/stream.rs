@@ -16,7 +16,6 @@
 use std::io::Error;
 
 use actix_web::{http, http::StatusCode, HttpResponse};
-use chrono::Duration;
 use config::{
     is_local_disk_storage,
     meta::stream::{
@@ -270,33 +269,11 @@ pub async fn save_stream_settings(
     }
     settings.partition_keys = old_partition_keys;
 
-    let old_data_retention_days = if let Some(old_settings) = unwrap_stream_settings(&schema) {
-        old_settings.data_retention
-    } else {
-        0
-    };
     for range in settings.red_days.iter() {
         if range.start > range.end {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 "start day should be less than end day".to_string(),
-            )));
-        }
-
-        let last_retained = config::utils::time::now()
-            - if settings.data_retention == 0 {
-                Duration::try_days(cfg.compact.data_retention_days).unwrap()
-            } else {
-                Duration::try_days(old_data_retention_days).unwrap()
-            };
-
-        if range.start < last_retained.timestamp_micros() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!(
-                    "start day should be greater than the last data retention day {}",
-                    last_retained
-                ),
             )));
         }
     }
