@@ -151,7 +151,7 @@ pub async fn put(
                 (active.insert(client).await?.try_into_model()?, new_template)
             }
         };
-    Ok(model.try_into(template)?)
+    model.try_into(template)
 }
 
 pub async fn get(
@@ -176,7 +176,7 @@ pub async fn list(org_id: &str) -> Result<Vec<destinations::Destination>, errors
     let destinations = list_models(client, Some(org_id))
         .await?
         .into_iter()
-        .map(|(model, template)| Ok(model.try_into(template)?))
+        .map(|(model, template)| model.try_into(template))
         .collect::<Result<_, errors::Error>>()?;
     Ok(destinations)
 }
@@ -189,7 +189,7 @@ pub async fn list_all() -> Result<Vec<destinations::Destination>, errors::Error>
     let destinations = list_models(client, None)
         .await?
         .into_iter()
-        .map(|(model, template)| Ok(model.try_into(template)?))
+        .map(|(model, template)| model.try_into(template))
         .collect::<Result<_, errors::Error>>()?;
     Ok(destinations)
 }

@@ -107,14 +107,16 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationErr
     db::alerts::destinations::get(org_id, name).await
 }
 
-// pub async fn get_with_template(
-//     org_id: &str,
-//     name: &str,
-// ) -> Result<DestinationWithTemplate, anyhow::Error> {
-//     let dest = get(org_id, name).await?;
-//     let template = db::alerts::templates::get(org_id, &dest.template).await?;
-//     Ok(dest.with_template(template))
-// }
+pub async fn get_with_template(
+    org_id: &str,
+    name: &str,
+) -> Result<(Destination, Template), DestinationError> {
+    let dest = get(org_id, name).await?;
+    let template = db::alerts::templates::get(org_id, name)
+        .await
+        .map_err(|_| DestinationError::TemplateNotFound)?;
+    Ok((dest, template))
+}
 
 pub async fn list(
     org_id: &str,

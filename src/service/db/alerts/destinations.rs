@@ -15,11 +15,15 @@
 
 use std::sync::Arc;
 
-use config::{meta::destinations::Destination, utils::json};
+use bytes::Bytes;
+use config::meta::destinations::Destination;
 use infra::table;
 use itertools::Itertools;
 
 use crate::{common::infra::config::ALERTS_DESTINATIONS, service::db};
+
+// db cache watcher prefix
+const DESTINATION_WATCHER_PREFIX: &str = "/destinations/";
 
 #[derive(Debug, thiserror::Error)]
 pub enum DestinationError {
@@ -66,18 +70,40 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationErr
 }
 
 pub async fn set(org_id: &str, destination: Destination) -> Result<Destination, DestinationError> {
-    let key = format!("{org_id}/{}", destination.name);
     let saved = table::destinations::put(org_id, destination).await?;
-    ALERTS_DESTINATIONS.insert(key, saved.clone());
+
+    // trigger watch event by putting empty value to cluster coordinator
+    let cluster_coordinator = db::get_coordinator().await;
+    cluster_coordinator
+        .put(
+            &format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, saved.name),
+            Bytes::new(),
+            db::NEED_WATCH,
+            None,
+        )
+        .await?;
+
     Ok(saved)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
-    ALERTS_DESTINATIONS.remove(&format!("{org_id}/{name}"));
     if table::destinations::get(org_id, name).await?.is_none() {
         return Err(DestinationError::NotFound);
     }
-    Ok(table::destinations::delete(org_id, name).await?)
+    table::destinations::delete(org_id, name).await?;
+
+    // trigger watch event to delete from cache
+    let cluster_coordinator = db::get_coordinator().await;
+    cluster_coordinator
+        .delete(
+            &format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, name),
+            false,
+            db::NEED_WATCH,
+            None,
+        )
+        .await?;
+
+    Ok(())
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Destination>, DestinationError> {
@@ -98,10 +124,11 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, DestinationError> {
     Ok(items)
 }
 
-pub async fn _watch() -> Result<(), anyhow::Error> {
-    let key = "/destinations/";
+pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator
+        .watch(DESTINATION_WATCHER_PREFIX)
+        .await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert destinations");
     loop {
@@ -114,28 +141,28 @@ pub async fn _watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Destination = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
+                let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
+                let keys = item_key.split('/').collect::<Vec<_>>();
+                if keys.len() != 2 {
+                    log::error!("Error event key not formatted correctly. Should be org_id/name, but got {}", item_key);
+                    continue;
+                }
+                let item_value: Destination = match table::destinations::get(keys[0], keys[1]).await
+                {
+                    Ok(Some(dest)) => dest,
+                    Ok(None) => {
+                        log::error!("Destination not found in db");
+                        continue;
                     }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
+                    Err(e) => {
+                        log::error!("Error getting from db: {}", e);
+                        continue;
+                    }
                 };
                 ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
             }
             db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
+                let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
                 ALERTS_DESTINATIONS.remove(item_key);
             }
             db::Event::Empty => {}

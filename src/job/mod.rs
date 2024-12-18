@@ -115,7 +115,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::compact::retention::watch().await });
     tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
-    // tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+    tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+    tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });

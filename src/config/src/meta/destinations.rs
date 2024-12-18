@@ -17,6 +17,7 @@ use std::fmt;
 
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -71,7 +72,7 @@ pub struct AwsSns {
     pub aws_region: String,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HTTPType {
     #[default]

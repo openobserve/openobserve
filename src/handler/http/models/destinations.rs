@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! These models define the schemas of HTTP request and response JSON bodies in
-//! folders API endpoints.
+//! destinations and templates API endpoints.
 
 use std::fmt;
 
@@ -85,7 +85,7 @@ impl Destination {
                 }),
                 DestinationType::Http => meta_dest::DestinationType::Http(meta_dest::Endpoint {
                     url: self.url,
-                    method: meta_dest::HTTPType::from(self.method),
+                    method: self.method,
                     skip_tls_verify: self.skip_tls_verify,
                     headers: self.headers,
                 }),
