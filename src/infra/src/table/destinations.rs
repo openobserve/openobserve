@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::destinations, utils::json};
+use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
     ModelTrait, QueryFilter, Set, TryIntoModel,
@@ -70,10 +70,6 @@ pub async fn put(
     org_id: &str,
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let template_id = if let destinations::Module::Alert { template, .. } = &destination.module {
         super::templates::get(org_id, template)
             .await?
@@ -81,6 +77,11 @@ pub async fn put(
     } else {
         None
     };
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
     let (model, template): (Model, Option<String>) =
         match get_model_and_template(client, org_id, &destination.name).await? {
             Some((model, ..)) => {
@@ -116,7 +117,7 @@ pub async fn put(
             None => {
                 let (active, new_template) = {
                     let mut active = ActiveModel {
-                        id: Set(destination.id),
+                        id: Set(ider::uuid()),
                         org: Set(destination.org_id),
                         name: Set(destination.name),
                         template_id: Set(None),

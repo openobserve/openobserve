@@ -73,11 +73,13 @@ pub struct AwsSns {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
 pub enum HTTPType {
     #[default]
+    #[serde(rename = "post")]
     POST,
+    #[serde(rename = "put")]
     PUT,
+    #[serde(rename = "get")]
     GET,
 }
 
@@ -104,10 +106,12 @@ pub struct Template {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum TemplateType {
+    #[serde(rename = "http")]
     Http,
+    #[serde(rename = "email")]
     Email { title: String },
+    #[serde(rename = "sns")]
     Sns,
 }
 
