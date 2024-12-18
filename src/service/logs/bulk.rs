@@ -28,7 +28,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{flatten, json, schema::is_valid_stream_name, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
@@ -103,6 +103,30 @@ pub async fn ingest(
                 continue; // skip
             }
             (action, stream_name, doc_id) = ret.unwrap();
+
+            if !is_valid_stream_name(&stream_name) {
+                bulk_res.errors = true;
+                let err_msg = format!("Invalid stream name: {}", stream_name);
+                let err = BulkResponseError::new(
+                    err_msg.to_string(),
+                    stream_name.clone(),
+                    err_msg,
+                    "0".to_string(), // TODO check
+                );
+                let mut item = HashMap::new();
+                item.insert(
+                    action.clone(),
+                    BulkResponseItem::new_failed(
+                        stream_name.clone(),
+                        doc_id.clone().unwrap_or_default(),
+                        err,
+                        Some(value),
+                        stream_name.clone(),
+                    ),
+                );
+                bulk_res.items.push(item);
+                continue; // skip
+            }
 
             if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(&stream_name);
