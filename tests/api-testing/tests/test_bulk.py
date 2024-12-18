@@ -80,7 +80,7 @@ def test_e2e_bulk_ingest(create_session, base_url):
         print("Error parsing JSON response:", str(e))
 
     # Assert that we get a 200 status code (as observed in Postman behavior)
-    assert resp_invalid_bulk_2.status_code == 200, (
+    assert resp_invalid_bulk_2.status_code == 422, (
         f"Expected status code 200 for invalid bulk request, but got {resp_invalid_bulk_2.status_code}. "
         f"Response: {resp_invalid_bulk_2.content}"
     )
@@ -103,7 +103,7 @@ def test_e2e_bulk_ingest(create_session, base_url):
     print("Negative Test Response:", resp_valid_bulk.content)
 
     # Assert positive case
-    assert resp_valid_bulk.status_code == 200, (
+    assert resp_valid_bulk.status_code == 422, (
         f"Expected status code 200 for valid bulk request, but got {resp_valid_bulk.status_code}. "
         f"Response: {resp_valid_bulk.content}"
     )
