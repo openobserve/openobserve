@@ -28,7 +28,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema::is_valid_stream_name, time::parse_timestamp_micro_from_value},
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
     BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
@@ -104,7 +104,8 @@ pub async fn ingest(
             }
             (action, stream_name, doc_id) = ret.unwrap();
 
-            if !is_valid_stream_name(&stream_name) {
+            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+                log::warn!("Invalid stream name: '{}'", stream_name);
                 bulk_res.errors = true;
                 let err_msg = format!("Invalid stream name: {}", stream_name);
                 let err = BulkResponseError::new(

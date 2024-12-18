@@ -266,14 +266,6 @@ pub fn format_stream_name(stream_name: &str) -> String {
         .to_lowercase()
 }
 
-// Check if stream name is valid
-// Stream name must be alphanumeric and can contain underscores
-// Stream name cannot be all underscores
-// Stream name cannot be empty
-pub fn is_valid_stream_name(stream_name: &str) -> bool {
-    !RE_CORRECT_STREAM_NAME.is_match(stream_name) && !stream_name.chars().all(|c| c == '_')
-}
-
 /// match a source is a needed file or not, return true if needed
 pub fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<String>)]) -> bool {
     !filters.iter().any(|(k, v)| {
@@ -394,15 +386,5 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
-    }
-
-    #[test]
-    fn test_invalid_stream_names() {
-        assert!(!is_valid_stream_name(""));
-        assert!(!is_valid_stream_name("_"));
-        assert!(!is_valid_stream_name("____"));
-        assert!(is_valid_stream_name("123stream"));
-        assert!(is_valid_stream_name("stream1"));
-        assert!(is_valid_stream_name("stream_name"));
     }
 }
