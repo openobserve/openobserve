@@ -156,7 +156,7 @@ export default defineComponent({
           if(e.response.status != 403){
             this.q.notify({
               type: "negative",
-              message: "Error while generating RUM Token." + e.error,
+              message: e.response?.data?.message || "Error while generating RUM Token.",
               timeout: 5000,
             });
           }   
@@ -187,7 +187,7 @@ export default defineComponent({
           if(e.response.status != 403){
             this.q.notify({
             type: "negative",
-            message: "Error while refreshing RUM Token." + e.error,
+            message: e.response?.data?.message || "Error while refreshing RUM Token.",
             timeout: 5000,
           });
           }  
