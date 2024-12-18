@@ -584,7 +584,6 @@ impl TimeRange {
         }
     }
 
-    /// `exclude_end_dates` is used to exclude the end date from the range
     pub fn split(&self, other: &Self) -> Vec<Self> {
         if !self.intersects(other) {
             return vec![self.clone()];
@@ -1148,5 +1147,20 @@ mod tests {
         assert_eq!(ranges.len(), 2);
         assert_eq!(ranges[0], TimeRange::new(0, 50));
         assert_eq!(ranges[1], TimeRange::new(150, 400));
+    }
+
+    #[test]
+    fn test_flatten_ranges() {
+        let ranges = vec![TimeRange::new(0, 150), TimeRange::new(100, 200)];
+        let expected_res = TimeRange::new(0, 200);
+        let mut ranges = TimeRange::flatten_overlapping_ranges(ranges);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0], expected_res);
+
+        ranges.clear();
+
+        ranges = vec![TimeRange::new(0, 150), TimeRange::new(200, 300)];
+        let expected_res = vec![TimeRange::new(0, 150), TimeRange::new(200, 300)];
+        assert_eq!(TimeRange::flatten_overlapping_ranges(ranges), expected_res);
     }
 }
