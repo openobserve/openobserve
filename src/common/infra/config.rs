@@ -17,8 +17,9 @@ use std::sync::Arc;
 
 use config::{
     meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
+        alerts::alert::Alert,
         dashboards::reports,
+        destinations::{Destination, Template},
         function::Transform,
         stream::StreamParams,
     },

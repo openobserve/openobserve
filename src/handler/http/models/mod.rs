@@ -17,4 +17,5 @@
 //! for HTTP responses and requests.
 
 pub mod dashboards;
+pub mod destinations;
 pub mod folders;

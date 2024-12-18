@@ -30,11 +30,11 @@ impl MigrationTrait for Migration {
         let txn = manager.get_connection().begin().await?;
 
         // Get all templates first
-        let templates: HashMap<String, String> = templates::Entity::find()
+        let templates: HashMap<(String, String), String> = templates::Entity::find()
             .all(&txn)
             .await?
             .into_iter()
-            .map(|model| (format!("{}-{}", model.org, model.name), model.id))
+            .map(|model| ((model.org, model.name), model.id))
             .collect();
 
         // Migrate pages of 100 records at a time to avoid loading too many
@@ -80,7 +80,7 @@ impl MigrationTrait for Migration {
                         json::to_value(new_type).map_err(|e| DbErr::Migration(e.to_string()))?;
 
                     let template_id = templates
-                        .get(&format!("{}-{}", meta.key1, old_dest.template))
+                        .get(&(meta.key1.clone(), old_dest.template))
                         .cloned();
                     Ok(destinations::ActiveModel {
                         id: Set(ider::uuid()),
@@ -89,7 +89,7 @@ impl MigrationTrait for Migration {
                         module: Set("alert".to_string()), // currently only alerts destinations
                         template_id: Set(template_id),
                         pipeline_id: Set(None), // currently only alerts destinations
-                        r#type: Set(new_type),  // this doesn't not have the enum tag!!! fix!
+                        r#type: Set(new_type),
                     })
                 })
                 .collect();

@@ -65,7 +65,6 @@ fn create_destinations_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Destinations::Name).string_len(256).not_null())
         .col(ColumnDef::new(Destinations::Module).string_len(10).not_null())
         .col(ColumnDef::new(Destinations::TemplateId).char_len(27).null())
-        .col(ColumnDef::new(Destinations::PipelineId).string_len(27).null()) // pipeline id created w/ varchar
         .col(ColumnDef::new(Destinations::Type).json().not_null())
         .foreign_key(sea_query::ForeignKey::create().name(DESTINATIONS_TEMPLATES_FK).from(Destinations::Table, Destinations::TemplateId).to(Templates::Table, Templates::Id))
         .to_owned()
@@ -91,7 +90,6 @@ enum Destinations {
     Name,
     Module,
     TemplateId,
-    PipelineId,
     Type,
 }
 
@@ -119,7 +117,6 @@ mod tests {
                 "name" varchar(256) NOT NULL,
                 "module" varchar(10) NOT NULL,
                 "template_id" char(27) NULL,
-                "pipeline_id" varchar(27) NULL, 
                 "type" json NOT NULL,
                 CONSTRAINT "destinations_templates_fk" FOREIGN KEY ("template_id") REFERENCES "templates" ("id") 
             )"#
@@ -142,7 +139,6 @@ mod tests {
                 `name` varchar(256) NOT NULL,
                 `module` varchar(10) NOT NULL,
                 `template_id` char(27) NULL,
-                `pipeline_id` varchar(27) NULL,
                 `type` json NOT NULL,
                 CONSTRAINT `destinations_templates_fk` FOREIGN KEY (`template_id`) REFERENCES `templates` (`id`) 
             )"#
@@ -165,7 +161,6 @@ mod tests {
                 "name" varchar(256) NOT NULL,
                 "module" varchar(10) NOT NULL,
                 "template_id" char(27) NULL,
-                "pipeline_id" varchar(27) NULL,
                 "type" json_text NOT NULL,
                 FOREIGN KEY ("template_id") REFERENCES "templates" ("id") 
             )"#
