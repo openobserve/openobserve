@@ -30,4 +30,15 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
     });
+
+    test("Create, use, and delete report", async ({ page }) => {
+        const TEST_REPORT_NAME = "rreport2";
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReport();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+    });
+
+    
 });
