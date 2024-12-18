@@ -149,12 +149,13 @@ async fn update_passcode_inner(
     if !is_root_user(user_id) {
         let orgs = db_user
             .organizations
-            .filter(|org| org.org_id.eq(local_org_id))
-            .collect::<Vec<UserOrg>>();
+            .iter()
+            .filter(|org| org.name.eq(local_org_id))
+            .collect::<Vec<&UserOrg>>();
         if orgs.is_empty() {
             return Err(anyhow::Error::msg("User not found"));
         }
-        let org_to_update = &orgs[0];
+        let org_to_update = orgs[0];
         if org_to_update.role.eq(&UserRole::ServiceAccount) && db_user.is_external {
             return Err(anyhow::Error::msg(
                 "Not allowed for external service accounts",
