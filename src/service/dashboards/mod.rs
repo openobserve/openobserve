@@ -25,6 +25,7 @@ use hashbrown::HashMap;
 use infra::table::{
     self,
     distinct_values::{self, DistinctFieldRecord, OriginType},
+    folders::FolderType,
 };
 
 use super::{folders, stream::save_stream_settings};
@@ -268,7 +269,7 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    if table::folders::exists(org_id, folder_id).await? {
+    if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
         set_ownership(
@@ -288,7 +289,7 @@ pub async fn create_dashboard(
             name: DEFAULT_FOLDER.to_string(),
             description: DEFAULT_FOLDER.to_string(),
         };
-        folders::save_folder(org_id, folder, true)
+        folders::save_folder(org_id, folder, FolderType::Dashboards, true)
             .await
             .map_err(|_| DashboardError::CreateDefaultFolder)?;
         let dashboard_id = ider::generate();
@@ -375,7 +376,7 @@ pub async fn move_dashboard(
     };
 
     // make sure the destination folder exists
-    if !table::folders::exists(org_id, to_folder).await? {
+    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
