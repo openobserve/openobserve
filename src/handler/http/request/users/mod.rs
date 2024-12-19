@@ -89,7 +89,7 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = PostUserRequest, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -181,7 +181,7 @@ pub async fn update(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "User's email id"),
     ),
-    request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
+    request_body(content = UserRoleRequest, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
