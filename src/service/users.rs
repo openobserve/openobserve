@@ -48,16 +48,20 @@ use crate::{
     service::{db, organization},
 };
 
+fn is_valid_email(email: &str) -> bool {
+    let email_regex = Regex::new(
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+    )
+    .expect("Email regex is valid");
+    email_regex.is_match(email)
+}
+
 pub async fn post_user(
     org_id: &str,
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let email_regex = Regex::new(
-        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
-    )
-    .expect("Email regex is valid");
-    if !email_regex.is_match(&usr_req.email) {
+    if !is_valid_email(&usr_req.email) {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             "Invalid email".to_string(),
@@ -252,6 +256,12 @@ pub async fn update_user(
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
+    if !is_valid_email(email) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Invalid email".to_string(),
+        )));
+    }
 
     let existing_user = if is_root_user(email) {
         db::user::get(None, email).await

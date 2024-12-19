@@ -47,7 +47,14 @@ pub async fn create_role(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(err) => Ok(MetaHttpResponse::internal_error(err)),
+        Err(err) => {
+            let err = err.to_string();
+            if err.contains("write_failed_due_to_invalid_input") {
+                Ok(MetaHttpResponse::bad_request("Role already exists"))
+            } else {
+                Ok(MetaHttpResponse::internal_error("Something went wrong"))
+            }
+        }
     }
 }
 
