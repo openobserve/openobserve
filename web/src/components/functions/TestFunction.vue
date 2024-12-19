@@ -429,7 +429,14 @@ const testFunction = () => {
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
     .then((res: any) => {
-      outputEvents.value = JSON.stringify(res?.data || []);
+      outputEvents.value = res?.data?.results || [];
+    })
+    .catch((err: any) => {
+      q.notify({
+        type: "negative",
+        message: err.response?.data?.message || "Error in testing function",
+        timeout: 3000,
+      });
     });
 };
 
