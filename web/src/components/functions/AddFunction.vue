@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw-w-2/4 tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max"
       >
-        <TestFunction ref="testFunctionRef" :vrlFunction="formData.function" />
+        <TestFunction ref="testFunctionRef" :vrlFunction="formData" />
       </div>
     </div>
   </div>
@@ -162,7 +162,7 @@ export default defineComponent({
     let editorobj: any = null;
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
-    const testFunctionRef = ref(null);
+    const testFunctionRef = ref<typeof TestFunction>();
 
     const expandState = ref({
       functions: true,
@@ -276,7 +276,7 @@ end`;
     };
 
     const onTestFunction = () => {
-      testFunctionRef.value.getResults();
+      if (testFunctionRef.value) testFunctionRef.value.testFunction();
     };
 
     return {
