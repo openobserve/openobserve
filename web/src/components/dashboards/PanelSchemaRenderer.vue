@@ -189,6 +189,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
+import useNotifications from "@/composables/useNotifications";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -674,6 +675,8 @@ export default defineComponent({
         hideDrilldownPopUp();
       }
     };
+    
+    const { showErrorNotification } = useNotifications();
 
     let parser: any;
     onBeforeMount(async () => {
@@ -702,6 +705,94 @@ export default defineComponent({
       { deep: true },
     );
 
+    const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
+      const originalQuery = metadata?.value?.queries[0]?.query;
+      const streamName = queryDetails?.queries[0]?.fields?.stream;
+
+      if (!originalQuery || !streamName) {
+        console.error("Missing query or stream name.");
+        return null;
+      }
+
+      return { originalQuery, streamName };
+    };
+
+    const calculateTimeRange = (
+      hoveredTimestamp: number | null,
+      interval: number | undefined,
+    ) => {
+      if (interval && hoveredTimestamp) {
+        const startTime = hoveredTimestamp * 1000; // Convert to microseconds
+        return {
+          startTime,
+          endTime: startTime + interval,
+        };
+      }
+      return {
+        startTime: selectedTimeObj.value.start_time.getTime(),
+        endTime: selectedTimeObj.value.end_time.getTime(),
+      };
+    };
+
+    const parseQuery = async (originalQuery: string, parser: any) => {
+      try {
+        return parser.astify(originalQuery);
+      } catch (error) {
+        console.error("Failed to parse query:", error);
+        return null;
+      }
+    };
+
+    const buildWhereClause = (
+      ast: any,
+      breakdownColumn?: string,
+      breakdownValue?: string,
+    ): string => {
+      let whereClause = ast?.where
+        ? parser
+            .sqlify({ type: "select", where: ast.where })
+            .slice("SELECT".length)
+        : "";
+
+      if (breakdownColumn && breakdownValue) {
+        const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
+        whereClause += whereClause
+          ? ` AND ${breakdownCondition}`
+          : ` WHERE ${breakdownCondition}`;
+      }
+
+      return whereClause;
+    };
+
+    const constructLogsUrl = (
+      streamName: string,
+      calculatedTimeRange: { startTime: number; endTime: number },
+      encodedQuery: string,
+      queryDetails: any,
+      currentUrl: string,
+    ) => {
+      const logsUrl = new URL(currentUrl + "/logs");
+      logsUrl.searchParams.set(
+        "stream_type",
+        queryDetails.queries[0]?.fields?.stream_type,
+      );
+      logsUrl.searchParams.set("stream", streamName);
+      logsUrl.searchParams.set(
+        "from",
+        calculatedTimeRange.startTime.toString(),
+      );
+      logsUrl.searchParams.set("to", calculatedTimeRange.endTime.toString());
+      logsUrl.searchParams.set("sql_mode", "true");
+      logsUrl.searchParams.set("query", encodedQuery);
+      logsUrl.searchParams.set(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
+      logsUrl.searchParams.set("quick_mode", "false");
+      logsUrl.searchParams.set("show_histogram", "true");
+
+      return logsUrl;
+    };
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
@@ -722,17 +813,13 @@ export default defineComponent({
         const navigateToLogs = async () => {
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
-            console.error("navigateToLogs: Panel schema is undefined.");
+            console.error("Panel schema is undefined.");
             return;
           }
 
-          const originalQuery = metadata?.value?.queries[0]?.query;
-          const streamName = queryDetails?.queries[0]?.fields?.stream;
-
-          if (!originalQuery || !streamName) {
-            console.error("navigateToLogs: Missing query or stream name.");
-            return;
-          }
+          const { originalQuery, streamName } =
+            getOriginalQueryAndStream(queryDetails, metadata) || {};
+          if (!originalQuery || !streamName) return;
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
           const hoveredTimestamp = hoveredTime
@@ -740,98 +827,48 @@ export default defineComponent({
             : null;
           const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-          // Determine time-series presence
-          const hasInterval = !!intervalMicro.value;
+          const calculatedTimeRange = calculateTimeRange(
+            hoveredTimestamp,
+            intervalMicro.value,
+          );
 
-          // Calculate start and end time
-          let calculatedStartTime, calculatedEndTime;
-
-          if (hasInterval && hoveredTimestamp) {
-            calculatedStartTime = hoveredTimestamp * 1000; // Convert to microseconds
-            calculatedEndTime = calculatedStartTime + intervalMicro.value;
-          } else {
-            calculatedStartTime = selectedTimeObj.value.start_time.getTime();
-            calculatedEndTime = selectedTimeObj.value.end_time.getTime();
-          }
-
-          // Initialize SQL parser if not already done
           if (!parser) {
             await importSqlParser();
           }
 
-          let ast;
-          try {
-            ast = parser.astify(originalQuery);
-          } catch (error) {
-            console.error("navigateToLogs: Failed to parse query:", error);
-            return;
-          }
+          const ast = await parseQuery(originalQuery, parser);
+          if (!ast) return;
 
-          // Extract WHERE clause
-          let whereClause: any = ast?.where
-            ? parser.sqlify({ type: "select", where: ast.where })
-            : null;
-
-          if (whereClause) {
-            // Remove unwanted SELECT part and retain only WHERE clause
-            const whereIndex = whereClause.indexOf("WHERE");
-            whereClause = whereClause.slice(whereIndex);
-          }
-
-          // Build condition for breakdown if applicable
-          let breakdownCondition = "";
-          if (breakdown.length > 0) {
-            const breakdownColumn = breakdown[0].column;
-            const breakdownValue = drilldownParams[0]?.seriesName;
-
-            if (breakdownColumn && breakdownValue) {
-              breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
-            }
-          }
-
-          // Append breakdown condition with AND if WHERE exists
-          let finalWhereClause = whereClause || "";
-          if (breakdownCondition) {
-            finalWhereClause += whereClause
-              ? ` AND ${breakdownCondition}`
-              : ` WHERE ${breakdownCondition}`;
-          }
+          const breakdownColumn = breakdown[0]?.column;
+          const breakdownValue = drilldownParams[0]?.seriesName;
+          const whereClause = buildWhereClause(
+            ast,
+            breakdownColumn,
+            breakdownValue,
+          );
 
           const modifiedQuery =
             drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}" ${finalWhereClause}`
+              ? `SELECT * FROM "${streamName}" ${whereClause}`
               : drilldownData.data.logsQuery;
 
-          // Encode the modified query
-          const encodedQuery = b64EncodeUnicode(modifiedQuery);
+          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
 
           const pos = window.location.pathname.indexOf("/web/");
-          // if there is /web/ in path
-          // url will be: origin from window.location.origin + pathname up to /web/ + /web/
-          let currentUrl: any =
+          const currentUrl =
             pos > -1
               ? window.location.origin +
                 window.location.pathname.slice(0, pos) +
                 "/web"
               : window.location.origin;
 
-          // Navigate to logs
-          const logsUrl: any = new URL(currentUrl + "/logs");
-          logsUrl.searchParams.set(
-            "stream_type",
-            queryDetails.queries[0]?.fields?.stream_type,
+          const logsUrl = constructLogsUrl(
+            streamName,
+            calculatedTimeRange,
+            encodedQuery,
+            queryDetails,
+            currentUrl,
           );
-          logsUrl.searchParams.set("stream", streamName);
-          logsUrl.searchParams.set("from", calculatedStartTime);
-          logsUrl.searchParams.set("to", calculatedEndTime);
-          logsUrl.searchParams.set("sql_mode", "true");
-          logsUrl.searchParams.set("query", encodedQuery);
-          logsUrl.searchParams.set(
-            "org_identifier",
-            store.state.selectedOrganization.identifier,
-          );
-          logsUrl.searchParams.set("quick_mode", "false");
-          logsUrl.searchParams.set("show_histogram", "true");
 
           try {
             if (drilldownData.targetBlank) {
@@ -843,7 +880,7 @@ export default defineComponent({
               });
             }
           } catch (error) {
-            console.error("navigateToLogs: Failed to navigate to logs:", error);
+            console.error("Failed to navigate to logs:", error);
           }
         };
 
@@ -951,7 +988,7 @@ export default defineComponent({
           try {
             navigateToLogs();
           } catch (error) {
-            console.error("navigateToLogs: Failed to navigate to logs:", error);
+            showErrorNotification("Failed to navigate to logs",)
           }
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
