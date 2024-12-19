@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
             class="tw-text-xs tw-font-bold no-border"
             data-test="metrics-cancel"
-            padding="xs"
+            padding="sm md"
             color="negative"
             no-caps
             :label="t('panel.cancel')"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @last-triggered-at-update="
                               handleLastTriggeredAtUpdate
                             "
-                            searchType="Metrics"
+                            searchType="ui"
                           />
                         </div>
                         <div
