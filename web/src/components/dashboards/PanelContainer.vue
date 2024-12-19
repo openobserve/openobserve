@@ -513,14 +513,16 @@ export default defineComponent({
       emit("refreshPanelRequest", props.data.id);
     };
 
+    const createVariableRegex = (name: any) =>
+      new RegExp(
+        `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+      );
+      
     const getDependentVariablesData = () =>
       props.variablesData?.values
         ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
         ?.filter((it: any) => {
-          const regexForVariable = new RegExp(
-            `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
-          );
-
+          const regexForVariable = createVariableRegex(it.name);
           return props.data.queries
             ?.map((q: any) => regexForVariable.test(q?.query))
             ?.includes(true);
