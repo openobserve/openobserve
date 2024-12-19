@@ -17,130 +17,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 42px); overflow-y: auto" class="scroll">
-    <!-- <div class="flex justify-between items-center q-pa-sm">
-       <div class="flex items-center q-table__title q-mr-md">
-        <span>
-          {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
-        </span>
-        <div>
-          <q-input
-            data-test="dashboard-panel-name"
-            v-model="dashboardPanelData.data.title"
-            :label="t('panel.name') + '*'"
-            class="q-ml-xl"
-            filled
-            dense
-          />
-        </div>
-      </div>
-       <div class="flex q-gutter-sm">
-        <q-btn
-          outline
-          padding="sm"
-          class="q-mr-sm"
-          no-caps
-          label="Dashboard Tutorial"
-          @click="showTutorial"
-          data-test="dashboard-panel-tutorial-btn"
-        ></q-btn>
-        <q-btn
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          outline
-          padding="sm"
-          class="q-mr-sm"
-          no-caps
-          icon="info_outline"
-          @click="showViewPanel = true"
-          data-test="dashboard-panel-data-view-query-inspector-btn"
-        >
-          <q-tooltip anchor="center left" self="center right"
-            >Query Inspector
-          </q-tooltip>
-        </q-btn>
-        <DateTimePickerDashboard
-          v-if="selectedDate"
-          v-model="selectedDate"
-          ref="dateTimePickerRef"
-          :disable="disable"
-        />
-        <q-btn
-          class="q-ml-md text-bold"
-          outline
-          padding="sm lg"
-          color="red"
-          no-caps
-          :label="t('panel.discard')"
-          @click="goBackToDashboardList"
-          data-test="dashboard-panel-discard"
-        />
-        <q-btn
-          class="q-ml-md text-bold"
-          outline
-          padding="sm lg"
-          no-caps
-          :label="t('panel.save')"
-          data-test="dashboard-panel-save"
-          @click.stop="savePanelData.execute()"
-          :loading="savePanelData.isLoading.value"
-        />
-        <template
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-        >
-          <q-btn
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
-            data-test="dashboard-cancel"
-            padding="sm lg"
-            color="negative"
-            no-caps
-            :label="t('panel.cancel')"
-            @click="cancelAddPanelQuery"
-          />
-          <q-btn
-            v-else
-            class="q-ml-md text-bold no-border"
-            data-test="dashboard-apply"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t('panel.apply')"
-            @click="runQuery"
-          />
-        </template>
-      </div>
-    </div>
-    <q-separator></q-separator> -->
-    <div class="row">
+    <div class="row" style="height: 40px; overflow-y: auto">
       <div class="flex items-center col">
         <syntax-guide-metrics class="q-mr-sm" />
       </div>
       <div class="text-right col flex justify-end">
         <DateTimePickerDashboard
-          v-if="selectedDate"
+          v-if="
+            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
+            selectedDate
+          "
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
           style="margin: 4px 0px"
         />
-        <!-- <auto-refresh-interval
-          class="q-pr-sm"
-          v-model="searchObj.meta.refreshInterval"
-          @update:model-value="onChangeRefreshInterval"
-        /> -->
-        <!-- <q-btn
-          data-test="metrics-explorer-run-query-button"
-          data-cy="metrics-explorer-run-query-button"
-          dense
-          flat
-          :title="t('metrics.runQuery')"
-          class="q-pa-none bg-secondary search-button"
-          @click="searchData"
+        <AutoRefreshInterval
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-model="refreshInterval"
+          trigger
+          @trigger="runQuery"
+          class="dashboard-icons hideOnPrintMode"
           size="sm"
-          :disable="
-            searchObj.loading || searchObj.data.streamResults.length == 0
-          "
-        >
-        </q-btn> -->
+        />
         <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
@@ -164,22 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('metrics.runQuery')"
             @click="runQuery"
           />
-          <q-btn
-            data-test="logs-search-bar-share-link-btn"
-            class="q-mx-sm download-logs-btn q-px-sm q-py-xs"
-            size="sm"
-            icon="share"
-            :title="
-              promqlMode ? t('search.shareLink') : t('search.disableShareLink')
-            "
-            @click="shareLink.execute()"
-            :loading="shareLink.isLoading.value"
-            :disable="!promqlMode"
-          />
         </template>
       </div>
     </div>
-    <div class="row" style="height: calc(100vh - 105px); overflow-y: auto">
+    <div class="row" style="height: calc(100vh - 82px); overflow-y: auto">
       <div
         class="col scroll"
         style="
@@ -209,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               class="col scroll tw-border-t-2"
-              style="height: calc(100vh - 105px); overflow-y: auto"
+              style="height: calc(100vh - 82px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
@@ -234,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row"
-              style="height: calc(100vh - 105px); overflow-y: auto"
+              class="row tw-border-t-2"
+              style="height: calc(100vh - 82px); overflow-y: auto"
             >
               <div class="col" style="height: 100%">
                 <q-splitter
@@ -262,16 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :dashboardData="currentDashboardData.data"
                       />
                       <q-separator />
-                      <VariablesValueSelector
-                        :variablesConfig="currentDashboardData.data?.variables"
-                        :showDynamicFilters="
-                          currentDashboardData.data?.variables
-                            ?.showDynamicFilters
-                        "
-                        :selectedTimeDate="dashboardPanelData.meta.dateTime"
-                        @variablesData="variablesDataUpdated"
-                        :initialVariableValues="initialVariableValues"
-                      />
 
                       <div v-if="isOutDated" class="tw-p-2">
                         <div
@@ -324,10 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @metadata-update="metaDataValue"
                             :key="dashboardPanelData.data.type"
                             :panelSchema="chartData"
-                            :dashboard-id="queryParams?.dashboard"
-                            :folder-id="queryParams?.folder"
                             :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                            :variablesData="variablesData"
+                            :variablesData="{}"
                             :width="6"
                             @error="handleChartApiError"
                             @updated:data-zoom="onDataZoom"
@@ -337,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @last-triggered-at-update="
                               handleLastTriggeredAtUpdate
                             "
-                            searchType="Dashboards"
+                            searchType="Metrics"
                           />
                         </div>
                         <div
@@ -389,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
-                    :variablesData="updatedVariablesData"
+                    :variablesData="{}"
                   />
                 </PanelSidebar>
               </div>
@@ -449,15 +324,12 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
-import shortURLService from "@/services/short_url";
-import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
-import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
+import { onBeforeRouteLeave } from "vue-router";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../composables/useDashboardPanel";
@@ -466,12 +338,12 @@ import DashboardErrorsComponent from "@/components/dashboards/addPanel/Dashboard
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
@@ -493,7 +365,7 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
 });
 
 export default defineComponent({
-  name: "AddPanel",
+  name: "Metrics",
   props: ["metaData"],
 
   components: {
@@ -515,6 +387,7 @@ export default defineComponent({
     CustomMarkdownEditor,
     SyntaxGuideMetrics,
     AddToDashboard,
+    AutoRefreshInterval,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -523,14 +396,8 @@ export default defineComponent({
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18n();
-    const router = useRouter();
-    const route = useRoute();
     const store = useStore();
-    const {
-      showErrorNotification,
-      showPositiveNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -538,15 +405,18 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       removeXYFilters,
-      promqlMode,
     } = useDashboardPanelData("metrics");
     const editMode = ref(false);
-    const selectedDate: any = ref(null);
+    const selectedDate: any = ref({
+      valueType: "relative",
+      startTime: null,
+      endTime: null,
+      relativeTimePeriod: "15m",
+    });
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
       errors: [],
     });
-    let variablesData: any = reactive({});
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -556,19 +426,8 @@ export default defineComponent({
 
     const showAddToDashboardDialog = ref(false);
 
-    // used to provide values to chart only when apply is clicked (same as chart data)
-    let updatedVariablesData: any = reactive({});
-
-    // ======= [START] default variable values
-
-    const initialVariableValues: any = { value: {} };
-    Object.keys(route.query).forEach((key) => {
-      if (key.startsWith("var-")) {
-        const newKey = key.slice(4);
-        initialVariableValues.value[newKey] = route.query[key];
-      }
-    });
-    // ======= [END] default variable values
+    // refresh interval v-model
+    const refreshInterval = ref(0);
 
     const metaData = ref(null);
     const showViewPanel = ref(false);
@@ -576,47 +435,6 @@ export default defineComponent({
       // console.time("metaDataValue");
       metaData.value = metadata;
       // console.timeEnd("metaDataValue");
-    };
-
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-
-      // change route query params based on current variables values
-      const variableObj: any = {};
-      data.values.forEach((variable: any) => {
-        if (variable.type === "dynamic_filters") {
-          const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
-          );
-          const encodedFilters = filters.map((item: any) => ({
-            name: item.name,
-            operator: item.operator,
-            value: item.value,
-          }));
-          variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
-        } else {
-          variableObj[`var-${variable.name}`] = variable.value;
-        }
-      });
-      router.replace({
-        query: {
-          ...route.query,
-          ...variableObj,
-          ...getQueryParamsForDuration(selectedDate.value),
-        },
-      });
-
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        !updatedVariablesData?.values?.length && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
-        Object.assign(updatedVariablesData, variablesData);
-      }
     };
 
     const currentDashboardData: any = reactive({
@@ -628,13 +446,11 @@ export default defineComponent({
     const isPanelConfigChanged = ref(false);
 
     onUnmounted(async () => {
-      // console.time("onUnmounted");
       // clear a few things
       resetDashboardPanelData();
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
-      // console.timeEnd("onUnmounted");
     });
 
     onMounted(async () => {
@@ -648,85 +464,24 @@ export default defineComponent({
       // need to remove the xy filters
       removeXYFilters();
 
-      if (route?.query?.query) {
-        dashboardPanelData.data.queryType = "promql";
-        dashboardPanelData.data.queries[0].customQuery = true;
+      // set the default query type as promql for metrics
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.queries[0].customQuery = true;
 
-        // set the value of the query after the reset
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream = route.query?.stream;
-
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = route?.query?.query
-          ? decodeURIComponent(route.query.query as string)
-          : (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].query ?? "");
-      }
+      // set the show query bar by default for metrics page
+      dashboardPanelData.layout.showQueryBar = true;
 
       chartData.value = {};
       // set the value of the date time after the reset
       updateDateTime(selectedDate.value);
 
-      // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
-      // console.time("add panel loadDashboard");
-      getSelectedDateFromRoute();
     });
-
-    const currentDashboard = toRaw(store.state.currentSelectedDashboard);
-
-    /**
-     * Retrieves the selected date from the query parameters.
-     */
-    const getSelectedDateFromQueryParams = (params: any) => ({
-      valueType: params.period
-        ? "relative"
-        : params.from && params.to
-          ? "absolute"
-          : "relative",
-      startTime: params.from ? params.from : null,
-      endTime: params.to ? params.to : null,
-      relativeTimePeriod: params.period ? params.period : "15m",
-    });
-
-    const getSelectedDateFromRoute = async () => {
-      // check if route has time related query params
-      // if not, take dashboard default time settings
-      if (!((route.query.from && route.query.to) || route.query.period)) {
-        // if dashboard has relative time settings
-        if (
-          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
-            "relative") === "relative"
-        ) {
-          selectedDate.value = {
-            valueType: "relative",
-            relativeTimePeriod:
-              currentDashboardData.data?.defaultDatetimeDuration
-                ?.relativeTimePeriod ?? "15m",
-          };
-        } else {
-          // else, dashboard will have absolute time settings
-          selectedDate.value = {
-            valueType: "absolute",
-            startTime:
-              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
-            endTime:
-              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
-          };
-        }
-      } else {
-        // take route time related query params
-        selectedDate.value = getSelectedDateFromQueryParams(route.query);
-      }
-    };
 
     const isInitialDashboardPanelData = () => {
       return (
@@ -747,10 +502,7 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
-      return (
-        !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData)
-      );
+      return !isEqual(chartData.value, dashboardPanelData.data);
     });
 
     watch(isOutDated, () => {
@@ -800,43 +552,11 @@ export default defineComponent({
       },
     );
 
-    function generateURLQuery(isShareLink = false) {
-      try {
-        const query: any = {
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream: dashboardPanelData.data.queries[0].fields.stream,
-          ...getQueryParamsForDuration(selectedDate.value),
-        };
-
-        // if promql mode, query will be used in url
-        if (promqlMode.value) {
-          query.query = encodeURIComponent(
-            dashboardPanelData.data.queries[0].query,
-          );
-        }
-
-        return query;
-      } catch (err) {
-        console.log(err);
-      }
-    }
-
-    function updateUrlQueryParams() {
-      const query = generateURLQuery();
-      router.push({ query });
-    }
-
     const runQuery = () => {
       // console.time("runQuery");
       if (!isValid(true)) {
         return;
       }
-
-      // Also update variables data
-      Object.assign(
-        updatedVariablesData,
-        JSON.parse(JSON.stringify(variablesData)),
-      );
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -844,25 +564,6 @@ export default defineComponent({
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime(selectedDate.value);
       // console.timeEnd("runQuery");
-    };
-
-    const getQueryParamsForDuration = (data: any) => {
-      try {
-        if (data.valueType === "relative") {
-          return {
-            period: data.relativeTimePeriod ?? "15m",
-          };
-        } else if (data.valueType === "absolute") {
-          return {
-            from: data.startTime,
-            to: data.endTime,
-            period: null,
-          };
-        }
-        return {};
-      } catch (error) {
-        return {};
-      }
     };
 
     const updateDateTime = (value: object) => {
@@ -873,8 +574,6 @@ export default defineComponent({
           start_time: new Date(date.startTime),
           end_time: new Date(date.endTime),
         };
-
-        updateUrlQueryParams();
       }
     };
 
@@ -916,9 +615,6 @@ export default defineComponent({
         // No unsaved changes or not leaving the edit route, allow navigation
         next();
       }
-    });
-    const panelTitle = computed(() => {
-      return { title: dashboardPanelData.data.title };
     });
 
     //validate the data
@@ -1217,27 +913,6 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
-    const shareLink = useLoading(async () => {
-      const urlObj = new URL(window.location.href);
-
-      try {
-        const res = await shortURLService.create(
-          store.state.selectedOrganization.identifier,
-          urlObj?.href,
-        );
-        const shortURL = res?.data?.short_url;
-        copyToClipboard(shortURL)
-          .then(() => {
-            showPositiveNotification("Link copied successfully");
-          })
-          .catch(() => {
-            showErrorNotification("Error while copying link");
-          });
-      } catch (error) {
-        showErrorNotification("Error while sharing link");
-      }
-    });
-
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
@@ -1267,17 +942,13 @@ export default defineComponent({
       layoutSplitterUpdated,
       expandedSplitterHeight,
       querySplitterUpdated,
-      currentDashboard,
       dashboardPanelData,
       chartData,
       editMode,
       selectedDate,
       errorData,
       handleChartApiError,
-      variablesDataUpdated,
       currentDashboardData,
-      variablesData,
-      updatedVariablesData,
       resetAggregationFunction,
       isOutDated,
       store,
@@ -1285,22 +956,18 @@ export default defineComponent({
       showViewPanel,
       metaDataValue,
       metaData,
-      panelTitle,
       onDataZoom,
       updateVrlFunctionFieldList,
-      queryParams: route.query as any,
-      initialVariableValues,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
       config,
-      shareLink,
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
-      promqlMode,
+      refreshInterval,
     };
   },
 });
