@@ -662,57 +662,62 @@ export default defineComponent({
     };
     const dashboardList = ref([]);
     const getDashboards = async () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading dashboards...",
+      });
       try {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading dashboards...",
-        });
-
-        const response = await getAllDashboards(store, activeFolderId.value ?? "default");
-
+        const response = await getAllDashboards(
+          store,
+          activeFolderId.value ?? "default",
+        );
         dashboardList.value = response;
-        dismiss();
       } catch (err) {
         showErrorNotification(err?.message || "Failed to load dashboards.");
+      } finally {
+        dismiss();
       }
     };
 
+    const mapDashboard = (
+      board: any,
+      index: number,
+      folderInfo?: { name: string; id: string },
+    ) => ({
+      "#": index < 9 ? `0${index + 1}` : index + 1,
+      id: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
+      ...(folderInfo && {
+        folder: folderInfo.name,
+        folder_id: folderInfo.id,
+      }),
+      name: folderInfo ? board.dashboard.title : board.title,
+      identifier: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
+      description: folderInfo ? board.dashboard.description : board.description,
+      owner: folderInfo ? board.dashboard.owner : board.owner,
+      created: date.formatDate(
+        folderInfo ? board.dashboard.created : board.created,
+        "YYYY-MM-DDTHH:mm:ssZ",
+      ),
+      actions: "true",
+    });
+
     const dashboards = computed(function () {
-      if(!searchAcrossFolders.value || searchQuery.value == ""){
-       const dashboardList = toRaw(
-        store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          [],
-      );
-      
-      return dashboardList.map((board: any, index) => {
-        return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: board.dashboardId,
-          name: board.title,
-          identifier: board.dashboardId,
-          description: board.description,
-          owner: board.owner,
-          created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
-          actions: "true",
-        };
-      });
-      }
-      else{
-        return filteredResults.value.map((board: any, index) => {
-        return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: board.dashboard.dashboardId,
-          folder: board.folder_name,
-          folder_id: board.folder_id,
-          name: board.dashboard.title,
-          identifier: board.dashboard.dashboardId,
-          tabs: board.dashboard.tabs,
-          description: board.dashboard.description,
-          owner: board.dashboard.owner,
-          created: date.formatDate(board.dashboard.created, "YYYY-MM-DDTHH:mm:ssZ"),
-          actions: "true",
-        };
-      });
+      if (!searchAcrossFolders.value || searchQuery.value == "") {
+        const dashboardList = toRaw(
+          store.state.organizationData?.allDashboardList[
+            activeFolderId.value
+          ] ?? [],
+        );
+        return dashboardList.map((board: any, index) =>
+          mapDashboard(board, index),
+        );
+      } else {
+        return filteredResults.value.map((board: any, index) =>
+          mapDashboard(board, index, {
+            name: board.folder_name,
+            id: board.folder_id,
+          }),
+        );
       }
     });
 
