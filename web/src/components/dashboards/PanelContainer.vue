@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onRefreshPanel"
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
-          :color="variablesDataUpdated ? 'yellow' : ''"
+          :color="variablesDataUpdated ? 'warning' : ''"
         >
           <q-tooltip>
             {{

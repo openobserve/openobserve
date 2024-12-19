@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn
               v-else
-              outline
+              :outline="isVariablesChanged ? false : true"
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
@@ -134,7 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshData"
               :disable="arePanelsLoading"
               data-test="dashboard-refresh-btn"
-              :color="isVariablesChanged ? 'yellow' : ''"
+              :color="isVariablesChanged ? 'warning' : ''"
+              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
             >
               <q-tooltip>
                 {{

@@ -66,14 +66,15 @@
         <q-btn
           v-else
           class="q-ml-sm"
-          outline
+          :outline="isVariablesChanged ? true : false"
           padding="xs"
           no-caps
           icon="refresh"
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
           :disable="disable"
-          :color="isVariablesChanged ? '' : 'yellow'"
+          :color="isVariablesChanged ? '' : 'warning'"
+          :text-color="store.state.theme == 'dark' ? 'white' : 'black'"
         >
           <q-tooltip>
             {{
@@ -636,6 +637,7 @@ export default defineComponent({
       config,
       refreshVariableDataRef,
       isVariablesChanged,
+      store
     };
   },
 });
