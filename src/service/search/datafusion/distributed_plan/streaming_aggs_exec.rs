@@ -68,7 +68,7 @@ impl StreamingAggsCache {
         }
         w.push_back(k.clone());
         drop(w);
-        let mut entry = self.data.entry(k).or_insert(Vec::new());
+        let mut entry = self.data.entry(k).or_default();
         entry.push(v);
     }
 

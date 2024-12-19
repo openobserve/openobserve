@@ -401,6 +401,7 @@ pub async fn run_datafusion(
         )?);
     }
 
+    // TODO: how to clean up the streaming cache
     // check for streaming aggregation query
     if streaming_output {
         let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap());
