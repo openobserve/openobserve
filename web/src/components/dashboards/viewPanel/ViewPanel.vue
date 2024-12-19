@@ -131,7 +131,7 @@
                   :dashboard-id="dashboardId"
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="refreshVariableDataRef"
+                  :variablesData="currentVariablesDataRef"
                   :width="6"
                   :searchType="searchType"
                   @error="handleChartApiError"
@@ -236,7 +236,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
 
-    const refreshVariableDataRef: any = reactive({});
+    const currentVariablesDataRef: any = reactive({});
 
     let parser: any;
     const dashboardPanelDataPageKey = inject(
@@ -258,34 +258,36 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        console.log('Updating variables data:', data);
+        console.log("Updating variables data:", data);
         // update the variables data
         Object.assign(variablesData, data);
-        console.log('Updated variablesData:', variablesData);
+        console.log("Updated variablesData:", variablesData);
 
         if (needsVariablesAutoUpdate) {
-          console.log('Checking if variables need auto-update');
+          console.log("Checking if variables need auto-update");
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData)) {
             needsVariablesAutoUpdate = false;
-            console.log('Variables loaded, disabling auto-update');
+            console.log("Variables loaded, disabling auto-update");
           }
 
-          Object.assign(refreshVariableDataRef, variablesData);
-          console.log('Updated refreshVariableDataRef:', refreshVariableDataRef);
+          Object.assign(currentVariablesDataRef, variablesData);
+          console.log(
+            "Updated currentVariablesDataRef:",
+            currentVariablesDataRef,
+          );
         }
-        
 
         return;
       } catch (error) {
-        console.error('Error updating variables data:', error);
+        console.error("Error updating variables data:", error);
         console.log(error);
       }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
       // NOTE: need to improve this logic it should only called if the variable requires more space
-      console.log('Dispatching resize event');
+      console.log("Dispatching resize event");
       window.dispatchEvent(new Event("resize"));
     };
     const currentDashboardData: any = reactive({
@@ -470,9 +472,9 @@ export default defineComponent({
       () => variablesData,
       (newVal) => {
         const isValueChanged =
-          refreshVariableDataRef?.values?.length > 0 &&
+          currentVariablesDataRef?.values?.length > 0 &&
           variablesData.values.every((variable: any, index: number) => {
-            const prevValue = refreshVariableDataRef.values[index]?.value;
+            const prevValue = currentVariablesDataRef.values[index]?.value;
             const newValue = variable.value;
             // Compare current and previous values; handle both string and array cases
             return Array.isArray(newValue)
@@ -488,7 +490,7 @@ export default defineComponent({
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
         Object.assign(
-          refreshVariableDataRef,
+          currentVariablesDataRef,
           JSON.parse(JSON.stringify(variablesData)),
         );
         isVariablesChanged.value = false;

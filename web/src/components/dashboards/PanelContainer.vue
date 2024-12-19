@@ -336,7 +336,7 @@ export default defineComponent({
     "searchType",
     "folderId",
     "reportId",
-    "refreshVariableData",
+    "currentVariablesData",
   ],
   components: {
     PanelSchemaRenderer,
@@ -531,11 +531,11 @@ export default defineComponent({
       // Get dependent variables
       const dependentVariables = getDependentVariablesData();
 
-      // Validate dependentVariables and refreshVariableData
+      // Validate dependentVariables and currentVariablesData
       if (!Array.isArray(dependentVariables)) {
         return false;
       }
-      if (!Array.isArray(props.refreshVariableData.values)) {
+      if (!Array.isArray(props.currentVariablesData.values)) {
         return false;
       }
 
@@ -545,8 +545,8 @@ export default defineComponent({
           return false;
         }
 
-        // Find the corresponding variable in refreshVariableData
-        const refreshedVariable = props.refreshVariableData.values.find(
+        // Find the corresponding variable in currentVariablesData
+        const refreshedVariable = props.currentVariablesData.values.find(
           (varData: any) => varData.name === dependentVariable.name,
         );
 

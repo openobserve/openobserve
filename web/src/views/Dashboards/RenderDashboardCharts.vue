@@ -57,15 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panels[0] || {}"
           :dashboardId="dashboardData.dashboardId"
           :folderId="folderId"
-          :reportId= "folderId"
+          :reportId="folderId"
           :selectedTimeDate="
             (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
             currentTimeObj['__global'] ||
             {}
           "
           :variablesData="
-            refreshVariableDataRef[panels[0].id] ||
-            refreshVariableDataRef['__global']
+            currentVariablesDataRef[panels[0].id] ||
+            currentVariablesDataRef['__global']
           "
           :forceLoad="forceLoad"
           :searchType="searchType"
@@ -122,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
               :variablesData="
-                refreshVariableDataRef[item.id] ||
-                refreshVariableDataRef['__global']
+                currentVariablesDataRef[item.id] ||
+                currentVariablesDataRef['__global']
               "
-              :refreshVariableData="variablesData"
+              :currentVariablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
@@ -288,7 +288,7 @@ export default defineComponent({
 
     // variables data
     const variablesData = ref({});
-    const refreshVariableDataRef: any = ref({ __global: {} });
+    const currentVariablesDataRef: any = ref({ __global: {} });
 
     // ======= [START] dashboard PrintMode =======
 
@@ -331,17 +331,17 @@ export default defineComponent({
     watch(
       () => props?.currentTimeObj?.__global,
       () => {
-        refreshVariableDataRef.value = {
+        currentVariablesDataRef.value = {
           __global: JSON.parse(JSON.stringify(variablesData.value)),
         };
       },
     );
 
     watch(
-      () => refreshVariableDataRef.value,
+      () => currentVariablesDataRef.value,
       () => {
-        if (refreshVariableDataRef.value?.__global) {
-          emit("variablesData", refreshVariableDataRef.value?.__global);
+        if (currentVariablesDataRef.value?.__global) {
+          emit("variablesData", currentVariablesDataRef.value?.__global);
         }
       },
     );
@@ -404,14 +404,20 @@ export default defineComponent({
           console.log("Needs variables auto update is true");
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {
-            console.log("checkIfVariablesAreLoaded is true, setting needsVariablesAutoUpdate to false");
+            console.log(
+              "checkIfVariablesAreLoaded is true, setting needsVariablesAutoUpdate to false",
+            );
             needsVariablesAutoUpdate = false;
           } else {
-            console.log("checkIfVariablesAreLoaded is false, not setting needsVariablesAutoUpdate to false");
+            console.log(
+              "checkIfVariablesAreLoaded is false, not setting needsVariablesAutoUpdate to false",
+            );
           }
-          refreshVariableDataRef.value = { __global: variablesData.value };
+          currentVariablesDataRef.value = { __global: variablesData.value };
         } else {
-          console.log("Needs variables auto update is false, not updating refreshVariableDataRef");
+          console.log(
+            "Needs variables auto update is false, not updating currentVariablesDataRef",
+          );
         }
         return;
       } catch (error) {
@@ -575,8 +581,8 @@ export default defineComponent({
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
 
-      refreshVariableDataRef.value = {
-        ...refreshVariableDataRef.value,
+      currentVariablesDataRef.value = {
+        ...currentVariablesDataRef.value,
         [panelId]: variablesData.value,
       };
     };
@@ -612,7 +618,7 @@ export default defineComponent({
       currentQueryTraceIds,
       openEditLayout,
       saveDashboard,
-      refreshVariableDataRef,
+      currentVariablesDataRef,
     };
   },
   methods: {
