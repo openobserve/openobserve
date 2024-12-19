@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           :disable="disable"
           class="dashboard-icons tw-mt-1"
+          data-test="metrics-date-picker"
         />
         <AutoRefreshInterval
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
@@ -44,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           trigger
           @trigger="runQuery"
           class="dashboard-icons tw-mt-1"
+          data-test="metrics-auto-refresh"
         />
         <div
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
@@ -52,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
             class="tw-text-xs tw-font-bold no-border"
-            data-test="dashboard-cancel"
+            data-test="metrics-cancel"
             padding="xs"
             color="negative"
             no-caps
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-else
             class="tw-text-xs tw-font-bold no-border"
-            data-test="dashboard-apply"
+            data-test="metrics-apply"
             padding="sm"
             color="secondary"
             no-caps
