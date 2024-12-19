@@ -330,7 +330,7 @@ pub async fn update_user(
                         )));
                     }
                 } else if self_update && user.old_password.is_none() {
-                    message = "Please provide existing password"
+                    message = "Please provide existing password";
                 } else if !self_update
                     && allow_password_update
                     && user.new_password.is_some()
@@ -344,7 +344,7 @@ pub async fn update_user(
 
                     is_updated = true;
                 } else if user.new_password.is_some() {
-                    message = "You are not authorised to change the password"
+                    message = "You are not authorised to change the password";
                 }
                 if user.first_name.is_some() && !local_user.is_external {
                     new_user.first_name = user.first_name.unwrap();
@@ -359,20 +359,23 @@ pub async fn update_user(
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
                             || local_user.role.eq(&UserRole::Root)))
-                    // if the User Role is Root, we do not change the Role
-                    // Admins Role can still be mutable.
-                    && !local_user.role.eq(&UserRole::Root)
+                // if the User Role is Root, we do not change the Role
+                // Admins Role can still be mutable.
                 {
-                    let new_org_role = UserOrgRole::from(&user.role.unwrap());
-                    old_role = Some(new_user.role);
-                    new_user.role = new_org_role.base_role;
-                    new_role = Some(new_user.role.clone());
-                    #[cfg(feature = "enterprise")]
-                    if new_org_role.custom_role.is_some() {
-                        custom_roles_need_change = true;
-                        custom_roles.extend(new_org_role.custom_role.unwrap());
+                    if local_user.role.eq(&UserRole::Root) {
+                        message = "Root user role cannot be changed";
+                    } else {
+                        let new_org_role = UserOrgRole::from(&user.role.unwrap());
+                        old_role = Some(new_user.role);
+                        new_user.role = new_org_role.base_role;
+                        new_role = Some(new_user.role.clone());
+                        #[cfg(feature = "enterprise")]
+                        if new_org_role.custom_role.is_some() {
+                            custom_roles_need_change = true;
+                            custom_roles.extend(new_org_role.custom_role.unwrap());
+                        }
+                        is_org_updated = true;
                     }
-                    is_org_updated = true;
                 }
                 if user.token.is_some() {
                     new_user.token = user.token.unwrap();
