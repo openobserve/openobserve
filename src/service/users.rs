@@ -578,6 +578,12 @@ pub async fn add_user_to_org(
     role: UserOrgRole,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
+    if !is_valid_email(email) {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Invalid email".to_string(),
+        )));
+    }
     let existing_user = db::user::get_user_record(email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
