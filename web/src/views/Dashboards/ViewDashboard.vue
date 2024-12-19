@@ -472,7 +472,6 @@ export default defineComponent({
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
-      console.log("Updating variables data", data);
       Object.assign(variablesData, data);
       const variableObj = {};
       data.values?.forEach((variable) => {
@@ -480,7 +479,6 @@ export default defineComponent({
           const filters = (variable.value || []).filter(
             (item: any) => item.name && item.operator && item.value,
           );
-          console.log("Filtered dynamic filters", filters);
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
             operator: item.operator,
@@ -493,7 +491,6 @@ export default defineComponent({
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });
-      console.log("Constructed variableObj", variableObj);
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -507,7 +504,6 @@ export default defineComponent({
           searchtype: route.query.searchtype,
         },
       });
-      console.log("Updated route query parameters");
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
@@ -639,7 +635,6 @@ export default defineComponent({
       const panelData = getPanelFromTab(selectedTabId.value, id);
 
       if (!panelData) {
-        console.log("Panel not found");
         return;
       }
 

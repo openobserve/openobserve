@@ -99,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ noData }}
       </div>
-      {{ errorDetail }}
       <div
         v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
         class="errorMessage"
@@ -561,9 +560,7 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {
-      console.log("errorDetail", errorDetail.value);
-      
+    watch(errorDetail, () => {      
       //check if there is an error message or not
       if (!errorDetail.value) return;
       emit("error", errorDetail);

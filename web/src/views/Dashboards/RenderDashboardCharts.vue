@@ -397,27 +397,14 @@ export default defineComponent({
 
     const variablesDataUpdated = (data: any) => {
       try {
-        console.log("variablesDataUpdated called with", data);
         // update the variables data
         variablesData.value = data;
         if (needsVariablesAutoUpdate) {
-          console.log("Needs variables auto update is true");
           // check if the length is > 0
           if (checkIfVariablesAreLoaded(variablesData.value)) {
-            console.log(
-              "checkIfVariablesAreLoaded is true, setting needsVariablesAutoUpdate to false",
-            );
             needsVariablesAutoUpdate = false;
-          } else {
-            console.log(
-              "checkIfVariablesAreLoaded is false, not setting needsVariablesAutoUpdate to false",
-            );
           }
           currentVariablesDataRef.value = { __global: variablesData.value };
-        } else {
-          console.log(
-            "Needs variables auto update is false, not updating currentVariablesDataRef",
-          );
         }
         return;
       } catch (error) {

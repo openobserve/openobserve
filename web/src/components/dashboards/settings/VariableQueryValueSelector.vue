@@ -98,7 +98,6 @@ export default defineComponent({
 
     const variableName = props.variableItem?.label || props.variableItem?.name
 
-    console.log(variableName, ": rendering variable");
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -136,24 +135,19 @@ export default defineComponent({
     };
 
     const applyChanges = () => {
-      console.log(variableName, ': blur: apply changes')
       if(props.variableItem.multiSelect) {
-        console.log(variableName, ': blur: multiselect, emit selected value')
         emitSelectedValues();
       }
     }
 
     // update selected value
     watch(selectedValue, () => {
-      console.log(variableName, ": watch: selected value changed: ", selectedValue.value);
       if(!props.variableItem.multiSelect) {
-        console.log(variableName, ": not multiselect, emit selected value");
         emitSelectedValues()
       }
     });
 
     const emitSelectedValues = () => {
-      console.log(variableName, ": emit selected value: ", selectedValue.value);
       emit("update:modelValue", selectedValue.value);
     }
 
