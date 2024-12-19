@@ -344,6 +344,7 @@ export default defineComponent({
           emit("variablesData", currentVariablesDataRef.value?.__global);
         }
       },
+      { deep: true },
     );
 
     watch(
@@ -351,6 +352,7 @@ export default defineComponent({
       () => {
         emit("refreshedVariablesDataUpdated", variablesData.value);
       },
+      { deep: true },
     );
 
     const currentQueryTraceIds = computed(() => {
