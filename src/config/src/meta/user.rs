@@ -45,12 +45,6 @@ pub struct UserOrg {
     pub role: UserRole,
 }
 
-impl PartialEq for UserOrg {
-    fn eq(&self, other: &Self) -> bool {
-        !self.name.eq(&other.name)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
 pub enum UserRole {
     #[serde(rename = "admin")]

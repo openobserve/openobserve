@@ -36,7 +36,7 @@ impl From<i16> for OrganizationType {
         match org {
             0 => OrganizationType::Default,
             1 => OrganizationType::Custom,
-            _ => OrganizationType::Default,
+            _ => OrganizationType::Custom,
         }
     }
 }
