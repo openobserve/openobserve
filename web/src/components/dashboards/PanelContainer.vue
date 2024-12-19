@@ -305,6 +305,7 @@ import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vu
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import { isEqual } from "lodash-es";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -559,7 +560,7 @@ export default defineComponent({
 
         // Handle both array and primitive types for value comparison
         return Array.isArray(currentValue)
-          ? JSON.stringify(currentValue) !== JSON.stringify(refreshedValue)
+          ? !isEqual(currentValue, refreshedValue)
           : currentValue !== refreshedValue;
       });
     });

@@ -189,6 +189,7 @@ import HistogramIntervalDropDown from "@/components/dashboards/addPanel/Histogra
 import { inject, provide, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
+import { isEqual } from "lodash-es";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -475,7 +476,7 @@ export default defineComponent({
             const newValue = variable.value;
             // Compare current and previous values; handle both string and array cases
             return Array.isArray(newValue)
-              ? JSON.stringify(prevValue) === JSON.stringify(newValue)
+              ? isEqual(prevValue, newValue)
               : prevValue === newValue;
           });
         // Set the `isChanged` flag if values are different
