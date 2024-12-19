@@ -21,6 +21,7 @@ test.describe("Join for logs", () => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
+        await logsPage.displayTwoStreams();
         await logsPage.selectRunQuery();
         await logsPage.signOut();
 
@@ -32,6 +33,7 @@ test.describe("Join for logs", () => {
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayTwoStreams();
         await logsPage.signOut();
 
     });
@@ -43,6 +45,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerName();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -54,6 +57,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -65,6 +69,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoinLimit();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -76,6 +81,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoinLike();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -87,6 +93,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameLeftJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -98,6 +105,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameRightJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });
@@ -109,6 +117,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameFullJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
+        await logsPage.displayCountQuery();
         await logsPage.signOut();
 
     });

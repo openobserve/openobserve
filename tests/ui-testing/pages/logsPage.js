@@ -285,10 +285,19 @@ async logsPageURLValidation() {
     await this.page.waitForTimeout(5000);
   }
 
+  async displayCountQuery() {
+    await this.page.waitForTimeout(4000);
+    await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+  }
+  
 
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
+  }
+
+  async displayTwoStreams() {
+    await expect(this.page.locator('[data-test="logs-search-index-list"]')).toContainText('default, e2e_automate');
   }
 
 }
