@@ -51,6 +51,7 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
+    _query: SearchQuery,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
