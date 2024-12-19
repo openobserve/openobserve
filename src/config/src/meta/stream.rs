@@ -579,26 +579,31 @@ impl TimeRange {
     }
 
     pub fn intersects(&self, other: &Self) -> bool {
-        if self != other {
-            self.start <= other.end && self.end >= other.start
-        } else {
-            false
-        }
+        self.start < other.end && self.end > other.start
     }
 
-    pub fn split(&self, other: &Self) -> Vec<Self> {
-        if !self.intersects(other) {
-            return vec![self.clone()];
+    /// Returns the intersection of two time ranges
+    /// If the time ranges do not intersect, returns nothing
+    /// If the time ranges intersect, returns the inverse of the intersection
+    pub fn split_by_range(&self, other: &Self) -> anyhow::Result<(Option<Self>, Option<Self>)> {
+        let mut left = None;
+        let mut right = None;
+
+        if self == other {
+            return Ok((left, right));
         }
 
-        let mut ranges = Vec::new();
+        if !self.intersects(other) {
+            return Err(anyhow::anyhow!("Time ranges do not intersect"));
+        }
+
         if self.start < other.start {
-            ranges.push(Self::new(self.start, other.start));
+            left = Some(Self::new(self.start, other.start));
         }
         if self.end > other.end {
-            ranges.push(Self::new(other.end, self.end));
+            right = Some(Self::new(other.end, self.end));
         }
-        ranges
+        Ok((left, right))
     }
 
     pub fn flatten_overlapping_ranges(ranges: Vec<Self>) -> Vec<Self> {
@@ -1146,12 +1151,33 @@ mod tests {
 
     #[test]
     fn test_split_ranges() {
+        // contains
         let range = TimeRange::new(0, 400);
         let other = TimeRange::new(50, 150);
-        let ranges = range.split(&other);
-        assert_eq!(ranges.len(), 2);
-        assert_eq!(ranges[0], TimeRange::new(0, 50));
-        assert_eq!(ranges[1], TimeRange::new(150, 400));
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.as_ref().and(right.as_ref()).is_some());
+        assert_eq!(left.unwrap(), TimeRange::new(0, 50));
+        assert_eq!(right.unwrap(), TimeRange::new(150, 400));
+
+        // partial overlap
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(50, 100);
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.as_ref().is_some());
+        assert!(!right.is_some());
+        assert_eq!(left.unwrap(), TimeRange::new(0, 50));
+
+        // equals
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(0, 100);
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.and(right).is_none());
+
+        // does not intersect
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(200, 300);
+        let res = range.split_by_range(&other);
+        assert!(res.is_err());
     }
 
     #[test]
@@ -1164,8 +1190,12 @@ mod tests {
 
         ranges.clear();
 
-        ranges = vec![TimeRange::new(0, 150), TimeRange::new(200, 300)];
-        let expected_res = vec![TimeRange::new(0, 150), TimeRange::new(200, 300)];
+        ranges = vec![
+            TimeRange::new(0, 150),
+            TimeRange::new(200, 300),
+            TimeRange::new(100, 199),
+        ];
+        let expected_res = vec![TimeRange::new(0, 199), TimeRange::new(200, 300)];
         assert_eq!(TimeRange::flatten_overlapping_ranges(ranges), expected_res);
     }
 }

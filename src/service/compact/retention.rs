@@ -44,65 +44,104 @@ use crate::{
 ///   - in this case the original time range will be updated to an empty range
 ///
 /// Returns the number of jobs created
-fn populate_time_ranges_for_deletion(
-    time_ranges_for_deletion: &mut Vec<TimeRange>,
-    exclude_range: &TimeRange,
-    original_time_range: &mut TimeRange,
-) -> u32 {
-    let cfg = get_config();
-    let mut extended_retention_range_start = exclude_range.start;
-    let mut extended_retention_range_end = exclude_range.end;
+fn generate_time_ranges_for_deletion(
+    extended_retention_ranges: Vec<TimeRange>,
+    original_time_range: TimeRange,
+    last_retained_time: i64,
+) -> Vec<TimeRange> {
+    // first we flatten out the overlapping red days
+    let extended_retention_ranges_iter =
+        TimeRange::flatten_overlapping_ranges(extended_retention_ranges).into_iter();
 
-    // In case if a red day is older than the red days retention period and the normal data
-    // retention period then skip the day, which will delete the data
-    let allowed_extended_retention_retention_end = config::utils::time::now()
-        - Duration::try_days(cfg.compact.extended_data_retention_days).unwrap()
-        - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-    let allowed_extended_retention_retention_end =
-        allowed_extended_retention_retention_end.timestamp_micros();
+    log::debug!(
+        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
+        extended_retention_ranges_iter.clone().join(", "),
+        original_time_range.clone()
+    );
 
-    if extended_retention_range_end < allowed_extended_retention_retention_end {
-        time_ranges_for_deletion.push(original_time_range.clone());
-        *original_time_range = TimeRange::new(0, 0);
-        return 1;
-    } else if extended_retention_range_start < allowed_extended_retention_retention_end {
-        extended_retention_range_start = allowed_extended_retention_retention_end;
+    let filtered_extended_ranges = extended_retention_ranges_iter
+        // filter out the ranges which are out of scope and mutate the ranges which are partially
+        // inside the original time range
+        .filter_map(|range| {
+            if range.start > original_time_range.end {
+                None
+            } else {
+                if range.end > original_time_range.end {
+                    Some(TimeRange::new(
+                        range.start,
+                        original_time_range.end,
+                    ))
+                } else {
+                    Some(range)
+                }
+            }
+        })
+        // filter out the ranges which are older than the last retained time
+        .filter_map(|range| {
+            if range.end < last_retained_time {
+                None
+            } else {
+                if range.start < last_retained_time {
+                    Some(TimeRange::new(
+                        last_retained_time,
+                        range.end,
+                    ))
+                } else {
+                    Some(range)
+                }
+            }
+        })
+        // sort the ranges by start time
+        .sorted_by(|x, x1| x.start.cmp(&x1.start))
+        .collect::<Vec<TimeRange>>();
+
+    let mut time_ranges_for_deletion = vec![];
+    let mut last_split_range_opt = Some(original_time_range);
+
+    for mut extended_range in filtered_extended_ranges {
+        if let Some(ref last_split_range) = last_split_range_opt {
+            if extended_range.end + hour_micros(24) != last_split_range.end {
+                extended_range.end += hour_micros(24); // add one day to make it exclusive
+            }
+            match last_split_range.split_by_range(&extended_range) {
+                Ok((Some(left), Some(right))) => {
+                    time_ranges_for_deletion.push(left);
+                    last_split_range_opt = Some(right);
+                }
+                Ok((None, Some(right))) => {
+                    last_split_range_opt = Some(right);
+                }
+                Ok((Some(left), None)) => {
+                    time_ranges_for_deletion.push(left);
+                    last_split_range_opt = None;
+                    break;
+                }
+                Ok((None, None)) => {
+                    last_split_range_opt = None;
+                    break;
+                }
+                Err(_) => {
+                    // if the split fails then we can skip the range
+                    continue;
+                }
+            }
+        } else {
+            break;
+        }
     }
 
-    // Improve this logic. Since the compactor works on days granularity, we can safely add
-    // day but this should be changed when the granularity is changed
-    extended_retention_range_end += hour_micros(24); // add one day to make it exclusive
-
-    let time_range = TimeRange::new(extended_retention_range_start, extended_retention_range_end);
-
-    if time_range.contains(original_time_range) {
-        // skip the whole deletion as the red day consists of the whole time range
-        return 0;
-    }
-
-    let mut ranges = original_time_range.split(&time_range);
-    let job_nos = ranges.len() as u32;
-    time_ranges_for_deletion.append(&mut ranges);
-
-    // update the original time range with the last split range from previous red day
-    // we can safely do this since the red days are sorted and have no overlap
-    if job_nos > 1 {
-        // we only do this in case there is a split in the original time range
-        *original_time_range = time_ranges_for_deletion.pop().unwrap().clone();
-    } else {
-        // if the split only generate a single range then we can just update the original time range
-        // with empty range
-        *original_time_range = TimeRange::new(0, 0);
+    if let Some(range) = last_split_range_opt {
+        time_ranges_for_deletion.push(range);
     }
 
     log::debug!(
-        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}, time_ranges_for_deletion: {}",
-        exclude_range,
-        original_time_range,
+        "[COMPACT] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
         time_ranges_for_deletion.iter().join(", ")
     );
-    job_nos
+
+    time_ranges_for_deletion
 }
+
 /// Creates delete jobs for the stream based on the stream settings
 /// Returns the number of jobs created
 pub async fn delete_by_stream(
@@ -133,26 +172,21 @@ pub async fn delete_by_stream(
         return Ok(0); // created_at is after lifecycle end, just skip
     }
 
-    let mut original_deletion_time_range = TimeRange::new(
+    // last extended retention time
+    let last_retained_time = (*lifecycle_end
+        - Duration::try_days(get_config().compact.extended_data_retention_days).unwrap())
+    .timestamp_micros();
+    // time range of deletion
+    let original_deletion_time_range = TimeRange::new(
         created_at.timestamp_micros(),
         lifecycle_end.timestamp_micros(),
     );
 
-    // flatten out the overlapping red days before we create deletion ranges
-    let extended_retentions = TimeRange::flatten_overlapping_ranges(extended_retentions.to_vec());
-    // create deletion ranges from red days
-    let mut final_deletion_time_ranges = vec![];
-    extended_retentions.iter().for_each(|extended_retention| {
-        let _ranges_added = populate_time_ranges_for_deletion(
-            &mut final_deletion_time_ranges,
-            extended_retention,
-            &mut original_deletion_time_range,
-        );
-    });
-
-    if !original_deletion_time_range.is_empty() {
-        final_deletion_time_ranges.push(original_deletion_time_range);
-    }
+    let final_deletion_time_ranges = generate_time_ranges_for_deletion(
+        extended_retentions.to_vec(),
+        original_deletion_time_range,
+        last_retained_time,
+    );
 
     log::debug!(
         "[COMPACT] extended_retentions: {}, final_deletion_time_ranges: {}",
@@ -621,33 +655,32 @@ mod tests {
     async fn test_populate_time_ranges() {
         let now = Utc::now();
         let exclude_range = TimeRange::new(
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
             (now - Duration::try_days(1).unwrap()).timestamp_micros(),
-            now.timestamp_micros(),
         );
         let original_time_range = TimeRange::new(
-            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
             now.timestamp_micros(),
         );
-        let mut res_time_ranges = vec![];
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
         println!("original time range : {}", original_time_range);
         println!("red day time range : {}", exclude_range);
-        assert_eq!(
-            populate_time_ranges_for_deletion(
-                &mut res_time_ranges,
-                &exclude_range,
-                &mut original_time_range.clone()
-            ),
-            1
+        let time_ranges_to_delete = generate_time_ranges_for_deletion(
+            vec![exclude_range],
+            original_time_range.clone(),
+            last_retained_time,
         );
-        println!("original time range : {}", original_time_range);
-        println!("res time ranges : {}", res_time_ranges.first().unwrap());
+        assert_eq!(time_ranges_to_delete.len(), 1);
+        println!(
+            "res time ranges : {}",
+            time_ranges_to_delete.iter().join(", ")
+        );
     }
 
     #[tokio::test]
     async fn test_populate_time_ranges_contains() {
         let now = Utc::now();
-        let mut res_time_ranges = vec![];
-        let mut original_time_range = TimeRange::new(
+        let original_time_range = TimeRange::new(
             (now - Duration::try_days(15).unwrap()).timestamp_micros(),
             now.timestamp_micros(),
         );
@@ -655,19 +688,17 @@ mod tests {
             (now - Duration::try_days(3).unwrap()).timestamp_micros(),
             (now - Duration::try_days(2).unwrap()).timestamp_micros(),
         );
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
         println!("original time range : {}", original_time_range);
         println!("red day time range : {}", exclude_range);
-        assert_eq!(
-            populate_time_ranges_for_deletion(
-                &mut res_time_ranges,
-                &exclude_range,
-                &mut original_time_range
-            ),
-            2
+        let res_time_ranges = generate_time_ranges_for_deletion(
+            vec![exclude_range],
+            original_time_range.clone(),
+            last_retained_time,
         );
+        assert_eq!(res_time_ranges.len(), 2);
         println!("res time ranges : {}", res_time_ranges.iter().join(", "));
-        assert_eq!(res_time_ranges.len(), 1);
-        assert!(!res_time_ranges[0].intersects(&original_time_range));
+        assert!(res_time_ranges[0].intersects(&original_time_range));
     }
 
     #[tokio::test]
@@ -689,64 +720,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_populate_time_ranges_non_intersecting_ext_ret_days() {
+    async fn test_populate_time_ranges_out_of_last_retained_period() {
         let now = Utc::now();
-        let mut res_time_ranges = vec![];
-        let exclude_range_1 = TimeRange::new(
-            (now - Duration::try_days(20).unwrap()).timestamp_micros(),
-            (now - Duration::try_days(10).unwrap()).timestamp_micros(),
-        );
-        let exclude_range_2 = TimeRange::new(
-            (now - Duration::try_days(8).unwrap()).timestamp_micros(),
-            (now - Duration::try_days(5).unwrap()).timestamp_micros(),
-        );
+        let exclude_ranges = vec![
+            TimeRange::new(
+                (now - Duration::try_days(20).unwrap()).timestamp_micros(),
+                (now - Duration::try_days(10).unwrap()).timestamp_micros(),
+            ),
+            TimeRange::new(
+                (now - Duration::try_days(8).unwrap()).timestamp_micros(),
+                (now - Duration::try_days(5).unwrap()).timestamp_micros(),
+            ),
+        ];
 
-        let time_range = TimeRange::flatten_overlapping_ranges(vec![
-            exclude_range_1.clone(),
-            exclude_range_2.clone(),
-        ]);
-
-        assert_eq!(time_range.len(), 2);
-
-        let mut original_time_range = TimeRange::new(
+        let original_time_range = TimeRange::new(
             (now - Duration::try_days(30).unwrap()).timestamp_micros(),
             now.timestamp_micros(),
         );
-
-        populate_time_ranges_for_deletion(
-            &mut res_time_ranges,
-            &exclude_range_1,
-            &mut original_time_range,
-        );
-
-        let expected_range = TimeRange::new(
-            (now - Duration::try_days(9).unwrap()).timestamp_micros(),
-            now.timestamp_micros(),
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
+        let res_time_ranges = generate_time_ranges_for_deletion(
+            exclude_ranges,
+            original_time_range.clone(),
+            last_retained_time,
         );
 
         println!("original time range : {}", original_time_range);
-        println!("expected range : {}", expected_range);
         println!("res time ranges : {}", res_time_ranges.iter().join(", "));
-
-        assert_eq!(res_time_ranges.len(), 1);
-        assert_eq!(original_time_range, expected_range);
-
-        populate_time_ranges_for_deletion(
-            &mut res_time_ranges,
-            &exclude_range_2,
-            &mut original_time_range,
-        );
-
-        assert_eq!(
-            original_time_range,
-            TimeRange::new(
-                (now - Duration::try_days(4).unwrap()).timestamp_micros(),
-                now.timestamp_micros(),
-            )
-        );
         assert_eq!(res_time_ranges.len(), 2);
-
-        res_time_ranges.push(original_time_range);
-        println!("res time ranges : {}", res_time_ranges.iter().join(", "));
     }
 }
