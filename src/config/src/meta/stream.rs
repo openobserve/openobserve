@@ -532,7 +532,7 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub approx_partition: Option<bool>,
     #[serde(default)]
-    pub red_days: UpdateSettingsWrapper<TimeRange>,
+    pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -659,7 +659,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub index_updated_at: i64,
     #[serde(default)]
-    pub red_days: Vec<TimeRange>,
+    pub extended_retention_days: Vec<TimeRange>,
 }
 
 impl Serialize for StreamSettings {
@@ -686,7 +686,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
-        state.serialize_field("red_days", &self.red_days)?;
+        state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -816,15 +816,18 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_i64())
             .unwrap_or_default();
 
-        let mut red_days = vec![];
-        if let Some(values) = settings.get("red_days").and_then(|v| v.as_array()) {
+        let mut extended_retention_days = vec![];
+        if let Some(values) = settings
+            .get("extended_retention_days")
+            .and_then(|v| v.as_array())
+        {
             for item in values {
                 let start = item
                     .get("start")
                     .and_then(|v| v.as_i64())
                     .unwrap_or_default();
                 let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
-                red_days.push(TimeRange::new(start, end));
+                extended_retention_days.push(TimeRange::new(start, end));
             }
         }
 
@@ -842,7 +845,7 @@ impl From<&str> for StreamSettings {
             approx_partition,
             distinct_value_fields,
             index_updated_at,
-            red_days,
+            extended_retention_days,
         }
     }
 }

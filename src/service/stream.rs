@@ -269,7 +269,7 @@ pub async fn save_stream_settings(
     }
     settings.partition_keys = old_partition_keys;
 
-    for range in settings.red_days.iter() {
+    for range in settings.extended_retention_days.iter() {
         if range.start > range.end {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -363,14 +363,16 @@ pub async fn update_stream_settings(
                     .retain(|field| !new_settings.index_fields.remove.contains(field));
             }
 
-            if !new_settings.red_days.add.is_empty() {
-                settings.red_days.extend(new_settings.red_days.add);
+            if !new_settings.extended_retention_days.add.is_empty() {
+                settings
+                    .extended_retention_days
+                    .extend(new_settings.extended_retention_days.add);
             }
 
-            if !new_settings.red_days.remove.is_empty() {
+            if !new_settings.extended_retention_days.remove.is_empty() {
                 settings
-                    .red_days
-                    .retain(|range| !new_settings.red_days.remove.contains(range));
+                    .extended_retention_days
+                    .retain(|range| !new_settings.extended_retention_days.remove.contains(range));
             }
 
             if !new_settings.distinct_value_fields.add.is_empty() {

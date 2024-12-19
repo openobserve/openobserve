@@ -74,14 +74,14 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                     data_lifecycle_end
                 };
 
-                let red_days = &stream_settings.red_days;
+                let extended_retention_days = &stream_settings.extended_retention_days;
                 // creates jobs to delete data
                 if let Err(e) = retention::delete_by_stream(
                     &stream_data_retention_end,
                     &org_id,
                     stream_type,
                     &stream_name,
-                    red_days,
+                    extended_retention_days,
                 )
                 .await
                 {
