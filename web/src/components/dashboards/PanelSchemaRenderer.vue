@@ -416,6 +416,8 @@ export default defineComponent({
 
             errorDetail.value = "";
           } catch (error: any) {
+            console.error("error", error);
+            
             errorDetail.value = error.message;
           }
         } else {
@@ -558,7 +560,7 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {
+    watch(errorDetail, () => {      
       //check if there is an error message or not
       if (!errorDetail.value) return;
       emit("error", errorDetail);
