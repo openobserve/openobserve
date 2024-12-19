@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    ider,
     meta::user::{DBUser, UserRole},
     utils::json,
 };
@@ -63,7 +64,7 @@ impl MigrationTrait for Migration {
                     user_type: Set(json_user.is_external as i16),
                     created_at: Set(now),
                     updated_at: Set(now),
-                    ..Default::default()
+                    id: Set(ider::uuid()),
                 });
 
                 for org_user in all_org_users {
@@ -75,7 +76,7 @@ impl MigrationTrait for Migration {
                         rum_token: Set(org_user.rum_token),
                         created_at: Set(now),
                         updated_at: Set(now),
-                        ..Default::default()
+                        id: Set(ider::uuid()),
                     });
                 }
             }
@@ -126,8 +127,8 @@ mod users {
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
     #[sea_orm(table_name = "users")]
     pub struct Model {
-        #[sea_orm(primary_key, auto_increment = true)]
-        pub id: i64,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
         #[sea_orm(column_type = "String(StringLen::N(100))")]
         pub email: String,
         #[sea_orm(column_type = "String(StringLen::N(80))")]
@@ -164,8 +165,8 @@ mod org_users {
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
     #[sea_orm(table_name = "org_users")]
     pub struct Model {
-        #[sea_orm(primary_key, auto_increment = true)]
-        pub id: i64,
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
         #[sea_orm(column_type = "String(StringLen::N(256))")]
         pub org_id: String,
         #[sea_orm(column_type = "String(StringLen::N(100))")]
