@@ -65,30 +65,26 @@ fn generate_time_ranges_for_deletion(
         .filter_map(|range| {
             if range.start > original_time_range.end {
                 None
+            } else if range.end > original_time_range.end {
+                Some(TimeRange::new(
+                    range.start,
+                    original_time_range.end,
+                ))
             } else {
-                if range.end > original_time_range.end {
-                    Some(TimeRange::new(
-                        range.start,
-                        original_time_range.end,
-                    ))
-                } else {
-                    Some(range)
-                }
+                Some(range)
             }
         })
         // filter out the ranges which are older than the last retained time
         .filter_map(|range| {
             if range.end < last_retained_time {
                 None
+            } else if range.start < last_retained_time {
+                Some(TimeRange::new(
+                    last_retained_time,
+                    range.end,
+                ))
             } else {
-                if range.start < last_retained_time {
-                    Some(TimeRange::new(
-                        last_retained_time,
-                        range.end,
-                    ))
-                } else {
-                    Some(range)
-                }
+                Some(range)
             }
         })
         // sort the ranges by start time
