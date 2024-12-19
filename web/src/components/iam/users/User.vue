@@ -728,10 +728,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          $q.notify({
-            color: "negative",
-            message: "Error while deleting user.",
-          });
+          if(err.response.status != 403){
+            $q.notify({
+              color: "negative",
+              message: "Error while deleting user.",
+            });
+          }
         });
     };
 
