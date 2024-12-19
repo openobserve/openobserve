@@ -14,11 +14,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 42px); overflow-y: auto" class="scroll">
     <div class="row" style="height: 40px; overflow-y: auto">
       <div class="flex items-center col">
+        <div
+          class="flex items-center q-table__title q-mx-md tw-font-semibold tw-text-xl"
+        >
+          <span>
+            {{ t("search.metrics") }}
+          </span>
+        </div>
         <syntax-guide-metrics class="q-mr-sm" />
       </div>
       <div class="text-right col flex justify-end">
@@ -30,24 +36,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
-          style="margin: 4px 0px"
+          class="dashboard-icons tw-mt-1"
         />
         <AutoRefreshInterval
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           v-model="refreshInterval"
           trigger
           @trigger="runQuery"
-          class="dashboard-icons hideOnPrintMode"
-          size="sm"
+          class="dashboard-icons tw-mt-1"
         />
-        <template
+        <div
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          class="dashboard-icons tw-my-1 tw-mx-2"
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="q-ml-md text-bold no-border"
+            class="tw-text-xs tw-font-bold no-border"
             data-test="dashboard-cancel"
-            padding="sm lg"
+            padding="xs"
             color="negative"
             no-caps
             :label="t('panel.cancel')"
@@ -55,15 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-else
-            class="q-ml-md text-bold no-border"
+            class="tw-text-xs tw-font-bold no-border"
             data-test="dashboard-apply"
-            padding="sm lg"
+            padding="sm"
             color="secondary"
             no-caps
             :label="t('metrics.runQuery')"
             @click="runQuery"
           />
-        </template>
+        </div>
       </div>
     </div>
     <div class="row" style="height: calc(100vh - 82px); overflow-y: auto">
@@ -121,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div
-              class="row tw-border-t-2"
+              class="row"
               style="height: calc(100vh - 82px); overflow-y: auto"
             >
               <div class="col" style="height: 100%">
@@ -977,6 +983,10 @@ export default defineComponent({
 .layout-panel-container {
   display: flex;
   flex-direction: column;
+}
+
+.dashboard-icons {
+  height: 32px;
 }
 
 .splitter {
