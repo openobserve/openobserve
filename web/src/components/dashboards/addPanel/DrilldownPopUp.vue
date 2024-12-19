@@ -601,14 +601,9 @@ export default defineComponent({
           return !isFormURLValid.value;
         }
       } else if (drilldownData.value.type == "logs") {
-        console.log("drilldownData.value.data", drilldownData.value.data);
         if (drilldownData.value.data.logsMode === "custom") {
-          console.log("drilldownData.value.data", drilldownData.value);
-
           return false;
-        } else if (drilldownData.value.data.logsMode === "auto") {
-          console.log("drilldownData.value.data", drilldownData.value);
-          
+        } else if (drilldownData.value.data.logsMode === "auto") {          
           return false;
         }
       } else {
@@ -626,14 +621,10 @@ export default defineComponent({
     const saveDrilldown = () => {
       // if editmode then made changes
       // else add new drilldown
-      if (props?.isEditMode) {
-        console.log("drilldownData.value edit", drilldownData.value);
-        
+      if (props?.isEditMode) {        
         dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
-      } else {
-        console.log("drilldownData.value", drilldownData.value);
-        
+      } else {        
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
       }
       emit("close");
