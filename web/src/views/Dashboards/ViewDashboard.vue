@@ -330,6 +330,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
+import { isEqual } from "lodash-es";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -513,9 +514,8 @@ export default defineComponent({
     };
 
     const isVariablesChanged = computed(() => {
-      return (
-        JSON.stringify(variablesData) !== JSON.stringify(refreshedVariablesData)
-      );
+          
+      return !isEqual(variablesData, refreshedVariablesData)
     });
     // ======= [START] default variable values
 
