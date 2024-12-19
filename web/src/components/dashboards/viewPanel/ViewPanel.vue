@@ -638,7 +638,7 @@ export default defineComponent({
       cancelViewPanelQuery,
       disable,
       config,
-      refreshVariableDataRef,
+      currentVariablesDataRef,
       isVariablesChanged,
       store
     };
