@@ -199,6 +199,14 @@ import { useStore } from "vuex";
 import { event, useQuasar } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
+import jstransform from "@/services/jstransform";
+
+const props = defineProps({
+  vrlFunction: {
+    type: Object,
+    required: true,
+  },
+});
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
@@ -287,6 +295,20 @@ const outputMessage = computed(() => {
 
   return "";
 });
+
+const areInputValid = () => {
+  if (activeTab.value === "stream" && !inputQuery.value) {
+    q.notify({
+      type: "negative",
+      message: "Please enter a query",
+      timeout: 3000,
+    });
+    sqlQueryErrorMsg.value = "Please enter a query";
+    return false;
+  }
+
+  return true;
+};
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -399,8 +421,20 @@ const updateActiveTab = (tab: string) => {
   }
 };
 
+const testFunction = () => {
+  const payload = {
+    function: props.vrlFunction.function,
+    events: JSON.parse(inputEvents.value),
+  };
+  jstransform
+    .test(store.state.selectedOrganization.identifier, payload)
+    .then((res: any) => {
+      outputEvents.value = JSON.stringify(res?.data || []);
+    });
+};
+
 defineExpose({
-  getResults,
+  testFunction,
 });
 </script>
 
