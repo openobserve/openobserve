@@ -81,10 +81,10 @@
           :class="drilldownData.type === 'logs' ? 'selected' : ''"
           size="sm"
           @click="changeTypeOfDrilldown('logs')"
-          data-test="dashboard-drilldown-by-url-btn"
+          data-test="dashboard-drilldown-by-logs-btn"
           ><q-icon
             class="q-mr-xs"
-            name="link"
+            name="search"
             style="cursor: pointer; height: 25px; display: flex !important"
           />Logs</q-btn
         >
@@ -602,7 +602,7 @@ export default defineComponent({
         }
       } else if (drilldownData.value.type == "logs") {
         if (drilldownData.value.data.logsMode === "custom") {
-          return false;
+          return !drilldownData.value.data.logsQuery.trim();
         } else if (drilldownData.value.data.logsMode === "auto") {          
           return false;
         }
