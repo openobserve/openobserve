@@ -27,7 +27,6 @@ export class MetricsPage {
 
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
         await this.page.getByText('default', { exact: true }).click();
-        await this.page.keyboard.press('Enter');
 
 
     }
@@ -41,7 +40,6 @@ export class MetricsPage {
         // await this.page.waitForTimeout(5000);
 
         await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-        await this.page.keyboard.press('Enter');
 
 
         // await validateUrlContains(this.page, 'path');

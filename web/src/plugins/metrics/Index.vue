@@ -337,7 +337,6 @@ import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue"
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { useI18n } from "vue-i18n";
-import { onBeforeRouteLeave } from "vue-router";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import useDashboardPanelData from "../../composables/useDashboardPanel";
@@ -456,9 +455,6 @@ export default defineComponent({
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
-
-      // remove beforeUnloadHandler event listener
-      window.removeEventListener("beforeunload", beforeUnloadHandler);
     });
 
     onMounted(async () => {
@@ -486,9 +482,6 @@ export default defineComponent({
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
-
-      //event listener before unload and data is updated
-      window.addEventListener("beforeunload", beforeUnloadHandler);
     });
 
     const isInitialDashboardPanelData = () => {
@@ -597,33 +590,6 @@ export default defineComponent({
       },
       { deep: true },
     );
-
-    const beforeUnloadHandler = (e: any) => {
-      //check is data updated or not
-      if (isPanelConfigChanged.value) {
-        // Display a confirmation message
-        const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
-        e.returnValue = confirmMessage;
-        return confirmMessage;
-      }
-      return;
-    };
-
-    onBeforeRouteLeave((to, from, next) => {
-      if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
-        const confirmMessage = t("dashboard.unsavedMessage");
-        if (window.confirm(confirmMessage)) {
-          // User confirmed, allow navigation
-          next();
-        } else {
-          // User canceled, prevent navigation
-          next(false);
-        }
-      } else {
-        // No unsaved changes or not leaving the edit route, allow navigation
-        next();
-      }
-    });
 
     //validate the data
     const isValid = (onlyChart = false) => {
