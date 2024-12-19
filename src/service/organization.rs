@@ -28,12 +28,9 @@ use config::{
 #[cfg(feature = "enterprise")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::org_invites;
+use o2_enterprise::enterprise::common::{infra::config::get_config as get_o2_config, org_invites};
 
-use super::{
-    db::org_users,
-    users::{add_admin_to_org, get_user},
-};
+use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "enterprise")]
 use crate::common::meta::organization::OrganizationInvites;
 use crate::{
@@ -206,6 +203,19 @@ pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    let is_allowed = false;
+    #[cfg(feature = "enterprise")]
+    let is_allowed = if get_o2_config().openfga.enabled {
+        // In this case, openfga takes care of permission checks
+        // If the request reaches here, it means the user is allowed
+        true
+    } else {
+        false
+    };
+    if !is_allowed && !is_root_user(user_email) {
+        return Err(anyhow::anyhow!("Only root user can create organization"));
+    }
     org.name = org.name.trim().to_owned();
     org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::generate());
     match db::organization::save_org(org).await {
@@ -281,15 +291,18 @@ pub async fn rename_org(
     name: &str,
     user_email: &str,
 ) -> Result<Organization, anyhow::Error> {
-    if !is_root_user(user_email) {
-        match get_user(Some(org_id), user_email).await {
-            Some(user) => {
-                if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
-                    return Err(anyhow::anyhow!("Unauthorized access"));
-                }
-            }
-            None => return Err(anyhow::anyhow!("Unauthorized access")),
-        }
+    #[cfg(not(feature = "enterprise"))]
+    let is_allowed = false;
+    #[cfg(feature = "enterprise")]
+    let is_allowed = if get_o2_config().openfga.enabled {
+        // In this case, openfga takes care of permission checks
+        // If the request reaches here, it means the user is allowed
+        true
+    } else {
+        false
+    };
+    if !is_allowed && !is_root_user(user_email) {
+        return Err(anyhow::anyhow!("Not allowed to rename org"));
     }
 
     if get_org(org_id).await.is_none() {
@@ -331,6 +344,8 @@ pub async fn generate_invitation(
     use o2_enterprise::enterprise::common::org_invites::{
         get_invite_email_body, get_invite_email_subject,
     };
+
+    use super::users::get_user;
 
     let cfg = get_config();
     if !is_root_user(user_email) {
