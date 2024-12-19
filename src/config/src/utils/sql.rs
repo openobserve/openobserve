@@ -57,9 +57,9 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
             if is_aggregate_in_select(query)
-                || !has_join(query)
-                || !has_subquery(statement)
-                || !has_union(query)
+                && !has_join(query)
+                && !has_subquery(statement)
+                && !has_union(query)
             {
                 return Ok(true);
             }

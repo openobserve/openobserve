@@ -583,8 +583,11 @@ pub async fn search_partition(
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
     // if need streaming output and is simple query, we shouldn't skip file list
-    if !skip_get_file_list && req.streaming_output && is_streaming_aggregate {
-        skip_get_file_list = true;
+    if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+        );
+        skip_get_file_list = false;
     }
 
     let mut files = Vec::new();
