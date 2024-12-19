@@ -44,6 +44,17 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
     Regex::new(&pattern).unwrap()
 });
 
+pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+    )
+    .unwrap()
+});
+
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
+
 pub fn into_ofga_supported_format(name: &str) -> String {
     // remove spaces around special characters
     let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {

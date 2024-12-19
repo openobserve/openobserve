@@ -28,7 +28,6 @@ use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
     openfga::authorizer::authz::delete_service_account_from_org,
 };
-use regex::Regex;
 
 use super::db::org_users::get_cached_user_org;
 #[cfg(feature = "enterprise")]
@@ -43,18 +42,10 @@ use crate::{
                 get_default_user_org, UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse,
             },
         },
-        utils::auth::{get_hash, get_role, is_root_user},
+        utils::auth::{get_hash, get_role, is_root_user, is_valid_email},
     },
     service::{db, organization},
 };
-
-fn is_valid_email(email: &str) -> bool {
-    let email_regex = Regex::new(
-        r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
-    )
-    .expect("Email regex is valid");
-    email_regex.is_match(email)
-}
 
 pub async fn post_user(
     org_id: &str,
