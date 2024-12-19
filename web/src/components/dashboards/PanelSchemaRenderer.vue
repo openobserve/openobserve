@@ -720,7 +720,6 @@ export default defineComponent({
         const drilldownData = panelSchema.value.config.drilldown[index];
 
         const navigateToLogs = async () => {
-
           const queryDetails = panelSchema.value;
           if (!queryDetails) {
             console.error("navigateToLogs: Panel schema is undefined.");
@@ -803,12 +802,21 @@ export default defineComponent({
               ? `SELECT * FROM "${streamName}" ${finalWhereClause}`
               : drilldownData.data.logsQuery;
 
-
           // Encode the modified query
           const encodedQuery = b64EncodeUnicode(modifiedQuery);
 
+          const pos = window.location.pathname.indexOf("/web/");
+          // if there is /web/ in path
+          // url will be: origin from window.location.origin + pathname up to /web/ + /web/
+          let currentUrl: any =
+            pos > -1
+              ? window.location.origin +
+                window.location.pathname.slice(0, pos) +
+                "/web"
+              : window.location.origin;
+
           // Navigate to logs
-          const logsUrl: any = new URL(window.location.origin + "/logs");
+          const logsUrl: any = new URL(currentUrl + "/logs");
           logsUrl.searchParams.set(
             "stream_type",
             queryDetails.queries[0]?.fields?.stream_type,
@@ -940,7 +948,6 @@ export default defineComponent({
             );
           } catch (error) {}
         } else if (drilldownData.type == "logs") {
-
           try {
             navigateToLogs();
           } catch (error) {
@@ -982,7 +989,7 @@ export default defineComponent({
 
           if (!dashboardData) {
             console.error(
-              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`,
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
             );
             return;
           }
