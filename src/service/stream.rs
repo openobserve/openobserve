@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, http::StatusCode, HttpResponse};
+use arrow_schema::DataType;
 use config::{
     is_local_disk_storage,
     meta::stream::{
@@ -25,6 +26,7 @@ use config::{
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
+use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
@@ -241,11 +243,42 @@ pub async fn save_stream_settings(
         }
     }
 
+    // get schema
+    let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    format!("error in getting schema : {e}"),
+                )),
+            );
+        }
+    };
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|f| (f.name(), f))
+        .collect::<HashMap<_, _>>();
+
+    // check the full text search keys must be text field
+    for key in settings.full_text_search_keys.iter() {
+        let Some(field) = schema_fields.get(key) else {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("field [{}] not found in schema", key),
+            )));
+        };
+        if field.data_type() != &DataType::Utf8 {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("full text search field [{}] must be text field", key),
+            )));
+        }
+    }
+
     // we need to keep the old partition information, because the hash bucket num can't be changed
     // get old settings and then update partition_keys
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
     let mut old_partition_keys = unwrap_stream_settings(&schema)
         .unwrap_or_default()
         .partition_keys;
@@ -468,7 +501,6 @@ pub async fn update_stream_settings(
                     .retain(|field| !update_settings.partition_keys.remove.contains(field));
             }
 
-            // TODO: What to do if partition time level is intentionally None?
             if let Some(partition_time_level) = update_settings.partition_time_level {
                 settings.partition_time_level = Some(partition_time_level);
             }
