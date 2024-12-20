@@ -52,13 +52,16 @@ pub struct TestVRLResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct VRLResult {
-    pub success: bool,
-    pub message: json::Value,
+    pub message: String,
+    pub event: json::Value,
 }
 
 impl VRLResult {
-    pub fn new(success: bool, message: json::Value) -> Self {
-        Self { success, message }
+    pub fn new(message: &str, event: json::Value) -> Self {
+        Self {
+            message: message.to_string(),
+            event,
+        }
     }
 }
 

@@ -21,12 +21,11 @@ use actix_web::{
 };
 use config::{
     meta::{
-        function::{FunctionList, TestVRLResponse, Transform, VRLResult},
+        function::{FunctionList, TestVRLResponse, Transform, VRLResult, VRLResultResolver},
         pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
     },
     utils::json,
 };
-use serde_json::json;
 
 use crate::{
     common,
@@ -34,7 +33,7 @@ use crate::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::{db, ingestion::compile_vrl_function},
+    service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -84,9 +83,19 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
 #[tracing::instrument(skip(org_id, function))]
 pub async fn test_run_function(
     org_id: &str,
-    function: String,
+    mut function: String,
     events: Vec<json::Value>,
 ) -> Result<HttpResponse, Error> {
+    // Append a dot at the end of the function if it doesn't exist
+    if !function.ends_with('.') {
+        function = format!("{} \n .", function);
+    }
+
+    let apply_over_hits = RESULT_ARRAY.is_match(&function);
+    if apply_over_hits {
+        function = RESULT_ARRAY.replace(&function, "").to_string();
+    }
+
     let runtime_config = match compile_vrl_function(&function, org_id) {
         Ok(program) => {
             let registry = program
@@ -109,30 +118,52 @@ pub async fn test_run_function(
     let program = runtime_config.program;
 
     let mut transformed_events = vec![];
-
-    events.into_iter().for_each(|event| {
-        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+    if apply_over_hits {
+        let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
             &mut runtime,
-            &config::meta::function::VRLResultResolver {
+            &VRLResultResolver {
                 program: program.clone(),
                 fields: fields.clone(),
             },
-            event,
-            org_id,
+            json::Value::Array(events),
+            &org_id,
             &[String::new()],
         );
-        if let Some(err) = err {
-            transformed_events.push(VRLResult::new(false, json!({"error": err})));
-            return;
-        }
+        ret_val
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| {
+                (!v.is_null()).then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+            })
+            .for_each(|transform| {
+                transformed_events.push(VRLResult::new("", transform));
+            });
+    } else {
+        events.into_iter().for_each(|event| {
+            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                &mut runtime,
+                &config::meta::function::VRLResultResolver {
+                    program: program.clone(),
+                    fields: fields.clone(),
+                },
+                event.clone(),
+                org_id,
+                &[String::new()],
+            );
+            if let Some(err) = err {
+                transformed_events.push(VRLResult::new(&err, event));
+                return;
+            }
 
-        let transform = if !ret_val.is_null() {
-            config::utils::flatten::flatten(ret_val).unwrap()
-        } else {
-            "".into()
-        };
-        transformed_events.push(VRLResult::new(true, transform));
-    });
+            let transform = if !ret_val.is_null() {
+                config::utils::flatten::flatten(ret_val).unwrap()
+            } else {
+                "".into()
+            };
+            transformed_events.push(VRLResult::new("", transform));
+        });
+    }
 
     let results = TestVRLResponse {
         results: transformed_events,
@@ -412,12 +443,9 @@ mod tests {
     "#
         .to_string();
 
-        let events = vec![
-            json!({
-                "original_field": "original_value"
-            }),
-            // json!({ "some": "" }), // To simulate an error scenario
-        ];
+        let events = vec![json!({
+            "original_field": "original_value"
+        })];
 
         let response = test_run_function(org_id, function, events).await.unwrap();
         assert_eq!(response.status(), http::StatusCode::OK);
@@ -427,17 +455,10 @@ mod tests {
 
         // Validate transformed events
         assert_eq!(body.results.len(), 1);
-        assert!(body.results[0].success);
-        // assert_eq!(
-        //     body.results[0].message,
-        //     r#"{"nested_key":42,"new_field":"new_value"}"#
-        // );
-
-        // // Validate errors
-        // assert!(!body.results[1].success);
-        // assert!(body.results[1]
-        //     .message
-        //     .to_string()
-        //     .contains("expected value at line 1 column 1")); // Error from invalid
+        assert_eq!(body.results[0].message, "");
+        assert_eq!(
+            body.results[0].event,
+            json! {{"nested_key":42,"new_field":"new_value"}}
+        );
     }
 }
