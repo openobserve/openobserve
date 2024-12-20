@@ -88,7 +88,6 @@ impl MigrationTrait for Migration {
                         name: Set(old_dest.name),
                         module: Set("alert".to_string()), // currently only alerts destinations
                         template_id: Set(template_id),
-                        pipeline_id: Set(None), // currently only alerts destinations
                         r#type: Set(new_type),
                     })
                 })
@@ -214,7 +213,6 @@ mod destinations {
         pub name: String,
         pub module: String,
         pub template_id: Option<String>,
-        pub pipeline_id: Option<String>,
         pub r#type: Json,
     }
 
