@@ -217,7 +217,7 @@ pub async fn create_org(
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
     org.name = org.name.trim().to_owned();
-    org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::generate());
+    org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::uuid());
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
