@@ -362,6 +362,13 @@ async fn rename_org(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org, new_name) = path.into_inner();
+    let new_name = new_name.trim();
+    if new_name.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "New name cannot be empty".to_string(),
+        )));
+    }
 
     let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
     match result {
