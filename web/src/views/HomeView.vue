@@ -22,23 +22,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
-      <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
+      <div class="my-card-wide card-container">
+        <div align="center" flat bordered class="my-card-wide q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="row justify-center" v-if="isCloud == 'false'">
-            <div class="col-5">
+            <div class="col">
               <div class="text-subtitle1">
                 {{ t("home.totalDataIngested") }}
               </div>
               <div class="text-h6">{{ summary.ingested_data }}</div>
             </div>
             <q-separator vertical />
-            <div class="col-5">
+            <div class="col">
               <div class="text-subtitle1">
                 {{ t("home.totalDataCompressed") }}
               </div>
               <div class="text-h6">{{ summary.compressed_data }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.indexSizeLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.index_size }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.docsCountLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.doc_count }}</div>
             </div>
           </div>
           <div v-else>
@@ -207,6 +221,8 @@ export default defineComponent({
             query_fns: query_fns,
             rt_alerts: rt_alerts,
             scheduled_alerts: scheduled_alerts,
+            doc_count: res.data.streams.total_records,
+            index_size: formatSizeFromMB(res.data.streams.total_index_size),
           };
           no_data_ingest.value = false;
           dismiss();
@@ -267,6 +283,10 @@ export default defineComponent({
 
 .my-card {
   background-color: rgba(0, 0, 0, 0.045);
+}
+
+.my-card-wide {
+  width: 600px;
 }
 
 .card-container {
