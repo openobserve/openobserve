@@ -131,7 +131,7 @@ impl Search for Searcher {
     ) -> Result<Response<GrpcSearchResponse>, Status> {
         let req = req.into_inner();
         let request = json::from_slice::<search::Request>(&req.request)
-            .map_err(|e| Status::internal(format!("failed to parse request: {}", e.to_string())))?;
+            .map_err(|e| Status::internal(format!("failed to parse request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret = SearchService::search(
             &req.trace_id,
