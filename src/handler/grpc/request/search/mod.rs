@@ -15,13 +15,19 @@
 
 #[cfg(feature = "enterprise")]
 use config::metrics;
+use config::{
+    meta::{search, stream::StreamType},
+    utils::json,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
-    search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
-    QueryStatusResponse,
+    search_server::Search, CancelQueryRequest, CancelQueryResponse, GrpcSearchRequest,
+    GrpcSearchResponse, QueryStatusRequest, QueryStatusResponse,
 };
 use tonic::{Request, Response, Status};
+
+use crate::service::search as SearchService;
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
@@ -119,6 +125,35 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
+    async fn grpc_search(
+        &self,
+        req: Request<GrpcSearchRequest>,
+    ) -> Result<Response<GrpcSearchResponse>, Status> {
+        let req = req.into_inner();
+        let request = json::from_slice::<search::Request>(&req.request)
+            .map_err(|e| Status::internal(format!("failed to parse request: {}", e.to_string())))?;
+        let stream_type = StreamType::from(req.stream_type.as_str());
+        let ret = SearchService::search(
+            &req.trace_id,
+            &req.org_id,
+            stream_type,
+            req.user_id.clone(),
+            &request,
+        )
+        .await;
+
+        match ret {
+            Ok(ret) => {
+                let response =
+                    json::to_string(&ret).map_err(|e| Status::internal(e.to_string()))?;
+                Ok(Response::new(GrpcSearchResponse {
+                    response: response.into_bytes(),
+                }))
+            }
+            Err(e) => return Err(Status::internal(e.to_string())),
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     async fn query_status(
         &self,
