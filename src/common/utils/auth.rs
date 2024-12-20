@@ -281,6 +281,7 @@ impl FromRequest for AuthExtractor {
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
                 || path.ends_with("users/roles")
+                || path.ends_with("status_all")
             {
                 if method.eq("GET") {
                     method = "LIST".to_string();
