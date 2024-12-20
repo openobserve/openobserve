@@ -28,7 +28,7 @@ use proto::cluster_rpc::KvItem;
 
 use super::{
     empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec::StreamingAggsExec,
+    streaming_aggs_exec,
 };
 use crate::service::search::{index::IndexCondition, request::Request};
 
@@ -192,12 +192,17 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
-            let streaming_node: Arc<dyn ExecutionPlan> = Arc::new(StreamingAggsExec::new(
-                self.id.clone(),
-                self.start_time,
-                self.end_time,
-                node,
-            )) as _;
+            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
+                .get(&self.id)
+                .unwrap_or_default();
+            let streaming_node: Arc<dyn ExecutionPlan> =
+                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
+                    self.id.clone(),
+                    self.start_time,
+                    self.end_time,
+                    cached_data,
+                    node,
+                )) as _;
             return Ok(Transformed::yes(streaming_node));
         }
         Ok(Transformed::no(node))

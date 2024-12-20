@@ -758,7 +758,7 @@ pub async fn search_partition(
 
     // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {
-        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+        if field == &ts_column.unwrap_or_default() && order_by == &OrderBy::Asc {
             resp.order_by = OrderBy::Asc;
             partitions.reverse();
         }
