@@ -370,7 +370,7 @@ async fn rename_org(
         )));
     }
 
-    let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
+    let result = organization::rename_org(&org, new_name, &user_email.user_id).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
