@@ -169,11 +169,17 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
 
 pub struct StreamingAggsRewriter {
     id: String,
+    start_time: i64,
+    end_time: i64,
 }
 
 impl StreamingAggsRewriter {
-    pub fn new(id: String) -> Self {
-        Self { id }
+    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
+        Self {
+            id,
+            start_time,
+            end_time,
+        }
     }
 }
 
@@ -186,8 +192,12 @@ impl TreeNodeRewriter for StreamingAggsRewriter {
             && node.children().first().unwrap().name() == "AggregateExec"
             && config::get_config().common.feature_query_streaming_aggs
         {
-            let streaming_node: Arc<dyn ExecutionPlan> =
-                Arc::new(StreamingAggsExec::new(self.id.clone(), node)) as _;
+            let streaming_node: Arc<dyn ExecutionPlan> = Arc::new(StreamingAggsExec::new(
+                self.id.clone(),
+                self.start_time,
+                self.end_time,
+                node,
+            )) as _;
             return Ok(Transformed::yes(streaming_node));
         }
         Ok(Transformed::no(node))
