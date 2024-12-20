@@ -320,6 +320,9 @@ pub async fn rename_org(
 }
 
 pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if org_id.eq(DEFAULT_ORG) {
+        return Err(anyhow::anyhow!("Cannot delete default organization"));
+    }
     if get_org(org_id).await.is_none() {
         return Err(anyhow::anyhow!("Organization does not exist"));
     }

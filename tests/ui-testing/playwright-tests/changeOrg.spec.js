@@ -50,12 +50,12 @@ test.describe("Change Organisation", () => {
     });
 
     test("Home Page default validation", async ({ page }) => {
-
+        await page.waitForTimeout(1000);
+        await page.reload();
+        await page.waitForTimeout(5000);
         await homePage.homePageValidation();
         await homePage.gotoHomePage();
         await homePage.homePageValidation();
-
-
     });
 
     test("Home Page change organisation validation", async ({ page }) => {

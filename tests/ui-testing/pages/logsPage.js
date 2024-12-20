@@ -59,7 +59,7 @@ export class LogsPage {
     await this.page.locator(this.homeButton).hover();
     await this.logsMenuItem.click();
     await this.page.waitForTimeout(3000);
-   // await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
+    // await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
   }
 
   async validateLogsPage() {
@@ -67,20 +67,16 @@ export class LogsPage {
   }
 
   async logsPageDefaultMultiOrg() {
-
+    await this.page.waitForTimeout(2000);
+    await this.page.reload();
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-  
+  }
 
-
-}
-
-async logsPageURLValidation() {
-
+  async logsPageURLValidation() {
     await expect(this.page).toHaveURL(/defaulttestmulti/);
-
-}
+  }
 
   async selectIndexAndStream() {
     // Select index and stream
@@ -235,53 +231,53 @@ async logsPageURLValidation() {
     await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"] [data-test="log-search-subfield-list-equal-kubernetes_container_name-field-btn"]').click();
 
   }
-  
+
   async kubernetesContainerNameJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameJoinLimit() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
     await this.page.waitForTimeout(5000);
   }
 
 
   async kubernetesContainerNameJoinLike() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameLeftJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameRightJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameFullJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
