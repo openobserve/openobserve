@@ -29,14 +29,17 @@ export class CreateOrgPage {
                 const jsonData = await response.json();
                 console.log(response.status);
                 console.log(jsonData);
+                return jsonData.identifier;
                 // Process JSON data here
             } else {
                 const textData = await response.text();
                 console.log("Response is not JSON:", textData);
+                return textData;
                 // Handle the non-JSON response here
             }
         } catch (error) {
             console.error("Failed to parse JSON response:", error);
+            return "";
         }
     }
 }

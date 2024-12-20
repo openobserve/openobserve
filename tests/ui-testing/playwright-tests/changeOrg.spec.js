@@ -45,8 +45,8 @@ test.describe("Change Organisation", () => {
         // await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
-        await createOrgPage.createOrg();
-        await ingestionPage.ingestionMultiOrg();
+        let orgId = await createOrgPage.createOrg();
+        await ingestionPage.ingestionMultiOrg(orgId);
     });
 
     test("Home Page default validation", async ({ page }) => {
