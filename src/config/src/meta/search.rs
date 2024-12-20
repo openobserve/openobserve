@@ -812,7 +812,7 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
-            "background_job" => Ok(SearchEventType::BackgroundJob),
+            "background_job" | "backgroundjob" => Ok(SearchEventType::BackgroundJob),
             _ => Err(format!(
                 "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `background_job`"
             )),

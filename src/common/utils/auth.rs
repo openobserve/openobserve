@@ -286,7 +286,7 @@ impl FromRequest for AuthExtractor {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 }
-                if method.eq("PUT") || method.eq("DELETE") {
+                if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -346,7 +346,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || (method.eq("DELETE") && !path_columns[1].eq("search_jobs"))
             {
                 format!(
                     "{}:{}",

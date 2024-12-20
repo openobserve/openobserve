@@ -225,7 +225,7 @@ pub async fn get_job_result(
     }
 
     if model.error_message.is_some() {
-        Ok(HttpResponse::Ok().json(format!(
+        Ok(MetaHttpResponse::ok(format!(
             "job_id: {job_id} error: {}",
             model.error_message.unwrap()
         )))
