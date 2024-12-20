@@ -53,7 +53,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20241220_000200_create_users_table::Migration),
             Box::new(m20241220_000300_create_org_users_table::Migration),
             Box::new(m20241220_000400_populate_users_table::Migration),
-            Box::new(m20241220_000500_delete_meta_users_table::Migration),
+            // TODO: Include this in a future pr
+            // Box::new(m20241220_000500_delete_meta_users_table::Migration),
         ]
     }
 }
