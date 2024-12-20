@@ -498,7 +498,9 @@ impl std::fmt::Display for PartitionTimeLevel {
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateSettingsWrapper<D> {
+    #[serde(default)]
     pub add: Vec<D>,
+    #[serde(default)]
     pub remove: Vec<D>,
 }
 
