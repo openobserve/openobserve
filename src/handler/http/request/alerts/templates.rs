@@ -26,9 +26,13 @@ use crate::{
 impl From<TemplateError> for HttpResponse {
     fn from(value: TemplateError) -> Self {
         match value {
-            TemplateError::InfraError(e) => MetaHttpResponse::internal_error(e),
+            TemplateError::InfraError(e) => {
+                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
+            }
             TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => MetaHttpResponse::conflict(e),
+            TemplateError::DeleteWithDestination(e) => {
+                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
+            }
             other_err => MetaHttpResponse::bad_request(other_err),
         }
     }
@@ -58,7 +62,7 @@ pub async fn save_template(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner().into(&org_id);
-    match templates::save(&org_id, "", tmpl, true).await {
+    match templates::save("", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Template saved")),
         Err(e) => Ok(e.into()),
     }
@@ -89,7 +93,7 @@ pub async fn update_template(
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner().into(&org_id);
-    match templates::save(&org_id, &name, tmpl, false).await {
+    match templates::save(&name, tmpl, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Template updated")),
         Err(e) => Ok(e.into()),
     }

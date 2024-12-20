@@ -23,12 +23,7 @@ use crate::{
     service::db::{self, alerts::templates::TemplateError},
 };
 
-pub async fn save(
-    org_id: &str,
-    name: &str,
-    mut template: Template,
-    create: bool,
-) -> Result<(), TemplateError> {
+pub async fn save(name: &str, mut template: Template, create: bool) -> Result<(), TemplateError> {
     if template.body.is_empty() {
         return Err(TemplateError::EmptyBody);
     }
@@ -43,17 +38,18 @@ pub async fn save(
     if template.name.contains('/') || is_ofga_unsupported(&template.name) {
         return Err(TemplateError::InvalidName);
     }
-    template.is_default = org_id == DEFAULT_ORG;
     if let TemplateType::Email { title } = &template.template_type {
         if title.is_empty() {
             return Err(TemplateError::EmptyTitle);
         }
     }
 
-    match db::alerts::templates::get(org_id, &template.name).await {
-        Ok(_) => {
+    match db::alerts::templates::get(&template.org_id, &template.name).await {
+        Ok(existing) => {
             if create {
                 return Err(TemplateError::AlreadyExists);
+            } else {
+                template.org_id = existing.org_id; // since org can be default
             }
         }
         Err(_) => {
@@ -63,9 +59,10 @@ pub async fn save(
         }
     }
 
-    let saved = db::alerts::templates::set(org_id, template).await?;
+    template.is_default = template.org_id.eq(DEFAULT_ORG);
+    let saved = db::alerts::templates::set(template).await?;
     if name.is_empty() {
-        set_ownership(org_id, "templates", Authz::new(&saved.name)).await;
+        set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
     }
     Ok(())
 }

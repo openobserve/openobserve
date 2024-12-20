@@ -26,8 +26,10 @@ use crate::{
 impl From<DestinationError> for HttpResponse {
     fn from(value: DestinationError) -> Self {
         match value {
-            DestinationError::InUse(e) => MetaHttpResponse::conflict(e),
-            DestinationError::InfraError(e) => MetaHttpResponse::internal_error(e),
+            DestinationError::InUse(e) => MetaHttpResponse::conflict(DestinationError::InUse(e)),
+            DestinationError::InfraError(e) => {
+                MetaHttpResponse::internal_error(DestinationError::InfraError(e))
+            }
             DestinationError::NotFound => MetaHttpResponse::not_found(DestinationError::NotFound),
             other_err => MetaHttpResponse::bad_request(other_err),
         }
