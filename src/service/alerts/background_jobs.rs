@@ -157,9 +157,14 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     let req: search::Request = json::from_str(&job.payload)?;
     let partition_req = SearchPartitionRequest::from(&req);
-    let res =
-        SearchService::search_partition(&job.trace_id, &job.org_id, stream_type, &partition_req)
-            .await?;
+    let res = SearchService::search_partition(
+        &job.trace_id,
+        &job.org_id,
+        stream_type,
+        &partition_req,
+        true,
+    )
+    .await?;
 
     submit_partitions(&job.id, res.partitions.as_slice()).await?;
 
