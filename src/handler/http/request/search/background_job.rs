@@ -19,7 +19,7 @@ use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpRespo
 use config::{
     get_config,
     meta::{
-        search::{Response, SearchEventType, SubmitQueryResponse},
+        search::{Response, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -132,18 +132,10 @@ pub async fn submit_job(
     .await;
 
     match res {
-        Ok(job_id) => {
-            let ret = SubmitQueryResponse { job_id };
-            Ok(HttpResponse::Ok().json(ret))
-        }
+        Ok(job_id) => Ok(MetaHttpResponse::ok(format!("job_id: {job_id}"))),
         Err(err) => {
             log::error!("[trace_id {trace_id}] sumbit query error: {}", err);
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            )
+            Ok(MetaHttpResponse::internal_error(err.to_string()))
         }
     }
 }
@@ -234,12 +226,13 @@ pub async fn get_job_result(
 
     if model.error_message.is_some() {
         Ok(HttpResponse::Ok().json(format!(
-            "job_id: {} error: {}",
-            job_id,
+            "job_id: {job_id} error: {}",
             model.error_message.unwrap()
         )))
     } else if model.result_path.is_none() {
-        Ok(HttpResponse::NotFound().json(format!("job_id: {} don't have result", job_id)))
+        Ok(MetaHttpResponse::not_found(format!(
+            "job_id: {job_id} don't have result"
+        )))
     } else {
         let result = storage::get(&model.result_path.unwrap()).await?;
         let model = String::from_utf8(result.to_vec())
@@ -276,8 +269,12 @@ pub async fn delete_job(
 
     // 2. make the job_id in background_job table delete
     match set_job_deleted(job_id.as_str()).await {
-        Ok(true) => Ok(HttpResponse::Ok().json(format!("job_id: {} delete success", job_id))),
-        Ok(false) => Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id))),
+        Ok(true) => Ok(MetaHttpResponse::ok(format!(
+            "job_id: {job_id} delete success"
+        ))),
+        Ok(false) => Ok(MetaHttpResponse::not_found(format!(
+            "job_id: {job_id} not found"
+        ))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -311,13 +308,17 @@ pub async fn retry_job(
     }
 
     if model.status != 2 && model.status != 3 {
-        return Ok(HttpResponse::Forbidden().json("Only canceled, finished job can be retry"));
+        return Ok(MetaHttpResponse::forbidden(
+            "Only canceled, finished job can be retry",
+        ));
     }
 
     // 2. make the job_id as pending in background_job table
     let res = retry_background_job(&job_id).await;
     match res {
-        Ok(_) => Ok(HttpResponse::Ok().json(format!("job_id: {} retry success", job_id))),
+        Ok(_) => Ok(MetaHttpResponse::ok(format!(
+            "job_id: {job_id} retry success"
+        ))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -330,7 +331,9 @@ async fn cancel_job_inner(
     // 1. use job_id to query the trace_id
     let job = get(job_id, org_id).await;
     if job.is_err() {
-        return Ok(HttpResponse::NotFound().json(format!("job_id: {} not found", job_id)));
+        return Ok(MetaHttpResponse::not_found(format!(
+            "job_id: {job_id} not found"
+        )));
     }
     let job = job.unwrap();
 
