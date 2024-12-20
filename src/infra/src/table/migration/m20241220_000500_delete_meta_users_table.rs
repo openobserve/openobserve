@@ -40,51 +40,6 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // The deletion of records from the meta table is not reversable.
-        let db = manager.get_connection();
-        let txn = db.begin().await?;
-        // Migrate pages of 100 records at a time to avoid loading too many
-        // records into memory.
-        // txn.execute()
-        let mut db_users = HashMap::new();
-        let mut user_pages = users::Entity::find()
-            .order_by_asc(users::Column::Id)
-            .paginate(&txn, 100);
-
-        while let Some(users) = user_pages.fetch_and_next().await? {
-            for u in users {
-                let db_user = DBUser {
-                    email: u.email.clone(),
-                    first_name: u.first_name.clone(),
-                    last_name: u.last_name.clone(),
-                    password: u.password.clone(),
-                    salt: u.salt.clone(),
-                    password_ext: u.password_ext.clone(),
-                    is_external: u.user_type != 0,
-                    organizations: vec![],
-                };
-                db_users.insert(u.email.clone(), db_user);
-            }
-        }
-
-        let mut org_user_pages = org_users::Entity::find()
-            .order_by_asc(org_users::Column::Id)
-            .paginate(&txn, 100);
-
-        while let Some(org_users) = org_user_pages.fetch_and_next().await? {
-            for ou in org_users {
-                let db_user = db_users
-                    .get_mut(&ou.email)
-                    .ok_or_else(|| DbErr::Migration("User not found".to_string()))?;
-                db_user.organizations.push(UserOrg {
-                    name: ou.org_id.clone(),
-                    role: ou.role.into(),
-                    token: ou.token.clone(),
-                    rum_token: ou.rum_token.clone(),
-                });
-            }
-        }
-
-        txn.commit().await?;
         Ok(())
     }
 }
