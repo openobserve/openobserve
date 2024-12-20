@@ -195,7 +195,13 @@ pub async fn cancel_job(
 
     let org_id = path.0.clone();
     let job_id = path.1.clone();
-    cancel_job_inner(&org_id, &job_id, &user_id).await
+    match cancel_job_inner(&org_id, &job_id, &user_id).await {
+        Ok(res) if res.status() != StatusCode::OK => Ok(res),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => Ok(MetaHttpResponse::ok(format!(
+            "job_id: {job_id} cancel success"
+        ))),
+    }
 }
 
 // 5. get
