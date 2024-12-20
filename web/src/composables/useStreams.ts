@@ -489,7 +489,7 @@ const useStreams = () => {
       "full_text_search_keys",
       "bloom_filter_fields",
       "defined_schema_fields",
-      "red_days",
+      "extended_retention_days",
     ];
 
     let updatedSettings: any = {};
@@ -540,7 +540,7 @@ const useStreams = () => {
           // Only keep in `remove` if not in `add` and `disabled` is false
           return !isInAdd && item.disabled === false;
         });
-      } else if (attribute === "red_days") {
+      } else if (attribute === "extended_retention_days") {
         add = currentArray.filter(
           (currentItem: any) =>
             !previousArray.some(
