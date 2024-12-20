@@ -13,6 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! This module provides methods for accessing alerts in the database.
+//!
+//! By default, the methods in this module will use the new `alerts` table to
+//! access and store alerts. However if the `USE_META_ALERTS` environment
+//! variable is set to `"true"` then the old `meta` tale will be used to access
+//! and set alerts instead. This functionality is provided temporarily to allow
+//! users to revert to using the `meta` table if they encounter problems. Once
+//! it has been validated that the new `alerts` table functions correctly then
+//! alerts will be removed from the `meta` table and the ability to use the
+//! `meta` table to access and store alerts will be removed.
+
 mod new;
 mod old;
 
@@ -39,7 +50,7 @@ pub async fn set(
     create: bool,
 ) -> Result<(), anyhow::Error> {
     if should_use_meta_alerts() {
-        old::set(org_id, stream_type, stream_name, alert, create).await
+        old::set(org_id, stream_type, stream_name, &alert, create).await
     } else {
         new::set(org_id, stream_type, stream_name, alert, create).await
     }
@@ -47,7 +58,9 @@ pub async fn set(
 
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
     if should_use_meta_alerts() {
-        old::set_without_updating_trigger(org_id, alert).await
+        old::set_without_updating_trigger(&org_id, alert.stream_type, &alert.stream_name, &alert)
+            .await?;
+        Ok(())
     } else {
         new::set_without_updating_trigger(org_id, alert).await
     }
