@@ -79,17 +79,29 @@ impl MigrationTrait for Migration {
                     let new_type =
                         json::to_value(new_type).map_err(|e| DbErr::Migration(e.to_string()))?;
 
-                    let template_id = templates
-                        .get(&(meta.key1.clone(), old_dest.template))
-                        .cloned();
-                    Ok(destinations::ActiveModel {
-                        id: Set(ider::uuid()),
-                        org: Set(meta.key1),
-                        name: Set(old_dest.name),
-                        module: Set("alert".to_string()), // currently only alerts destinations
-                        template_id: Set(template_id),
-                        r#type: Set(new_type),
-                    })
+                    let key = (meta.key1.clone(), old_dest.template.clone());
+                    templates
+                        .get(&key)
+                        .or_else(|| templates.get(&("default".to_string(), old_dest.template))) // template could be default org
+                        .cloned()
+                        .map(|template_id| {
+                            Ok(Some(destinations::ActiveModel {
+                                id: Set(ider::uuid()),
+                                org: Set(meta.key1),
+                                name: Set(old_dest.name),
+                                module: Set("alert".to_string()),
+                                template_id: Set(Some(template_id)),
+                                r#type: Set(new_type),
+                            }))
+                        })
+                        .unwrap_or_else(|| Ok(None))
+                })
+                .filter_map(|result| match result {
+                    Ok(Some(value)) => Some(Ok(value)),
+                    // template not found from either default or its own org.
+                    // Wrong data. dropped
+                    Ok(None) => None,
+                    Err(err) => Some(Err(err)),
                 })
                 .collect();
             let new_temps = new_temp_results?;

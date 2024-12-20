@@ -33,6 +33,8 @@ use crate::{
     },
 };
 
+const DEFAULT_ORG: &str = "default";
+
 impl TryFrom<Model> for Template {
     type Error = TemplateError;
 
@@ -145,7 +147,7 @@ async fn get_model(
     name: &str,
 ) -> Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
-        .filter(Column::Org.eq(org_id))
+        .filter(Column::Org.eq(org_id).or(Column::Org.eq(DEFAULT_ORG)))
         .filter(Column::Name.eq(name))
         .one(db)
         .await
