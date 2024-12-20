@@ -54,7 +54,7 @@ fn create_users_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Users::Email).string_len(100).not_null())
         .col(ColumnDef::new(Users::FirstName).string_len(80).not_null())
         .col(ColumnDef::new(Users::LastName).string_len(80).not_null())
-        .col(ColumnDef::new(Users::Password).text().not_null())
+        .col(ColumnDef::new(Users::Password).string_len(256).not_null())
         .col(ColumnDef::new(Users::Salt).string_len(256).not_null())
         .col(ColumnDef::new(Users::IsRoot).boolean().not_null())
         .col(ColumnDef::new(Users::PasswordExt).string_len(256))
