@@ -135,9 +135,9 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     let partition_jobs = get_partition_jobs(&job.id).await?;
     let mut response = merge_response(partition_jobs, limit, offset).await?;
     response.set_trace_id(job.trace_id.clone());
-    let buf = bytes::Bytes::from(json::to_string(&response)?);
+    let buf = json::to_string(&response)?.into_bytes();
     let path = generate_result_path(job.created_at, &job.trace_id, None);
-    storage::put(&path, buf).await?;
+    storage::put(&path, buf.into()).await?;
 
     // 6. update `background_jobs` table
     set_job_finish(&job.id, &path).await?;
@@ -220,9 +220,9 @@ async fn run_partition_job(
 
     // 4. write the result to s3
     let hits = result.total;
-    let buf = bytes::Bytes::from(json::to_string(&result)?);
+    let buf = json::to_string(&result)?.into_bytes();
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
-    storage::put(&path, buf).await?;
+    storage::put(&path, buf.into()).await?;
 
     // 5. set the partition status to finish
     set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
@@ -356,7 +356,7 @@ async fn merge_response(
         }
         let path = job.result_path.as_ref().unwrap();
         let buf = storage::get(path).await?;
-        let res: Response = json::from_str(String::from_utf8(buf.to_vec())?.as_str())?;
+        let res: Response = json::from_slice::<Response>(&buf)?;
         response.push(res);
     }
 

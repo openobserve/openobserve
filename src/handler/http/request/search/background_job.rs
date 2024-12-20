@@ -241,9 +241,7 @@ pub async fn get_job_result(
         )))
     } else {
         let result = storage::get(&model.result_path.unwrap()).await?;
-        let model = String::from_utf8(result.to_vec())
-            .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
-        let response: Response = json::from_str(&model)?;
+        let response: Response = json::from_slice::<Response>(&result)?;
         Ok(HttpResponse::Ok().json(response))
     }
 }
