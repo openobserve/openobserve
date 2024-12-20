@@ -962,10 +962,10 @@ export default defineComponent({
             });
           });
       }
-      if (streamResponse.settings.red_days.length >= 0) {
+      if (streamResponse.settings.extended_retention_days.length >= 0) {
         redBtnRows.value = [];
-        indexData.value.red_days = streamResponse.settings.red_days;
-        streamResponse.settings.red_days.forEach((field, index) => {
+        indexData.value.extended_retention_days = streamResponse.settings.extended_retention_days;
+        streamResponse.settings.extended_retention_days.forEach((field, index) => {
           redBtnRows.value.push({
             index: index,
             original_start: field.start,
@@ -1078,7 +1078,7 @@ export default defineComponent({
         full_text_search_keys: [],
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
-        red_days: [...indexData.value.red_days],
+        extended_retention_days: [...indexData.value.extended_retention_days],
       };
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
@@ -1113,7 +1113,7 @@ export default defineComponent({
       settings.defined_schema_fields.push(...newSchemaFieldsSet);
 
       redDaysList.value.forEach((field) => {
-        settings.red_days.push({
+        settings.extended_retention_days.push({
           start: field.start,
           end: field.end,
         });
@@ -1121,7 +1121,7 @@ export default defineComponent({
       if (selectedDateFields.value.length > 0) {
         selectedDateFields.value.forEach((field) => {
           // Filter out the items that match the condition
-          settings.red_days = settings.red_days.filter((item) => {
+          settings.extended_retention_days = settings.extended_retention_days.filter((item) => {
             return item.start !== field.start && item.end !== field.end;
           });
         });
