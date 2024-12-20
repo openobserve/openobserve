@@ -378,7 +378,7 @@ const saveTemplate = () => {
         });
       })
       .catch((err) => {
-      if(err.response?.status == 403){
+        if (err.response?.status == 403) {
           return;
         }
         dismiss();
@@ -410,7 +410,7 @@ const saveTemplate = () => {
           });
         })
         .catch((err) => {
-          if(err.response?.status == 403){
+          if (err.response?.status == 403) {
             return;
           }
           dismiss();
@@ -428,7 +428,7 @@ const copyTemplateBody = (text: any) => {
       type: "positive",
       message: "Content Copied Successfully!",
       timeout: 1000,
-    })
+    }),
   );
 };
 </script>

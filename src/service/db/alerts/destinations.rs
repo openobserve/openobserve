@@ -55,7 +55,7 @@ pub enum DestinationError {
     AlreadyExists,
     #[error("Destination not found")]
     NotFound,
-    #[error("Destination is in use for alert# {0}")]
+    #[error("Destination is in use for alert {0}")]
     InUse(String),
 }
 

@@ -47,7 +47,7 @@ pub enum TemplateError {
     EmptyBody,
     #[error("Template with the same name already exists")]
     AlreadyExists,
-    #[error("Template is in use for destination# {0}")]
+    #[error("Template is in use for destination {0}")]
     DeleteWithDestination(String),
     #[error("Template not found")]
     NotFound,
@@ -71,14 +71,14 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
         .ok_or(TemplateError::NotFound)
 }
 
-pub async fn set(org_id: &str, template: Template) -> Result<Template, TemplateError> {
-    let saved = table::templates::put(org_id, template).await?;
+pub async fn set(template: Template) -> Result<Template, TemplateError> {
+    let saved = table::templates::put(template).await?;
 
     // trigger watch event by putting empty value to cluster coordinator
     let cluster_coordinator = db::get_coordinator().await;
     cluster_coordinator
         .put(
-            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", org_id, saved.name),
+            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name),
             Bytes::new(),
             db::NEED_WATCH,
             None,
@@ -91,14 +91,15 @@ pub async fn set(org_id: &str, template: Template) -> Result<Template, TemplateE
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     for dest in ALERTS_DESTINATIONS.iter() {
         let d = dest.value();
-        if dest.key().starts_with(org_id)
+        if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
             && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))
         {
             return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
         }
     }
-    if table::templates::get(org_id, name).await?.is_none() {
-        return Err(TemplateError::NotFound);
+    let key = match table::templates::get(org_id, name).await? {
+        None => return Err(TemplateError::NotFound),
+        Some(temp) => format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", temp.org_id, temp.name),
     };
 
     table::templates::delete(org_id, name).await?;
@@ -106,12 +107,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     // trigger watch event to delete from cache
     let cluster_coordinator = db::get_coordinator().await;
     cluster_coordinator
-        .delete(
-            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", org_id, name),
-            false,
-            db::NEED_WATCH,
-            None,
-        )
+        .delete(&key, false, db::NEED_WATCH, None)
         .await?;
     Ok(())
 }

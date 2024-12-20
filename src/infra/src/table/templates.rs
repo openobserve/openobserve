@@ -59,7 +59,7 @@ impl TryFrom<Model> for Template {
     }
 }
 
-pub async fn put(org_id: &str, template: Template) -> Result<Template, Error> {
+pub async fn put(template: Template) -> Result<Template, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -70,14 +70,14 @@ pub async fn put(org_id: &str, template: Template) -> Result<Template, Error> {
     };
     let mut active: ActiveModel = ActiveModel {
         id: NotSet,
-        org: Set(org_id.to_string()),
+        org: Set(template.org_id.to_string()),
         name: Set(template.name.to_string()),
         is_default: Set(template.is_default),
         r#type: Set(template.template_type.to_string()),
         body: Set(template.body),
         title: Set(title),
     };
-    let model: Model = match get_model(client, org_id, &template.name).await? {
+    let model: Model = match get_model(client, &template.org_id, &template.name).await? {
         Some(model) => {
             active.id = Set(model.id);
             active.update(client).await?.try_into_model()?
