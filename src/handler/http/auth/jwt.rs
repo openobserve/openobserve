@@ -212,7 +212,6 @@ pub async fn process_token(
                 }
                 None => {
                     // The organization is not found in source_orgs, hence removed
-                    // TODO: Check if removing org from db is the right thing to do
                     orgs_removed.push(existing_org);
                 }
             }

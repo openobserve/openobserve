@@ -353,8 +353,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::org::create_user_rumtoken)
             .service(organization::org::get_user_rumtoken)
             .service(organization::org::update_user_rumtoken)
-            .service(organization::org::generate_org_invite)
-            .service(organization::org::accept_org_invite)
             .service(organization::es::org_index)
             .service(organization::es::org_license)
             .service(organization::es::org_xpack)
