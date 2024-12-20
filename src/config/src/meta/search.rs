@@ -392,6 +392,7 @@ impl From<&Request> for SearchPartitionRequest {
             regions: req.regions.clone(),
             clusters: req.clusters.clone(),
             query_fn: req.query.query_fn.clone(),
+            streaming_output: req.query.streaming_output,
         }
     }
 }
