@@ -15,12 +15,7 @@
 
 //! Deletes user records from the meta table.
 
-use std::collections::HashMap;
-
-use config::meta::user::{DBUser, UserOrg};
-use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, TransactionTrait,
-};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -38,7 +33,7 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
         // The deletion of records from the meta table is not reversable.
         Ok(())
     }
@@ -64,57 +59,6 @@ mod meta {
         pub start_dt: i64,
         #[sea_orm(column_type = "Text")]
         pub value: String,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
-mod users {
-    use sea_orm::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "users")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: i64,
-        #[sea_orm(unique)]
-        pub email: String,
-        pub first_name: String,
-        pub last_name: String,
-        #[sea_orm(column_type = "Text")]
-        pub password: String,
-        pub salt: String,
-        pub is_root: bool,
-        pub password_ext: Option<String>,
-        pub user_type: i16,
-        pub created_at: i64,
-        pub updated_at: i64,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
-mod org_users {
-    use sea_orm::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "org_users")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: i64,
-        pub email: String,
-        pub org_id: String,
-        pub role: i16,
-        pub token: String,
-        pub rum_token: Option<String>,
-        pub created_at: i64,
-        pub updated_at: i64,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
