@@ -330,11 +330,14 @@ mod cluster {
     /// sent to cluster cache watchers. Returns the organization, stream type,
     /// stream name, and alert name from the key.
     pub fn parse_alert_key(key: &str) -> Option<(String, StreamType, String, String)> {
-        let mut parts = key.trim_start_matches("/").split('/').collect_vec();
-        let org = parts.pop()?.to_owned();
-        let stream_type: StreamType = parts.pop()?.into();
-        let stream_name = parts.pop()?.to_owned();
-        let alert_name = parts.pop()?.to_owned();
+        let parts = key.trim_start_matches("/").split('/').collect_vec();
+        if parts.len() < 5 || parts[0] != "alerts" {
+            return None;
+        }
+        let org = parts[1].to_owned();
+        let stream_type: StreamType = parts[2].into();
+        let stream_name = parts[3].to_owned();
+        let alert_name = parts[4].to_owned();
         Some((org, stream_type, stream_name, alert_name))
     }
 }
