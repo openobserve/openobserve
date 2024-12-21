@@ -58,7 +58,7 @@ pub async fn set(
 
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
     if should_use_meta_alerts() {
-        old::set_without_updating_trigger(&org_id, alert.stream_type, &alert.stream_name, &alert)
+        old::set_without_updating_trigger(org_id, alert.stream_type, &alert.stream_name, &alert)
             .await?;
         Ok(())
     } else {
