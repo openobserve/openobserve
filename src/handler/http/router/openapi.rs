@@ -186,7 +186,6 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
             crate::handler::http::models::destinations::Destination,
             crate::handler::http::models::destinations::DestinationType,
-            crate::handler::http::models::destinations::Destination,
             crate::handler::http::models::destinations::Template,
             crate::handler::http::models::folders::CreateFolderRequestBody,
             crate::handler::http::models::folders::CreateFolderResponseBody,
