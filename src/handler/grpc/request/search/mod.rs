@@ -144,14 +144,14 @@ impl Search for Searcher {
 
         match ret {
             Ok(ret) => {
-                let response =
-                    json::to_string(&ret).map_err(|e| Status::internal(e.to_string()))?;
+                let response = json::to_vec(&ret)
+                    .map_err(|e| Status::internal(format!("failed to serialize response: {e}")))?;
                 Ok(Response::new(SearchResponse {
                     trace_id: req.trace_id,
-                    response: response.into_bytes(),
+                    response,
                 }))
             }
-            Err(e) => return Err(Status::internal(e.to_string())),
+            Err(e) => Err(Status::internal(format!("search failed: {e}"))),
         }
     }
 
