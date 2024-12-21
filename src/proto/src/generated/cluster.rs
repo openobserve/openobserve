@@ -917,9 +917,10 @@ pub mod metrics_server {
         const NAME: &'static str = "cluster.Metrics";
     }
 }
+#[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GrpcSearchRequest {
+pub struct SearchRequest {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
@@ -931,9 +932,13 @@ pub struct GrpcSearchRequest {
     #[prost(bytes = "vec", tag = "5")]
     pub request: ::prost::alloc::vec::Vec<u8>,
 }
+#[derive(Eq)]
+#[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GrpcSearchResponse {
+pub struct SearchResponse {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
     #[prost(bytes = "vec", tag = "2")]
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
@@ -1210,13 +1215,10 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "ClusterCancelQuery"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn grpc_search(
+        pub async fn search(
             &mut self,
-            request: impl tonic::IntoRequest<super::GrpcSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::GrpcSearchResponse>,
-            tonic::Status,
-        > {
+            request: impl tonic::IntoRequest<super::SearchRequest>,
+        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
             self.inner
                 .ready()
                 .await
@@ -1227,11 +1229,9 @@ pub mod search_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/cluster.Search/GrpcSearch",
-            );
+            let path = http::uri::PathAndQuery::from_static("/cluster.Search/Search");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GrpcSearch"));
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -1264,13 +1264,10 @@ pub mod search_server {
             tonic::Response<super::CancelQueryResponse>,
             tonic::Status,
         >;
-        async fn grpc_search(
+        async fn search(
             &self,
-            request: tonic::Request<super::GrpcSearchRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::GrpcSearchResponse>,
-            tonic::Status,
-        >;
+            request: tonic::Request<super::SearchRequest>,
+        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct SearchServer<T: Search> {
@@ -1489,23 +1486,23 @@ pub mod search_server {
                     };
                     Box::pin(fut)
                 }
-                "/cluster.Search/GrpcSearch" => {
+                "/cluster.Search/Search" => {
                     #[allow(non_camel_case_types)]
-                    struct GrpcSearchSvc<T: Search>(pub Arc<T>);
-                    impl<T: Search> tonic::server::UnaryService<super::GrpcSearchRequest>
-                    for GrpcSearchSvc<T> {
-                        type Response = super::GrpcSearchResponse;
+                    struct SearchSvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
+                    for SearchSvc<T> {
+                        type Response = super::SearchResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::GrpcSearchRequest>,
+                            request: tonic::Request<super::SearchRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Search>::grpc_search(&inner, request).await
+                                <T as Search>::search(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -1517,7 +1514,7 @@ pub mod search_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = GrpcSearchSvc(inner);
+                        let method = SearchSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

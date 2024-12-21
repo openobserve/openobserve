@@ -12,10 +12,10 @@ service Search {
     rpc QueryStatus(QueryStatusRequest) returns (QueryStatusResponse) {}
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
-    rpc GrpcSearch(GrpcSearchRequest) returns (GrpcSearchResponse) {}
+    rpc Search(SearchRequest) returns (SearchResponse) {}
 }
 
-message GrpcSearchRequest {
+message SearchRequest {
     string             trace_id = 1;
     string               org_id = 2;
     string          stream_type = 3;
@@ -23,7 +23,8 @@ message GrpcSearchRequest {
     bytes               request = 5;
 }
 
-message GrpcSearchResponse {
+message SearchResponse {
+    string             trace_id = 1;
     bytes              response = 2;
 }
 

@@ -54,7 +54,7 @@ pub async fn grpc_search(
     let task = tokio::task::spawn(
         async move {
             let req = bytes::Bytes::from(json::to_string(&in_req)?).to_vec();
-            let mut request = tonic::Request::new(proto::cluster_rpc::GrpcSearchRequest {
+            let mut request = tonic::Request::new(proto::cluster_rpc::SearchRequest {
                 trace_id: trace_id.to_string(),
                 org_id: org_id.to_string(),
                 stream_type: stream_type.to_string(),
@@ -93,7 +93,7 @@ pub async fn grpc_search(
                 .accept_compressed(CompressionEncoding::Gzip)
                 .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                 .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-            let response = match client.grpc_search(request).await {
+            let response = match client.search(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
                     log::error!(

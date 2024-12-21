@@ -22,8 +22,8 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
-    search_server::Search, CancelQueryRequest, CancelQueryResponse, GrpcSearchRequest,
-    GrpcSearchResponse, QueryStatusRequest, QueryStatusResponse,
+    search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
+    QueryStatusResponse, SearchRequest, SearchResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -125,10 +125,10 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    async fn grpc_search(
+    async fn search(
         &self,
-        req: Request<GrpcSearchRequest>,
-    ) -> Result<Response<GrpcSearchResponse>, Status> {
+        req: Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>, Status> {
         let req = req.into_inner();
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse request: {e}")))?;
@@ -146,7 +146,8 @@ impl Search for Searcher {
             Ok(ret) => {
                 let response =
                     json::to_string(&ret).map_err(|e| Status::internal(e.to_string()))?;
-                Ok(Response::new(GrpcSearchResponse {
+                Ok(Response::new(SearchResponse {
+                    trace_id: req.trace_id,
                     response: response.into_bytes(),
                 }))
             }
