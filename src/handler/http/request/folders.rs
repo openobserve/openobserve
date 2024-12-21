@@ -72,7 +72,7 @@ impl From<FolderError> for HttpResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
     ),
 )]
-#[post("/{org_id}/folders/{folder_type}")]
+#[post("/v2/{org_id}/folders/{folder_type}")]
 pub async fn create_folder(
     path: web::Path<(String, FolderType)>,
     body: web::Json<CreateFolderRequestBody>,
@@ -114,7 +114,7 @@ pub async fn create_folder(
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
     ),
 )]
-#[put("/{org_id}/folders/{folder_type}/{folder_id}")]
+#[put("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 pub async fn update_folder(
     path: web::Path<(String, FolderType, String)>,
     body: web::Json<UpdateFolderRequestBody>,
@@ -143,7 +143,7 @@ pub async fn update_folder(
         (status = StatusCode::OK, body = ListFoldersResponseBody),
     ),
 )]
-#[get("/{org_id}/folders/{folder_type}")]
+#[get("/v2/{org_id}/folders/{folder_type}")]
 #[allow(unused_variables)]
 pub async fn list_folders(
     path: web::Path<(String, FolderType)>,
@@ -187,7 +187,7 @@ pub async fn list_folders(
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
     ),
 )]
-#[get("/{org_id}/folders/{folder_type}/{folder_id}")]
+#[get("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
     let (org_id, folder_type, folder_id) = path.into_inner();
     match folders::get_folder(&org_id, &folder_id, folder_type.into()).await {
@@ -218,7 +218,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Error", body = HttpResponse),
     ),
 )]
-#[delete("/{org_id}/folders/{folder_type}/{folder_id}")]
+#[delete("/v2/{org_id}/folders/{folder_type}/{folder_id}")]
 async fn delete_folder(path: web::Path<(String, FolderType, String)>) -> impl Responder {
     let (org_id, folder_type, folder_id) = path.into_inner();
     match folders::delete_folder(&org_id, &folder_id, folder_type.into()).await {
