@@ -42,6 +42,7 @@ export class LogsPage {
     this.streamDropdown = '[data-test="log-search-index-list-select-stream"]';
     this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
     this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
+    this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
 
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.getByText('Sign Out');
@@ -217,6 +218,13 @@ async logsPageURLValidation() {
     await expect.poll(async () => (await search).status()).toBe(200);
   }
 
+  async applyQueryButton(expectedUrl) {
+    const searchResponse = this.page.waitForResponse(expectedUrl);
+    await this.page.waitForTimeout(3000);
+    await this.page.locator(this.queryButton).click({ force: true });
+    await expect.poll(async () => (await searchResponse).status()).toBe(200);
+  }
+
   async clearAndRunQuery() {
     await this.page.locator(this.queryButton).click();
     await this.page.getByLabel("SQL Mode").locator("div").nth(2).click();
@@ -299,5 +307,16 @@ async logsPageURLValidation() {
   async displayTwoStreams() {
     await expect(this.page.locator('[data-test="logs-search-index-list"]')).toContainText('default, e2e_automate');
   }
+
+  async verifyQuickModeToggle() {
+    await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+  }
+
+  async verifyQuickModeToggle() {
+
+    await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+    
+  }
+
 
 }

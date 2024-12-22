@@ -3,6 +3,7 @@ import { LoginPage } from '../pages/loginPage';
 import { LogsPage } from '../pages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage';
 
+test.describe.configure({ mode: 'parallel' });
 
 test.describe("Join for logs", () => {
     let loginPage, logsPage, ingestionPage;
@@ -121,4 +122,18 @@ test.describe("Join for logs", () => {
         await logsPage.signOut();
 
     });
+
+    test("Display quick mode toggle button", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexAndStreamJoin();
+        await logsPage.enableSQLMode();
+        await logsPage.selectRunQuery();
+        await logsPage.verifyQuickModeToggle();
+        await logsPage.signOut();
+
+    });
+
+    
+
 });
