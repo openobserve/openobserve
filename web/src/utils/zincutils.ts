@@ -504,18 +504,6 @@ export const formatSizeFromMB = (sizeInMB: string) => {
   return `${size.toFixed(2)} ${units[index]}`;
 };
 
-export const formatDocCount = (count: number) => {
-  const docUnits = ["", "K", "M", "B", "T"]; // K = Thousand, M = Million, B = Billion, T = Trillion
-  let unitIndex = 0;
-
-  while (count >= 1000 && unitIndex < docUnits.length - 1) {
-    count /= 1000;
-    unitIndex++;
-  }
-
-  return `${count.toFixed(2)} ${docUnits[unitIndex]}`;
-};
-
 export const addCommasToNumber = (number: number) => {
   if (number === null || number === undefined) return '0';
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
