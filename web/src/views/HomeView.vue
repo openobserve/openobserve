@@ -25,9 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="my-card-wide my-card card-container">
         <div align="center" flat
 bordered class="my-card-wide my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.streams") }}: <span class="text-h7">{{ summary.streams_count }}</span></div>
+          <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <q-separator class="q-ma-md" />
           <div class="row justify-center" v-if="isCloud == 'false'">
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.streamTotal") }}
+              </div>
+              <div class="text-h6">{{ summary.streams_count }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.docsCountLbl") }} 
+              </div>
+              <div class="text-h6">{{ summary.doc_count }}</div>
+            </div>
+            <q-separator vertical />
             <div class="col">
               <div class="text-subtitle1">
                 {{ t("home.totalDataIngested") }}
@@ -47,13 +61,6 @@ bordered class="my-card-wide my-card q-py-md">
                 {{ t("home.indexSizeLbl") }}
               </div>
               <div class="text-h6">{{ summary.index_size }}</div>
-            </div>
-            <q-separator vertical />
-            <div class="col">
-              <div class="text-subtitle1">
-                {{ t("home.docsCountLbl") }}
-              </div>
-              <div class="text-h6">{{ summary.doc_count }}</div>
             </div>
           </div>
           <div v-else>
@@ -151,11 +158,16 @@ flat
         <div align="center" flat
 bordered class="my-card q-py-md">
           <div class="row justify-center" v-if="isCloud == 'false'">
-            <div class="col-4">
+            <div class="col-12">
               <div class="text-subtitle1">
                 {{ t("home.dashboardTitle") }}
               </div>
-              <div class="text-h6">{{ summary.dashboard_count }}</div>
+              <q-separator class="q-ma-md" />
+              <div class="row justify-center" v-if="isCloud == 'false'">
+                <div class="col-4">
+                  <div class="text-h4 q-pa-sm">{{ summary.dashboard_count }}</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -209,7 +221,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
-import { formatSizeFromMB } from "@/utils/zincutils";
+import { formatSizeFromMB, addCommasToNumber } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 
@@ -245,7 +257,7 @@ export default defineComponent({
             pipelines: res.data.pipelines?.num_pipelines ?? 0,
             rt_alerts: res.data.alerts?.num_realtime ?? 0,
             scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
-            doc_count: res.data.streams?.total_records ?? 0,
+            doc_count: addCommasToNumber(res.data.streams?.total_records ?? 0),
             index_size: formatSizeFromMB(
               res.data.streams?.total_index_size ?? 0,
             ),
@@ -313,7 +325,7 @@ export default defineComponent({
 }
 
 .my-card-wide {
-  width: 600px;
+  width: 90vw;
 }
 
 .card-container {

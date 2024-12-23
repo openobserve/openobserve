@@ -772,7 +772,7 @@
     "rtAlert": "Real time",
     "noData": "No Data Ingested",
     "indexSizeLbl": "Index Size",
-    "docsCountLbl": "Docs Count",
+    "docsCountLbl": "Documents",
     "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "It appears you have not ingested any data to the selected organization. There are various ways to ingest data, such as using Fluent Bit.",
     "inestedInSearch": "Try Log Search",
@@ -781,7 +781,9 @@
     "pipeline": "Pipeline",
     "functionpipelinetitle": "Pipelines & Functions",
     "alertTitle": "Alerts",
-    "dashboardTitle": "Dashboards"
+    "dashboardTitle": "Dashboards",
+    "streamTotal": "Streams",
+    "totalDashboard": "Dashboards"
   },
   "billing": {
     "header": "Usage & Billing",
