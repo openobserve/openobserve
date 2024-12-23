@@ -22,23 +22,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
-      <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.streams") }}</div>
-          <div class="text-h6">{{ summary.streams_count }}</div>
+      <div class="my-card-wide my-card card-container">
+        <div align="center" flat
+bordered class="my-card-wide my-card q-py-md">
+          <div class="text-subtitle1">{{ t("home.streams") }}: <span class="text-h7">{{ summary.streams_count }}</span></div>
+          <q-separator class="q-ma-md" />
           <div class="row justify-center" v-if="isCloud == 'false'">
-            <div class="col-5">
+            <div class="col">
               <div class="text-subtitle1">
                 {{ t("home.totalDataIngested") }}
               </div>
               <div class="text-h6">{{ summary.ingested_data }}</div>
             </div>
             <q-separator vertical />
-            <div class="col-5">
+            <div class="col">
               <div class="text-subtitle1">
                 {{ t("home.totalDataCompressed") }}
               </div>
               <div class="text-h6">{{ summary.compressed_data }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.indexSizeLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.index_size }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col">
+              <div class="text-subtitle1">
+                {{ t("home.docsCountLbl") }}
+              </div>
+              <div class="text-h6">{{ summary.doc_count }}</div>
             </div>
           </div>
           <div v-else>
@@ -50,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -62,15 +78,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div align="center" class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
-          <div class="text-h6">{{ summary.query_fns }}</div>
-          <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
-          <div class="text-h6">{{ summary.ingest_fns }}</div>
+        <div align="center" flat
+bordered class="my-card q-py-md">
+          <div class="text-subtitle1">{{ t("home.functionpipelinetitle") }}</div>
+          <q-separator class="q-ma-md" />
+          <div class="row justify-center" v-if="isCloud == 'false'">
+            <div class="col-4">
+              <div class="text-subtitle1">
+                {{ t("home.pipeline") }}
+              </div>
+              <div class="text-h6">{{ summary.pipelines }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col-4">
+              <div class="text-subtitle1">
+                {{ t("home.function") }}
+              </div>
+              <div class="text-h6">{{ summary.functions }}</div>
+            </div>
+          </div>
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -82,19 +113,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
-          <div class="text-h6">{{ summary.scheduled_alerts }}</div>
-          <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
-          <div class="text-h6">{{ summary.rt_alerts }}</div>
+        <div align="center" flat
+bordered class="my-card q-py-md">
+          <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
+          <q-separator class="q-ma-md" />
+          <div class="row justify-center" v-if="isCloud == 'false'">
+            <div class="col-4">
+              <div class="text-subtitle1">
+                {{ t("home.scheduledAlert") }}
+              </div>
+              <div class="text-h6">{{ summary.scheduled_alerts }}</div>
+            </div>
+            <q-separator vertical />
+            <div class="col-4">
+              <div class="text-subtitle1">
+                {{ t("home.rtAlert") }}
+              </div>
+              <div class="text-h6">{{ summary.rt_alerts }}</div>
+            </div>
+          </div>
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
               :to="{ name: 'alertList' }"
+              class="absolute full-width full-height"
+            ></router-link>
+          </q-btn>
+        </div>
+      </div>
+
+      <div class="my-card card-container">
+        <div align="center" flat
+bordered class="my-card q-py-md">
+          <div class="row justify-center" v-if="isCloud == 'false'">
+            <div class="col-4">
+              <div class="text-subtitle1">
+                {{ t("home.dashboardTitle") }}
+              </div>
+              <div class="text-h6">{{ summary.dashboard_count }}</div>
+            </div>
+          </div>
+        </div>
+        <q-separator />
+        <div align="center" class="q-py-sm">
+          <q-btn no-caps color="primary"
+flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'dashboards' }"
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
@@ -108,7 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
     >
       <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
+        <div align="center" flat
+bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
         </div>
@@ -138,6 +211,7 @@ import orgService from "../services/organizations";
 import config from "../aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
+import pipelines from "@/services/pipelines";
 
 export default defineComponent({
   name: "PageHome",
@@ -159,54 +233,23 @@ export default defineComponent({
       orgService
         .get_organization_summary(org_id)
         .then((res) => {
-          //setStreams("all", res.data.streams);
-
-          if (
-            res.data.streams.num_streams == 0 &&
-            res.data.functions.length == 0 &&
-            res.data.alerts.length == 0
-          ) {
-            no_data_ingest.value = true;
-            summary.value = {};
-            dismiss();
-            return;
-          }
-
-          let streamsCount = res.data.streams.num_streams;
-          let sum = res.data.streams.total_storage_size;
-          let compressedData = res.data.streams.total_compressed_size;
-
-          let ingest_fns = 0;
-          let query_fns = 0;
-          if (res.data.functions.length > 0) {
-            res.data.functions.forEach((fn: { stream_name: any }) => {
-              if (fn.stream_name && fn.stream_name != "") {
-                ingest_fns += 1;
-              } else {
-                query_fns += 1;
-              }
-            });
-          }
-
-          let rt_alerts = 0;
-          let scheduled_alerts = 0;
-          if (res.data.alerts.length > 0) {
-            res.data.alerts.forEach((alert: { is_real_time: any }) => {
-              if (alert.is_real_time) {
-                rt_alerts += 1;
-              } else {
-                scheduled_alerts += 1;
-              }
-            });
-          }
           summary.value = {
-            streams_count: streamsCount,
-            ingested_data: formatSizeFromMB(sum.toFixed(2)),
-            compressed_data: formatSizeFromMB(compressedData.toFixed(2)),
-            ingest_fns: ingest_fns,
-            query_fns: query_fns,
-            rt_alerts: rt_alerts,
-            scheduled_alerts: scheduled_alerts,
+            streams_count: res.data.streams?.num_streams ?? 0,
+            ingested_data: formatSizeFromMB(
+              res.data.streams?.total_storage_size.toFixed(2),
+            ),
+            compressed_data: formatSizeFromMB(
+              res.data.streams?.total_compressed_size.toFixed(2),
+            ),
+            functions: res.data.pipelines?.num_functions ?? 0,
+            pipelines: res.data.pipelines?.num_pipelines ?? 0,
+            rt_alerts: res.data.alerts?.num_realtime ?? 0,
+            scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
+            doc_count: res.data.streams?.total_records ?? 0,
+            index_size: formatSizeFromMB(
+              res.data.streams?.total_index_size ?? 0,
+            ),
+            dashboard_count: res.data.dashboards?.num ?? 0,
           };
           no_data_ingest.value = false;
           dismiss();
@@ -267,6 +310,10 @@ export default defineComponent({
 
 .my-card {
   background-color: rgba(0, 0, 0, 0.045);
+}
+
+.my-card-wide {
+  width: 600px;
 }
 
 .card-container {
