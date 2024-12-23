@@ -357,7 +357,7 @@ export default defineComponent({
 }
 
 .my-card-wide {
-  width: 90vw;
+  width: 88.6vw;
 }
 
 .card-container {
