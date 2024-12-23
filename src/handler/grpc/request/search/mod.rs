@@ -22,8 +22,8 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
-    search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchRequest, SearchResponse,
+    search_server::Search, CancelQueryRequest, CancelQueryResponse, GetResultRequest,
+    GetResultResponse, QueryStatusRequest, QueryStatusResponse, SearchRequest, SearchResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -153,6 +153,13 @@ impl Search for Searcher {
             }
             Err(e) => Err(Status::internal(format!("search failed: {e}"))),
         }
+    }
+
+    async fn get_result(
+        &self,
+        _req: Request<GetResultRequest>,
+    ) -> Result<Response<GetResultResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
     }
 
     #[cfg(feature = "enterprise")]

@@ -43,6 +43,7 @@ use crate::{
 
 #[allow(clippy::too_many_arguments)]
 pub async fn submit(
+    job_id: &str,
     trace_id: &str,
     org_id: &str,
     user_id: &str,
@@ -51,10 +52,11 @@ pub async fn submit(
     payload: &str,
     start_time: i64,
     end_time: i64,
+    created_at: i64,
+    update_at: i64,
 ) -> Result<String, errors::Error> {
-    let job_id = config::ider::uuid();
     let record = ActiveModel {
-        id: Set(job_id.clone()),
+        id: Set(job_id.to_string()),
         trace_id: Set(trace_id.to_string()),
         org_id: Set(org_id.to_string()),
         user_id: Set(user_id.to_string()),
@@ -63,8 +65,8 @@ pub async fn submit(
         payload: Set(payload.to_string()),
         start_time: Set(start_time),
         end_time: Set(end_time),
-        created_at: Set(chrono::Utc::now().timestamp_micros()),
-        updated_at: Set(chrono::Utc::now().timestamp_micros()),
+        created_at: Set(created_at),
+        updated_at: Set(update_at),
         status: Set(0),
         ..Default::default()
     };
@@ -78,7 +80,7 @@ pub async fn submit(
         Err(e) => return orm_err!(format!("submit background job error: {e}")),
     };
 
-    Ok(job_id)
+    Ok(job_id.to_string())
 }
 
 // get the job and update status
@@ -121,6 +123,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
                 Column::StartedAt,
                 Expr::value(chrono::Utc::now().timestamp_micros()),
             )
+            .col_expr(Column::Cluster, Expr::value(config::get_cluster_name()))
             .col_expr(Column::Node, Expr::value(&LOCAL_NODE.uuid))
             .filter(Column::Id.eq(&model.id))
             .exec(&tx)
@@ -443,6 +446,7 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
         trace_id: Set(res.trace_id.clone()),
         started_at: Set(res.started_at),
         ended_at: Set(res.ended_at),
+        cluster: Set(res.cluster.clone()),
         result_path: Set(res.result_path.clone()),
         error_message: Set(res.error_message.clone()),
     };
@@ -515,6 +519,10 @@ fn generate_reset_partition_job_query(job_id: &str) -> UpdateMany<PartitionJobEn
             SimpleExpr::Keyword(Keyword::Null),
         )
         .col_expr(PartitionJobColumn::Status, Expr::value(0))
+        .col_expr(
+            PartitionJobColumn::Cluster,
+            SimpleExpr::Keyword(Keyword::Null),
+        )
         .col_expr(
             PartitionJobColumn::ResultPath,
             SimpleExpr::Keyword(Keyword::Null),

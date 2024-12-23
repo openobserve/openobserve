@@ -77,6 +77,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(ColumnDef::new(BackgroundJobs::StartedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobs::EndedAt).big_integer())
+        .col(ColumnDef::new(BackgroundJobs::Cluster).string_len(256))
         .col(ColumnDef::new(BackgroundJobs::Node).string_len(256))
         .col(
             ColumnDef::new(BackgroundJobs::Status)
@@ -105,6 +106,7 @@ enum BackgroundJobs {
     UpdatedAt,
     StartedAt,
     EndedAt,
+    Cluster,
     Node,
     Status,
     ResultPath,

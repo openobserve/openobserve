@@ -35,6 +35,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(ColumnDef::new(BackgroundJobResults::StartedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobResults::EndedAt).big_integer())
+        .col(ColumnDef::new(BackgroundJobResults::Cluster).string_len(256))
         .col(ColumnDef::new(BackgroundJobResults::ResultPath).string_len(512))
         .col(ColumnDef::new(BackgroundJobResults::ErrorMessage).text())
         .primary_key(
@@ -53,6 +54,7 @@ enum BackgroundJobResults {
     TraceId,
     StartedAt,
     EndedAt,
+    Cluster,
     ResultPath,
     ErrorMessage,
 }

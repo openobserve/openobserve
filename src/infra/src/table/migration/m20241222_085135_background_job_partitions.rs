@@ -54,6 +54,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(ColumnDef::new(BackgroundJobPartitions::StartedAt).big_integer())
         .col(ColumnDef::new(BackgroundJobPartitions::EndedAt).big_integer())
+        .col(ColumnDef::new(BackgroundJobPartitions::Cluster).string_len(256))
         .col(
             ColumnDef::new(BackgroundJobPartitions::Status)
                 .big_integer()
@@ -80,6 +81,7 @@ enum BackgroundJobPartitions {
     CreatedAt,
     StartedAt,
     EndedAt,
+    Cluster,
     Status,
     ResultPath,
     ErrorMessage,

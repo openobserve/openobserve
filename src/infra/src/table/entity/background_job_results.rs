@@ -11,6 +11,7 @@ pub struct Model {
     pub trace_id: String,
     pub started_at: Option<i64>,
     pub ended_at: Option<i64>,
+    pub cluster: Option<String>,
     pub result_path: Option<String>,
     #[sea_orm(column_type = "Text", nullable)]
     pub error_message: Option<String>,

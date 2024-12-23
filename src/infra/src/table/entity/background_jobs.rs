@@ -21,6 +21,7 @@ pub struct Model {
     pub updated_at: i64,
     pub started_at: Option<i64>,
     pub ended_at: Option<i64>,
+    pub cluster: Option<String>,
     pub node: Option<String>,
     pub status: i64,
     pub result_path: Option<String>,

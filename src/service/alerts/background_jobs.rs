@@ -402,3 +402,8 @@ async fn merge_response(
 
     Ok(resp)
 }
+
+pub async fn get_result(job: PartitionJob, org_id: &str) -> Result<Job, anyhow::Error> {
+    let job = get(&job.job_id, org_id).await?;
+    Ok(job)
+}

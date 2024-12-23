@@ -50,7 +50,11 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
+pub async fn submit_partitions(
+    job_id: &str,
+    partitions: &[[i64; 2]],
+    created_at: i64,
+) -> Result<(), errors::Error> {
     if partitions.is_empty() {
         return orm_err!("partitions array cannot be empty");
     }
@@ -67,7 +71,7 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
             partition_id: Set(idx as i64),
             start_time: Set(partition[0]),
             end_time: Set(partition[1]),
-            created_at: Set(chrono::Utc::now().timestamp_micros()),
+            created_at: Set(created_at),
             status: Set(0),
             ..Default::default()
         });
@@ -147,6 +151,7 @@ pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<
             Column::StartedAt,
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
+        .col_expr(Column::Cluster, Expr::value(config::get_cluster_name()))
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
         .exec(client)

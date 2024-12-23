@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::ider;
 use infra::{
     errors,
     table::entity::{
@@ -32,7 +33,11 @@ pub async fn submit(
     start_time: i64,
     end_time: i64,
 ) -> Result<String, errors::Error> {
+    let job_id = ider::uuid();
+    let created_at = chrono::Utc::now().timestamp_micros();
+    let updated_at = created_at;
     infra::table::background_jobs::submit(
+        &job_id,
         trace_id,
         org_id,
         user_id,
@@ -41,6 +46,8 @@ pub async fn submit(
         payload,
         start_time,
         end_time,
+        created_at,
+        updated_at,
     )
     .await
 }
@@ -104,7 +111,8 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
-    infra::table::background_job_partitions::submit_partitions(job_id, partitions).await
+    let created_at = chrono::Utc::now().timestamp_micros();
+    infra::table::background_job_partitions::submit_partitions(job_id, partitions, created_at).await
 }
 
 pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<PartitionJob>, errors::Error> {

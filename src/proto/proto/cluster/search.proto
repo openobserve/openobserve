@@ -13,6 +13,18 @@ service Search {
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
+}
+
+message GetResultRequest {
+    string      job_id = 1;
+    string      org_id = 2;
+    string         path= 3;
+}
+
+message GetResultResponse {
+    string      job_id = 1;
+    bytes     response = 2;
 }
 
 message SearchRequest {
