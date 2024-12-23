@@ -410,6 +410,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let records = Entity::find()
         .filter(Column::Email.eq(email))
+        .order_by(Column::CreatedAt, Order::Desc)
         .inner_join(super::entity::organizations::Entity)
         .select_only()
         .column(Column::Email)

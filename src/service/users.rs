@@ -613,7 +613,7 @@ pub async fn add_user_to_org(
             if is_member {
                 return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
                     http::StatusCode::CONFLICT.into(),
-                    "User is already part of the org".to_string(),
+                    "User is already part of the organization".to_string(),
                 )));
             }
 
@@ -774,6 +774,7 @@ pub async fn list_users(
                         last_name: user.last_name.clone(),
                         is_external: user.is_external,
                         orgs: None,
+                        created_at: org_user.value().created_at,
                     });
                 }
             }
@@ -786,9 +787,12 @@ pub async fn list_users(
             if is_root_user(&user.email) {
                 continue;
             }
-            let role = match ORG_USERS.get(&format!("{org_id}/{}", user.email)) {
-                Some(org_user) => org_user.value().role.to_string(),
-                None => "".to_string(),
+            let (role, created_at) = match ORG_USERS.get(&format!("{org_id}/{}", user.email)) {
+                Some(org_user) => {
+                    let value = org_user.value();
+                    (value.role.to_string(), value.created_at)
+                }
+                None => ("".to_string(), 0),
             };
             user_list.push(UserResponse {
                 email: user.email.clone(),
@@ -797,6 +801,7 @@ pub async fn list_users(
                 last_name: user.last_name.clone(),
                 is_external: user.user_type.is_external(),
                 orgs: user_orgs.get(user.email.as_str()).cloned(),
+                created_at,
             });
         }
     }
@@ -823,10 +828,12 @@ pub async fn list_users(
                 last_name: root_user.last_name.clone(),
                 is_external: root_user.is_external,
                 orgs: None,
+                created_at: 0,
             });
         }
     }
 
+    user_list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
