@@ -19,10 +19,10 @@ use sea_orm_migration::MigratorTrait;
 
 use crate::db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE};
 
+pub mod alerts;
 pub mod background_job_partitions;
 pub mod background_job_results;
 pub mod background_jobs;
-pub mod alerts;
 pub mod dashboards;
 pub mod distinct_values;
 #[allow(unused_imports)]
