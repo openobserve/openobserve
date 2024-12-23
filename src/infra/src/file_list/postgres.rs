@@ -1147,7 +1147,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
             .inc();
         let ret = sqlx
             ::query(
-                r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = 0 GROUP BY stream, status ORDER BY status desc;"#
+                r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = $1 GROUP BY stream, status ORDER BY status desc;"#
             )
             .bind(super::FileListJobStatus::Pending)
             .fetch_all(&pool).await?;
