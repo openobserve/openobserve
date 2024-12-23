@@ -994,7 +994,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         let pool = CLIENT_RO.clone();
 
         let ret =
-            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = 0 GROUP BY stream, status ORDER BY status desc;"#)
                 .fetch_all(&pool)
                 .await?;
 
