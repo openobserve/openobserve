@@ -20,10 +20,11 @@ use config::{get_config, SMTP_CLIENT};
 use config::{
     ider,
     meta::{
+        organization::is_valid_org_name,
         stream::StreamType,
         user::{UserOrg, UserRole},
     },
-    utils::rand::generate_random_string,
+    utils::{rand::generate_random_string, schema::format_stream_name},
 };
 #[cfg(feature = "enterprise")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
@@ -223,7 +224,12 @@ pub async fn create_org(
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
     org.name = org.name.trim().to_owned();
-    org.identifier = format!("{}_{}", org.name.replace(' ', "_"), ider::uuid());
+    if !is_valid_org_name(&org.name) {
+        return Err(anyhow::anyhow!("Invalid organization name"));
+    }
+
+    org.identifier = format!("{}_{}", format_stream_name(&org.name), ider::uuid());
+    org.org_type = CUSTOM.to_owned();
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;

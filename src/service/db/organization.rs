@@ -162,7 +162,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             let item_key = ev.key.strip_prefix(key).unwrap();
             let item_value = ev.value.unwrap();
             let json_val: Organization = if config::get_config().common.meta_store_external {
-                match get_org(item_key).await {
+                match get_org_from_db(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
@@ -200,6 +200,17 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
     Ok(())
+}
+
+pub async fn get_org_from_db(org_id: &str) -> Result<Organization, anyhow::Error> {
+    let org = organizations::get(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error getting org: {}", e))?;
+    Ok(Organization {
+        identifier: org.identifier,
+        name: org.org_name,
+        org_type: org.org_type.to_string(),
+    })
 }
 
 pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {

@@ -172,6 +172,7 @@ pub struct UserResponse {
     pub is_external: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orgs: Option<Vec<OrgRoleMapping>>,
+    pub created_at: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

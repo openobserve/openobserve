@@ -57,8 +57,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     let mut orgs: Vec<OrgDetails> = vec![];
     let mut org_names = HashSet::new();
     let user_detail = OrgUser {
-        first_name: user_id.to_string(),
-        last_name: user_id.to_string(),
+        first_name: "".to_string(),
+        last_name: "".to_string(),
         email: user_id.to_string(),
     };
 
@@ -319,6 +319,7 @@ async fn create_user_rumtoken(
     security(
         ("Authorization"= [])
     ),
+    request_body(content = Organization, description = "Organization data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )

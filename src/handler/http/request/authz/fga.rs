@@ -32,7 +32,8 @@ pub async fn create_role(
     use crate::common::meta::user::is_standard_role;
 
     let org_id = org_id.into_inner();
-    let user_req = user_req.into_inner();
+    let mut user_req = user_req.into_inner();
+    user_req.role = user_req.role.trim().to_lowercase();
 
     if user_req.role.is_empty() || is_standard_role(&user_req.role) {
         return Ok(MetaHttpResponse::bad_request(

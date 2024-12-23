@@ -102,6 +102,14 @@ pub fn get_cached_user_org(org_id: &str, user_email: &str) -> Option<User> {
     }
 }
 
+pub async fn get_from_db(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow::Error> {
+    let user_email = user_email.to_lowercase();
+    let org_user = org_users::get(org_id, &user_email)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to fetch user role: {}", e))?;
+    Ok(org_user)
+}
+
 pub async fn get(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow::Error> {
     let user_email = user_email.to_lowercase();
     if let Some(org_user) = ORG_USERS.get(&format!("{}/{}", org_id, user_email)) {
@@ -206,7 +214,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if item_key.starts_with("single") {
                     let item_key = item_key.strip_prefix("single/").unwrap();
                     let (org_id, user_id) = item_key.split_once('/').unwrap();
-                    let item_value = match get(org_id, user_id).await {
+                    let item_value = match get_from_db(org_id, user_id).await {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
