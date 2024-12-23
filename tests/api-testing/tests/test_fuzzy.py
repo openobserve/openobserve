@@ -51,3 +51,4 @@ def test_e2e_fuzzy(create_session, base_url, sql_query):
     # Additional Assertions on the response data
     assert "hits" in response_data, "Response does not contain 'hits'."
     assert len(response_data["hits"]) > 0, "No logs found in the response."
+    

@@ -248,7 +248,7 @@ test.describe("Logs Queries testcases", () => {
   
     // Verify log table is visible
     const logTableColumn = page.locator('[data-test="log-table-column-0-source"]');
-    await expect(logTableColumn).toBeVisible();
+    await expect(logTableColumn).toBeVisible({ timeout: 5000 });
   });
   
 
