@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
@@ -64,7 +64,10 @@ pub async fn save_pipeline(
     pipeline.org = org_id;
     pipeline.id = ider::generate();
     match pipeline::save_pipeline(pipeline).await {
-        Ok(()) => Ok(HttpResponse::Ok().body("Pipeline created")),
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline created successfully".to_string(),
+        ))),
         Err(e) => Ok(e.into()),
     }
 }
@@ -175,7 +178,10 @@ async fn delete_pipeline(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, pipeline_id) = path.into_inner();
     match pipeline::delete_pipeline(&pipeline_id).await {
-        Ok(()) => Ok(HttpResponse::Ok().body("Pipeline deleted")),
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline deleted successfully".to_string(),
+        ))),
         Err(e) => Ok(e.into()),
     }
 }
@@ -204,7 +210,10 @@ pub async fn update_pipeline(
 ) -> Result<HttpResponse, Error> {
     let pipeline = pipeline.into_inner();
     match pipeline::update_pipeline(pipeline).await {
-        Ok(()) => Ok(HttpResponse::Ok().body("Pipeline updated")),
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline updated successfully".to_string(),
+        ))),
         Err(e) => Ok(e.into()),
     }
 }
@@ -242,7 +251,10 @@ pub async fn enable_pipeline(
     let resp_msg =
         "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
     match pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await {
-        Ok(()) => Ok(HttpResponse::Ok().body(resp_msg)),
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            resp_msg,
+        ))),
         Err(e) => Ok(e.into()),
     }
 }
