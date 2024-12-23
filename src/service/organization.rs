@@ -16,7 +16,9 @@
 use std::io::{Error, ErrorKind};
 
 use config::{
-    meta::{dashboards::ListDashboardsParams, stream::StreamType},
+    meta::{
+        dashboards::ListDashboardsParams, pipeline::components::PipelineSource, stream::StreamType,
+    },
     utils::rand::generate_random_string,
 };
 
@@ -25,8 +27,8 @@ use crate::{
         infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
-                AlertSummary, DashboardSummary, IngestionPasscode, IngestionTokensContainer,
-                OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
+                AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary,
+                Organization, PipelineSummary, RumIngestionToken, StreamSummary,
             },
             user::{UserOrg, UserRole},
         },
@@ -51,25 +53,34 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     }
 
     let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
-    let functions = db::functions::list(org_id).await.unwrap_or_default();
+    let pipeline_summary = PipelineSummary {
+        num_realtime: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Realtime(_)))
+            .count() as i64,
+        num_scheduled: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
+            .count() as i64,
+    };
+
     let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
+    let alert_summary = AlertSummary {
+        num_realtime: alerts.iter().filter(|a| a.is_real_time).count() as i64,
+        num_scheduled: alerts.iter().filter(|a| !a.is_real_time).count() as i64,
+    };
+
+    let functions = db::functions::list(org_id).await.unwrap_or_default();
     let dashboards = super::dashboards::list_dashboards(ListDashboardsParams::new(org_id))
         .await
         .unwrap_or_default();
 
     OrgSummary {
         streams: stream_summary,
-        pipelines: PipelineSummary {
-            num_pipelines: pipelines.len() as i64,
-            num_functions: functions.len() as i64,
-        },
-        alerts: AlertSummary {
-            num_realtime: alerts.iter().filter(|a| a.is_real_time).count() as i64,
-            num_scheduled: alerts.iter().filter(|a| !a.is_real_time).count() as i64,
-        },
-        dashboards: DashboardSummary {
-            num: dashboards.len() as i64,
-        },
+        pipelines: pipeline_summary,
+        alerts: alert_summary,
+        total_functions: functions.len() as i64,
+        total_dashboards: dashboards.len() as i64,
     }
 }
 

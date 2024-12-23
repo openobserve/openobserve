@@ -57,7 +57,8 @@ pub struct OrgSummary {
     pub streams: StreamSummary,
     pub pipelines: PipelineSummary,
     pub alerts: AlertSummary,
-    pub dashboards: DashboardSummary,
+    pub total_functions: i64,
+    pub total_dashboards: i64,
 }
 
 #[derive(Default, Serialize, Deserialize, ToSchema)]
@@ -71,19 +72,14 @@ pub struct StreamSummary {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct PipelineSummary {
-    pub num_pipelines: i64,
-    pub num_functions: i64,
+    pub num_realtime: i64,
+    pub num_scheduled: i64,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct AlertSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct DashboardSummary {
-    pub num: i64,
 }
 
 /// A container for passcodes and rumtokens
