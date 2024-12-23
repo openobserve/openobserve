@@ -1,6 +1,6 @@
 use config::{
     get_config,
-    meta::{cluster::get_internal_grpc_token, search, stream::StreamType},
+    meta::{cluster::NodeInfo, search, stream::StreamType},
     utils::json,
 };
 use infra::errors::{Error, ErrorCodes};
@@ -70,7 +70,8 @@ pub async fn grpc_search(
                 )
             });
 
-            let token: MetadataValue<_> = get_internal_grpc_token()
+            let token: MetadataValue<_> = node
+                .get_auth_token()
                 .parse()
                 .map_err(|_| Error::Message("invalid token".to_string()))?;
             let channel = get_cached_channel(&node_addr).await.map_err(|err| {

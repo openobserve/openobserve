@@ -17,14 +17,11 @@ service Search {
 }
 
 message GetResultRequest {
-    string      job_id = 1;
-    string      org_id = 2;
-    string         path= 3;
+    string         path= 1;
 }
 
 message GetResultResponse {
-    string      job_id = 1;
-    bytes     response = 2;
+    bytes     response = 1;
 }
 
 message SearchRequest {

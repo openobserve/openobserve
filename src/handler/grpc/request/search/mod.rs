@@ -155,6 +155,21 @@ impl Search for Searcher {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    async fn get_result(
+        &self,
+        req: Request<GetResultRequest>,
+    ) -> Result<Response<GetResultResponse>, Status> {
+        let path = req.into_inner().path;
+        let res = storage::get(&path)
+            .await
+            .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
+        Ok(Response::new(GetResultResponse {
+            response: res.to_vec(),
+        }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
     async fn get_result(
         &self,
         _req: Request<GetResultRequest>,

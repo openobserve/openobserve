@@ -921,18 +921,12 @@ pub mod metrics_server {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetResultRequest {
     #[prost(string, tag = "1")]
-    pub job_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
     pub path: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetResultResponse {
-    #[prost(string, tag = "1")]
-    pub job_id: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", tag = "2")]
+    #[prost(bytes = "vec", tag = "1")]
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Eq)]

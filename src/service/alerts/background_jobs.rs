@@ -22,14 +22,26 @@ use config::{
     utils::json,
 };
 use infra::{
+    errors::{Error, ErrorCodes},
     storage,
     table::entity::{
         background_job_partitions::Model as PartitionJob, background_jobs::Model as Job,
     },
 };
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    super_cluster::search::get_cluster_node_by_name,
+};
+use proto::cluster_rpc;
 use tokio::sync::mpsc;
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{db::background_job::*, search as SearchService};
+use crate::service::{
+    db::background_job::*,
+    grpc::get_cached_channel,
+    search::{self as SearchService, server_internal_error, MetadataMap},
+};
 
 // 1. get the oldest job from `background_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
@@ -107,7 +119,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         for partition_job in partition_jobs.iter() {
             // check if the job is still running
             check_status(id, &job.id, &job.org_id).await?;
-            let res = run_partition_job(id, &job, partition_job, req.clone()).await;
+            let res = run_partition_job(id, &job, partition_job, req.clone(), need).await;
             let total = match res {
                 Ok(total) => total,
                 Err(e) => {
@@ -183,6 +195,7 @@ async fn run_partition_job(
     job: &Job,
     partition_job: &PartitionJob,
     req: search::Request,
+    need: i64,
 ) -> Result<i64, anyhow::Error> {
     log::info!(
         "[BACKGROUND JOB {id}] running job_id: {}, partition id: {}",
@@ -195,6 +208,8 @@ async fn run_partition_job(
     let mut req = req;
     req.query.start_time = partition_job.start_time;
     req.query.end_time = partition_job.end_time;
+    req.query.from = 0;
+    req.query.size = need;
     let partition_id = partition_job.partition_id;
 
     // 2. set the partition status to running
@@ -351,18 +366,28 @@ async fn merge_response(
 ) -> Result<Response, anyhow::Error> {
     let mut response = Vec::new();
     for job in jobs.iter() {
-        if job.result_path.is_none() {
+        if job.result_path.is_none() || job.cluster.is_none() {
             continue;
         }
+        let cluster = job.cluster.as_ref().unwrap();
         let path = job.result_path.as_ref().unwrap();
-        let buf = storage::get(path).await?;
-        let res: Response = json::from_slice::<Response>(&buf)?;
+        let res = get_result(path, cluster).await?;
         response.push(res);
     }
 
     // if only one partition job, return directly
     if response.len() == 1 {
-        return Ok(response.remove(0));
+        let mut resp = response.remove(0);
+        resp.from = offset;
+        resp.size = limit;
+        resp.hits = resp
+            .hits
+            .into_iter()
+            .skip(offset as usize)
+            .take(limit as usize)
+            .collect();
+        resp.total = resp.hits.len();
+        return Ok(resp);
     }
 
     // merge all response
@@ -403,7 +428,84 @@ async fn merge_response(
     Ok(resp)
 }
 
-pub async fn get_result(job: PartitionJob, org_id: &str) -> Result<Job, anyhow::Error> {
-    let job = get(&job.job_id, org_id).await?;
-    Ok(job)
+// get the response in this cluster or other cluster
+pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::Error> {
+    let cfg = config::get_config();
+    if *cluster == config::get_cluster_name() {
+        let buf = storage::get(path).await?;
+        let res: Response = json::from_slice::<Response>(&buf)?;
+        return Ok(res);
+    }
+
+    // super cluster
+    if get_o2_config().super_cluster.enabled {
+        let node = get_cluster_node_by_name(cluster).await?;
+        let path = path.to_string();
+        let task = tokio::task::spawn(async move {
+            let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
+            request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+
+            opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.inject_context(
+                    &tracing::Span::current().context(),
+                    &mut MetadataMap(request.metadata_mut()),
+                )
+            });
+
+            let token: MetadataValue<_> = node
+                .get_auth_token()
+                .parse()
+                .map_err(|_| Error::Message("invalid token".to_string()))?;
+            let channel = get_cached_channel(&node.get_grpc_addr())
+                .await
+                .map_err(|err| {
+                    log::error!(
+                        "search->grpc: node: {}, connect err: {:?}",
+                        &node.get_grpc_addr(),
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
+            let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
+                channel,
+                move |mut req: Request<()>| {
+                    req.metadata_mut().insert("authorization", token.clone());
+                    Ok(req)
+                },
+            );
+            client = client
+                .send_compressed(CompressionEncoding::Gzip)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+            let response = match client.get_result(request).await {
+                Ok(res) => res.into_inner(),
+                Err(err) => {
+                    log::error!(
+                        "search->grpc: node: {}, search err: {:?}",
+                        &node.get_grpc_addr(),
+                        err
+                    );
+                    if err.code() == tonic::Code::Internal {
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
+                    }
+                    return Err(server_internal_error("search node error"));
+                }
+            };
+            Ok(response)
+        });
+
+        let response = task
+            .await
+            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))??;
+        let response = json::from_slice::<search::Response>(&response.response)?;
+
+        return Ok(response);
+    }
+
+    Err(anyhow::anyhow!(format!(
+        "cluster name: {cluster} in partition job equal to current cluster name: {}",
+        config::get_cluster_name()
+    )))
 }

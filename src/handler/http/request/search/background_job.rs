@@ -18,14 +18,10 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use config::{
     get_config,
-    meta::{
-        search::{Response, SearchEventType},
-        sql::resolve_stream_names,
-        stream::StreamType,
-    },
+    meta::{search::SearchEventType, sql::resolve_stream_names, stream::StreamType},
     utils::json,
 };
-use infra::{storage, table::entity::background_jobs::Model as JobModel};
+use infra::table::entity::background_jobs::Model as JobModel;
 use tracing::Span;
 
 use crate::{
@@ -37,7 +33,7 @@ use crate::{
         },
     },
     handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
-    service::db::background_job::*,
+    service::{alerts::background_jobs::get_result, db::background_job::*},
 };
 
 // 1. submit
@@ -235,13 +231,16 @@ pub async fn get_job_result(
             "job_id: {job_id} error: {}",
             model.error_message.unwrap()
         )))
-    } else if model.result_path.is_none() {
+    } else if model.result_path.is_none() || model.cluster.is_none() {
         Ok(MetaHttpResponse::not_found(format!(
-            "job_id: {job_id} don't have result"
+            "job_id: {job_id} don't have result_path or cluster"
         )))
     } else {
-        let result = storage::get(&model.result_path.unwrap()).await?;
-        let response: Response = json::from_slice::<Response>(&result)?;
+        let path = model.result_path.clone().unwrap();
+        let cluster = model.cluster.clone().unwrap();
+        let response = get_result(&path, &cluster)
+            .await
+            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
         Ok(HttpResponse::Ok().json(response))
     }
 }
