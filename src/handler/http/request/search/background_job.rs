@@ -41,7 +41,7 @@ use crate::{
 };
 
 // 1. submit
-#[post("/{org_id}/search_jobs/submit")]
+#[post("/{org_id}/search_jobs")]
 pub async fn submit_job(
     org_id: web::Path<String>,
     in_req: HttpRequest,
@@ -141,7 +141,7 @@ pub async fn submit_job(
 }
 
 // 2. status_all
-#[get("/{org_id}/search_jobs/status_all")]
+#[get("/{org_id}/search_jobs")]
 pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = list_status_by_org_id(&org_id).await;
     let res = match res {
@@ -153,7 +153,7 @@ pub async fn list_status(org_id: web::Path<String>) -> Result<HttpResponse, Erro
 }
 
 // 3. status
-#[get("/{org_id}/search_jobs/status/{job_id}")]
+#[get("/{org_id}/search_jobs/{job_id}/status")]
 pub async fn get_status(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
@@ -181,7 +181,7 @@ pub async fn get_status(
 }
 
 // 4. cancel
-#[post("/{org_id}/search_jobs/cancel/{job_id}")]
+#[post("/{org_id}/search_jobs/{job_id}/cancel")]
 pub async fn cancel_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
@@ -205,7 +205,7 @@ pub async fn cancel_job(
 }
 
 // 5. get
-#[get("/{org_id}/search_jobs/result/{job_id}")]
+#[get("/{org_id}/search_jobs/{job_id}/result")]
 pub async fn get_job_result(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
@@ -247,7 +247,7 @@ pub async fn get_job_result(
 }
 
 // 6. delete
-#[delete("/{org_id}/search_jobs/delete/{job_id}")]
+#[delete("/{org_id}/search_jobs/{job_id}")]
 pub async fn delete_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
@@ -284,7 +284,7 @@ pub async fn delete_job(
 }
 
 // 7. retry
-#[post("/{org_id}/search_jobs/retry/{job_id}")]
+#[post("/{org_id}/search_jobs/{job_id}/retry")]
 pub async fn retry_job(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,

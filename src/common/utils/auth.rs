@@ -281,7 +281,6 @@ impl FromRequest for AuthExtractor {
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
                 || path.ends_with("users/roles")
-                || path.ends_with("status_all")
             {
                 if method.eq("GET") {
                     method = "LIST".to_string();
@@ -346,7 +345,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || (method.eq("DELETE") && !path_columns[1].eq("search_jobs"))
+                || method.eq("DELETE")
             {
                 format!(
                     "{}:{}",

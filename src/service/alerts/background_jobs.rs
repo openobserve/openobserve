@@ -135,7 +135,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     let partition_jobs = get_partition_jobs(&job.id).await?;
     let mut response = merge_response(partition_jobs, limit, offset).await?;
     response.set_trace_id(job.trace_id.clone());
-    let buf = json::to_string(&response)?.into_bytes();
+    let buf = json::to_vec(&response)?;
     let path = generate_result_path(job.created_at, &job.trace_id, None);
     storage::put(&path, buf.into()).await?;
 
@@ -220,7 +220,7 @@ async fn run_partition_job(
 
     // 4. write the result to s3
     let hits = result.total;
-    let buf = json::to_string(&result)?.into_bytes();
+    let buf = json::to_vec(&result)?;
     let path = generate_result_path(job.created_at, &job.trace_id, Some(partition_id));
     storage::put(&path, buf.into()).await?;
 
