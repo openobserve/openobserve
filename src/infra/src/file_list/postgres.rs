@@ -1149,6 +1149,7 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
             ::query(
                 r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = 0 GROUP BY stream, status ORDER BY status desc;"#
             )
+            .bind(super::FileListJobStatus::Pending)
             .fetch_all(&pool).await?;
 
         let mut job_status: stdHashMap<String, stdHashMap<String, i64>> = stdHashMap::new();
