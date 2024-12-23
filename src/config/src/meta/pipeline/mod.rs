@@ -302,7 +302,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct PipelineList {
     pub list: Vec<Pipeline>,
 }
