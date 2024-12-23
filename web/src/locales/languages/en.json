@@ -768,15 +768,20 @@
     "view": "View More >>",
     "queryFunctions": "Query functions",
     "ingestFunctions": "Ingest functions",
-    "scheduledAlert": "Scheduled alerts",
-    "rtAlert": "Real time alerts",
+    "scheduledAlert": "Scheduled",
+    "rtAlert": "Real time",
     "noData": "No Data Ingested",
     "indexSizeLbl": "Index Size",
     "docsCountLbl": "Docs Count",
     "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "It appears you have not ingested any data to the selected organization. There are various ways to ingest data, such as using Fluent Bit.",
     "inestedInSearch": "Try Log Search",
-    "searchInDemoOrg": "You can explore search capabilities by switching to the demo organization. To switch, select 'Demo Organization' using the organization dropdown at the top. We keep ingesting dummy data into the demo organization."
+    "searchInDemoOrg": "You can explore search capabilities by switching to the demo organization. To switch, select 'Demo Organization' using the organization dropdown at the top. We keep ingesting dummy data into the demo organization.",
+    "function": "Function",
+    "pipeline": "Pipeline",
+    "functionpipelinetitle": "Pipelines & Functions",
+    "alertTitle": "Alerts",
+    "dashboardTitle": "Dashboards"
   },
   "billing": {
     "header": "Usage & Billing",
