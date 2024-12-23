@@ -37,7 +37,7 @@ bordered class="my-card-wide my-card q-py-md">
             <q-separator vertical />
             <div class="col">
               <div class="text-subtitle1">
-                {{ t("home.docsCountLbl") }} 
+                {{ t("home.docsCountLbl") }}
               </div>
               <div class="text-h6">{{ summary.doc_count }}</div>
             </div>
@@ -84,24 +84,24 @@ flat
         </div>
       </div>
 
-      <div align="center" class="my-card card-container">
+      <div align="center" class="q-w-sm my-card card-container">
         <div align="center" flat
-bordered class="my-card q-py-md">
-          <div class="text-subtitle1">{{ t("home.functionpipelinetitle") }}</div>
+bordered class="q-w-sm my-card q-py-md">
+          <div class="text-subtitle1">{{ t("home.pipelineTitle") }}</div>
           <q-separator class="q-ma-md" />
-          <div class="row justify-center" v-if="isCloud == 'false'">
+          <div class="row justify-center">
             <div class="col-4">
               <div class="text-subtitle1">
-                {{ t("home.pipeline") }}
+                {{ t("home.schedulePipelineTitle") }}
               </div>
-              <div class="text-h6">{{ summary.pipelines }}</div>
+              <div class="text-h6">{{ summary.scheduled_pipelines }}</div>
             </div>
             <q-separator vertical />
             <div class="col-4">
               <div class="text-subtitle1">
-                {{ t("home.function") }}
+                {{ t("home.rtPipelineTitle") }}
               </div>
-              <div class="text-h6">{{ summary.functions }}</div>
+              <div class="text-h6">{{ summary.rt_pipelines }}</div>
             </div>
           </div>
         </div>
@@ -119,12 +119,12 @@ flat
         </div>
       </div>
 
-      <div class="my-card card-container">
+      <div class="q-w-sm my-card card-container">
         <div align="center" flat
-bordered class="my-card q-py-md">
+bordered class="q-w-sm my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.alertTitle") }}</div>
           <q-separator class="q-ma-md" />
-          <div class="row justify-center" v-if="isCloud == 'false'">
+          <div class="row justify-center">
             <div class="col-4">
               <div class="text-subtitle1">
                 {{ t("home.scheduledAlert") }}
@@ -154,16 +154,47 @@ flat
         </div>
       </div>
 
-      <div class="my-card card-container">
+      <div class="q-w-sm my-card card-container">
         <div align="center" flat
-bordered class="my-card q-py-md">
-          <div class="row justify-center" v-if="isCloud == 'false'">
+bordered class="q-w-sm my-card q-py-md">
+          <div class="row justify-center">
+            <div class="col-12">
+              <div class="text-subtitle1">
+                {{ t("home.functionTitle") }}
+              </div>
+              <q-separator class="q-ma-md" />
+              <div class="row justify-center">
+                <div class="col-4">
+                  <div class="text-h4 q-pa-sm">{{ summary.function_count }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <q-separator />
+        <div align="center" class="q-py-sm">
+          <q-btn no-caps color="primary"
+flat
+            >{{ t("home.view") }}
+            <router-link
+              exact
+              :to="{ name: 'functionList' }"
+              class="absolute full-width full-height"
+            ></router-link>
+          </q-btn>
+        </div>
+      </div>
+
+      <div class="q-w-sm my-card card-container">
+        <div align="center" flat
+bordered class="q-w-sm my-card q-py-md">
+          <div class="row justify-center">
             <div class="col-12">
               <div class="text-subtitle1">
                 {{ t("home.dashboardTitle") }}
               </div>
               <q-separator class="q-ma-md" />
-              <div class="row justify-center" v-if="isCloud == 'false'">
+              <div class="row justify-center">
                 <div class="col-4">
                   <div class="text-h4 q-pa-sm">{{ summary.dashboard_count }}</div>
                 </div>
@@ -253,15 +284,16 @@ export default defineComponent({
             compressed_data: formatSizeFromMB(
               res.data.streams?.total_compressed_size.toFixed(2),
             ),
-            functions: res.data.pipelines?.num_functions ?? 0,
-            pipelines: res.data.pipelines?.num_pipelines ?? 0,
-            rt_alerts: res.data.alerts?.num_realtime ?? 0,
-            scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
             doc_count: addCommasToNumber(res.data.streams?.total_records ?? 0),
             index_size: formatSizeFromMB(
               res.data.streams?.total_index_size ?? 0,
             ),
-            dashboard_count: res.data.dashboards?.num ?? 0,
+            scheduled_pipelines: res.data.pipelines?.num_scheduled ?? 0,
+            rt_pipelines: res.data.pipelines?.num_realtime ?? 0,
+            rt_alerts: res.data.alerts?.num_realtime ?? 0,
+            scheduled_alerts: res.data.alerts?.num_scheduled ?? 0,
+            dashboard_count: res.data.total_dashboards ?? 0,
+            function_count: res.data.total_functions ?? 0,
           };
           no_data_ingest.value = false;
           dismiss();
