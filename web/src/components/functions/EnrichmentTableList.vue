@@ -205,7 +205,7 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-    const { getStreams } = useStreams();
+    const { getStreams, resetStreamType } = useStreams();
 
     onBeforeMount(() => {
       getLookupTables();
@@ -234,13 +234,15 @@ export default defineComponent({
         })
         .catch((err) => {
           console.log("--", err);
-
           dismiss();
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             type: "negative",
-            message: "Error while pulling function.",
+            message: err.response?.data?.message || "Error while fetching functions.",
             timeout: 2000,
           });
+          }
+          
         });
     };
 
@@ -312,6 +314,7 @@ export default defineComponent({
         },
       });
       showAddJSTransformDialog.value = false;
+      resetStreamType("enrichment_tables");
       getLookupTables();
     };
 
@@ -338,14 +341,17 @@ export default defineComponent({
               color: "positive",
               message: `${selectedDelete.value.name} deleted successfully.`,
             });
+            resetStreamType("enrichment_tables");
             getLookupTables();
           }
         })
         .catch((err: any) => {
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             color: "negative",
-            message: "Error while deleting stream.",
+            message: err.response?.data?.message || "Error while deleting stream.",
           });
+          }
         });
 
       segment.track("Button Click", {
