@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
       <div class="my-card-wide card-container">
-        <div align="center" flat bordered class="my-card-wide q-py-md">
+        <div align="center" flat
+bordered class="my-card-wide q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -64,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -76,7 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div align="center" class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
+        <div align="center" flat
+bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
@@ -84,7 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -96,7 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
+        <div align="center" flat
+bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
@@ -104,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary" flat
+          <q-btn no-caps color="primary"
+flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -122,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="margin: 0 auto; justify-content: center"
     >
       <div class="my-card card-container">
-        <div align="center" flat bordered class="my-card q-py-md">
+        <div align="center" flat
+bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
         </div>
@@ -221,8 +228,10 @@ export default defineComponent({
             query_fns: query_fns,
             rt_alerts: rt_alerts,
             scheduled_alerts: scheduled_alerts,
-            doc_count: res.data.streams.total_records,
-            index_size: formatSizeFromMB(res.data.streams.total_index_size),
+            doc_count: res.data.streams?.total_records ?? 0,
+            index_size: formatSizeFromMB(
+              res.data.streams?.total_index_size ?? 0,
+            ),
           };
           no_data_ingest.value = false;
           dismiss();
