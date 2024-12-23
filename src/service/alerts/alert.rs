@@ -29,7 +29,9 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
+        folder::{Folder, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
+        sql::resolve_stream_names,
         stream::StreamType,
     },
     utils::{
@@ -39,6 +41,10 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
+use infra::{
+    schema::unwrap_stream_settings,
+    table::{self, folders::FolderType},
+};
 use lettre::{message::MultiPart, AsyncTransport, Message};
 
 use crate::{
@@ -48,7 +54,7 @@ use crate::{
     },
     service::{
         alerts::{build_sql, destinations, QueryConditionExt},
-        db,
+        db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
     },
@@ -61,6 +67,17 @@ pub async fn save(
     mut alert: Alert,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    // Currently all alerts are stored in the default folder so create the
+    // default folder for the org if it doesn't exist yet.
+    if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
+        let default_folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        };
+        folders::save_folder(org_id, default_folder, FolderType::Alerts, true).await?;
+    };
+
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -172,6 +189,19 @@ pub async fn save(
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 
+    // Alerts must follow the max_query_range of the stream as set in the schema
+    if let Some(settings) = unwrap_stream_settings(&schema) {
+        let max_query_range = settings.max_query_range;
+        if max_query_range > 0
+            && !alert.is_real_time
+            && alert.trigger_condition.period > max_query_range * 60
+        {
+            return Err(anyhow::anyhow!(
+                "Alert period is greater than max query range of {max_query_range} hours for stream \"{stream_name}\""
+            ));
+        }
+    }
+
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(anyhow::anyhow!(
             "Realtime alert should use Custom query type"
@@ -199,6 +229,36 @@ pub async fn save(
                     "Alert with SQL can not contain SELECT * in the SQL query"
                 ));
             }
+
+            let sql = alert.query_condition.sql.as_ref().unwrap();
+            let stream_names = match resolve_stream_names(sql) {
+                Ok(stream_names) => stream_names,
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Error resolving stream names in SQL query: {e}"
+                    ));
+                }
+            };
+
+            // SQL may contain multiple stream names, check for each stream
+            // if the alert period is greater than the max query range
+            for stream in stream_names.iter() {
+                if !stream.eq(stream_name) {
+                    if let Some(settings) =
+                        infra::schema::get_settings(org_id, stream, stream_type).await
+                    {
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && !alert.is_real_time
+                            && alert.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(anyhow::anyhow!(
+                                "Alert period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                            ));
+                        }
+                    }
+                }
+            }
         }
         QueryType::PromQL => {
             if alert.query_condition.promql.is_none()
@@ -220,10 +280,11 @@ pub async fn save(
     // }
 
     // save the alert
-    match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, stream_type, stream_name, alert, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
             }
             Ok(())
         }
@@ -319,7 +380,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, &alert, false)
+    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

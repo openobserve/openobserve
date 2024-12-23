@@ -25,6 +25,8 @@ mod m20241119_000003_delete_metas;
 mod m20241204_143100_create_table_search_queue;
 mod m20241209_120000_create_alerts_table;
 mod m20241215_190333_delete_metas;
+mod m20241217_154900_alter_folders_table_idx;
+mod m20241217_155000_populate_alerts_table;
 mod m20241220_000001_create_organizations_table;
 mod m20241220_000100_populate_organizations_table;
 mod m20241220_000200_create_users_table;
@@ -48,6 +50,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20241204_143100_create_table_search_queue::Migration),
             Box::new(m20241209_120000_create_alerts_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
+            Box::new(m20241217_154900_alter_folders_table_idx::Migration),
+            Box::new(m20241217_155000_populate_alerts_table::Migration),
             Box::new(m20241220_000001_create_organizations_table::Migration),
             Box::new(m20241220_000100_populate_organizations_table::Migration),
             Box::new(m20241220_000200_create_users_table::Migration),
