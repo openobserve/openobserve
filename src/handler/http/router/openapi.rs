@@ -220,7 +220,6 @@ use crate::{common::meta, handler::http::request};
             meta::organization::StreamSummary,
             meta::organization::PipelineSummary,
             meta::organization::AlertSummary,
-            meta::organization::DashboardSummary,
             meta::organization::OrganizationResponse,
             meta::organization::OrgDetails,
             meta::organization::OrgUser,
