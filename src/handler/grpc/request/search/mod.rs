@@ -161,7 +161,7 @@ impl Search for Searcher {
         req: Request<GetResultRequest>,
     ) -> Result<Response<GetResultResponse>, Status> {
         let path = req.into_inner().path;
-        let res = storage::get(&path)
+        let res = infra::storage::get(&path)
             .await
             .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
         Ok(Response::new(GetResultResponse {

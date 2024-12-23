@@ -40,7 +40,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::{
     db::background_job::*,
     grpc::get_cached_channel,
-    search::{self as SearchService, server_internal_error, MetadataMap},
+    search::{self as SearchService, grpc_search::grpc_search, MetadataMap},
 };
 
 // 1. get the oldest job from `background_jobs` table
@@ -217,7 +217,7 @@ async fn run_partition_job(
 
     // 3. run the query
     let stream_type = StreamType::from(job.stream_type.as_str());
-    let res = SearchService::search(
+    let res = grpc_search(
         &job.trace_id,
         &job.org_id,
         stream_type,
@@ -464,7 +464,7 @@ pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::E
                         &node.get_grpc_addr(),
                         err
                     );
-                    server_internal_error("connect search node error")
+                    Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
                 })?;
             let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                 channel,
@@ -490,7 +490,9 @@ pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::E
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));
                     }
-                    return Err(server_internal_error("search node error"));
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        "search node error".to_string(),
+                    )));
                 }
             };
             Ok(response)
