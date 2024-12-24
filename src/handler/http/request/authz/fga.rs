@@ -269,7 +269,8 @@ pub async fn create_group(
     user_group: web::Json<UserGroup>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let user_grp = user_group.into_inner();
+    let mut user_grp = user_group.into_inner();
+    user_grp.name = user_grp.name.trim().to_lowercase();
 
     match o2_enterprise::enterprise::openfga::authorizer::groups::create_group(
         &org_id,

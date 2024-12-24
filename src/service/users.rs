@@ -49,7 +49,7 @@ use crate::{
 
 pub async fn post_user(
     org_id: &str,
-    usr_req: UserRequest,
+    mut usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     if !is_valid_email(&usr_req.email) {
@@ -59,6 +59,7 @@ pub async fn post_user(
         )));
     }
     let cfg = get_config();
+    usr_req.email = usr_req.email.to_lowercase();
     if usr_req.role.custom_role.is_some() {
         #[cfg(not(feature = "enterprise"))]
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
@@ -320,7 +321,8 @@ pub async fn update_user(
                             message.to_string(),
                         )));
                     }
-                } else if self_update && user.old_password.is_none() {
+                } else if self_update && user.new_password.is_some() && user.old_password.is_none()
+                {
                     message = "Please provide existing password";
                 } else if !self_update
                     && allow_password_update
@@ -349,17 +351,18 @@ pub async fn update_user(
                     && !local_user.is_external
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
+                            || local_user.role.eq(&UserRole::Editor)
                             || local_user.role.eq(&UserRole::Root)))
                 // if the User Role is Root, we do not change the Role
                 // Admins Role can still be mutable.
                 {
-                    if local_user.role.eq(&UserRole::Root) {
+                    let new_org_role = UserOrgRole::from(&user.role.unwrap());
+                    old_role = Some(new_user.role);
+                    new_user.role = new_org_role.base_role;
+                    new_role = Some(new_user.role.clone());
+                    if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
                         message = "Root user role cannot be changed";
                     } else {
-                        let new_org_role = UserOrgRole::from(&user.role.unwrap());
-                        old_role = Some(new_user.role);
-                        new_user.role = new_org_role.base_role;
-                        new_role = Some(new_user.role.clone());
                         #[cfg(feature = "enterprise")]
                         if new_org_role.custom_role.is_some() {
                             custom_roles_need_change = true;
@@ -575,7 +578,8 @@ pub async fn add_user_to_org(
             "Invalid email".to_string(),
         )));
     }
-    let existing_user = db::user::get_user_record(email).await;
+    let email = email.trim().to_lowercase();
+    let existing_user = db::user::get_user_record(&email).await;
     let root_user = ROOT_USER.clone();
     if existing_user.is_ok() {
         let initiating_user = if is_root_user(initiator_id) {
@@ -609,7 +613,7 @@ pub async fn add_user_to_org(
         if is_allowed {
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
-            let is_member = db::org_users::get(org_id, email).await.is_ok();
+            let is_member = db::org_users::get(org_id, &email).await.is_ok();
             if is_member {
                 return Ok(HttpResponse::Conflict().json(MetaHttpResponse::error(
                     http::StatusCode::CONFLICT.into(),
@@ -617,7 +621,7 @@ pub async fn add_user_to_org(
                 )));
             }
 
-            if db::org_users::add(org_id, email, base_role.clone(), &token, Some(rum_token))
+            if db::org_users::add(org_id, &email, base_role.clone(), &token, Some(rum_token))
                 .await
                 .is_err()
             {
@@ -637,11 +641,11 @@ pub async fn add_user_to_org(
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(&base_role.to_string(), email, org_id, &mut tuples);
+                    get_user_role_tuple(&base_role.to_string(), &email, org_id, &mut tuples);
                     if role.custom_role.is_some() {
                         let custom_role = role.custom_role.unwrap();
                         custom_role.iter().for_each(|crole| {
-                            tuples.push(get_user_crole_tuple(org_id, crole, email));
+                            tuples.push(get_user_crole_tuple(org_id, crole, &email));
                         });
                     }
                     match update_tuples(tuples, vec![]).await {
