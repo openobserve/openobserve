@@ -211,44 +211,23 @@ test.describe("Logs Queries testcases", () => {
   });
   
 
+
   test("should change stream settings and click on search stream", async ({ page }) => {
-    // Navigate to Streams page
+    // Type the value of a variable into an input field
     await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-  
-    // Ensure the search stream input is visible and clickable before interacting
-    const searchStreamInput = page.locator('[data-test="streams-search-stream-input"]');
-    await expect(searchStreamInput).toBeVisible();
-    await searchStreamInput.click();
+    await page.waitForTimeout(3000);
+    await page.click('[data-test="streams-search-stream-input"]')
     await page.keyboard.type("e2e_automate");
-  
-    // Open the first Stream Detail
-    const streamDetail = page.locator("[title=\"Stream Detail\"]").first();
-    await expect(streamDetail).toBeVisible();
-    await streamDetail.click({ force: true });
-  
-    // Change the stream settings
-    const indexSelect = page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]');
-    await expect(indexSelect).toBeVisible();
-    await indexSelect.click();
-  
+    await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
+    await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");
-    await expect(scope).toBeVisible();
     await scope.getByText(/Full text search/).first().click();
-  
-    // Update settings
-    const updateSettingsButton = page.locator('[data-test="schema-update-settings-button"]');
-    await expect(updateSettingsButton).toBeVisible();
-    await updateSettingsButton.click({ force: true });
-    const confirmButton = page.locator(".col-auto > .q-btn > .q-btn__content");
-    await expect(confirmButton).toBeVisible();
-    await confirmButton.click({ force: true });
-    const explore = page.locator("[title=\"Explore\"]").first();
-    await expect(explore).toBeVisible();
-    await explore.click({ force: true });
-  
-    // Verify log table is visible
-    const logTableColumn = page.locator('[data-test="log-table-column-0-source"]');
-    await expect(logTableColumn).toBeVisible({ timeout: 5000 });
+    await page.locator('[data-test="schema-update-settings-button"]').click({ force: true });
+    await page.waitForTimeout(3000);
+    await page.locator(".col-auto > .q-btn > .q-btn__content").click({ force: true });
+    await page.waitForTimeout(3000);
+    await page.locator("[title=\"Explore\"]").first().click({ force: true });
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
   
 
