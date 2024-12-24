@@ -206,9 +206,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
                 _alert_list_from_rbac = stream_list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return MetaHttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
