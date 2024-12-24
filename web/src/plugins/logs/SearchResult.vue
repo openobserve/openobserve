@@ -156,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @view-trace="redirectToTraces"
       />
 
       <q-dialog
