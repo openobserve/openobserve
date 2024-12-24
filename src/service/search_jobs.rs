@@ -28,7 +28,10 @@ use infra::{
 };
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
-    super_cluster::search::get_cluster_node_by_name,
+    super_cluster::{
+        kv::cluster::get_grpc_addr,
+        search::{get_cluster_node_by_name, get_cluster_nodes},
+    },
 };
 use proto::cluster_rpc;
 use tokio::sync::mpsc;
@@ -325,11 +328,8 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
         }
 
         // delete all files
-        let deleted_files_str: Vec<&str> = deleted_files.iter().map(|s| s.as_str()).collect();
-        if let Err(e) = storage::del(&deleted_files_str).await {
-            log::warn!(
-                "[SEARCH JOB] delete_jobs failed to delete files: {deleted_files_str:?}, error: {e}",
-            );
+        if let Err(e) = delete_result(deleted_files).await {
+            log::warn!("[SEARCH JOB] delete_jobs failed to delete files error: {e}",);
         }
 
         // 3. delete the partition jobs from database
@@ -510,4 +510,84 @@ pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::E
         "cluster name: {cluster} in partition job equal to current cluster name: {}",
         config::get_cluster_name()
     )))
+}
+
+pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
+    let local_paths: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
+    storage::del(&local_paths).await?;
+
+    if get_o2_config().super_cluster.enabled {
+        let nodes = get_cluster_nodes("delete_result", vec![], vec![]).await?;
+        // delete result in all cluster,
+        // because for retry job, we don't know partition in which cluster
+        for node in nodes {
+            if node.get_grpc_addr() == get_grpc_addr() {
+                continue;
+            }
+            let paths = paths.clone();
+            let task = tokio::task::spawn(async move {
+                let cfg = config::get_config();
+                let mut request =
+                    tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
+                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
+
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &tracing::Span::current().context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
+
+                let token: MetadataValue<_> = node
+                    .get_auth_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = get_cached_channel(&node.get_grpc_addr())
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "search->grpc: node: {}, connect err: {:?}",
+                            &node.get_grpc_addr(),
+                            err
+                        );
+                        Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
+                    })?;
+                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
+                        req.metadata_mut().insert("authorization", token.clone());
+                        Ok(req)
+                    },
+                );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let response = match client.delete_result(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "search->grpc: node: {}, search err: {:?}",
+                            &node.get_grpc_addr(),
+                            err
+                        );
+                        if err.code() == tonic::Code::Internal {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            "search node error".to_string(),
+                        )));
+                    }
+                };
+                Ok(response)
+            });
+
+            let _ = task
+                .await
+                .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))??;
+        }
+    }
+    Ok(())
 }
