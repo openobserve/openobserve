@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    ider,
-    meta::user::{DBUser, UserRole},
-    utils::json,
-};
+use config::{ider, utils::json};
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
@@ -43,13 +39,13 @@ impl MigrationTrait for Migration {
             let mut users = vec![];
             let mut org_users = vec![];
             for m in metas {
-                let json_user: DBUser =
+                let json_user: meta::DBUser =
                     json::from_str(&m.value).map_err(|e| DbErr::Migration(e.to_string()))?;
                 let all_org_users = json_user.get_all_users();
                 let is_root_user = if all_org_users.is_empty() {
                     false
                 } else {
-                    all_org_users[0].role.eq(&UserRole::Root)
+                    all_org_users[0].role.eq(&meta::UserRole::Root)
                 };
 
                 let now = chrono::Utc::now().timestamp_micros() as u64;
@@ -98,7 +94,10 @@ impl MigrationTrait for Migration {
 
 /// Representation of the meta table at the time this migration executes.
 mod meta {
+    use std::{fmt, str::FromStr};
+
     use sea_orm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
     #[sea_orm(table_name = "meta")]
@@ -117,6 +116,165 @@ mod meta {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct DBUser {
+        pub email: String,
+        #[serde(default)]
+        pub first_name: String,
+        #[serde(default)]
+        pub last_name: String,
+        pub password: String,
+        #[serde(default)]
+        pub salt: String,
+        pub organizations: Vec<UserOrg>,
+        #[serde(default)]
+        pub is_external: bool,
+        pub password_ext: Option<String>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct UserOrg {
+        pub name: String,
+        #[serde(default)]
+        pub token: String,
+        #[serde(default)]
+        pub rum_token: Option<String>,
+        pub role: UserRole,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+    pub enum UserRole {
+        #[serde(rename = "admin")]
+        Admin,
+        #[serde(rename = "root")]
+        Root,
+        #[serde(rename = "viewer")] // read only user
+        Viewer,
+        #[serde(rename = "user")] // No access only login user
+        User,
+        #[serde(rename = "editor")]
+        Editor,
+        #[serde(rename = "service_account")]
+        ServiceAccount,
+    }
+
+    impl From<UserRole> for i16 {
+        fn from(role: UserRole) -> i16 {
+            match role {
+                UserRole::Admin => 0,
+                UserRole::Root => 1,
+                UserRole::Viewer => 2,
+                UserRole::User => 3,
+                UserRole::Editor => 4,
+                UserRole::ServiceAccount => 5,
+            }
+        }
+    }
+
+    impl From<i16> for UserRole {
+        fn from(role: i16) -> Self {
+            match role {
+                0 => UserRole::Admin,
+                1 => UserRole::Root,
+                2 => UserRole::Viewer,
+                3 => UserRole::User,
+                4 => UserRole::Editor,
+                5 => UserRole::ServiceAccount,
+                _ => UserRole::Admin,
+            }
+        }
+    }
+
+    impl fmt::Display for UserRole {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                UserRole::Admin => write!(f, "admin"),
+                UserRole::Root => write!(f, "root"),
+                UserRole::Viewer => write!(f, "viewer"),
+                UserRole::Editor => write!(f, "editor"),
+                UserRole::User => write!(f, "user"),
+                UserRole::ServiceAccount => write!(f, "service_account"),
+            }
+        }
+    }
+
+    impl UserRole {
+        pub fn get_label(&self) -> String {
+            match self {
+                UserRole::Admin => "Admin".to_string(),
+                UserRole::Root => "Root".to_string(),
+                UserRole::Viewer => "Viewer".to_string(),
+                UserRole::Editor => "Editor".to_string(),
+                UserRole::User => "User".to_string(),
+                UserRole::ServiceAccount => "Service Account".to_string(),
+            }
+        }
+    }
+
+    // Implementing FromStr for UserRole
+    impl FromStr for UserRole {
+        type Err = ();
+
+        fn from_str(input: &str) -> Result<UserRole, Self::Err> {
+            match input {
+                "admin" => Ok(UserRole::Admin),
+                "root" => Ok(UserRole::Root),
+                "viewer" => Ok(UserRole::Viewer),
+                "editor" => Ok(UserRole::Editor),
+                "user" => Ok(UserRole::User),
+                "service_account" => Ok(UserRole::ServiceAccount),
+                _ => Ok(UserRole::Admin),
+            }
+        }
+    }
+
+    impl DBUser {
+        pub fn get_all_users(&self) -> Vec<User> {
+            let mut ret_val = vec![];
+            if self.organizations.is_empty() {
+                ret_val
+            } else {
+                for org in self.organizations.clone() {
+                    ret_val.push(User {
+                        email: self.email.clone(),
+                        first_name: self.first_name.clone(),
+                        last_name: self.last_name.clone(),
+                        password: self.password.clone(),
+                        role: org.role,
+                        org: org.name,
+                        token: org.token,
+                        rum_token: org.rum_token,
+                        salt: self.salt.clone(),
+                        is_external: self.is_external,
+                        password_ext: self.password_ext.clone(),
+                    })
+                }
+                ret_val
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct User {
+        pub email: String,
+        #[serde(default)]
+        pub first_name: String,
+        #[serde(default)]
+        pub last_name: String,
+        pub password: String,
+        #[serde(default)]
+        pub salt: String,
+        #[serde(default)]
+        pub token: String,
+        #[serde(default)]
+        pub rum_token: Option<String>,
+        pub role: UserRole,
+        pub org: String,
+        /// Is the user authenticated and created via LDAP
+        pub is_external: bool,
+        pub password_ext: Option<String>,
+    }
 }
 
 /// Representation of the users table at the time this migration executes.
