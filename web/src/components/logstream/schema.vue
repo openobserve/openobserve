@@ -970,8 +970,8 @@ export default defineComponent({
             index: index,
             original_start: field.start,
             original_end: field.end,
-            start: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(field.start),"00:00",'UTC').timestamp),
-            end: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(field.end),"00:00",'UTC').timestamp),
+            start: convertUnixToQuasarFormat(field.start),
+            end: convertUnixToQuasarFormat(field.end),
           });
         });
       }
@@ -1512,24 +1512,35 @@ export default defineComponent({
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
       return date.formatDate(formattedDate, "DD-MM-YYYY");
+
     }
+    function formatDate(dateString) {
+      const date = new Date(dateString); // Convert to Date object
+      const day = String(date.getDate()).padStart(2, '0'); // Get day with leading zero
+      const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month with leading zero
+      const year = date.getFullYear(); // Get the full year
+      
+      return `${day}-${month}-${year}`; // Return formatted date
+    }
+
+
+
+
+
+
+
 
 
     const dateChangeValue = (value) => {
 
+      const selectedFromDate = value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.from)
+      const selectedToDate =value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.to)
       if (value.relativeTimePeriod == null) {
         redDaysList.value.push({
-          start: convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp,
-          end: convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp,
+          start: convertDateToTimestamp(selectedFromDate,"00:00",'UTC').timestamp,
+          end: convertDateToTimestamp(selectedToDate,"00:00",'UTC').timestamp,
         });
-        redBtnRows.value.unshift({
-          start: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp),
-          end: convertUnixToQuasarFormat(convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp),
-          original_start: convertDateToTimestamp(convertUnixToQuasarFormat(value.startTime),"00:00",'UTC').timestamp,
-          original_end: convertDateToTimestamp(convertUnixToQuasarFormat(value.endTime),"00:00",'UTC').timestamp,
-          isCreated: false,
-        });
-        formDirtyFlag.value = true;
+        onSubmit();
       }
     };
     const calculateDateRange = () => {
