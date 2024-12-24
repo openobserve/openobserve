@@ -55,11 +55,11 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
-pub mod background_job;
-#[cfg(feature = "enterprise")]
 pub mod job;
 pub mod multi_streams;
 pub mod saved_view;
+#[cfg(feature = "enterprise")]
+pub mod search_job;
 #[cfg(feature = "enterprise")]
 pub(crate) mod utils;
 

@@ -21,7 +21,7 @@ use config::{
     meta::{search::SearchEventType, sql::resolve_stream_names, stream::StreamType},
     utils::json,
 };
-use infra::table::entity::background_jobs::Model as JobModel;
+use infra::table::entity::search_jobs::Model as JobModel;
 use tracing::Span;
 
 use crate::{
@@ -33,7 +33,10 @@ use crate::{
         },
     },
     handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
-    service::{alerts::background_jobs::get_result, db::background_job::*},
+    service::{
+        db::search_job::{search_job_partitions::*, search_jobs::*},
+        search_jobs::get_result,
+    },
 };
 
 // 1. submit
@@ -77,11 +80,11 @@ pub async fn submit_job(
 
     // update timeout
     if req.timeout == 0 {
-        req.timeout = cfg.limit.background_job_timeout;
+        req.timeout = cfg.limit.search_job_timeout;
     }
 
     // set search event type
-    req.search_type = Some(SearchEventType::BackgroundJob);
+    req.search_type = Some(SearchEventType::SearchJob);
     if req.search_event_context.is_none() {
         req.search_event_context = req
             .search_type
@@ -270,7 +273,7 @@ pub async fn delete_job(
         _ => {}
     };
 
-    // 2. make the job_id in background_job table delete
+    // 2. make the job_id in search_job table delete
     match set_job_deleted(job_id.as_str()).await {
         Ok(true) => Ok(MetaHttpResponse::ok(format!(
             "job_id: {job_id} delete success"
@@ -316,8 +319,8 @@ pub async fn retry_job(
         ));
     }
 
-    // 2. make the job_id as pending in background_job table
-    let res = retry_background_job(&job_id).await;
+    // 2. make the job_id as pending in search_job table
+    let res = retry_search_job(&job_id).await;
     match res {
         Ok(_) => Ok(MetaHttpResponse::ok(format!(
             "job_id: {job_id} retry success"
@@ -345,7 +348,7 @@ async fn cancel_job_inner(
         return Ok(res);
     }
 
-    // 2. use job_id to make background_job cancel
+    // 2. use job_id to make search_job cancel
     let status = cancel_job_by_job_id(job_id).await;
     if let Err(e) = status {
         return Ok(MetaHttpResponse::bad_request(e));

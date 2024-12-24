@@ -713,7 +713,7 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
-    BackgroundJob,
+    SearchJob,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -753,7 +753,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "other"),
             SearchEventType::RUM => write!(f, "rum"),
             SearchEventType::DerivedStream => write!(f, "derived_stream"),
-            SearchEventType::BackgroundJob => write!(f, "background_job"),
+            SearchEventType::SearchJob => write!(f, "search_job"),
         }
     }
 }
@@ -771,9 +771,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
-            "background_job" | "backgroundjob" => Ok(SearchEventType::BackgroundJob),
+            "search_job" | "searchjob" => Ok(SearchEventType::SearchJob),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `background_job`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),
         }
     }

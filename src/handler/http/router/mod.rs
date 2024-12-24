@@ -499,13 +499,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 
     #[cfg(feature = "enterprise")]
     let service = service
-        .service(search::background_job::submit_job)
-        .service(search::background_job::list_status)
-        .service(search::background_job::get_status)
-        .service(search::background_job::get_job_result)
-        .service(search::background_job::cancel_job)
-        .service(search::background_job::delete_job)
-        .service(search::background_job::retry_job)
+        .service(search::search_job::submit_job)
+        .service(search::search_job::list_status)
+        .service(search::search_job::get_status)
+        .service(search::search_job::get_job_result)
+        .service(search::search_job::cancel_job)
+        .service(search::search_job::delete_job)
+        .service(search::search_job::retry_job)
         .service(search::job::cancel_multiple_query)
         .service(search::job::cancel_query)
         .service(search::job::query_status);

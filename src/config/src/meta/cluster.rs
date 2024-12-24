@@ -203,7 +203,7 @@ impl From<SearchEventType> for RoleGroup {
             SearchEventType::Reports
             | SearchEventType::Alerts
             | SearchEventType::DerivedStream
-            | SearchEventType::BackgroundJob => RoleGroup::Background,
+            | SearchEventType::SearchJob => RoleGroup::Background,
             _ => RoleGroup::Interactive,
         }
     }

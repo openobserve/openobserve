@@ -34,8 +34,6 @@ use super::promql;
 use crate::service::search as SearchService;
 
 pub mod alert;
-#[cfg(feature = "enterprise")]
-pub mod background_jobs;
 pub mod derived_streams;
 pub mod destinations;
 pub mod scheduler;

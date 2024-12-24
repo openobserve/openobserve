@@ -3,10 +3,10 @@
 pub mod prelude;
 
 pub mod alerts;
-pub mod background_job_partitions;
-pub mod background_job_results;
-pub mod background_jobs;
 pub mod dashboards;
 pub mod distinct_value_fields;
 pub mod folders;
+pub mod search_job_partitions;
+pub mod search_job_results;
+pub mod search_jobs;
 pub mod search_queue;

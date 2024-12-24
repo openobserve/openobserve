@@ -66,7 +66,7 @@ pub(crate) fn get_search_type_from_request(
             "values" => Some(SearchEventType::Values),
             "rum" => Some(SearchEventType::RUM),
             "derived_stream" => Some(SearchEventType::DerivedStream),
-            "background_job" => Some(SearchEventType::BackgroundJob),
+            "search_job" => Some(SearchEventType::SearchJob),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,

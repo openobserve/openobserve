@@ -61,10 +61,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_schedule_jobs().await });
     tokio::task::spawn(async move { clean_complete_jobs().await });
     tokio::task::spawn(async move { watch_timeout_jobs().await });
-    for i in 0..cfg.limit.background_job_workers {
-        tokio::task::spawn(async move { run_background_jobs(i).await });
+    for i in 0..cfg.limit.search_job_workers {
+        tokio::task::spawn(async move { run_search_jobs(i).await });
     }
-    tokio::task::spawn(async move { run_check_running_background_jobs().await });
+    tokio::task::spawn(async move { run_check_running_search_jobs().await });
     tokio::task::spawn(async move { run_delete_jobs().await });
 
     Ok(())
@@ -113,54 +113,55 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
-async fn run_background_jobs(id: i64) -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.background_job_scheduler_interval;
+async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
+    let interval = get_config().limit.search_job_scheduler_interval;
     let mut interval = time::interval(time::Duration::from_secs(interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = service::alerts::background_jobs::run(id).await {
-            log::error!("[BACKGROUND JOB {id}] run background jobs error: {}", e);
+        if let Err(e) = service::search_jobs::run(id).await {
+            log::error!("[SEARCH JOB {id}] run search jobs error: {}", e);
         }
     }
 }
 
 #[cfg(feature = "enterprise")]
-async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
-    let time = get_config().limit.background_job_run_timeout;
+async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
+    let time = get_config().limit.search_job_run_timeout;
     let mut interval = time::interval(time::Duration::from_secs(time as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        log::debug!("[BACKGROUND JOB] Running check on running jobs");
+        log::debug!("[SEARCH JOB] Running check on running jobs");
         let now = config::utils::time::now_micros();
         let updated_at = now - (time * 1_000_000);
-        if let Err(e) = service::db::background_job::check_running_jobs(updated_at).await {
-            log::error!("[BACKGROUND JOB] Error checking running jobs: {e}");
+        if let Err(e) = service::db::search_job::search_jobs::check_running_jobs(updated_at).await {
+            log::error!("[SEARCH JOB] Error checking running jobs: {e}");
         }
     }
 }
 
 #[cfg(feature = "enterprise")]
 async fn run_delete_jobs() -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.background_job_delete_interval;
+    let interval = get_config().limit.search_job_delete_interval;
     let mut interval = time::interval(time::Duration::from_secs(interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = service::alerts::background_jobs::delete_jobs().await {
-            log::error!("[BACKGROUND JOB] run delete jobs error: {}", e);
+        log::debug!("[SEARCH JOB] Running delete jobs");
+        if let Err(e) = service::search_jobs::delete_jobs().await {
+            log::error!("[SEARCH JOB] run delete jobs error: {}", e);
         }
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn run_background_jobs(_id: i64) -> Result<(), anyhow::Error> {
+async fn run_search_jobs(_id: i64) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn run_check_running_background_jobs() -> Result<(), anyhow::Error> {
+async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
     Ok(())
 }
 

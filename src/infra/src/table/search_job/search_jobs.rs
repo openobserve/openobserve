@@ -18,14 +18,15 @@ use sea_orm::{
     prelude::Expr,
     sea_query::{Keyword, LockType, SimpleExpr},
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait, UpdateMany,
+    TransactionTrait, UpdateMany, UpdateResult,
 };
+use serde::{Deserialize, Serialize};
 
-use super::{
+use super::super::{
     entity::{
-        background_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
-        background_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
-        background_jobs::*,
+        search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
+        search_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
+        search_jobs::*,
     },
     get_lock,
 };
@@ -34,7 +35,125 @@ use crate::{
     errors, orm_err,
 };
 
-// in background_jobs table
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum MetaColumn {
+    Id,
+    TraceId,
+    OrgId,
+    UserId,
+    StreamType,
+    StreamNames,
+    Payload,
+    StartTime,
+    EndTime,
+    CreatedAt,
+    UpdatedAt,
+    StartedAt,
+    EndedAt,
+    Cluster,
+    Node,
+    Status,
+    ResultPath,
+    ErrorMessage,
+    PartitionNum,
+}
+
+impl From<MetaColumn> for Column {
+    fn from(column: MetaColumn) -> Self {
+        match column {
+            MetaColumn::Id => Column::Id,
+            MetaColumn::TraceId => Column::TraceId,
+            MetaColumn::OrgId => Column::OrgId,
+            MetaColumn::UserId => Column::UserId,
+            MetaColumn::StreamType => Column::StreamType,
+            MetaColumn::StreamNames => Column::StreamNames,
+            MetaColumn::Payload => Column::Payload,
+            MetaColumn::StartTime => Column::StartTime,
+            MetaColumn::EndTime => Column::EndTime,
+            MetaColumn::CreatedAt => Column::CreatedAt,
+            MetaColumn::UpdatedAt => Column::UpdatedAt,
+            MetaColumn::StartedAt => Column::StartedAt,
+            MetaColumn::EndedAt => Column::EndedAt,
+            MetaColumn::Cluster => Column::Cluster,
+            MetaColumn::Node => Column::Node,
+            MetaColumn::Status => Column::Status,
+            MetaColumn::ResultPath => Column::ResultPath,
+            MetaColumn::ErrorMessage => Column::ErrorMessage,
+            MetaColumn::PartitionNum => Column::PartitionNum,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Value {
+    String(String),
+    I64(i64),
+}
+
+impl Value {
+    pub fn string(s: &str) -> Self {
+        Self::String(s.to_string())
+    }
+
+    pub fn i64(i: i64) -> Self {
+        Self::I64(i)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum OperatorType {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Filter {
+    pub left: MetaColumn,
+    pub operator: OperatorType,
+    pub right: Value,
+}
+
+impl Filter {
+    pub fn new(left: MetaColumn, operator: OperatorType, right: Value) -> Self {
+        Self {
+            left,
+            operator,
+            right,
+        }
+    }
+}
+
+impl From<Filter> for SimpleExpr {
+    fn from(filter: Filter) -> Self {
+        let left: Column = filter.left.into();
+
+        match filter.right {
+            Value::String(s) => match filter.operator {
+                OperatorType::Equal => left.eq(s),
+                OperatorType::NotEqual => left.ne(s),
+                OperatorType::GreaterThan => left.gt(s),
+                OperatorType::LessThan => left.lt(s),
+            },
+            Value::I64(i) => match filter.operator {
+                OperatorType::Equal => left.eq(i),
+                OperatorType::NotEqual => left.ne(i),
+                OperatorType::GreaterThan => left.gt(i),
+                OperatorType::LessThan => left.lt(i),
+            },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SetOperator {
+    pub filter: Vec<Filter>,
+    pub update: Vec<(MetaColumn, Value)>,
+}
+
+// TODO: use enum to represent the status
+// in search_jobs table
 // status 0: pending
 // status 1: running
 // status 2: finish
@@ -77,14 +196,14 @@ pub async fn submit(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _res = match Entity::insert(record).exec(client).await {
         Ok(res) => res,
-        Err(e) => return orm_err!(format!("submit background job error: {e}")),
+        Err(e) => return orm_err!(format!("submit search job error: {e}")),
     };
 
     Ok(job_id.to_string())
 }
 
 // get the job and update status
-pub async fn get_job() -> Result<Option<Model>, errors::Error> {
+pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -94,7 +213,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
         Ok(tx) => tx,
         Err(e) => return orm_err!(format!("get job start transaction error: {e}")),
     };
-    // sql: select * from background_jobs where status = 0 order by created_at limit 1 for update
+    // sql: select * from search_jobs where status = 0 order by created_at limit 1 for update
     let res = Entity::find()
         .lock(LockType::Update)
         .filter(Column::Status.eq(0))
@@ -115,14 +234,8 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     if let Some(model) = &model {
         if let Err(e) = Entity::update_many()
             .col_expr(Column::Status, Expr::value(1))
-            .col_expr(
-                Column::UpdatedAt,
-                Expr::value(chrono::Utc::now().timestamp_micros()),
-            )
-            .col_expr(
-                Column::StartedAt,
-                Expr::value(chrono::Utc::now().timestamp_micros()),
-            )
+            .col_expr(Column::UpdatedAt, Expr::value(updated_at))
+            .col_expr(Column::StartedAt, Expr::value(updated_at))
             .col_expr(Column::Cluster, Expr::value(config::get_cluster_name()))
             .col_expr(Column::Node, Expr::value(&LOCAL_NODE.uuid))
             .filter(Column::Id.eq(&model.id))
@@ -142,37 +255,6 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     }
 
     Ok(model)
-}
-
-pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Status.ne(4))
-        .all(client)
-        .await;
-
-    let res = match res {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("get background job by org_id error: {e}")),
-    };
-
-    Ok(res)
-}
-
-pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::find()
-        .filter(Column::Id.eq(job_id))
-        .filter(Column::OrgId.eq(org_id))
-        .one(client)
-        .await;
-
-    match res {
-        Ok(Some(res)) => Ok(res),
-        Ok(None) => orm_err!(format!("job_id: {job_id} not found")),
-        Err(e) => orm_err!(format!("get background job by job_id: {job_id} error: {e}")),
-    }
 }
 
 pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
@@ -238,125 +320,38 @@ pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
     Ok(res.unwrap().status)
 }
 
-pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<(), errors::Error> {
+pub async fn set(operator: SetOperator) -> Result<UpdateResult, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let res = Entity::update_many()
-        .col_expr(Column::ErrorMessage, Expr::value(error_message))
-        .col_expr(Column::Status, Expr::value(2))
-        .filter(Column::Id.eq(job_id))
-        .exec(client)
-        .await;
+    let mut query = Entity::update_many();
 
-    if let Err(e) = res {
-        return orm_err!(format!("set job error message error: {e}"));
+    for (column, value) in operator.update.clone() {
+        let column: Column = column.into();
+        match value {
+            Value::String(s) => {
+                query = query.col_expr(column, Expr::value(s));
+            }
+            Value::I64(i) => {
+                query = query.col_expr(column, Expr::value(i));
+            }
+        }
     }
 
-    Ok(())
-}
-
-pub async fn set_job_finish(job_id: &str, result_path: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(2))
-        .col_expr(Column::ResultPath, Expr::value(result_path))
-        .col_expr(
-            Column::UpdatedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
-        .col_expr(
-            Column::EndedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
-        .filter(Column::Id.eq(job_id))
-        .filter(Column::Status.eq(1)) // make sure the job is running
-        .exec(client)
-        .await;
-
-    match res {
-        Ok(res) if res.rows_affected == 1 => Ok(()),
-        Ok(_) => orm_err!("job_id not found or status is not running"),
-        Err(e) => orm_err!(format!("set job finish error: {e}")),
-    }
-}
-
-pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(
-            Column::UpdatedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
-        .filter(Column::Id.eq(job_id))
-        .filter(Column::Status.eq(1))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("update running job error: {e}"));
+    for filter in operator.filter.clone() {
+        let filter: SimpleExpr = filter.into();
+        query = query.filter(filter);
     }
 
-    Ok(())
-}
-
-pub async fn check_running_jobs(update_at: i64) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(0))
-        .filter(Column::Status.eq(1))
-        .filter(Column::UpdatedAt.lt(update_at))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("check running jobs error: {e}"));
-    }
-
-    Ok(())
-}
-
-pub async fn set_partition_num(job_id: &str, partition_num: i64) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::PartitionNum, Expr::value(partition_num))
-        .filter(Column::Id.eq(job_id))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("set partition num error: {e}"));
-    }
-
-    Ok(())
-}
-
-pub async fn get_deleted_jobs() -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::find()
-        .filter(Column::Status.eq(4))
-        .all(client)
-        .await;
+    let res = query.exec(client).await;
 
     match res {
         Ok(res) => Ok(res),
-        Err(e) => orm_err!(format!("get deleted jobs error: {e}")),
+        Err(e) => orm_err!(format!(
+            "set operator: {operator:?} in search job table error: {e}"
+        )),
     }
 }
 
@@ -378,25 +373,6 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(4))
-        .filter(Column::Id.eq(job_id))
-        .exec(client)
-        .await;
-
-    match res {
-        Ok(res) if res.rows_affected == 1 => Ok(true),
-        Ok(_) => Ok(false),
-        Err(e) => orm_err!(format!("set job deleted error: {e}")),
-    }
-}
-
 // 1. start a transaction
 // 2. move the status from job table -> job result table,
 // 3. clean old status: trace_id updated_at started_at ended_at node status result_path
@@ -407,7 +383,11 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
 // NOTE: this function can ensure,
 // 1. for finished job, it reset all partition job's status, result_path, error_message
 // 2. for failed job, it reset faild job and all pending job's status, result_path, error_message
-pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
+pub async fn retry_search_job(
+    job_id: &str,
+    new_trace_id: &str,
+    updated_at: i64,
+) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -483,9 +463,9 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
     }
 
     let mut model: ActiveModel = res.into();
-    model.trace_id = Set(config::ider::uuid());
+    model.trace_id = Set(new_trace_id.to_string());
     model.status = Set(0);
-    model.updated_at = Set(chrono::Utc::now().timestamp_micros());
+    model.updated_at = Set(updated_at);
     model.started_at = Set(None);
     model.ended_at = Set(None);
     model.node = Set(None);
@@ -506,6 +486,51 @@ pub async fn retry_background_job(job_id: &str) -> Result<(), errors::Error> {
     }
 
     Ok(())
+}
+
+pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::Id.eq(job_id))
+        .filter(Column::OrgId.eq(org_id))
+        .one(client)
+        .await;
+
+    match res {
+        Ok(Some(res)) => Ok(res),
+        Ok(None) => orm_err!(format!("job_id: {job_id} not found")),
+        Err(e) => orm_err!(format!("get search job by job_id: {job_id} error: {e}")),
+    }
+}
+
+pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Status.ne(4))
+        .all(client)
+        .await;
+
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return orm_err!(format!("get search job by org_id error: {e}")),
+    };
+
+    Ok(res)
+}
+
+pub async fn get_deleted_jobs() -> Result<Vec<Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::find()
+        .filter(Column::Status.eq(4))
+        .all(client)
+        .await;
+
+    match res {
+        Ok(res) => Ok(res),
+        Err(e) => orm_err!(format!("get deleted jobs error: {e}")),
+    }
 }
 
 fn generate_reset_partition_job_query(job_id: &str) -> UpdateMany<PartitionJobEntity> {

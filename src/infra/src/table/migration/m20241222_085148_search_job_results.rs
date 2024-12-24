@@ -12,7 +12,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(BackgroundJobResults::Table).to_owned())
+            .drop_table(Table::drop().table(SearchJobResults::Table).to_owned())
             .await?;
         Ok(())
     }
@@ -21,34 +21,34 @@ impl MigrationTrait for Migration {
 /// Statement to create table.
 fn create_table_stmt() -> TableCreateStatement {
     Table::create()
-        .table(BackgroundJobResults::Table)
+        .table(SearchJobResults::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(BackgroundJobResults::JobId)
+            ColumnDef::new(SearchJobResults::JobId)
                 .string_len(64)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(BackgroundJobResults::TraceId)
+            ColumnDef::new(SearchJobResults::TraceId)
                 .string_len(64)
                 .not_null(),
         )
-        .col(ColumnDef::new(BackgroundJobResults::StartedAt).big_integer())
-        .col(ColumnDef::new(BackgroundJobResults::EndedAt).big_integer())
-        .col(ColumnDef::new(BackgroundJobResults::Cluster).string_len(256))
-        .col(ColumnDef::new(BackgroundJobResults::ResultPath).string_len(512))
-        .col(ColumnDef::new(BackgroundJobResults::ErrorMessage).text())
+        .col(ColumnDef::new(SearchJobResults::StartedAt).big_integer())
+        .col(ColumnDef::new(SearchJobResults::EndedAt).big_integer())
+        .col(ColumnDef::new(SearchJobResults::Cluster).string_len(256))
+        .col(ColumnDef::new(SearchJobResults::ResultPath).string_len(512))
+        .col(ColumnDef::new(SearchJobResults::ErrorMessage).text())
         .primary_key(
             Index::create()
-                .name("pk_background_job_results")
-                .col(BackgroundJobResults::JobId)
-                .col(BackgroundJobResults::TraceId),
+                .name("pk_search_job_results")
+                .col(SearchJobResults::JobId)
+                .col(SearchJobResults::TraceId),
         )
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum BackgroundJobResults {
+enum SearchJobResults {
     Table,
     JobId,
     TraceId,

@@ -18,13 +18,13 @@ use sea_orm::{
     QuerySelect, Set, TransactionTrait,
 };
 
-use super::{entity::background_job_partitions::*, get_lock};
+use super::super::{entity::search_job_partitions::*, get_lock};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
 };
 
-// in background_jobs table
+// in search_jobs table
 // status 0: pending
 // status 1: running
 // status 2: finish
@@ -82,7 +82,7 @@ pub async fn submit_partitions(
         Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
     };
 
-    // sql: select * from background_job_partitions where job_id = job_id limit 1
+    // sql: select * from search_job_partitions where job_id = job_id limit 1
     let status = Entity::find()
         .filter(Column::JobId.eq(job_id))
         .lock(LockType::Update)
@@ -126,7 +126,7 @@ pub async fn submit_partitions(
 pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // sql: select * from background_job_partitions where job_id = job_id
+    // sql: select * from search_job_partitions where job_id = job_id
     let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
         .order_by(Column::PartitionId, Order::Asc)
@@ -139,7 +139,11 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
     }
 }
 
-pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<(), errors::Error> {
+pub async fn set_partition_job_start(
+    job_id: &str,
+    partition_id: i64,
+    updated_at: i64,
+) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -147,10 +151,7 @@ pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<
 
     let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(1))
-        .col_expr(
-            Column::StartedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
+        .col_expr(Column::StartedAt, Expr::value(updated_at))
         .col_expr(Column::Cluster, Expr::value(config::get_cluster_name()))
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))
@@ -168,6 +169,7 @@ pub async fn set_partition_job_finish(
     job_id: &str,
     partition_id: i64,
     path: &str,
+    updated_at: i64,
 ) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -176,10 +178,7 @@ pub async fn set_partition_job_finish(
 
     let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(2))
-        .col_expr(
-            Column::EndedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
+        .col_expr(Column::EndedAt, Expr::value(updated_at))
         .col_expr(Column::ResultPath, Expr::value(path))
         .filter(Column::JobId.eq(job_id))
         .filter(Column::PartitionId.eq(partition_id))

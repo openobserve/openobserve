@@ -12,7 +12,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(BackgroundJobs::Table).to_owned())
+            .drop_table(Table::drop().table(SearchJobs::Table).to_owned())
             .await?;
         Ok(())
     }
@@ -21,77 +21,65 @@ impl MigrationTrait for Migration {
 /// Statement to create table.
 fn create_table_stmt() -> TableCreateStatement {
     Table::create()
-        .table(BackgroundJobs::Table)
+        .table(SearchJobs::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(BackgroundJobs::Id)
+            ColumnDef::new(SearchJobs::Id)
                 .string_len(64)
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(BackgroundJobs::TraceId)
+            ColumnDef::new(SearchJobs::TraceId)
                 .string_len(64)
                 .not_null(),
         )
+        .col(ColumnDef::new(SearchJobs::OrgId).string_len(256).not_null())
         .col(
-            ColumnDef::new(BackgroundJobs::OrgId)
+            ColumnDef::new(SearchJobs::UserId)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(BackgroundJobs::UserId)
+            ColumnDef::new(SearchJobs::StreamType)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(BackgroundJobs::StreamType)
+            ColumnDef::new(SearchJobs::StreamNames)
                 .string_len(256)
                 .not_null(),
         )
+        .col(ColumnDef::new(SearchJobs::Payload).text().not_null())
         .col(
-            ColumnDef::new(BackgroundJobs::StreamNames)
-                .string_len(256)
+            ColumnDef::new(SearchJobs::StartTime)
+                .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(BackgroundJobs::Payload).text().not_null())
+        .col(ColumnDef::new(SearchJobs::EndTime).big_integer().not_null())
         .col(
-            ColumnDef::new(BackgroundJobs::StartTime)
+            ColumnDef::new(SearchJobs::CreatedAt)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(BackgroundJobs::EndTime)
+            ColumnDef::new(SearchJobs::UpdatedAt)
                 .big_integer()
                 .not_null(),
         )
-        .col(
-            ColumnDef::new(BackgroundJobs::CreatedAt)
-                .big_integer()
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(BackgroundJobs::UpdatedAt)
-                .big_integer()
-                .not_null(),
-        )
-        .col(ColumnDef::new(BackgroundJobs::StartedAt).big_integer())
-        .col(ColumnDef::new(BackgroundJobs::EndedAt).big_integer())
-        .col(ColumnDef::new(BackgroundJobs::Cluster).string_len(256))
-        .col(ColumnDef::new(BackgroundJobs::Node).string_len(256))
-        .col(
-            ColumnDef::new(BackgroundJobs::Status)
-                .big_integer()
-                .not_null(),
-        )
-        .col(ColumnDef::new(BackgroundJobs::ResultPath).string_len(512))
-        .col(ColumnDef::new(BackgroundJobs::ErrorMessage).text())
-        .col(ColumnDef::new(BackgroundJobs::PartitionNum).big_integer())
+        .col(ColumnDef::new(SearchJobs::StartedAt).big_integer())
+        .col(ColumnDef::new(SearchJobs::EndedAt).big_integer())
+        .col(ColumnDef::new(SearchJobs::Cluster).string_len(256))
+        .col(ColumnDef::new(SearchJobs::Node).string_len(256))
+        .col(ColumnDef::new(SearchJobs::Status).big_integer().not_null())
+        .col(ColumnDef::new(SearchJobs::ResultPath).string_len(512))
+        .col(ColumnDef::new(SearchJobs::ErrorMessage).text())
+        .col(ColumnDef::new(SearchJobs::PartitionNum).big_integer())
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum BackgroundJobs {
+enum SearchJobs {
     Table,
     Id,
     TraceId,

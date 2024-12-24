@@ -24,9 +24,7 @@ use config::{
 use infra::{
     errors::{Error, ErrorCodes},
     storage,
-    table::entity::{
-        background_job_partitions::Model as PartitionJob, background_jobs::Model as Job,
-    },
+    table::entity::{search_job_partitions::Model as PartitionJob, search_jobs::Model as Job},
 };
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
@@ -38,20 +36,20 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{
-    db::background_job::*,
+    db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
     grpc::get_cached_channel,
     search::{self as SearchService, grpc_search::grpc_search, MetadataMap},
 };
 
-// 1. get the oldest job from `background_jobs` table
+// 1. get the oldest job from `search_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
 //    do not have previous run (case 2) in case 2, call search_partition to get all jobs, write to
 //    database
-// 3. get all partition jobs from `background_job_partitions` table
+// 3. get all partition jobs from `search_job_partitions` table
 // 4. after run on partition, write result to s3
-// 6. when all partition is done, write data to s3, then update `background_jobs` table
+// 6. when all partition is done, write data to s3, then update `search_jobs` table
 pub async fn run(id: i64) -> Result<(), anyhow::Error> {
-    // 1. get the oldest job from `background_jobs` table, and set status to running
+    // 1. get the oldest job from `search_jobs` table, and set status to running
     let job = match get_job().await? {
         Some(job) => job,
         None => return Ok(()),
@@ -59,16 +57,13 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
 
     let start = std::time::Instant::now();
     log::info!(
-        "[BACKGROUND JOB {id}] job_id: {}, start running, trace_id: {}",
+        "[SEARCH JOB {id}] job_id: {}, start running, trace_id: {}",
         job.id,
         job.trace_id
     );
 
     // 2. similar to the compactor, we need to update the job status every 15 seconds
-    let ttl = std::cmp::max(
-        60,
-        config::get_config().limit.background_job_run_timeout / 4,
-    ) as u64;
+    let ttl = std::cmp::max(60, config::get_config().limit.search_job_run_timeout / 4) as u64;
     let job_id = job.id.clone();
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     tokio::task::spawn(async move {
@@ -76,15 +71,13 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             tokio::select! {
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                 _ = rx.recv() => {
-                    log::debug!("[BACKGROUND JOB {id}] job_id: {job_id}, update_running_jobs done");
+                    log::debug!("[SEARCH JOB {id}] job_id: {job_id}, update_running_jobs done");
                     return;
                 }
             }
 
             if let Err(e) = update_running_job(&job_id).await {
-                log::error!(
-                    "[BACKGROUND JOB {id}] job_id: {job_id}, update_job_status failed: {e}",
-                );
+                log::error!("[SEARCH JOB {id}] job_id: {job_id}, update_job_status failed: {e}",);
             }
         }
     });
@@ -96,14 +89,14 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         if let Err(e) = res {
             set_job_error_message(&job.id, &e.to_string()).await?;
             log::error!(
-                "[BACKGROUND JOB {id}] job_id: {}, handle_search_partition error: {e}",
+                "[SEARCH JOB {id}] job_id: {}, handle_search_partition error: {e}",
                 job.id
             );
             return Err(e);
         }
     }
 
-    // 4. get all partition jobs from `background_job_partitions` table
+    // 4. get all partition jobs from `search_job_partitions` table
     let req: search::Request = json::from_str(&job.payload)?;
     let limit = if req.query.size > 0 {
         req.query.size
@@ -125,7 +118,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
                 Err(e) => {
                     set_job_error_message(&job.id, &e.to_string()).await?;
                     log::error!(
-                        "[BACKGROUND JOB {id}] job_id: {}, run_partition_job error: {e}",
+                        "[SEARCH JOB {id}] job_id: {}, run_partition_job error: {e}",
                         job.id
                     );
                     return Err(e);
@@ -139,7 +132,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     }
 
     log::info!(
-        "[BACKGROUND JOB {id}] job_id: {}, start merge all partition result",
+        "[SEARCH JOB {id}] job_id: {}, start merge all partition result",
         job.id,
     );
 
@@ -151,11 +144,11 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     let path = generate_result_path(job.created_at, &job.trace_id, None);
     storage::put(&path, buf.into()).await?;
 
-    // 6. update `background_jobs` table
+    // 6. update `search_jobs` table
     set_job_finish(&job.id, &path).await?;
 
     log::info!(
-        "[BACKGROUND JOB {id}] finish running, job_id: {}, time_elapsed: {}ms",
+        "[SEARCH JOB {id}] finish running, job_id: {}, time_elapsed: {}ms",
         job.id,
         start.elapsed().as_millis()
     );
@@ -198,7 +191,7 @@ async fn run_partition_job(
     need: i64,
 ) -> Result<i64, anyhow::Error> {
     log::info!(
-        "[BACKGROUND JOB {id}] running job_id: {}, partition id: {}",
+        "[SEARCH JOB {id}] running job_id: {}, partition id: {}",
         job.id,
         partition_job.partition_id
     );
@@ -243,7 +236,7 @@ async fn run_partition_job(
     set_partition_job_finish(&job.id, partition_id, path.as_str()).await?;
 
     log::info!(
-        "[BACKGROUND JOB {id}] finish job_id: {}, partition id: {}",
+        "[SEARCH JOB {id}] finish job_id: {}, partition id: {}",
         job.id,
         partition_job.partition_id
     );
@@ -322,13 +315,20 @@ pub async fn delete_jobs() -> Result<(), anyhow::Error> {
             if result.result_path.is_some() {
                 deleted_files.push(result.result_path.clone().unwrap());
             }
+            // the old running maybe have partition result
+            if let Some(partition_num) = partition_num {
+                for i in 0..partition_num {
+                    let path = generate_result_path(job.created_at, &result.trace_id, Some(i));
+                    deleted_files.push(path);
+                }
+            }
         }
 
         // delete all files
         let deleted_files_str: Vec<&str> = deleted_files.iter().map(|s| s.as_str()).collect();
         if let Err(e) = storage::del(&deleted_files_str).await {
             log::warn!(
-                "[BACKGROUND JOB] delete_jobs failed to delete files: {deleted_files_str:?}, error: {e}",
+                "[SEARCH JOB] delete_jobs failed to delete files: {deleted_files_str:?}, error: {e}",
             );
         }
 
@@ -349,7 +349,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
     let job = get(job_id, org_id).await?;
     if job.status != 1 {
         let message = format!(
-            "[BACKGROUND JOB {id}] job_id: {}, status is not running when running background job, current status: {}",
+            "[SEARCH JOB {id}] job_id: {}, status is not running when running search job, current status: {}",
             job.id, job.status
         );
         set_job_error_message(&job.id, message.as_str()).await?;

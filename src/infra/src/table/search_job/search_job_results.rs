@@ -15,7 +15,7 @@
 
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
 
-use super::{entity::background_job_results::*, get_lock};
+use super::super::{entity::search_job_results::*, get_lock};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
@@ -35,7 +35,7 @@ pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
 
     match res {
         Ok(res) => Ok(res),
-        Err(e) => orm_err!(format!("get_background_job_results failed: {}", e)),
+        Err(e) => orm_err!(format!("get_search_job_results failed: {}", e)),
     }
 }
 
@@ -51,7 +51,7 @@ pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error>
         .await;
 
     if let Err(e) = res {
-        return orm_err!(format!("delete_background_job_results failed: {}", e));
+        return orm_err!(format!("delete_search_job_results failed: {}", e));
     }
 
     Ok(())

@@ -23,7 +23,6 @@ use {
 };
 
 pub mod alerts;
-pub mod background_job;
 pub mod compact;
 pub mod dashboards;
 pub mod enrichment_table;
@@ -39,6 +38,7 @@ pub mod pipeline;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
+pub mod search_job;
 pub mod session;
 pub mod short_url;
 pub mod syslog;
