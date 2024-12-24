@@ -35,6 +35,7 @@
           borderless
           dense
           fill-input
+          behavior="menu"
           :title="searchObj.meta.selectedTraceStream"
           :loading="isTracesStreamsLoading"
         >
