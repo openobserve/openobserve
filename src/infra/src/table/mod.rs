@@ -45,6 +45,12 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::down(client, steps).await?;
+    Ok(())
+}
+
 pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     organizations::create_table().await?;
     users::create_table().await?;
