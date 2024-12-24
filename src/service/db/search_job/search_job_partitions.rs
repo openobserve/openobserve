@@ -13,26 +13,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::{errors, table::entity::search_job_partitions::Model as PartitionJob};
+use infra::{
+    errors,
+    table::{
+        entity::search_job_partitions::Model,
+        search_job::{
+            common::{OperatorType, Value},
+            search_job_partitions::{Filter, MetaColumn, SetOperator},
+        },
+    },
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-// query search_job_partitions table
-pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
-    infra::table::search_job::search_job_partitions::cancel_partition_job(job_id).await?;
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
-
-    Ok(())
-}
-
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
     let created_at = chrono::Utc::now().timestamp_micros();
-    infra::table::search_job::search_job_partitions::submit_partitions(
-        job_id, partitions, created_at,
-    )
-    .await?;
+    let mut jobs = Vec::with_capacity(partitions.len());
+    for (idx, partition) in partitions.iter().enumerate() {
+        jobs.push(Model {
+            job_id: job_id.to_string(),
+            partition_id: idx as i64,
+            start_time: partition[0],
+            end_time: partition[1],
+            created_at,
+            status: 0,
+            started_at: None,
+            ended_at: None,
+            cluster: None,
+            result_path: None,
+            error_message: None,
+        });
+    }
+
+    infra::table::search_job::search_job_partitions::submit_partitions(job_id, jobs).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {}
@@ -40,18 +53,37 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
     Ok(())
 }
 
-pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<PartitionJob>, errors::Error> {
+pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     infra::table::search_job::search_job_partitions::get_partition_jobs(job_id).await
 }
 
 pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<(), errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
-    infra::table::search_job::search_job_partitions::set_partition_job_start(
-        job_id,
-        partition_id,
-        updated_at,
-    )
-    .await?;
+
+    let operator = SetOperator {
+        filter: vec![
+            Filter::new(
+                MetaColumn::JobId,
+                OperatorType::Equal,
+                Value::string(job_id),
+            ),
+            Filter::new(
+                MetaColumn::PartitionId,
+                OperatorType::Equal,
+                Value::i64(partition_id),
+            ),
+        ],
+        update: vec![
+            (MetaColumn::Status, Value::i64(1)),
+            (MetaColumn::StartedAt, Value::i64(updated_at)),
+            (
+                MetaColumn::Cluster,
+                Value::string(config::get_cluster_name().as_str()),
+            ),
+        ],
+    };
+
+    infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {}
@@ -65,13 +97,27 @@ pub async fn set_partition_job_finish(
     path: &str,
 ) -> Result<(), errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
-    infra::table::search_job::search_job_partitions::set_partition_job_finish(
-        job_id,
-        partition_id,
-        path,
-        updated_at,
-    )
-    .await?;
+    let operator = SetOperator {
+        filter: vec![
+            Filter::new(
+                MetaColumn::JobId,
+                OperatorType::Equal,
+                Value::string(job_id),
+            ),
+            Filter::new(
+                MetaColumn::PartitionId,
+                OperatorType::Equal,
+                Value::i64(partition_id),
+            ),
+        ],
+        update: vec![
+            (MetaColumn::Status, Value::i64(2)),
+            (MetaColumn::EndedAt, Value::i64(updated_at)),
+            (MetaColumn::ResultPath, Value::string(path)),
+        ],
+    };
+
+    infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {}
@@ -84,12 +130,47 @@ pub async fn set_partition_job_error_message(
     partition_id: i64,
     error_message: &str,
 ) -> Result<(), errors::Error> {
-    infra::table::search_job::search_job_partitions::set_partition_job_error_message(
-        job_id,
-        partition_id,
-        error_message,
-    )
-    .await?;
+    let updated_at = chrono::Utc::now().timestamp_micros();
+    let operator = SetOperator {
+        filter: vec![
+            Filter::new(
+                MetaColumn::JobId,
+                OperatorType::Equal,
+                Value::string(job_id),
+            ),
+            Filter::new(
+                MetaColumn::PartitionId,
+                OperatorType::Equal,
+                Value::i64(partition_id),
+            ),
+        ],
+        update: vec![
+            (MetaColumn::Status, Value::i64(2)),
+            (MetaColumn::EndedAt, Value::i64(updated_at)),
+            (MetaColumn::ErrorMessage, Value::string(error_message)),
+        ],
+    };
+
+    infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {}
+
+    Ok(())
+}
+
+// query search_job_partitions table
+pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
+    let operator = SetOperator {
+        filter: vec![Filter::new(
+            MetaColumn::JobId,
+            OperatorType::Equal,
+            Value::string(job_id),
+        )],
+        update: vec![(MetaColumn::Status, Value::i64(3))],
+    };
+
+    infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {}

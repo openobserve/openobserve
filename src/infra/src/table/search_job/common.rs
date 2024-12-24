@@ -13,7 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod common;
-pub mod search_job_partitions;
-pub mod search_job_results;
-pub mod search_jobs;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Value {
+    String(String),
+    I64(i64),
+}
+
+impl Value {
+    pub fn string(s: &str) -> Self {
+        Self::String(s.to_string())
+    }
+
+    pub fn i64(i: i64) -> Self {
+        Self::I64(i)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum OperatorType {
+    Equal,
+    NotEqual,    // curently not used
+    GreaterThan, // curently not used
+    LessThan,
+}

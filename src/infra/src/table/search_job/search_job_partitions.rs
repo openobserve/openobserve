@@ -14,15 +14,94 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    prelude::Expr, sea_query::LockType, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
+    prelude::Expr,
+    sea_query::{LockType, SimpleExpr},
+    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
+use serde::{Deserialize, Serialize};
 
-use super::super::{entity::search_job_partitions::*, get_lock};
+use super::{
+    super::{entity::search_job_partitions::*, get_lock},
+    common::{OperatorType, Value},
+};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
 };
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum MetaColumn {
+    JobId,
+    PartitionId,
+    StartTime,
+    EndTime,
+    CreatedAt,
+    StartedAt,
+    EndedAt,
+    Cluster,
+    Status,
+    ResultPath,
+    ErrorMessage,
+}
+
+impl From<MetaColumn> for Column {
+    fn from(column: MetaColumn) -> Self {
+        match column {
+            MetaColumn::JobId => Column::JobId,
+            MetaColumn::PartitionId => Column::PartitionId,
+            MetaColumn::StartTime => Column::StartTime,
+            MetaColumn::EndTime => Column::EndTime,
+            MetaColumn::CreatedAt => Column::CreatedAt,
+            MetaColumn::StartedAt => Column::StartedAt,
+            MetaColumn::EndedAt => Column::EndedAt,
+            MetaColumn::Cluster => Column::Cluster,
+            MetaColumn::Status => Column::Status,
+            MetaColumn::ResultPath => Column::ResultPath,
+            MetaColumn::ErrorMessage => Column::ErrorMessage,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Filter {
+    pub left: MetaColumn,
+    pub operator: OperatorType,
+    pub right: Value,
+}
+
+impl Filter {
+    pub fn new(left: MetaColumn, operator: OperatorType, right: Value) -> Self {
+        Self {
+            left,
+            operator,
+            right,
+        }
+    }
+}
+
+impl From<Filter> for SimpleExpr {
+    fn from(filter: Filter) -> Self {
+        let left: Column = filter.left.into();
+
+        match filter.right {
+            Value::String(s) => match filter.operator {
+                OperatorType::Equal => left.eq(s),
+                _ => unreachable!("search_job_partition table only need equal"),
+            },
+            Value::I64(i) => match filter.operator {
+                OperatorType::Equal => left.eq(i),
+                _ => unreachable!("search_job_partition table only need equal"),
+            },
+        }
+    }
+}
+
+// used for unify the set operation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SetOperator {
+    pub filter: Vec<Filter>,
+    pub update: Vec<(MetaColumn, Value)>,
+}
 
 // in search_jobs table
 // status 0: pending
@@ -31,52 +110,14 @@ use crate::{
 // status 3: cancel
 // status 4: delete
 
-pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(3))
-        .filter(Column::JobId.eq(job_id))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("cancel_partition_job failed: {}", e));
-    }
-
-    Ok(())
-}
-
-pub async fn submit_partitions(
-    job_id: &str,
-    partitions: &[[i64; 2]],
-    created_at: i64,
-) -> Result<(), errors::Error> {
-    if partitions.is_empty() {
+pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), errors::Error> {
+    if jobs.is_empty() {
         return orm_err!("partitions array cannot be empty");
     }
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let mut jobs = Vec::with_capacity(partitions.len());
-    for (idx, partition) in partitions.iter().enumerate() {
-        jobs.push(ActiveModel {
-            job_id: Set(job_id.to_string()),
-            partition_id: Set(idx as i64),
-            start_time: Set(partition[0]),
-            end_time: Set(partition[1]),
-            created_at: Set(created_at),
-            status: Set(0),
-            ..Default::default()
-        });
-    }
-
     let tx = match client.begin().await {
         Ok(tx) => tx,
         Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
@@ -106,6 +147,7 @@ pub async fn submit_partitions(
         Ok(None) => {}
     };
 
+    let jobs: Vec<ActiveModel> = jobs.into_iter().map(|job| job.into()).collect::<Vec<_>>();
     let res = Entity::insert_many(jobs).exec(&tx).await;
 
     if let Err(e) = res {
@@ -139,82 +181,39 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
     }
 }
 
-pub async fn set_partition_job_start(
-    job_id: &str,
-    partition_id: i64,
-    updated_at: i64,
-) -> Result<(), errors::Error> {
+pub async fn set(operator: SetOperator) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(1))
-        .col_expr(Column::StartedAt, Expr::value(updated_at))
-        .col_expr(Column::Cluster, Expr::value(config::get_cluster_name()))
-        .filter(Column::JobId.eq(job_id))
-        .filter(Column::PartitionId.eq(partition_id))
-        .exec(client)
-        .await;
+    let mut query = Entity::update_many();
 
-    if let Err(e) = res {
-        return orm_err!(format!("set_partition_job_start failed: {}", e));
+    for (column, value) in operator.update.clone() {
+        let column: Column = column.into();
+        match value {
+            Value::String(s) => {
+                query = query.col_expr(column, Expr::value(s));
+            }
+            Value::I64(i) => {
+                query = query.col_expr(column, Expr::value(i));
+            }
+        }
     }
 
-    Ok(())
-}
-
-pub async fn set_partition_job_finish(
-    job_id: &str,
-    partition_id: i64,
-    path: &str,
-    updated_at: i64,
-) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(2))
-        .col_expr(Column::EndedAt, Expr::value(updated_at))
-        .col_expr(Column::ResultPath, Expr::value(path))
-        .filter(Column::JobId.eq(job_id))
-        .filter(Column::PartitionId.eq(partition_id))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("set_partition_job_finish failed: {}", e));
+    for filter in operator.filter.clone() {
+        let filter: SimpleExpr = filter.into();
+        query = query.filter(filter);
     }
 
-    Ok(())
-}
+    let res = query.exec(client).await;
 
-pub async fn set_partition_job_error_message(
-    job_id: &str,
-    partition_id: i64,
-    error_message: &str,
-) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    let res = Entity::update_many()
-        .col_expr(Column::ErrorMessage, Expr::value(error_message))
-        .col_expr(Column::Status, Expr::value(2))
-        .filter(Column::JobId.eq(job_id))
-        .filter(Column::PartitionId.eq(partition_id))
-        .exec(client)
-        .await;
-
-    if let Err(e) = res {
-        return orm_err!(format!("set_partition_job_error_message failed: {}", e));
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => orm_err!(format!(
+            "set operator: {operator:?} in search job partition table error: {e}"
+        )),
     }
-
-    Ok(())
 }
 
 pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Error> {

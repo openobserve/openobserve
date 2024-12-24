@@ -22,18 +22,45 @@ use sea_orm::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::super::{
-    entity::{
-        search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
-        search_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
-        search_jobs::*,
+use super::{
+    super::{
+        entity::{
+            search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
+            search_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
+            search_jobs::*,
+        },
+        get_lock,
     },
-    get_lock,
+    common::{OperatorType, Value},
 };
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
 };
+
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub enum JobOperator {
+//     Submit(Box<Model>),
+//     Set(SetOperator),
+//     GetJob {
+//         job_id: String,
+//         cluster: String,
+//         node: String,
+//         updated_at: i64,
+//     },
+//     Cancel {
+//         job_id: String,
+//         updated_at: i64,
+//     },
+//     Delete {
+//         job_id: String,
+//     },
+//     Retry {
+//         job_id: String,
+//         new_trace_id: String,
+//         updated_at: i64,
+//     },
+// }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MetaColumn {
@@ -82,30 +109,6 @@ impl From<MetaColumn> for Column {
             MetaColumn::PartitionNum => Column::PartitionNum,
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Value {
-    String(String),
-    I64(i64),
-}
-
-impl Value {
-    pub fn string(s: &str) -> Self {
-        Self::String(s.to_string())
-    }
-
-    pub fn i64(i: i64) -> Self {
-        Self::I64(i)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum OperatorType {
-    Equal,
-    NotEqual,
-    GreaterThan,
-    LessThan,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -161,45 +164,17 @@ pub struct SetOperator {
 // status 4: delete
 
 #[allow(clippy::too_many_arguments)]
-pub async fn submit(
-    job_id: &str,
-    trace_id: &str,
-    org_id: &str,
-    user_id: &str,
-    stream_type: &str,
-    stream_names: &str,
-    payload: &str,
-    start_time: i64,
-    end_time: i64,
-    created_at: i64,
-    update_at: i64,
-) -> Result<String, errors::Error> {
-    let record = ActiveModel {
-        id: Set(job_id.to_string()),
-        trace_id: Set(trace_id.to_string()),
-        org_id: Set(org_id.to_string()),
-        user_id: Set(user_id.to_string()),
-        stream_type: Set(stream_type.to_string()),
-        stream_names: Set(stream_names.to_string()),
-        payload: Set(payload.to_string()),
-        start_time: Set(start_time),
-        end_time: Set(end_time),
-        created_at: Set(created_at),
-        updated_at: Set(update_at),
-        status: Set(0),
-        ..Default::default()
-    };
-
+pub async fn submit(job: ActiveModel) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _res = match Entity::insert(record).exec(client).await {
+    let _res = match Entity::insert(job).exec(client).await {
         Ok(res) => res,
         Err(e) => return orm_err!(format!("submit search job error: {e}")),
     };
 
-    Ok(job_id.to_string())
+    Ok(())
 }
 
 // get the job and update status
@@ -257,7 +232,7 @@ pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
     Ok(model)
 }
 
-pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
+pub async fn cancel_job(job_id: &str, update_at: i64) -> Result<i64, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -288,6 +263,7 @@ pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
         if res.status == 1 || res.status == 0 {
             if let Err(e) = Entity::update_many()
                 .col_expr(Column::Status, Expr::value(3))
+                .col_expr(Column::EndedAt, Expr::value(update_at))
                 .filter(Column::Id.eq(job_id))
                 .exec(&tx)
                 .await
@@ -557,4 +533,29 @@ fn generate_reset_partition_job_query(job_id: &str) -> UpdateMany<PartitionJobEn
             SimpleExpr::Keyword(Keyword::Null),
         )
         .filter(PartitionJobColumn::JobId.eq(job_id))
+}
+
+// only used for super cluster sync
+pub async fn set_job_start(
+    job_id: &str,
+    cluster: &str,
+    node: &str,
+    updated_at: i64,
+) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let res = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(1))
+        .col_expr(Column::StartedAt, Expr::value(updated_at))
+        .col_expr(Column::UpdatedAt, Expr::value(updated_at))
+        .col_expr(Column::Cluster, Expr::value(cluster))
+        .col_expr(Column::Node, Expr::value(node))
+        .filter(Column::Id.eq(job_id))
+        .exec(client)
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => orm_err!(format!("set job start error: {e}")),
+    }
 }
