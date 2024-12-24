@@ -276,6 +276,21 @@ export default defineComponent({
       orgService
         .get_organization_summary(org_id)
         .then((res) => {
+          if (
+            res.data.streams.num_streams == 0 &&
+            res.data.alerts.num_realtime == 0 &&
+            res.data.alerts.num_scheduled == 0 &&
+            res.data.pipelines?.num_realtime == 0 &&
+            res.data.pipelines?.num_scheduled == 0 &&
+            res.data.total_dashboards == 0 &&
+            res.data.total_functions == 0
+          ) {
+            no_data_ingest.value = true;
+            summary.value = {};
+            dismiss();
+            return;
+          }
+
           summary.value = {
             streams_count: res.data.streams?.num_streams ?? 0,
             ingested_data: formatSizeFromMB(
@@ -357,7 +372,7 @@ export default defineComponent({
 }
 
 .my-card-wide {
-  width: 90vw;
+  width: 88.6vw;
 }
 
 .card-container {
