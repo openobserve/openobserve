@@ -38,29 +38,29 @@ use crate::{
     errors, orm_err,
 };
 
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub enum JobOperator {
-//     Submit(Box<Model>),
-//     Set(SetOperator),
-//     GetJob {
-//         job_id: String,
-//         cluster: String,
-//         node: String,
-//         updated_at: i64,
-//     },
-//     Cancel {
-//         job_id: String,
-//         updated_at: i64,
-//     },
-//     Delete {
-//         job_id: String,
-//     },
-//     Retry {
-//         job_id: String,
-//         new_trace_id: String,
-//         updated_at: i64,
-//     },
-// }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum JobOperator {
+    Submit(Box<Model>),
+    Set(SetOperator),
+    GetJob {
+        job_id: String,
+        cluster: String,
+        node: String,
+        updated_at: i64,
+    },
+    Cancel {
+        job_id: String,
+        updated_at: i64,
+    },
+    Delete {
+        job_id: String,
+    },
+    Retry {
+        job_id: String,
+        new_trace_id: String,
+        updated_at: i64,
+    },
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MetaColumn {

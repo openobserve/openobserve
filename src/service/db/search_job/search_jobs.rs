@@ -25,8 +25,11 @@ use infra::{
     },
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use o2_enterprise::enterprise::super_cluster;
+use {
+    config::cluster::LOCAL_NODE, infra::table::search_job::search_jobs::JobOperator,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::super_cluster,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub async fn submit(
@@ -69,10 +72,10 @@ pub async fn submit(
     // super cluster, add a new job
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_submit(job)
+        super_cluster::queue::search_job_operator(JobOperator::Submit(job.into()))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster submit search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job submit error: {e}"))
             })?;
     }
 
@@ -86,7 +89,17 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
 
     // TODO: need other call to set the get job's status
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled && res.is_some() {
+        let job_id = res.as_ref().unwrap().clone();
+        super_cluster::queue::search_job_operator(JobOperator::GetJob {
+            job_id: job_id.id.clone(),
+            updated_at,
+            cluster: config::get_cluster_name(),
+            node: LOCAL_NODE.uuid.clone(),
+        })
+        .await
+        .map_err(|e| errors::Error::Message(format!("super cluster search job get error: {e}")))?;
+    }
 
     Ok(res)
 }
@@ -97,8 +110,16 @@ pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
 
     // super cluster, cancel a job
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
-
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_operator(JobOperator::Cancel {
+            job_id: job_id.to_string(),
+            updated_at,
+        })
+        .await
+        .map_err(|e| {
+            errors::Error::Message(format!("super cluster search job cancel error: {e}"))
+        })?;
+    }
     Ok(res)
 }
 
@@ -121,10 +142,10 @@ pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -156,10 +177,10 @@ pub async fn set_job_finish(job_id: &str, path: &str) -> Result<(), errors::Erro
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -181,10 +202,10 @@ pub async fn set_partition_num(job_id: &str, partition_num: i64) -> Result<(), e
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -211,10 +232,10 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -236,10 +257,10 @@ pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -264,10 +285,10 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::search_job_set(operator)
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
             .await
             .map_err(|e| {
-                errors::Error::Message(format!("super cluster set search job error: {e}"))
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
             })?;
     }
 
@@ -279,7 +300,15 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_operator(JobOperator::Delete {
+            job_id: job_id.to_string(),
+        })
+        .await
+        .map_err(|e| {
+            errors::Error::Message(format!("super cluster search job delete error: {e}"))
+        })?;
+    }
 
     Ok(())
 }
@@ -289,9 +318,18 @@ pub async fn retry_search_job(job_id: &str) -> Result<(), errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
     infra::table::search_job::search_jobs::retry_search_job(job_id, &trace_id, updated_at).await?;
 
-    // TODO: retry logical is complex, how to do this in super cluster
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_operator(JobOperator::Retry {
+            job_id: job_id.to_string(),
+            new_trace_id: trace_id.to_string(),
+            updated_at,
+        })
+        .await
+        .map_err(|e| {
+            errors::Error::Message(format!("super cluster search job retry error: {e}"))
+        })?;
+    }
 
     Ok(())
 }

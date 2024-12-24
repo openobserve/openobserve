@@ -14,12 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
+use serde::{Deserialize, Serialize};
 
 use super::super::{entity::search_job_results::*, get_lock};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors, orm_err,
 };
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum JobResultOperator {
+    Delete { job_id: String },
+}
 
 pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)

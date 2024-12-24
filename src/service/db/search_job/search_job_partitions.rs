@@ -24,7 +24,11 @@ use infra::{
     },
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use {
+    infra::table::search_job::search_job_partitions::PartitionJobOperator,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::super_cluster,
+};
 
 pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<(), errors::Error> {
     let created_at = chrono::Utc::now().timestamp_micros();
@@ -45,10 +49,22 @@ pub async fn submit_partitions(job_id: &str, partitions: &[[i64; 2]]) -> Result<
         });
     }
 
-    infra::table::search_job::search_job_partitions::submit_partitions(job_id, jobs).await?;
+    infra::table::search_job::search_job_partitions::submit_partitions(job_id, jobs.clone())
+        .await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Submit {
+            job_id: job_id.to_string(),
+            jobs: Box::new(jobs),
+        })
+        .await
+        .map_err(|e| {
+            errors::Error::Message(format!(
+                "super cluster search job partition submit error: {e}"
+            ))
+        })?;
+    }
 
     Ok(())
 }
@@ -86,7 +102,13 @@ pub async fn set_partition_job_start(job_id: &str, partition_id: i64) -> Result<
     infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job partition set error: {e}"))
+            })?;
+    }
 
     Ok(())
 }
@@ -120,7 +142,13 @@ pub async fn set_partition_job_finish(
     infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job partition set error: {e}"))
+            })?;
+    }
 
     Ok(())
 }
@@ -154,7 +182,13 @@ pub async fn set_partition_job_error_message(
     infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job partition set error: {e}"))
+            })?;
+    }
 
     Ok(())
 }
@@ -173,7 +207,13 @@ pub async fn cancel_partition_job(job_id: &str) -> Result<(), errors::Error> {
     infra::table::search_job::search_job_partitions::set(operator.clone()).await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job partition set error: {e}"))
+            })?;
+    }
 
     Ok(())
 }
@@ -182,7 +222,17 @@ pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Err
     infra::table::search_job::search_job_partitions::clean_deleted_partition_job(job_id).await?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {}
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_partition_operator(PartitionJobOperator::Delete {
+            job_id: job_id.to_string(),
+        })
+        .await
+        .map_err(|e| {
+            errors::Error::Message(format!(
+                "super cluster search job partition delete error: {e}"
+            ))
+        })?;
+    }
 
     Ok(())
 }

@@ -30,6 +30,18 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PartitionJobOperator {
+    Submit {
+        job_id: String,
+        jobs: Box<Vec<Model>>,
+    },
+    Set(SetOperator),
+    Delete {
+        job_id: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MetaColumn {
     JobId,
     PartitionId,
