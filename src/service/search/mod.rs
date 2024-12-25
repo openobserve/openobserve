@@ -550,6 +550,7 @@ pub async fn search_partition(
     org_id: &str,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
+    skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -727,7 +728,7 @@ pub async fn search_partition(
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
-    if max_query_range > 0 && step > max_query_range {
+    if !skip_max_query_range && max_query_range > 0 && step > max_query_range {
         step = if min_step < max_query_range {
             max_query_range - max_query_range % min_step
         } else {
@@ -1174,6 +1175,7 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
             },
+            false,
         )
         .await
         {
