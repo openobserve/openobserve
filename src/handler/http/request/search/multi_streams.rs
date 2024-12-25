@@ -190,9 +190,6 @@ pub async fn search_multi(
 
     for mut req in queries {
         sqls.push(req.query.sql.clone());
-        let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
-        rpc_req.org_id = org_id.to_string();
-        rpc_req.stream_type = stream_type.to_string();
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
@@ -970,6 +967,8 @@ pub async fn around_multi(
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
@@ -1043,6 +1042,8 @@ pub async fn around_multi(
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),

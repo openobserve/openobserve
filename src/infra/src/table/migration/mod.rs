@@ -25,6 +25,11 @@ mod m20241119_000003_delete_metas;
 mod m20241204_143100_create_table_search_queue;
 mod m20241209_120000_create_alerts_table;
 mod m20241215_190333_delete_metas;
+mod m20241217_154900_alter_folders_table_idx;
+mod m20241217_155000_populate_alerts_table;
+mod m20241222_085111_search_jobs;
+mod m20241222_085135_search_job_partitions;
+mod m20241222_085148_search_job_results;
 mod m20241224_120000_create_cipher_table;
 
 pub struct Migrator;
@@ -43,6 +48,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20241204_143100_create_table_search_queue::Migration),
             Box::new(m20241209_120000_create_alerts_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
+            Box::new(m20241217_154900_alter_folders_table_idx::Migration),
+            Box::new(m20241217_155000_populate_alerts_table::Migration),
+            Box::new(m20241222_085111_search_jobs::Migration),
+            Box::new(m20241222_085135_search_job_partitions::Migration),
+            Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20241224_120000_create_cipher_table::Migration),
         ]
     }

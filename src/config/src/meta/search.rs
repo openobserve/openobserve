@@ -20,7 +20,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    ider,
     meta::sql::OrderBy,
     utils::{base64, json},
 };
@@ -114,6 +113,11 @@ pub struct Query {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    // streaming output
+    #[serde(default)]
+    pub streaming_output: bool,
+    #[serde(default)]
+    pub streaming_id: Option<String>,
 }
 
 fn default_size() -> i64 {
@@ -135,6 +139,8 @@ impl Default for Query {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         }
     }
 }
@@ -214,6 +220,17 @@ pub struct ResponseTook {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<ResponseNodeTook>,
+}
+
+impl ResponseTook {
+    pub fn add(&mut self, other: &ResponseTook) {
+        self.total += other.total;
+        self.idx_took += other.idx_took;
+        self.wait_queue += other.wait_queue;
+        self.cluster_total += other.cluster_total;
+        self.cluster_wait_queue += other.cluster_wait_queue;
+        self.nodes.extend(other.nodes.clone());
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -341,6 +358,8 @@ pub struct SearchPartitionRequest {
     pub clusters: Vec<String>,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub streaming_output: bool,
 }
 
 impl SearchPartitionRequest {
@@ -362,6 +381,21 @@ impl SearchPartitionRequest {
     }
 }
 
+impl From<&Request> for SearchPartitionRequest {
+    fn from(req: &Request) -> Self {
+        SearchPartitionRequest {
+            sql: req.query.sql.clone(),
+            start_time: req.query.start_time,
+            end_time: req.query.end_time,
+            encoding: req.encoding,
+            regions: req.regions.clone(),
+            clusters: req.clusters.clone(),
+            query_fn: req.query.query_fn.clone(),
+            streaming_output: req.query.streaming_output,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
     pub trace_id: String,
@@ -375,6 +409,9 @@ pub struct SearchPartitionResponse {
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
     pub order_by: OrderBy,
+    pub streaming_output: bool,
+    pub streaming_aggs: bool,
+    pub streaming_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -430,6 +467,8 @@ impl SearchHistoryRequest {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -612,46 +651,6 @@ impl ScanStats {
     }
 }
 
-impl From<Request> for cluster_rpc::SearchRequest {
-    fn from(req: Request) -> Self {
-        let req_query = cluster_rpc::SearchQuery {
-            sql: req.query.sql.clone(),
-            quick_mode: req.query.quick_mode,
-            query_type: req.query.query_type.clone(),
-            from: req.query.from as i32,
-            size: req.query.size as i32,
-            start_time: req.query.start_time,
-            end_time: req.query.end_time,
-            sort_by: req.query.sort_by.unwrap_or_default(),
-            track_total_hits: req.query.track_total_hits,
-            uses_zo_fn: req.query.uses_zo_fn,
-            query_fn: req.query.query_fn.unwrap_or_default(),
-            skip_wal: req.query.skip_wal,
-        };
-
-        let job = cluster_rpc::Job {
-            trace_id: ider::uuid(),
-            job: "".to_string(),
-            stage: 0,
-            partition: 0,
-        };
-
-        cluster_rpc::SearchRequest {
-            job: Some(job),
-            org_id: "".to_string(),
-            agg_mode: cluster_rpc::AggregateMode::Final.into(),
-            query: Some(req_query),
-            file_ids: vec![],
-            idx_files: vec![],
-            stream_type: "".to_string(),
-            timeout: req.timeout,
-            work_group: "".to_string(),
-            user_id: None,
-            search_event_type: req.search_type.map(|event| event.to_string()),
-        }
-    }
-}
-
 impl From<Query> for cluster_rpc::SearchQuery {
     fn from(query: Query) -> Self {
         cluster_rpc::SearchQuery {
@@ -714,6 +713,7 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
+    SearchJob,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -753,6 +753,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "other"),
             SearchEventType::RUM => write!(f, "rum"),
             SearchEventType::DerivedStream => write!(f, "derived_stream"),
+            SearchEventType::SearchJob => write!(f, "search_job"),
         }
     }
 }
@@ -770,8 +771,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
+            "search_job" | "searchjob" => Ok(SearchEventType::SearchJob),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),
         }
     }
@@ -868,6 +870,8 @@ pub struct MultiSearchPartitionRequest {
     pub clusters: Vec<String>,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub streaming_output: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -993,6 +997,8 @@ impl MultiStreamRequest {
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
                     skip_wal: self.skip_wal,
+                    streaming_output: false,
+                    streaming_id: None,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -1060,37 +1066,6 @@ mod tests {
         let mut req: Request = json::from_value(req).unwrap();
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
-    }
-
-    #[tokio::test]
-    async fn test_search_convert() {
-        let req = Request {
-            query: Query {
-                sql: "SELECT * FROM test".to_string(),
-                quick_mode: false,
-                query_type: "".to_string(),
-                from: 0,
-                size: 100,
-                start_time: 0,
-                end_time: 0,
-                sort_by: None,
-                track_total_hits: false,
-                uses_zo_fn: false,
-                query_fn: None,
-                skip_wal: false,
-            },
-            encoding: "base64".into(),
-            regions: vec![],
-            clusters: vec![],
-            timeout: 0,
-            search_type: None,
-            search_event_context: None,
-        };
-
-        let rpc_req = cluster_rpc::SearchRequest::from(req.clone());
-
-        assert_eq!(rpc_req.query.as_ref().unwrap().sql, req.query.sql);
-        assert_eq!(rpc_req.query.as_ref().unwrap().size, req.query.size as i32);
     }
 }
 
