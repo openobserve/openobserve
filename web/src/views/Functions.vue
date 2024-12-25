@@ -29,9 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inline-label
             vertical
           >
-          <q-route-tab
+            <q-route-tab
               v-if="
-                !store.state.zoConfig?.custom_hide_menus?.split(',')
+                !store.state.zoConfig?.custom_hide_menus
+                  ?.split(',')
                   .includes('pipelines')
               "
               data-test="stream-pipelines-tab"
@@ -70,14 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.enrichmentTables')"
               content-class="tab_content"
             />
-
-
-
           </q-tabs>
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-md q-my-sm">
+        <div class="q-mx-sm">
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
@@ -112,7 +110,7 @@ export default defineComponent({
         // This is added to redirect to functionList if the user is on functions route
         // This case happens when user clicks on functions from menu when he is already on functions page
         if (routeName === "pipeline") router.back();
-      }
+      },
     );
 
     onBeforeMount(() => {
