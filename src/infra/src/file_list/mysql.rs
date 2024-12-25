@@ -1191,7 +1191,8 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret =
-            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = ? GROUP BY stream, status ORDER BY status desc;"#)
+                .bind(super::FileListJobStatus::Pending)
                 .fetch_all(&pool)
                 .await?;
 
@@ -1230,8 +1231,8 @@ impl MysqlFileList {
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(org_id)
@@ -1244,6 +1245,7 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
         .bind(meta.records)
         .bind(meta.original_size)
         .bind(meta.compressed_size)
+        .bind(meta.index_size)
         .bind(meta.flattened)
         .execute(&pool)
         .await {

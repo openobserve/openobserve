@@ -303,10 +303,11 @@ impl FromRequest for AuthExtractor {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 }
-                if method.eq("PUT") || method.eq("DELETE") {
+                if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
                     // for put/delete actions i.e. updations, we need permissions
                     // on that particular "sub-entity", and this will take form of
                     // alert:templates or alerts:destinations or stream:alerts
+                    // search jobs also fall under this 3 length case
                     format!(
                         "{}:{}",
                         OFGA_MODELS

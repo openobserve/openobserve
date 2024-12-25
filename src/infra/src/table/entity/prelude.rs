@@ -2,5 +2,8 @@
 
 pub use super::{
     alerts::Entity as Alerts, cipher_keys::Entity as CipherKeys, dashboards::Entity as Dashboards,
-    folders::Entity as Folders, search_queue::Entity as SearchQueue,
+    distinct_value_fields::Entity as DistinctValueFields, folders::Entity as Folders,
+    search_job_partitions::Entity as SearchJobPartitions,
+    search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,
+    search_queue::Entity as SearchQueue,
 };

@@ -118,9 +118,10 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
                 }
                 Err(e) => {
                     // TODO: need a better solution for identifying the error
-                    if file.ends_with(".puffin") {
-                        // ignore puffin file deletion error
-                    } else {
+                    if file.ends_with(".result.json") {
+                        // ignore search job file deletion error
+                        log::debug!("Failed to delete object: {}, error: {:?}", file, e);
+                    } else if !is_local_disk_storage() {
                         log::error!("Failed to delete object: {:?}", e);
                     }
                 }
