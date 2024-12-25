@@ -1,8 +1,29 @@
 <template>
-  <div class="tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center">
-    <div class="tw-flex tw-items-center">
+  <div
+    class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
+  >
+    <div class="tw-flex tw-items-center o2-input">
       <q-icon class="tw-pr-1" name="arrow_back_ios" size="18px" />
-      <div class="tw-text-lg">Add Function</div>
+      <div class="tw-text-lg tw-w-full">Add Function</div>
+      <q-input
+        v-model="functionName"
+        :label="t('function.name')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-pa-none tw-w-full q-ml-md"
+        stack-label
+        outlined
+        filled
+        dense
+        v-bind:readonly="disableName"
+        v-bind:disable="disableName"
+        :rules="[
+          (val: any) => !!val || 'Field is required!',
+          isValidMethodName,
+        ]"
+        tabindex="0"
+        style="min-width: 300px"
+      />
     </div>
     <div class="add-function-actions flex justify-center">
       <q-btn
@@ -55,25 +76,52 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-const emit = defineEmits(["test", "save"]);
+const props = defineProps({
+  name: {
+    type: String,
+    required: true,
+  },
+  disableName: {
+    type: Boolean,
+    default: false,
+  },
+});
+
+const emit = defineEmits(["test", "save", "update:name"]);
+
+const isValidMethodName = () => {
+  const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
+  return methodPattern.test(props.name) || "Invalid method name.";
+};
+
+const functionName = computed({
+  get: () => props.name,
+  set: (value) => emit("update:name", value),
+});
 </script>
 <style scoped lang="scss">
-.add-function-actions {
-  :deep(.q-btn) {
-    padding-top: 4px !important;
-    padding-bottom: 4px !important;
-    font-size: 13px;
-  }
-  :deep(.q-btn .q-icon) {
-    margin-right: 2px;
+.functions-toolbar {
+  :deep(.q-field__bottom) {
+    display: none;
   }
 
-  :deep(.block) {
-    font-weight: lighter;
-  }
+  .add-function-actions {
+    :deep(.q-btn) {
+      padding-top: 4px !important;
+      padding-bottom: 4px !important;
+      font-size: 13px;
+    }
+    :deep(.q-btn .q-icon) {
+      margin-right: 2px;
+    }
 
-  :deep(.cancel-btn)::before {
-    border: 1px solid var(--q-negative) !important;
+    :deep(.block) {
+      font-weight: lighter;
+    }
+
+    :deep(.cancel-btn)::before {
+      border: 1px solid var(--q-negative) !important;
+    }
   }
 }
 </style>

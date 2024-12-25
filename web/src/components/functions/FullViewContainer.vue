@@ -9,7 +9,10 @@
           :class="expanded ? 'tw-transform tw-rotate-180' : ''"
           size="20px"
         />
-        <div class="tw-text-gray-500 tw-text-[14px] tw-font-bold">
+        <div
+          class="tw-text-gray-500 tw-text-[14px] tw-font-bold"
+          :class="labelClass"
+        >
           {{ label }}
         </div>
         <slot name="left" />
@@ -45,6 +48,10 @@ const props = defineProps({
   isExpanded: {
     type: Boolean,
     default: false,
+  },
+  labelClass: {
+    type: String,
+    default: "",
   },
 });
 

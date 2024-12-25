@@ -16,8 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="add-functions-section">
-    <div class="add-function-actions tw-pb-4">
-      <FunctionsToolbar @test="onTestFunction" @save="onSubmit" />
+    <div class="add-function-actions tw-pb-2">
+      <FunctionsToolbar
+        v-model:name="formData.name"
+        :disable-name="beingUpdated"
+        @test="onTestFunction"
+        @save="onSubmit"
+      />
       <q-separator />
     </div>
 
@@ -28,51 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="addJSTransformForm"
           @submit="onSubmit"
         >
-          <div class="add-function-name-input q-pb-sm q-pt-md">
-            <q-input
-              v-model="formData.name"
-              :label="t('function.name')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop tw-w-full"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              :rules="[
-                (val: any) => !!val || 'Field is required!',
-                isValidMethodName,
-              ]"
-              tabindex="0"
-            />
-
-            <q-input
-              v-if="formData.transType === '0'"
-              v-model="formData.params"
-              :label="t('function.params')"
-              :placeholder="t('function.paramsHint')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col-4 q-py-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              :rules="[
-                (val: any) => !!val || 'Field is required!',
-                isValidParam,
-              ]"
-              tabindex="0"
-            />
-
+          <div class="add-function-name-input q-pb-sm o2-input">
             <FullViewContainer
               name="function"
               v-model:is-expanded="expandState.functions"
               :label="t('function.jsfunction') + '*'"
+              class="tw-mt-1"
             />
             <div
               v-show="expandState.functions"
@@ -87,6 +53,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 language="vrl"
               />
             </div>
+            <div class="text-subtitle2 q-pb-sm" style="min-height: 21px">
+              <div v-if="vrlFunctionError">
+                <FullViewContainer
+                  name="function"
+                  v-model:is-expanded="expandState.functionError"
+                  :label="t('function.errorDetails')"
+                  labelClass="tw-text-red-600"
+                />
+                <div
+                  v-if="expandState.functionError"
+                  class="q-px-sm q-pb-sm"
+                  :class="
+                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
+                  "
+                >
+                  <pre class="q-my-none" style="white-space: pre-wrap">{{
+                    vrlFunctionError
+                  }}</pre>
+                </div>
+              </div>
+            </div>
 
             <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
@@ -94,13 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               compilationErr
             }}</pre>
           </div>
-          <div></div>
         </q-form>
       </div>
       <div
         class="tw-w-2/4 tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max"
       >
-        <TestFunction ref="testFunctionRef" :vrlFunction="formData" />
+        <TestFunction
+          ref="testFunctionRef"
+          :vrlFunction="formData"
+          @function-error="handleFunctionError"
+        />
       </div>
     </div>
   </div>
@@ -166,7 +156,10 @@ export default defineComponent({
 
     const expandState = ref({
       functions: true,
+      functionError: false,
     });
+
+    const vrlFunctionError = ref("");
 
     let compilationErr = ref("");
 
@@ -281,6 +274,10 @@ end`;
       if (testFunctionRef.value) testFunctionRef.value.testFunction();
     };
 
+    const handleFunctionError = (err: string) => {
+      vrlFunctionError.value = err;
+    };
+
     return {
       t,
       $q,
@@ -305,6 +302,8 @@ end`;
       expandState,
       testFunctionRef,
       onTestFunction,
+      handleFunctionError,
+      vrlFunctionError,
     };
   },
   created() {
@@ -339,7 +338,7 @@ end`;
 
 .monaco-editor {
   width: 100%;
-  min-height: 15rem;
+  height: calc(100vh - 250px);
   border-radius: 5px;
 }
 

@@ -1,72 +1,10 @@
 <template>
-  <div class="tw-flex tw-items-center tw-pb-3">
-    <span class="tw-text-[16px]">Test Function on</span>
-    <app-tabs
-      class="test-function-option-tabs tw-border tw-text-gray-700 tw-border-gray-300 tw-w-max tw-ml-2"
-      style="border-radius: 4px; overflow: hidden"
-      data-test="test-function-option-tabs"
-      :tabs="tabs"
-      :active-tab="activeTab"
-      @update:active-tab="updateActiveTab"
-    />
-  </div>
-  <div
-    v-if="activeTab === 'stream'"
-    class="tw-flex tw-items-center tw-flex-wrap q-pb-sm"
-  >
-    <div class="function-stream-select-input tw-w-[35%] q-pr-md">
-      <div class="tw-text-[12px] tw-text-gray-700">
-        {{ t("alerts.streamType") + " *" }}
-      </div>
-      <q-select
-        v-model="selectedStream.type"
-        :options="streamTypes"
-        :popup-content-style="{ textTransform: 'lowercase' }"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-xs showLabelOnTop no-case"
-        emit-value
-        stack-label
-        outlined
-        filled
-        dense
-        @update:model-value="updateStreams()"
-        style="min-width: 120px"
-      />
-    </div>
-    <div class="functions-duration-input tw-w-[65%]">
-      <div class="tw-text-[12px] tw-text-gray-700">
-        {{ t("common.duration") + " *" }}
-      </div>
-      <DateTime label="Start Time" class="q-py-sm tw-w-full" />
-    </div>
-    <div class="function-stream-select-input tw-w-[100%]">
-      <div class="tw-text-[12px] tw-text-gray-700">
-        {{ t("alerts.stream_name") + " *" }}
-      </div>
-      <q-select
-        v-model="selectedStream.name"
-        :options="streams"
-        :popup-content-style="{ textTransform: 'lowercase' }"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-xs showLabelOnTop no-case"
-        stack-label
-        outlined
-        filled
-        dense
-        :loading="isFetchingStreams"
-        style="min-width: 120px"
-        @filter="filterStreams"
-        @update:model-value="updateQuery"
-      />
-    </div>
-
-    <div class="test-function-query-container tw-w-[100%] tw-mt-1">
+  <div class="tw-flex tw-items-center tw-flex-wrap q-pb-sm">
+    <div class="test-function-query-container tw-w-[100%] tw-mt-2">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.query"
-        :label="t('common.query') + '*'"
+        :label="t('common.query')"
       >
         <template #left>
           <q-icon
@@ -99,21 +37,74 @@
         </template>
       </FullViewContainer>
       <div
+        class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
         v-show="expandState.query"
-        class="tw-border-[1px] tw-border-gray-200 tw-relative"
       >
-        <query-editor
-          data-test="vrl-function-test-sql-editor"
-          ref="queryEditorRef"
-          editor-id="test-function-query-input-editor"
-          class="monaco-editor"
-          v-model:query="inputQuery"
-          language="sql"
-        />
-        <div class="text-negative q-pa-xs invalid-sql-error tw-min-h-[22px]">
-          <span v-show="!!sqlQueryErrorMsg" class="tw-text-[13px]">
-            Error: {{ sqlQueryErrorMsg }}</span
-          >
+        <div class="function-stream-select-input tw-w-[150px] q-pr-md">
+          <div class="tw-text-[12px] tw-text-gray-700">
+            {{ t("alerts.streamType") + " *" }}
+          </div>
+          <q-select
+            v-model="selectedStream.type"
+            :options="streamTypes"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-xs showLabelOnTop no-case"
+            emit-value
+            stack-label
+            outlined
+            filled
+            dense
+            @update:model-value="updateStreams()"
+            style="min-width: 120px"
+          />
+        </div>
+        <div class="function-stream-select-input tw-w-[300px]">
+          <div class="tw-text-[12px] tw-text-gray-700">
+            {{ t("alerts.stream_name") + " *" }}
+          </div>
+          <q-select
+            v-model="selectedStream.name"
+            :options="streams"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-xs showLabelOnTop no-case"
+            stack-label
+            outlined
+            filled
+            dense
+            :loading="isFetchingStreams"
+            style="min-width: 120px"
+            @filter="filterStreams"
+            @update:model-value="updateQuery"
+          />
+        </div>
+        <div class="functions-duration-input tw-w-[330px]">
+          <div class="tw-text-[12px] tw-text-gray-700">
+            {{ t("common.duration") + " *" }}
+          </div>
+          <DateTime label="Start Time" class="q-py-xs tw-w-full" />
+        </div>
+
+        <div class="tw-text-[12px] tw-text-gray-700 tw-w-[100%] q-mt-xs">
+          {{ t("common.query") + " *" }}
+        </div>
+        <div class="tw-border-[1px] tw-border-gray-200 tw-relative tw-w-[100%]">
+          <query-editor
+            data-test="vrl-function-test-sql-editor"
+            ref="queryEditorRef"
+            editor-id="test-function-query-input-editor"
+            class="monaco-editor"
+            v-model:query="inputQuery"
+            language="sql"
+          />
+          <div class="text-negative q-pa-xs invalid-sql-error tw-min-h-[22px]">
+            <span v-show="!!sqlQueryErrorMsg" class="tw-text-[13px]">
+              Error: {{ sqlQueryErrorMsg }}</span
+            >
+          </div>
         </div>
       </div>
     </div>
@@ -129,19 +120,6 @@
         v-show="expandState.events"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
       >
-        <div
-          v-if="activeTab === 'stream' && !inputEvents"
-          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-bg-white tw-opacity-90"
-        >
-          <q-icon
-            :name="outlinedLightbulb"
-            size="40px"
-            class="tw-text-orange-400"
-          />
-          <div class="tw-text-[15px] tw-text-gray-600">
-            {{ eventsMessage }}
-          </div>
-        </div>
         <query-editor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
@@ -176,16 +154,29 @@
             {{ outputMessage }}
           </div>
         </div>
-        <pre class="test-output-container tw-p-2 tw-text-sm tw-text-gray-600">{{
-          outputEvents
-        }}</pre>
+        <query-editor
+          data-test="vrl-function-test-events-output-editor"
+          ref="outputEventsEditorRef"
+          editor-id="test-function-events-output-editor"
+          class="monaco-editor"
+          v-model:query="outputEvents"
+          language="json"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { onBeforeMount, ref, defineProps, defineExpose, computed } from "vue";
+import {
+  onBeforeMount,
+  ref,
+  defineProps,
+  defineExpose,
+  computed,
+  nextTick,
+  onMounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -208,6 +199,8 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(["function-error"]);
+
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
@@ -216,14 +209,14 @@ const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
+const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
+
+const loading = ref({
+  events: false,
+  output: false,
+});
+
 const dateTime = ref<any>({});
-
-const tabs = [
-  { label: "Stream/Query", value: "stream" },
-  { label: "Data", value: "data" },
-];
-
-const activeTab = ref("stream");
 
 const selectedStream = ref<{
   name: string;
@@ -249,10 +242,11 @@ let parser: any = null;
 const { t } = useI18n();
 
 const expandState = ref({
+  stream: true,
   functions: true,
   query: false,
-  events: false,
-  output: false,
+  events: true,
+  output: true,
 });
 
 const filteredStreams = ref<any[]>([]);
@@ -268,27 +262,18 @@ onBeforeMount(async () => {
   await updateStreams();
 });
 
-const eventsMessage = computed(() => {
-  if (activeTab.value === "stream" && !selectedStream.value.name) {
-    return "Please select a stream and Run Query to see the events";
-  }
-
-  if (activeTab.value === "stream" && !inputQuery.value) {
-    return "Please enter Query and click Run Query to see the events";
-  }
-
-  if (activeTab.value === "stream" && !inputEvents.value) {
-    return "Click Run Query to see the events";
-  }
-
-  return "";
+onMounted(() => {
+  setEventsEditor();
 });
 
-const outputMessage = computed(() => {
-  if (activeTab.value === "stream" && eventsMessage.value) {
-    return eventsMessage.value;
-  }
+const setEventsEditor = () => {
+  setTimeout(() => {
+    inputEvents.value = `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`;
+    eventsEditorRef?.value?.formatDocument();
+  }, 300);
+};
 
+const outputMessage = computed(() => {
   if (!outputEvents.value) {
     return "Please click Test Function to see the events";
   }
@@ -297,7 +282,7 @@ const outputMessage = computed(() => {
 });
 
 const areInputValid = () => {
-  if (activeTab.value === "stream" && !inputQuery.value) {
+  if (!inputQuery.value) {
     q.notify({
       type: "negative",
       message: "Please enter a query",
@@ -363,6 +348,8 @@ const updateStreams = async (resetStream = true) => {
 };
 
 const getResults = async () => {
+  loading.value.events = true;
+
   const timestamps: any =
     dateTime.value.type === "relative"
       ? getConsumableRelativeTime(dateTime.value.relativeTimePeriod)
@@ -394,6 +381,8 @@ const getResults = async () => {
       page_type: "logs",
     })
     .then((res: any) => {
+      expandState.value.stream = false;
+      expandState.value.query = false;
       expandState.value.events = true;
       inputEvents.value = JSON.stringify(res.data.hits, null, 2);
       sqlQueryErrorMsg.value = "";
@@ -410,18 +399,14 @@ const getResults = async () => {
         message: "Invalid SQL Query : " + err.response?.data?.message,
         timeout: 3000,
       });
+    })
+    .finally(() => {
+      loading.value.events = false;
     });
 };
 
-const updateActiveTab = (tab: string) => {
-  activeTab.value = tab;
-  if (tab === "data" && !inputEvents.value) {
-    expandState.value.events = true;
-    inputEvents.value = JSON.stringify(JSON.parse(JSON.stringify([])));
-  }
-};
-
 const testFunction = () => {
+  loading.value.output = true;
   const payload = {
     function: props.vrlFunction.function,
     events: JSON.parse(inputEvents.value),
@@ -429,14 +414,28 @@ const testFunction = () => {
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
     .then((res: any) => {
-      outputEvents.value = res?.data?.results || [];
+      expandState.value.query = false;
+      expandState.value.output = true;
+      outputEvents.value = JSON.stringify(
+        JSON.parse(JSON.stringify(res?.data?.results || [])),
+      );
+      nextTick(() => {
+        outputEventsEditorRef?.value?.formatDocument();
+      });
     })
     .catch((err: any) => {
+      const errMsg = err.response?.data?.message || "Error in testing function";
+
       q.notify({
         type: "negative",
-        message: err.response?.data?.message || "Error in testing function",
+        message: errMsg,
         timeout: 3000,
       });
+
+      outputEvents.value = errMsg;
+    })
+    .finally(() => {
+      loading.value.output = false;
     });
 };
 
@@ -457,7 +456,7 @@ defineExpose({
   :deep(.rum-tab) {
     width: auto !important;
     font-size: 12px;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border: none !important;
   }
 
