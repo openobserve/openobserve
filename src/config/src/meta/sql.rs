@@ -73,16 +73,15 @@ pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, 
 }
 
 pub trait TableReferenceExt {
-    fn stream_type(&self) -> StreamType;
+    fn stream_type(&self) -> String;
     fn stream_name(&self) -> String;
     fn has_stream_type(&self) -> bool;
     fn get_stream_type(&self, stream_type: StreamType) -> StreamType;
 }
 
 impl TableReferenceExt for TableReference {
-    fn stream_type(&self) -> StreamType {
-        let stream_type = self.schema().unwrap_or("");
-        StreamType::from(stream_type)
+    fn stream_type(&self) -> String {
+        self.schema().unwrap_or("").to_string()
     }
 
     fn stream_name(&self) -> String {
@@ -95,7 +94,7 @@ impl TableReferenceExt for TableReference {
 
     fn get_stream_type(&self, stream_type: StreamType) -> StreamType {
         if self.has_stream_type() {
-            self.stream_type()
+            StreamType::from(self.stream_type().as_str())
         } else {
             stream_type
         }

@@ -57,7 +57,7 @@ use crate::{
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
-            table_provider::empty_table::NewEmptyTable,
+            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
         request::Request,
@@ -737,6 +737,23 @@ pub async fn generate_context(
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
+    // register schema provider
+    let mut registed_schema = HashSet::new();
+    for (stream, _) in &sql.schemas {
+        let stream_type = stream.stream_type();
+        if !stream.has_stream_type() || registed_schema.contains(&stream_type) {
+            continue;
+        }
+        registed_schema.insert(stream_type.clone());
+        let schema_provider = StreamTypeProvider::create(&stream_type).await?;
+        let _ = ctx
+            .catalog("datafusion")
+            .unwrap()
+            .as_ref()
+            .register_schema(&stream_type, schema_provider);
+    }
+
+    // register table
     for (stream, schema) in &sql.schemas {
         let schema = schema.schema().as_ref().clone();
         let stream_name = stream.to_quoted_string();
@@ -745,8 +762,9 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
                 .with_partitions(ctx.state().config().target_partitions())
                 .with_sorted_by_time(sql.sorted_by_time),
         );
-        ctx.register_table(stream_name, table)?;
+        ctx.register_table(&stream_name, table)?;
     }
+
     Ok(())
 }
 
@@ -799,7 +817,7 @@ async fn get_inverted_index_file_lists(
     let (idx_file_list, idx_scan_size, idx_took) = get_inverted_index_file_list(
         req.clone(),
         query.clone(),
-        &stream_name,
+        &stream_name, // for inverted index search, only have on stream
         &match_terms,
         &index_terms,
     )
