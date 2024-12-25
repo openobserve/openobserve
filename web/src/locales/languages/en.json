@@ -64,7 +64,8 @@
     "duration": "Duration",
     "fullscreen": "Go Full Screen",
     "query": "Query",
-    "output": "Output"
+    "output": "Output",
+    "selectStream": "Select Stream"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -466,7 +467,8 @@
     "deleteAssociatedFunction": "Delete Associated Function",
     "streamPipeline": "Pipelines",
     "streamRouting": "Stream Routing",
-    "testFunction": "Test Function"
+    "testFunction": "Test Function",
+    "errorDetails": "Error"
   },
   "confirmDialog": {
     "cancel": "Cancel",
