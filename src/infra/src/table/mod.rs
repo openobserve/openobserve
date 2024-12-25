@@ -23,9 +23,10 @@ pub mod alerts;
 pub mod dashboards;
 pub mod distinct_values;
 #[allow(unused_imports)]
-mod entity;
+pub mod entity;
 pub mod folders;
 mod migration;
+pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
 
@@ -38,6 +39,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Migrator::up(client, None).await?;
+    Ok(())
+}
+
+pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::down(client, steps).await?;
     Ok(())
 }
 
@@ -56,4 +63,13 @@ pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sq
     } else {
         None
     }
+}
+
+#[macro_export]
+macro_rules! orm_err {
+    ($e:expr) => {
+        Err($crate::errors::Error::DbError(
+            $crate::errors::DbError::SeaORMError($e.to_string()),
+        ))
+    };
 }
