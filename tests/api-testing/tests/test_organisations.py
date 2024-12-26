@@ -56,3 +56,20 @@ def test_e2e_passcode(create_session, base_url):
     assert (
         resp_get_allorgs.status_code == 200
     ), f"Get all alerts list 200, but got {resp_get_allorgs.status_code} {resp_get_allorgs.content}"
+
+    
+def test_e2e_reset_passcode(create_session, base_url):
+    """Running an E2E test for Reset passcode."""
+
+    """Just make sure create_session as editor not root user"""
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    """Some thing like this"""
+    resp_get_allorgs = session.put(f"{url}api/{org_id}/passcode")
+
+    print(resp_get_allorgs.content)
+    assert (
+        resp_get_allorgs.status_code == 200
+    ), f"Get all alerts list 200, but got {resp_get_allorgs.status_code} {resp_get_allorgs.content}"
