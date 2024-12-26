@@ -110,9 +110,9 @@ impl Query {
         let nr_steps = ((self.end - self.start) / self.interval) + 1;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
-            let mut engine = super::Engine::new(ctx.clone(), time);
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
             let expr = expr.clone();
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let mut engine = super::Engine::new(ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;
