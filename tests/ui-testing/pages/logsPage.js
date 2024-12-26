@@ -75,7 +75,7 @@ export class LogsPage {
   }
 
   async logsPageURLValidation() {
-    await expect(this.page).toHaveURL(/defaulttestmulti/);
+    await expect(this.page).not.toHaveURL(/default/);
   }
 
   async selectIndexAndStream() {

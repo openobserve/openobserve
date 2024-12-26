@@ -49,7 +49,7 @@ export class MetricsPage {
 
     async metricsPageURLValidation() {
 
-        await expect(this.page).toHaveURL(/defaulttestmulti/);
+        await expect(this.page).not.toHaveURL(/default/);
 
     }
 
