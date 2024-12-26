@@ -5,25 +5,27 @@
     <div class="tw-flex tw-items-center o2-input">
       <q-icon class="tw-pr-1" name="arrow_back_ios" size="18px" />
       <div class="tw-text-lg tw-w-full">Add Function</div>
-      <q-input
-        v-model="functionName"
-        :label="t('function.name')"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-pa-none tw-w-full q-ml-md"
-        stack-label
-        outlined
-        filled
-        dense
-        v-bind:readonly="disableName"
-        v-bind:disable="disableName"
-        :rules="[
-          (val: any) => !!val || 'Field is required!',
-          isValidMethodName,
-        ]"
-        tabindex="0"
-        style="min-width: 300px"
-      />
+      <q-form ref="addFunctionForm">
+        <q-input
+          v-model="functionName"
+          :label="t('function.name')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-pa-none tw-w-full q-ml-md"
+          stack-label
+          outlined
+          filled
+          dense
+          v-bind:readonly="disableName"
+          v-bind:disable="disableName"
+          :rules="[
+            (val: any) => !!val || 'Field is required!',
+            isValidMethodName,
+          ]"
+          tabindex="0"
+          style="min-width: 300px"
+        />
+      </q-form>
     </div>
     <div class="add-function-actions flex justify-center">
       <q-btn
@@ -89,6 +91,8 @@ const props = defineProps({
 
 const emit = defineEmits(["test", "save", "update:name"]);
 
+const addFunctionForm = ref(null);
+
 const isValidMethodName = () => {
   const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
   return methodPattern.test(props.name) || "Invalid method name.";
@@ -98,6 +102,8 @@ const functionName = computed({
   get: () => props.name,
   set: (value) => emit("update:name", value),
 });
+
+defineExpose({ addFunctionForm });
 </script>
 <style scoped lang="scss">
 .functions-toolbar {
