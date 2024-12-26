@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use core::clone::Clone;
+
 use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
@@ -82,6 +84,7 @@ pub async fn validator(
                 if let Err(e) = check_and_create_org(user_id, req.method(), path).await {
                     return Err((e, req));
                 }
+                let path = path.to_owned();
 
                 // / Hack for prometheus, need support POST and check the header
                 let mut req = req;
@@ -95,6 +98,17 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
+
+                #[cfg(feature = "enterprise")]
+                if let Some(role) = &res.user_role {
+                    if role.eq(&UserRole::Viewer)
+                        && req.method().eq(&Method::PUT)
+                        && path.ends_with(&format!("users/{}", res.user_email))
+                    {
+                        // Viewer should be able to update its own details
+                        return Ok(req);
+                    }
+                }
 
                 if auth_info.bypass_check
                     || check_permissions(

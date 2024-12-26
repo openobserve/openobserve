@@ -21,12 +21,11 @@ use config::{
     ider,
     meta::{
         dashboards::ListDashboardsParams,
-        organization::is_valid_org_name,
         pipeline::components::PipelineSource,
         stream::StreamType,
         user::{UserOrg, UserRole},
     },
-    utils::{rand::generate_random_string, schema::format_stream_name},
+    utils::rand::generate_random_string,
 };
 #[cfg(feature = "enterprise")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
@@ -238,11 +237,8 @@ pub async fn create_org(
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
     org.name = org.name.trim().to_owned();
-    if !is_valid_org_name(&org.name) {
-        return Err(anyhow::anyhow!("Invalid organization name"));
-    }
 
-    org.identifier = format!("{}_{}", format_stream_name(&org.name), ider::uuid());
+    org.identifier = ider::uuid();
     org.org_type = CUSTOM.to_owned();
     match db::organization::save_org(org).await {
         Ok(_) => {

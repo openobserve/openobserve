@@ -15,16 +15,6 @@
 
 use std::{fmt::Display, str::FromStr};
 
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-pub static RE_CORRECT_ORG_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[a-zA-Z0-9_\(\)\s\'|\[\]]+").unwrap());
-
-pub fn is_valid_org_name(org_name: &str) -> bool {
-    RE_CORRECT_ORG_NAME.is_match(org_name)
-}
-
 // define the organizations type
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OrganizationType {

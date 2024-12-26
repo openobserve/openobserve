@@ -75,7 +75,30 @@ pub async fn list(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpRes
         Some(v) => v.parse::<bool>().unwrap_or(false),
         None => false,
     };
-    users::list_users(&org_id, None, None, list_all).await
+
+    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
+    let mut _user_list_from_rbac = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id, user_id, "GET", "user",
+        )
+        .await
+        {
+            Ok(user_list) => {
+                _user_list_from_rbac = user_list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    users::list_users(&org_id, user_id, None, _user_list_from_rbac, list_all).await
 }
 
 /// CreateUser
