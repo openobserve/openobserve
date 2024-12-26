@@ -28,7 +28,7 @@ mod new;
 mod old;
 
 use config::meta::{alerts::alert::Alert, stream::StreamType};
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -74,6 +74,15 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     } else {
         new::set_without_updating_trigger(org_id, alert).await
     }
+}
+
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::create(conn, org_id, folder_id, alert).await
 }
 
 pub async fn delete_by_name(
