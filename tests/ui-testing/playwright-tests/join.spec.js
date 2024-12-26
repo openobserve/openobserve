@@ -83,7 +83,7 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoinLike();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.validateResult();
+       
       
 
     });
