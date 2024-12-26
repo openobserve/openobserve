@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use core::convert::Into;
+
 use config::{
     ider,
     meta::{
@@ -189,10 +191,11 @@ pub async fn add(
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
+    let role: i16 = role.into();
     let record = ActiveModel {
         org_id: Set(org_id.to_string()),
         email: Set(user_email.to_string()),
-        role: Set(role.into()),
+        role: Set(role),
         token: Set(token.to_string()),
         rum_token: Set(rum_token),
         created_at: Set(now),

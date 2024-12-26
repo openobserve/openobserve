@@ -351,7 +351,9 @@ pub async fn update_user(
                     && !local_user.is_external
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
+                            // Editor can update other's roles, but viewer can update only self
                             || local_user.role.eq(&UserRole::Editor)
+                            || local_user.role.eq(&UserRole::Viewer)
                             || local_user.role.eq(&UserRole::Root)))
                 // if the User Role is Root, we do not change the Role
                 // Admins Role can still be mutable.
@@ -362,6 +364,8 @@ pub async fn update_user(
                     new_role = Some(new_user.role.clone());
                     if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
                         message = "Root user role cannot be changed";
+                    } else if self_update && local_user.role < new_user.role {
+                        message = "Self role cannot be upgraded";
                     } else {
                         #[cfg(feature = "enterprise")]
                         if new_org_role.custom_role.is_some() {
@@ -740,6 +744,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 
 pub async fn list_users(
     org_id: &str,
+    _initiator_id: &str,
     role: Option<UserRole>,
     permitted: Option<Vec<String>>,
     list_all: bool,
@@ -749,6 +754,27 @@ pub async fn list_users(
     let is_list_all = list_all & org_id.eq(cfg.common.usage_org.as_str());
     let mut user_orgs: HashMap<String, Vec<OrgRoleMapping>> = HashMap::new();
     log::debug!("Listing users for org: {}", org_id);
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().openfga.enabled && role.is_none() && permitted.is_some() {
+        let permitted = permitted.as_ref().unwrap();
+        // This user does not have list users permission
+        // Hence only return this specific user
+        if permitted.is_empty() {
+            if let Some(user) = get_user(Some(org_id), _initiator_id).await {
+                user_list.push(UserResponse {
+                    email: user.email.clone(),
+                    role: user.role.to_string(),
+                    first_name: user.first_name.clone(),
+                    last_name: user.last_name.clone(),
+                    is_external: user.is_external,
+                    orgs: None,
+                    created_at: 0, // Not used
+                });
+            }
+            return Ok(HttpResponse::Ok().json(UserList { data: user_list }));
+        }
+    }
 
     for org_user in ORG_USERS.iter() {
         // If list all user, maintain a list of orgs for each user

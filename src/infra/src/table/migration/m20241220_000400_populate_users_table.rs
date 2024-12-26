@@ -145,28 +145,28 @@ mod meta {
 
     #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
     pub enum UserRole {
-        #[serde(rename = "admin")]
-        Admin,
         #[serde(rename = "root")]
-        Root,
-        #[serde(rename = "viewer")] // read only user
-        Viewer,
-        #[serde(rename = "user")] // No access only login user
-        User,
+        Root = 0,
+        #[serde(rename = "admin")]
+        Admin = 1,
         #[serde(rename = "editor")]
-        Editor,
+        Editor = 2,
+        #[serde(rename = "viewer")] // read only user
+        Viewer = 3,
+        #[serde(rename = "user")] // No access only login user
+        User = 4,
         #[serde(rename = "service_account")]
-        ServiceAccount,
+        ServiceAccount = 5,
     }
 
     impl From<UserRole> for i16 {
         fn from(role: UserRole) -> i16 {
             match role {
-                UserRole::Admin => 0,
-                UserRole::Root => 1,
-                UserRole::Viewer => 2,
-                UserRole::User => 3,
-                UserRole::Editor => 4,
+                UserRole::Root => 0,
+                UserRole::Admin => 1,
+                UserRole::Editor => 2,
+                UserRole::Viewer => 3,
+                UserRole::User => 4,
                 UserRole::ServiceAccount => 5,
             }
         }
@@ -175,11 +175,11 @@ mod meta {
     impl From<i16> for UserRole {
         fn from(role: i16) -> Self {
             match role {
-                0 => UserRole::Admin,
-                1 => UserRole::Root,
-                2 => UserRole::Viewer,
-                3 => UserRole::User,
-                4 => UserRole::Editor,
+                0 => UserRole::Root,
+                1 => UserRole::Admin,
+                2 => UserRole::Editor,
+                3 => UserRole::Viewer,
+                4 => UserRole::User,
                 5 => UserRole::ServiceAccount,
                 _ => UserRole::Admin,
             }
