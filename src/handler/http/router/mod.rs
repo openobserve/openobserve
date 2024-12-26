@@ -336,7 +336,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(users::save)
         .service(users::delete)
         .service(users::update)
-        .service(users::add_user_to_org
+        .service(users::add_user_to_org)
         .service(users::list_invitations)
         .service(users::list_roles)
         .service(organization::org::organizations)
