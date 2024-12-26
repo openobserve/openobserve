@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::{alerts::alert::Alert as MetaAlert, folder::DEFAULT_FOLDER};
 use infra::db::{connect_to_orm, ORM_CLIENT};
 use svix_ksuid::Ksuid;
@@ -21,8 +21,8 @@ use svix_ksuid::Ksuid;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::alerts::{
-        requests::{CreateAlertRequestBody, UpdateAlertRequestBody},
-        responses::GetAlertResponseBody,
+        requests::{CreateAlertRequestBody, EnableAlertQuery, UpdateAlertRequestBody},
+        responses::{EnableAlertResponseBody, GetAlertResponseBody},
     },
     service::alerts::alert::{self, AlertError},
 };
@@ -168,6 +168,103 @@ pub async fn update_alert(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::update(client, &org_id, None, alert).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Err(e) => e.into(),
+    }
+}
+
+/// DeleteAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "DeleteAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[delete("v2/{org_id}/alerts/{alert_id}")]
+async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::delete_by_id(client, &org_id, alert_id).await {
+        Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+        Err(e) => e.into(),
+    }
+}
+
+/// EnableAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "EnableAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        EnableAlertQuery,
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("v2/{org_id}/alerts/{alert_id}/enable")]
+async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+    let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
+    };
+    let should_enable = query.0.value;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
+        Ok(_) => {
+            let resp_body = EnableAlertResponseBody {
+                enabled: should_enable,
+            };
+            MetaHttpResponse::json(resp_body)
+        }
+        Err(e) => e.into(),
+    }
+}
+
+/// TriggerAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TriggerAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/v2/{org_id}/alerts/{alert_id}/trigger")]
+async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::trigger_by_id(client, &org_id, alert_id).await {
+        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(e) => e.into(),
     }
 }

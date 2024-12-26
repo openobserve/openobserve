@@ -490,6 +490,24 @@ pub async fn list(
     }
 }
 
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), AlertError> {
+    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Ok(());
+    };
+
+    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
+        Ok(_) => {
+            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
@@ -511,6 +529,21 @@ pub async fn delete_by_name(
     }
 }
 
+pub async fn enable_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    should_enable: bool,
+) -> Result<(), AlertError> {
+    let Some(mut alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
+    };
+    let stream_name = alert.stream_name.clone();
+    alert.enabled = should_enable;
+    db::alerts::alert::set(org_id, alert.stream_type, &stream_name, alert, false).await?;
+    Ok(())
+}
+
 pub async fn enable_by_name(
     org_id: &str,
     stream_type: StreamType,
@@ -528,6 +561,19 @@ pub async fn enable_by_name(
     alert.enabled = value;
     db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
     Ok(())
+}
+
+pub async fn trigger_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(String, String), AlertError> {
+    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
+    };
+    let now = Utc::now().timestamp_micros();
+    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+    Ok((success_message, err_message))
 }
 
 pub async fn trigger_by_name(
