@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="add-functions-section">
+  <div class="add-functions-section tw-pl-4">
     <div class="add-function-actions tw-pb-2">
       <FunctionsToolbar
         v-model:name="formData.name"
+        ref="functionsToolbarRef"
         :disable-name="beingUpdated"
         @test="onTestFunction"
         @save="onSubmit"
@@ -153,6 +154,7 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
+    const functionsToolbarRef = ref<typeof FunctionsToolbar>();
 
     const expandState = ref({
       functions: true,
@@ -197,75 +199,81 @@ end`;
     ${suffixCode.value}`;
     };
 
+    const isValidFnName = () => {
+      return formData.value.name.trim().length > 0;
+    };
+
     const onSubmit = () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-
-      addJSTransformForm.value.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        if (!beingUpdated.value) {
-          formData.value.transType = parseInt(formData.value.transType);
-          //trans type is lua remove params from form
-          if (formData.value.transType == 1) {
-            formData.value.params = "";
+      functionsToolbarRef.value.addFunctionForm
+        .validate()
+        .then((valid: any) => {
+          if (!valid) {
+            return false;
           }
 
-          callTransform = jsTransformService.create(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
-        } else {
-          formData.value.transType = parseInt(formData.value.transType);
-          //trans type is lua remove params from form
-          if (formData.value.transType == 1) {
-            formData.value.params = "";
-          }
-
-          callTransform = jsTransformService.update(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
-        }
-
-        callTransform
-          .then((res: { data: any }) => {
-            const data = res.data;
-            const _formData: any = { ...formData.value };
-            formData.value = { ...defaultValue() };
-
-            emit("update:list", _formData);
-            addJSTransformForm.value.resetValidation();
-            dismiss();
-            $q.notify({
-              type: "positive",
-              message: res.data.message,
-            });
-          })
-          .catch((err) => {
-            compilationErr.value = err.response.data["message"];
-            $q.notify({
-              type: "negative",
-              message:
-                JSON.stringify(err.response.data["error"]) ||
-                "Function creation failed",
-            });
-            dismiss();
+          const dismiss = $q.notify({
+            spinner: true,
+            message: "Please wait...",
+            timeout: 2000,
           });
 
-        segment.track("Button Click", {
-          button: "Save Function",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          function_name: formData.value.name,
-          page: "Add/Update Function",
+          if (!beingUpdated.value) {
+            formData.value.transType = parseInt(formData.value.transType);
+            //trans type is lua remove params from form
+            if (formData.value.transType == 1) {
+              formData.value.params = "";
+            }
+
+            callTransform = jsTransformService.create(
+              store.state.selectedOrganization.identifier,
+              formData.value,
+            );
+          } else {
+            formData.value.transType = parseInt(formData.value.transType);
+            //trans type is lua remove params from form
+            if (formData.value.transType == 1) {
+              formData.value.params = "";
+            }
+
+            callTransform = jsTransformService.update(
+              store.state.selectedOrganization.identifier,
+              formData.value,
+            );
+          }
+
+          callTransform
+            .then((res: { data: any }) => {
+              const data = res.data;
+              const _formData: any = { ...formData.value };
+              formData.value = { ...defaultValue() };
+
+              emit("update:list", _formData);
+              addJSTransformForm.value.resetValidation();
+              dismiss();
+              $q.notify({
+                type: "positive",
+                message: res.data.message,
+              });
+            })
+            .catch((err) => {
+              compilationErr.value = err.response.data["message"];
+              $q.notify({
+                type: "negative",
+                message:
+                  JSON.stringify(err.response.data["error"]) ||
+                  "Function creation failed",
+              });
+              dismiss();
+            });
+
+          segment.track("Button Click", {
+            button: "Save Function",
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            function_name: formData.value.name,
+            page: "Add/Update Function",
+          });
         });
-      });
     };
 
     const onTestFunction = () => {
@@ -302,6 +310,7 @@ end`;
       onTestFunction,
       handleFunctionError,
       vrlFunctionError,
+      functionsToolbarRef,
     };
   },
   created() {

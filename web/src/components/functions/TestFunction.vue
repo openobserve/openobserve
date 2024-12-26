@@ -1,14 +1,132 @@
 <template>
   <div class="tw-flex tw-items-center tw-flex-wrap q-pb-sm">
     <div class="test-function-query-container tw-w-[100%] tw-mt-2">
+      <q-form ref="querySelectionRef" @submit="getResults">
+        <FullViewContainer
+          name="function"
+          v-model:is-expanded="expandState.query"
+          :label="t('common.query')"
+        >
+          <template #left>
+            <q-icon
+              v-if="!!sqlQueryErrorMsg"
+              name="info"
+              class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
+              size="16px"
+            >
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                :offset="[10, 10]"
+              >
+                {{ sqlQueryErrorMsg }}
+              </q-tooltip>
+            </q-icon>
+          </template>
+          <template #right>
+            <q-btn
+              :label="t('search.runQuery')"
+              class="test-function-run-query-btn text-bold tw-ml-[12px] no-border"
+              padding="sm md"
+              icon="search"
+              no-caps
+              dense
+              size="xs"
+              color="primary"
+              type="submit"
+            />
+          </template>
+        </FullViewContainer>
+        <div
+          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
+          v-show="expandState.query"
+        >
+          <div class="function-stream-select-input tw-w-[150px] q-pr-md">
+            <div class="tw-text-[12px] tw-text-gray-700">
+              {{ t("alerts.streamType") + " *" }}
+            </div>
+
+            <q-select
+              v-model="selectedStream.type"
+              :options="streamTypes"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-xs showLabelOnTop no-case"
+              emit-value
+              stack-label
+              outlined
+              filled
+              dense
+              @update:model-value="updateStreams()"
+              style="min-width: 120px"
+            />
+          </div>
+          <div class="function-stream-select-input tw-w-[300px]">
+            <div class="tw-text-[12px] tw-text-gray-700">
+              {{ t("alerts.stream_name") + " *" }}
+            </div>
+            <q-select
+              v-model="selectedStream.name"
+              :options="streams"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-xs showLabelOnTop no-case"
+              stack-label
+              outlined
+              filled
+              dense
+              :loading="isFetchingStreams"
+              style="min-width: 120px"
+              @filter="filterStreams"
+              @update:model-value="updateQuery"
+              :rules="[(val: any) => !!val || '']"
+            />
+          </div>
+          <div class="functions-duration-input tw-w-[330px]">
+            <div class="tw-text-[12px] tw-text-gray-700">
+              {{ t("common.duration") + " *" }}
+            </div>
+            <DateTime label="Start Time" class="q-py-xs tw-w-full" />
+          </div>
+
+          <div class="tw-text-[12px] tw-text-gray-700 tw-w-[100%] q-mt-xs">
+            {{ t("common.query") + " *" }}
+          </div>
+          <div
+            class="tw-border-[1px] tw-border-gray-200 tw-relative tw-w-[100%]"
+          >
+            <query-editor
+              data-test="vrl-function-test-sql-editor"
+              ref="queryEditorRef"
+              editor-id="test-function-query-input-editor"
+              class="monaco-editor"
+              v-model:query="inputQuery"
+              language="sql"
+            />
+            <div
+              class="text-negative q-pa-xs invalid-sql-error tw-min-h-[22px]"
+            >
+              <span v-show="!!sqlQueryErrorMsg" class="tw-text-[13px]">
+                Error: {{ sqlQueryErrorMsg }}</span
+              >
+            </div>
+          </div>
+        </div>
+      </q-form>
+    </div>
+  </div>
+  <div>
+    <div>
       <FullViewContainer
         name="function"
-        v-model:is-expanded="expandState.query"
-        :label="t('common.query')"
+        v-model:is-expanded="expandState.events"
+        :label="t('common.events')"
       >
         <template #left>
           <q-icon
-            v-if="!!sqlQueryErrorMsg"
+            v-if="!!eventsErrorMsg"
             name="info"
             class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
             size="16px"
@@ -18,104 +136,11 @@
               self="center left"
               :offset="[10, 10]"
             >
-              {{ sqlQueryErrorMsg }}
+              {{ eventsErrorMsg }}
             </q-tooltip>
           </q-icon>
         </template>
-        <template #right>
-          <q-btn
-            :label="t('search.runQuery')"
-            class="test-function-run-query-btn text-bold tw-ml-[12px] no-border"
-            padding="sm md"
-            icon="search"
-            no-caps
-            dense
-            size="xs"
-            color="primary"
-            @click="getResults"
-          />
-        </template>
       </FullViewContainer>
-      <div
-        class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
-        v-show="expandState.query"
-      >
-        <div class="function-stream-select-input tw-w-[150px] q-pr-md">
-          <div class="tw-text-[12px] tw-text-gray-700">
-            {{ t("alerts.streamType") + " *" }}
-          </div>
-          <q-select
-            v-model="selectedStream.type"
-            :options="streamTypes"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-xs showLabelOnTop no-case"
-            emit-value
-            stack-label
-            outlined
-            filled
-            dense
-            @update:model-value="updateStreams()"
-            style="min-width: 120px"
-          />
-        </div>
-        <div class="function-stream-select-input tw-w-[300px]">
-          <div class="tw-text-[12px] tw-text-gray-700">
-            {{ t("alerts.stream_name") + " *" }}
-          </div>
-          <q-select
-            v-model="selectedStream.name"
-            :options="streams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-xs showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            :loading="isFetchingStreams"
-            style="min-width: 120px"
-            @filter="filterStreams"
-            @update:model-value="updateQuery"
-          />
-        </div>
-        <div class="functions-duration-input tw-w-[330px]">
-          <div class="tw-text-[12px] tw-text-gray-700">
-            {{ t("common.duration") + " *" }}
-          </div>
-          <DateTime label="Start Time" class="q-py-xs tw-w-full" />
-        </div>
-
-        <div class="tw-text-[12px] tw-text-gray-700 tw-w-[100%] q-mt-xs">
-          {{ t("common.query") + " *" }}
-        </div>
-        <div class="tw-border-[1px] tw-border-gray-200 tw-relative tw-w-[100%]">
-          <query-editor
-            data-test="vrl-function-test-sql-editor"
-            ref="queryEditorRef"
-            editor-id="test-function-query-input-editor"
-            class="monaco-editor"
-            v-model:query="inputQuery"
-            language="sql"
-          />
-          <div class="text-negative q-pa-xs invalid-sql-error tw-min-h-[22px]">
-            <span v-show="!!sqlQueryErrorMsg" class="tw-text-[13px]">
-              Error: {{ sqlQueryErrorMsg }}</span
-            >
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div>
-    <div>
-      <FullViewContainer
-        name="function"
-        v-model:is-expanded="expandState.events"
-        :label="t('common.events')"
-      />
       <div
         v-show="expandState.events"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
@@ -161,6 +186,7 @@
           class="monaco-editor"
           v-model:query="outputEvents"
           language="json"
+          read-only
         />
       </div>
     </div>
@@ -205,11 +231,15 @@ const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
 
+const eventsErrorMsg = ref<string>("");
+
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
+
+const querySelectionRef = ref<any>();
 
 const loading = ref({
   events: false,
@@ -335,8 +365,6 @@ const updateStreams = async (resetStream = true) => {
   isFetchingStreams.value = true;
   return getStreams(selectedStream.value.type, false)
     .then((res: any) => {
-      console.log("selectedStreams", res.list);
-
       streams.value = res.list.map((data: any) => {
         return data.name;
       });
@@ -372,8 +400,6 @@ const getResults = async () => {
   query.query.from = 0;
   query.query.size = 10;
 
-  console.log("query", query);
-
   searchService
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -404,9 +430,26 @@ const getResults = async () => {
       loading.value.events = false;
     });
 };
-
+const isInputValid = () => {
+  try {
+    JSON.parse(inputEvents.value);
+    return true;
+  } catch (e) {
+    eventsErrorMsg.value = "Invalid JSON in events";
+    q.notify({
+      type: "negative",
+      message: "Invalid JSON in events",
+      timeout: 3000,
+    });
+    return false;
+  }
+};
 const testFunction = () => {
   loading.value.output = true;
+  eventsErrorMsg.value = "";
+  if (!isInputValid()) {
+    return;
+  }
   const payload = {
     function: props.vrlFunction.function,
     events: JSON.parse(inputEvents.value),
@@ -419,9 +462,10 @@ const testFunction = () => {
       outputEvents.value = JSON.stringify(
         JSON.parse(JSON.stringify(res?.data?.results || [])),
       );
-      nextTick(() => {
+      setTimeout(() => {
+        eventsEditorRef?.value?.formatDocument();
         outputEventsEditorRef?.value?.formatDocument();
-      });
+      }, 1000);
     })
     .catch((err: any) => {
       const errMsg = err.response?.data?.message || "Error in testing function";
