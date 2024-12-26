@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, put, web, HttpResponse};
 use config::meta::{alerts::alert::Alert as MetaAlert, folder::DEFAULT_FOLDER};
 use infra::db::{connect_to_orm, ORM_CLIENT};
 use svix_ksuid::Ksuid;
@@ -21,7 +21,8 @@ use svix_ksuid::Ksuid;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::alerts::{
-        requests::CreateAlertRequestBody, responses::GetAlertResponseBody,
+        requests::{CreateAlertRequestBody, UpdateAlertRequestBody},
+        responses::GetAlertResponseBody,
     },
     service::alerts::alert::{self, AlertError},
 };
@@ -42,6 +43,7 @@ impl From<AlertError> for HttpResponse {
             AlertError::AlertDestinationMissing => MetaHttpResponse::bad_request(value),
             AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound => MetaHttpResponse::not_found(value),
+            AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
@@ -129,6 +131,43 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
             let resp_body: GetAlertResponseBody = alert.into();
             MetaHttpResponse::json(resp_body)
         }
+        Err(e) => e.into(),
+    }
+}
+
+/// UpdateAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "UpdateAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+      ),
+    request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/v2/{org_id}/alerts/{alert_id}")]
+pub async fn update_alert(
+    path: web::Path<(String, Ksuid)>,
+    req_body: web::Json<UpdateAlertRequestBody>,
+    user_email: UserEmail,
+) -> HttpResponse {
+    let (org_id, _alert_id) = path.into_inner();
+    let req_body = req_body.into_inner();
+
+    let mut alert: MetaAlert = req_body.into();
+    alert.last_edited_by = Some(user_email.user_id);
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::update(client, &org_id, None, alert).await {
+        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(e) => e.into(),
     }
 }

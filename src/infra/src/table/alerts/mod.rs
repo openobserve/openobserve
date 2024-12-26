@@ -310,6 +310,54 @@ pub async fn create<C: TransactionTrait>(
     Ok(alert)
 }
 
+/// Creates a new alert in the database. Returns the new alert.
+pub async fn update<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: MetaAlert,
+) -> Result<MetaAlert, errors::Error> {
+    // Ensure that ID is provided.
+    let Some(alert_id) = alert.id else {
+        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+    };
+
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    // Try to get the new parent folder if a folder ID is provided.
+    let maybe_folder_m = match folder_id {
+        Some(f_id) => {
+            let Some(folder_m) =
+                super::folders::get_model(&txn, org_id, f_id, FolderType::Alerts).await?
+            else {
+                return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
+            };
+            Some(folder_m)
+        }
+        None => None,
+    };
+
+    // Try to get the alert to update.
+    let Some((_, alert_m)) = get_model_by_id(conn, org_id, alert_id).await? else {
+        return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into());
+    };
+
+    // Update fields using values from the given alert.
+    let mut alert_am: alerts::ActiveModel = alert_m.into();
+    update_mutable_fields(&mut alert_am, alert)?;
+
+    // Update the folder if a new parent folder was provided.
+    if let Some(folder_m) = maybe_folder_m {
+        alert_am.folder_id = Set(folder_m.id);
+    }
+
+    let alert_m: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
+    let alert = alert_m.try_into()?;
+    txn.commit().await?;
+    Ok(alert)
+}
+
 /// Deletes an alert by its name.
 pub async fn delete_by_name<C: ConnectionTrait>(
     conn: &C,
