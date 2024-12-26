@@ -917,6 +917,27 @@ pub mod metrics_server {
         const NAME: &'static str = "cluster.Metrics";
     }
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryStatusRequest {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryStatusResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub status: ::prost::alloc::vec::Vec<QueryStatus>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CancelQueryRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct CancelQueryResponse {
+    #[prost(bool, tag = "1")]
+    pub is_success: bool,
+}
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -940,6 +961,49 @@ pub struct SearchResponse {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
     #[prost(bytes = "vec", tag = "2")]
+    pub response: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchPartitionRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "5")]
+    pub request: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bool, tag = "6")]
+    pub skip_max_query_range: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchPartitionResponse {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "2")]
+    pub response: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteResultRequest {
+    #[prost(string, repeated, tag = "1")]
+    pub paths: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeleteResultResponse {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetResultRequest {
+    #[prost(string, tag = "1")]
+    pub path: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetResultResponse {
+    #[prost(bytes = "vec", tag = "1")]
     pub response: ::prost::alloc::vec::Vec<u8>,
 }
 /// Search request query
@@ -971,15 +1035,6 @@ pub struct SearchQuery {
     pub query_fn: ::prost::alloc::string::String,
     #[prost(bool, tag = "14")]
     pub skip_wal: bool,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryStatusRequest {}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryStatusResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub status: ::prost::alloc::vec::Vec<QueryStatus>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1016,18 +1071,6 @@ pub struct Query {
     pub start_time: i64,
     #[prost(int64, tag = "3")]
     pub end_time: i64,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CancelQueryRequest {
-    #[prost(string, tag = "1")]
-    pub trace_id: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct CancelQueryResponse {
-    #[prost(bool, tag = "1")]
-    pub is_success: bool,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -1234,6 +1277,78 @@ pub mod search_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn search_partition(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SearchPartitionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SearchPartitionResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/SearchPartition",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "SearchPartition"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn get_result(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetResultRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetResultResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Search/GetResult");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "GetResult"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn delete_result(
+            &mut self,
+            request: impl tonic::IntoRequest<super::DeleteResultRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteResultResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/DeleteResult",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "DeleteResult"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1268,6 +1383,27 @@ pub mod search_server {
             &self,
             request: tonic::Request<super::SearchRequest>,
         ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
+        async fn search_partition(
+            &self,
+            request: tonic::Request<super::SearchPartitionRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::SearchPartitionResponse>,
+            tonic::Status,
+        >;
+        async fn get_result(
+            &self,
+            request: tonic::Request<super::GetResultRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetResultResponse>,
+            tonic::Status,
+        >;
+        async fn delete_result(
+            &self,
+            request: tonic::Request<super::DeleteResultRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::DeleteResultResponse>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct SearchServer<T: Search> {
@@ -1515,6 +1651,142 @@ pub mod search_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = SearchSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/SearchPartition" => {
+                    #[allow(non_camel_case_types)]
+                    struct SearchPartitionSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::SearchPartitionRequest>
+                    for SearchPartitionSvc<T> {
+                        type Response = super::SearchPartitionResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SearchPartitionRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::search_partition(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = SearchPartitionSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetResult" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetResultSvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::GetResultRequest>
+                    for GetResultSvc<T> {
+                        type Response = super::GetResultResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetResultRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_result(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetResultSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/DeleteResult" => {
+                    #[allow(non_camel_case_types)]
+                    struct DeleteResultSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::DeleteResultRequest>
+                    for DeleteResultSvc<T> {
+                        type Response = super::DeleteResultResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::DeleteResultRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::delete_result(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = DeleteResultSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
