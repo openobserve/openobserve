@@ -84,6 +84,8 @@ pub async fn validator(
                 if let Err(e) = check_and_create_org(user_id, req.method(), path).await {
                     return Err((e, req));
                 }
+
+                #[cfg(feature = "enterprise")]
                 let path = path.to_owned();
 
                 // / Hack for prometheus, need support POST and check the header
