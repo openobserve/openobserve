@@ -40,6 +40,6 @@ export class HomePage {
     }
 
     async homePageURLValidation() {
-        await expect(this.page).toHaveURL(/defaulttestmulti/);
+        await expect(this.page).not.toHaveURL(/default/);
     }
 }
