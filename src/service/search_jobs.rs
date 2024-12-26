@@ -41,7 +41,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::{
     db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
     grpc::get_cached_channel,
-    search::{self as SearchService, grpc_search::grpc_search, MetadataMap},
+    search::{
+        grpc_search::{grpc_search, grpc_search_partition},
+        MetadataMap,
+    },
 };
 
 // 1. get the oldest job from `search_jobs` table
@@ -165,7 +168,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     let req: search::Request = json::from_str(&job.payload)?;
     let partition_req = SearchPartitionRequest::from(&req);
-    let res = SearchService::search_partition(
+    let res = grpc_search_partition(
         &job.trace_id,
         &job.org_id,
         stream_type,
