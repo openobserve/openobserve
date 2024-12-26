@@ -28,6 +28,16 @@ mod new;
 mod old;
 
 use config::meta::{alerts::alert::Alert, stream::StreamType};
+use sea_orm::ConnectionTrait;
+use svix_ksuid::Ksuid;
+
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    new::get_by_id(conn, org_id, alert_id).await
+}
 
 pub async fn get_by_name(
     org_id: &str,

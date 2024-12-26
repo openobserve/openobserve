@@ -27,8 +27,23 @@ use infra::{
     table::alerts as table,
 };
 use itertools::Itertools;
+use sea_orm::ConnectionTrait;
+use svix_ksuid::Ksuid;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
+
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    // We cannot check the cache because the cache stores alerts by stream type
+    // and stream name which are currently unknown.
+    let alert = table::get_by_id(conn, org_id, alert_id)
+        .await?
+        .map(|(_f, a)| a);
+    Ok(alert)
+}
 
 pub async fn get_by_name(
     org_id: &str,
