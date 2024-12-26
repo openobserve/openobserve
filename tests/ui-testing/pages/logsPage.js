@@ -298,6 +298,16 @@ async logsPageURLValidation() {
     await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
   }
   
+  async validateResult() {
+    await this.page.waitForTimeout(10000);
+    await expect(this.page.locator('[data-test="logs-search-search-result"]')).toBeVisible();
+    await this.page.locator('td[data-test="log-table-column-0-source"]').nth(0).click();
+    await expect(this.page.locator('[data-test="log-expand-detail-key-kubernetes_container_name-text"]')).toBeVisible();
+   
+  }
+  
+
+  
 
   async signOut() {
     await this.profileButton.click();
