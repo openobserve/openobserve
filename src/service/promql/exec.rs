@@ -106,7 +106,7 @@ impl Query {
         let mut instant_vectors = Vec::new();
         let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
         let nr_steps = ((self.end - self.start) / self.interval) + 1;
         for i in 0..nr_steps {
             let time = self.start + (self.interval * i);
@@ -124,10 +124,7 @@ impl Query {
 
         for (time, ret) in tasks {
             let (result, result_type_exec) = match ret.await {
-                Ok(Ok((value, result_type))) => {
-                    log::debug!("time: {}, value: {:?}", time, value);
-                    (value, result_type)
-                }
+                Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
                     log::error!("Error executing query engine: {}", e);
                     return Err(e);
