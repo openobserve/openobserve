@@ -1157,7 +1157,9 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy", None, None, false).await.is_ok())
+        assert!(list_users("dummy", "admin@zo.dev", None, None, false)
+            .await
+            .is_ok())
     }
 
     #[tokio::test]
