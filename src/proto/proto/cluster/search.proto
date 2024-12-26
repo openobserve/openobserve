@@ -13,6 +13,23 @@ service Search {
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc SearchPartition(SearchPartitionRequest) returns (SearchPartitionResponse) {}
+    rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
+    rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
+}
+
+message QueryStatusRequest {}
+
+message QueryStatusResponse {
+    repeated QueryStatus status = 1;
+}
+
+message CancelQueryRequest {
+    string trace_id = 1;
+}
+
+message CancelQueryResponse {
+    bool is_success = 1;
 }
 
 message SearchRequest {
@@ -26,6 +43,34 @@ message SearchRequest {
 message SearchResponse {
     string             trace_id = 1;
     bytes              response = 2;
+}
+
+
+message SearchPartitionRequest {
+    string             trace_id = 1;
+    string               org_id = 2;
+    string          stream_type = 3;
+    bytes               request = 5;
+    bool   skip_max_query_range = 6; 
+}
+
+message SearchPartitionResponse {
+    string             trace_id = 1;
+    bytes              response = 2;
+}
+
+message DeleteResultRequest {
+    repeated string paths = 1;
+}
+
+message DeleteResultResponse {}
+
+message GetResultRequest {
+    string           path = 1;
+}
+
+message GetResultResponse {
+    bytes        response = 1;
 }
 
 // Search request query
@@ -44,12 +89,7 @@ message SearchQuery {
     bool          skip_wal = 14;
 }
 
-message QueryStatusRequest {
-}
 
-message QueryStatusResponse {
-    repeated QueryStatus status = 1;
-}
 
 message QueryStatus {
     string                trace_id = 1;
@@ -76,10 +116,4 @@ message Query {
     int64   end_time = 3;
 }
 
-message CancelQueryRequest {
-    string trace_id = 1;
-}
 
-message CancelQueryResponse {
-    bool is_success = 1;
-}

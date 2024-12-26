@@ -33,6 +33,9 @@ mod m20241220_000200_create_users_table;
 mod m20241220_000300_create_org_users_table;
 mod m20241220_000400_populate_users_table;
 mod m20241220_000500_delete_meta_users_table;
+mod m20241222_085111_search_jobs;
+mod m20241222_085135_search_job_partitions;
+mod m20241222_085148_search_job_results;
 
 pub struct Migrator;
 
@@ -52,6 +55,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20241215_190333_delete_metas::Migration),
             Box::new(m20241217_154900_alter_folders_table_idx::Migration),
             Box::new(m20241217_155000_populate_alerts_table::Migration),
+            Box::new(m20241222_085111_search_jobs::Migration),
+            Box::new(m20241222_085135_search_job_partitions::Migration),
+            Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20241220_000001_create_organizations_table::Migration),
             Box::new(m20241220_000100_populate_organizations_table::Migration),
             Box::new(m20241220_000200_create_users_table::Migration),

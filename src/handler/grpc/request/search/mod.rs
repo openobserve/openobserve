@@ -22,8 +22,10 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
-    search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchRequest, SearchResponse,
+    search_server::Search, CancelQueryRequest, CancelQueryResponse, DeleteResultRequest,
+    DeleteResultResponse, GetResultRequest, GetResultResponse, QueryStatusRequest,
+    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
+    SearchResponse,
 };
 use tonic::{Request, Response, Status};
 
@@ -131,7 +133,7 @@ impl Search for Searcher {
     ) -> Result<Response<SearchResponse>, Status> {
         let req = req.into_inner();
         let request = json::from_slice::<search::Request>(&req.request)
-            .map_err(|e| Status::internal(format!("failed to parse request: {e}")))?;
+            .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
         let ret = SearchService::search(
             &req.trace_id,
@@ -144,8 +146,9 @@ impl Search for Searcher {
 
         match ret {
             Ok(ret) => {
-                let response = json::to_vec(&ret)
-                    .map_err(|e| Status::internal(format!("failed to serialize response: {e}")))?;
+                let response = json::to_vec(&ret).map_err(|e| {
+                    Status::internal(format!("failed to serialize search response: {e}"))
+                })?;
                 Ok(Response::new(SearchResponse {
                     trace_id: req.trace_id,
                     response,
@@ -153,6 +156,84 @@ impl Search for Searcher {
             }
             Err(e) => Err(Status::internal(format!("search failed: {e}"))),
         }
+    }
+
+    async fn search_partition(
+        &self,
+        req: Request<SearchPartitionRequest>,
+    ) -> Result<Response<SearchPartitionResponse>, Status> {
+        let req = req.into_inner();
+        let request =
+            json::from_slice::<search::SearchPartitionRequest>(&req.request).map_err(|e| {
+                Status::internal(format!("failed to parse search partition request: {e}"))
+            })?;
+        let stream_type = StreamType::from(req.stream_type.as_str());
+        let ret = SearchService::search_partition(
+            &req.trace_id,
+            &req.org_id,
+            stream_type,
+            &request,
+            req.skip_max_query_range,
+        )
+        .await;
+
+        match ret {
+            Ok(ret) => {
+                let response = json::to_vec(&ret).map_err(|e| {
+                    Status::internal(format!(
+                        "failed to serialize search partition response: {e}"
+                    ))
+                })?;
+                Ok(Response::new(SearchPartitionResponse {
+                    trace_id: req.trace_id,
+                    response,
+                }))
+            }
+            Err(e) => Err(Status::internal(format!("search partition failed: {e}"))),
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_result(
+        &self,
+        req: Request<GetResultRequest>,
+    ) -> Result<Response<GetResultResponse>, Status> {
+        let path = req.into_inner().path;
+        let res = infra::storage::get(&path)
+            .await
+            .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
+        Ok(Response::new(GetResultResponse {
+            response: res.to_vec(),
+        }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn get_result(
+        &self,
+        _req: Request<GetResultRequest>,
+    ) -> Result<Response<GetResultResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn delete_result(
+        &self,
+        req: Request<DeleteResultRequest>,
+    ) -> Result<Response<DeleteResultResponse>, Status> {
+        let paths = req.into_inner().paths;
+        let paths = paths.iter().map(|path| path.as_str()).collect::<Vec<_>>();
+        let _ = infra::storage::del(&paths)
+            .await
+            .map_err(|e| Status::internal(format!("failed to delete result: {e}")))?;
+        Ok(Response::new(DeleteResultResponse {}))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn delete_result(
+        &self,
+        _req: Request<DeleteResultRequest>,
+    ) -> Result<Response<DeleteResultResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
     }
 
     #[cfg(feature = "enterprise")]
