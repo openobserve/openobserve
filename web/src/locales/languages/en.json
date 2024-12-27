@@ -236,7 +236,7 @@
     "repassword": "Reconfirm Password",
     "addOrUpdate": "Add/Update User",
     "editUser": "Update User",
-    "add": "Add User",
+    "add": "Add Basic User",
     "search": "Search User",
     "createdAt": "Updated at",
     "updatedAt": "Created at",
@@ -300,7 +300,7 @@
     "groups": "User Groups",
     "roles": "Roles",
     "organizations": "Organizations",
-    "addGroup": "Add Group",
+    "addGroup": "Add User Group",
     "addRole": "Add Role",
     "roleName": "Role Name",
     "groupName": "Group Name",
@@ -319,7 +319,8 @@
     "searchGroup": "Search User Group",
     "object": "Object",
     "serviceAccounts": "Service Accounts",
-    "serviceAccountsName": "Service Accounts Name"
+    "serviceAccountsName": "Service Accounts Name",
+    "basicUsers": "Basic Users"
   },
   "ticket": {
     "header": "Support Tickets",
@@ -347,7 +348,7 @@
   "organization": {
     "header": "Organizations",
     "orgName": "Organization Name",
-    "createOrganization": "Create Organization",
+    "createOrganization": "Add Organization",
     "updateOrganization": "Update Organization",
     "nameHolder": "Type name here",
     "add": "Add Organization",
