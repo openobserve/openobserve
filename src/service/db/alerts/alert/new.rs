@@ -202,6 +202,30 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     Ok(alert)
 }
 
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), infra::errors::Error> {
+    let Some((_folder, alert)) = table::get_by_id(conn, org_id, alert_id).await? else {
+        return Ok(());
+    };
+
+    table::delete_by_id(conn, org_id, alert_id).await?;
+    cluster::emit_delete_event(org_id, alert.stream_type, &alert.stream_name, &alert.name).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_delete_event(org_id, alert.stream_type, &alert.stream_name, &alert.name)
+        .await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    if let Err(e) =
+        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+    {
+        log::error!("Failed to delete trigger: {}", e);
+    };
+    Ok(())
+}
+
 pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,

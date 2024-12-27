@@ -358,6 +358,24 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     Ok(alert)
 }
 
+/// Deletes an alert by its ID.
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), errors::Error> {
+    let _lock = super::get_lock().await;
+    let model = get_model_by_id(conn, org_id, alert_id)
+        .await?
+        .map(|(_folder, alert)| alert);
+
+    if let Some(model) = model {
+        let _ = model.delete(conn).await?;
+    }
+
+    Ok(())
+}
+
 /// Deletes an alert by its name.
 pub async fn delete_by_name<C: ConnectionTrait>(
     conn: &C,
