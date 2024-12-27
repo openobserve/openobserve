@@ -397,7 +397,14 @@ export default defineComponent({
     };
 
     const formatDocument = () => {
-      editorObj?.getAction("editor.action.formatDocument")?.run();
+      // As Monaco editor does not support formatting in read-only mode, we need to temporarily disable it while formatting
+      editorObj.updateOptions({ readOnly: false });
+      editorObj
+        .getAction("editor.action.formatDocument")
+        .run()
+        .then(() => {
+          editorObj.updateOptions({ readOnly: props.readOnly });
+        });
     };
 
     const getCursorIndex = () => {

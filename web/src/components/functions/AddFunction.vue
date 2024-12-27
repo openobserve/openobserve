@@ -345,7 +345,7 @@ end`;
 
 .monaco-editor {
   width: 100%;
-  height: calc(100vh - 250px);
+  height: calc(100vh - 160px);
   border-radius: 5px;
 }
 
