@@ -29,16 +29,16 @@ mod old;
 
 use config::meta::{alerts::alert::Alert, stream::StreamType};
 
-pub async fn get(
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
     if should_use_meta_alerts() {
-        old::get(org_id, stream_type, stream_name, name).await
+        old::get_by_name(org_id, stream_type, stream_name, name).await
     } else {
-        new::get(org_id, stream_type, stream_name, name).await
+        new::get_by_name(org_id, stream_type, stream_name, name).await
     }
 }
 
@@ -66,16 +66,16 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     }
 }
 
-pub async fn delete(
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(), infra::errors::Error> {
     if should_use_meta_alerts() {
-        old::delete(org_id, stream_type, stream_name, name).await
+        old::delete_by_name(org_id, stream_type, stream_name, name).await
     } else {
-        new::delete(org_id, stream_type, stream_name, name).await
+        new::delete_by_name(org_id, stream_type, stream_name, name).await
     }
 }
 
