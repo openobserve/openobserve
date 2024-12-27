@@ -45,7 +45,7 @@ use infra::{
     table::{self, folders::FolderType},
 };
 use lettre::{message::MultiPart, AsyncTransport, Message};
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
 use crate::{
@@ -86,6 +86,11 @@ pub enum AlertError {
 
     #[error("Alert already exists")]
     CreateAlreadyExists,
+
+    /// Error that occurs when trying to create an alert in a folder that cannot
+    /// be found.
+    #[error("Error creating alert in folder that cannot be found")]
+    CreateFolderNotFound,
 
     #[error("Alert not found")]
     AlertNotFound,
@@ -140,16 +145,43 @@ pub async fn save(
     // Currently all alerts are stored in the default folder so create the
     // default folder for the org if it doesn't exist yet.
     if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
-        let default_folder = Folder {
-            folder_id: DEFAULT_FOLDER.to_owned(),
-            name: "default".to_owned(),
-            description: "default".to_owned(),
-        };
-        folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
-            .await
-            .map_err(|_| AlertError::CreateDefaultFolderError)?;
+        create_default_alerts_folder(org_id).await?;
     };
 
+    prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
+
+    // save the alert
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
+        .await
+        .map_err(|_| AlertError::CreateDefaultFolderError)?;
+    Ok(())
+}
+
+async fn prepare_alert(
+    org_id: &str,
+    stream_name: &str,
+    name: &str,
+    alert: &mut Alert,
+    create: bool,
+) -> Result<(), AlertError> {
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -345,17 +377,29 @@ pub async fn save(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
-    // save the alert
-    let alert_name = alert.name.clone();
-    match db::alerts::alert::set(org_id, stream_type, stream_name, alert, create).await {
-        Ok(_) => {
-            if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
-            }
-            Ok(())
+    Ok(())
+}
+
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+        if folder_id == DEFAULT_FOLDER {
+            create_default_alerts_folder(org_id).await?;
+        } else {
+            return Err(AlertError::CreateFolderNotFound);
         }
-        Err(e) => Err(e.into()),
     }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+
+    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
 }
 
 pub async fn get_by_id<C: ConnectionTrait>(
