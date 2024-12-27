@@ -930,17 +930,19 @@ fn process_hist_data_point(
         .as_array()
         .unwrap();
     let len = buckets.len();
+    let mut accumulated_count = 0;
     for i in 0..len {
         let mut bucket_rec = rec.clone();
         bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-        if let Some(val) = buckets.get(i) {
-            bucket_rec[VALUE_LABEL] = json::get_float_value(val).into();
-        }
         if let Some(val) = explicit_bounds.get(i) {
             bucket_rec["le"] = (*val.to_string()).into()
-        }
-        if i == len - 1 {
+        } else {
             bucket_rec["le"] = f64::INFINITY.to_string().into();
+        }
+        if let Some(val) = buckets.get(i) {
+            let val = json::get_uint_value(val);
+            accumulated_count += val;
+            bucket_rec[VALUE_LABEL] = (accumulated_count as f64).into()
         }
         bucket_recs.push(bucket_rec);
     }

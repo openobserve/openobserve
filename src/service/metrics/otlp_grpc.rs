@@ -761,17 +761,18 @@ fn process_hist_data_point(
 
     // add bucket records
     let len = data_point.bucket_counts.len();
+    let mut accumulated_count = 0;
     for i in 0..len {
         let mut bucket_rec = rec.clone();
         bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-        if let Some(val) = data_point.bucket_counts.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val as f64).into()
-        }
         if let Some(val) = data_point.explicit_bounds.get(i) {
             bucket_rec["le"] = (*val.to_string()).into()
-        }
-        if i == len - 1 {
+        } else {
             bucket_rec["le"] = f64::INFINITY.to_string().into();
+        }
+        if let Some(val) = data_point.bucket_counts.get(i) {
+            accumulated_count += val;
+            bucket_rec[VALUE_LABEL] = (accumulated_count as f64).into()
         }
         bucket_recs.push(bucket_rec);
     }
