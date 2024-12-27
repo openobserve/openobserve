@@ -94,6 +94,14 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     new::update(conn, org_id, folder_id, alert).await
 }
 
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), infra::errors::Error> {
+    new::delete_by_id(conn, org_id, alert_id).await
+}
+
 pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
