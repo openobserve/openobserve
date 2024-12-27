@@ -27,7 +27,7 @@ use infra::{
     table::alerts as table,
 };
 use itertools::Itertools;
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
@@ -133,6 +133,36 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     #[cfg(feature = "enterprise")]
     super_cluster::emit_put_event(org_id, &alert).await?;
     Ok(())
+}
+
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let alert = table::create(conn, org_id, folder_id, alert).await?;
+
+    cluster::emit_put_event(org_id, &alert).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, &alert).await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    let trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at: chrono::Utc::now().timestamp_micros(),
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    let _ = db::scheduler::push(trigger).await.map_err(|e| {
+        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+        e
+    });
+
+    Ok(alert)
 }
 
 pub async fn delete_by_name(

@@ -36,7 +36,7 @@ use super::{
     entity::{alerts, folders},
     folders::FolderType,
 };
-use crate::errors::{self, FromStrError};
+use crate::errors::{self, FromStrError, PutAlertError};
 
 pub mod intermediate;
 
@@ -219,11 +219,11 @@ pub async fn put<C: TransactionTrait>(
                 errors::DbError::PutAlert(errors::PutAlertError::FolderDoesNotExist).into(),
             );
         }
-        Some((folder_m, Some(alert_m))) => {
+        Some((_folder_m, Some(alert_m))) => {
             // Destination folder exists and alert already exists, so convert
             // the alert model to an active model and update it.
             let mut alert_am: alerts::ActiveModel = alert_m.into();
-            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            update_mutable_fields(&mut alert_am, alert)?;
             let model: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
             Ok(model)
         }
@@ -238,6 +238,7 @@ pub async fn put<C: TransactionTrait>(
                 // The following fields can only be set on creation.
                 id: Set(id),
                 org: Set(org_id.to_owned()),
+                folder_id: Set(folder_m.id),
                 stream_type: Set(stream_type),
                 stream_name: Set(stream_name),
                 name: Set(alert_name),
@@ -245,12 +246,66 @@ pub async fn put<C: TransactionTrait>(
                 // they are set below.
                 ..Default::default()
             };
-            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            update_mutable_fields(&mut alert_am, alert)?;
+
+            // Triggered and satisfied timestamps should always be initialized
+            // to None.
+            alert_am.last_triggered_at = Set(None);
+            alert_am.last_satisfied_at = Set(None);
+
             let model: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
             Ok(model)
         }
     };
     let alert = rslt?.try_into()?;
+    txn.commit().await?;
+    Ok(alert)
+}
+
+/// Creates a new alert in the database. Returns the new alert.
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: MetaAlert,
+) -> Result<MetaAlert, errors::Error> {
+    // Ensure that no ID is provided.
+    if alert.id.is_some() {
+        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+    };
+
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    // Get the destination folder.
+    let Some(folder_m) =
+        super::folders::get_model(&txn, org_id, folder_id, FolderType::Alerts).await?
+    else {
+        return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
+    };
+
+    let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
+    let mut alert_am = alerts::ActiveModel {
+        id: Set(id),
+        org: Set(org_id.to_owned()),
+        folder_id: Set(folder_m.id),
+        stream_type: Set(stream_type),
+        stream_name: Set(alert.stream_name.clone()),
+        name: Set(alert.name.clone()),
+        // All remaining fields can be set on creation or updated so
+        // they are set below.
+        ..Default::default()
+    };
+    update_mutable_fields(&mut alert_am, alert)?;
+
+    // Triggered and satisfied timestamps should always be initialized
+    // to None so overwrite any value that might have been set already.
+    alert_am.last_triggered_at = Set(None);
+    alert_am.last_satisfied_at = Set(None);
+
+    let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
+    let alert = alert_m.try_into()?;
     txn.commit().await?;
     Ok(alert)
 }
@@ -418,7 +473,6 @@ async fn list_models<C: ConnectionTrait>(
 /// should be treated as immutable will not be updated.
 fn update_mutable_fields(
     alert_am: &mut alerts::ActiveModel,
-    folder_m: folders::Model,
     alert: MetaAlert,
 ) -> Result<(), errors::Error> {
     let is_real_time = alert.is_real_time;
@@ -496,7 +550,6 @@ fn update_mutable_fields(
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
     let updated_at: i64 = chrono::Utc::now().timestamp();
 
-    alert_am.folder_id = Set(folder_m.id);
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.context_attributes = Set(context_attributes);
