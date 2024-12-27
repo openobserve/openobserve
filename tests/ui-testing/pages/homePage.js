@@ -40,6 +40,7 @@ export class HomePage {
     }
 
     async homePageURLValidation() {
+        // TODO: Fix this test
         await expect(this.page).not.toHaveURL(/default/);
     }
 }
