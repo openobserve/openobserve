@@ -43,7 +43,7 @@ use crate::{
     },
     service::{
         db,
-        exporter::otlp_o2_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
+        exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
     },
 };
 
