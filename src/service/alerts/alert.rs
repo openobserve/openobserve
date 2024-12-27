@@ -162,7 +162,7 @@ pub async fn save(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
+    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(old_alert)) => {
             if create {
                 return Err(AlertError::CreateAlreadyExists);
@@ -356,13 +356,13 @@ pub async fn save(
     }
 }
 
-pub async fn get(
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, AlertError> {
-    let alert = db::alerts::alert::get(org_id, stream_type, stream_name, name).await?;
+    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await?;
     Ok(alert)
 }
 
@@ -404,19 +404,19 @@ pub async fn list(
     }
 }
 
-pub async fn delete(
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get(org_id, stream_type, stream_name, name)
+    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
         return Err(AlertError::AlertNotFound);
     }
-    match db::alerts::alert::delete(org_id, stream_type, stream_name, name).await {
+    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
@@ -425,31 +425,32 @@ pub async fn delete(
     }
 }
 
-pub async fn enable(
+pub async fn enable_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
     value: bool,
 ) -> Result<(), AlertError> {
-    let mut alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
-        Ok(Some(alert)) => alert,
-        _ => {
-            return Err(AlertError::AlertNotFound);
-        }
-    };
+    let mut alert =
+        match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
+            Ok(Some(alert)) => alert,
+            _ => {
+                return Err(AlertError::AlertNotFound);
+            }
+        };
     alert.enabled = value;
     db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
     Ok(())
 }
 
-pub async fn trigger(
+pub async fn trigger_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(String, String), AlertError> {
-    let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
+    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err(AlertError::AlertNotFound);
