@@ -45,6 +45,8 @@ use infra::{
     table::{self, folders::FolderType},
 };
 use lettre::{message::MultiPart, AsyncTransport, Message};
+use sea_orm::ConnectionTrait;
+use svix_ksuid::Ksuid;
 
 use crate::{
     common::{
@@ -353,6 +355,17 @@ pub async fn save(
             Ok(())
         }
         Err(e) => Err(e.into()),
+    }
+}
+
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Alert, AlertError> {
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
     }
 }
 

@@ -99,6 +99,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::deprecated::delete_alert,
         request::alerts::deprecated::enable_alert,
         request::alerts::deprecated::trigger_alert,
+        request::alerts::get_alert,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,
