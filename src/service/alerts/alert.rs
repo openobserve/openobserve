@@ -92,6 +92,11 @@ pub enum AlertError {
     #[error("Error creating alert in folder that cannot be found")]
     CreateFolderNotFound,
 
+    /// Error that occurs when trying to move an alert to a destination folder
+    /// that cannot be found.
+    #[error("Error moving alert to folder that cannot be found")]
+    MoveDestinationFolderNotFound,
+
     #[error("Alert not found")]
     AlertNotFound,
 
@@ -399,6 +404,30 @@ pub async fn create<C: TransactionTrait>(
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if let Some(folder_id) = folder_id {
+        if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+            if folder_id == DEFAULT_FOLDER {
+                create_default_alerts_folder(org_id).await?;
+            } else {
+                return Err(AlertError::MoveDestinationFolderNotFound);
+            }
+        }
+    }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+
+    let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
     Ok(alert)
 }
 
