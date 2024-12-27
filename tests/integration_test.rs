@@ -751,8 +751,8 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
-                                "role": "member"
+                                "new_password": "12345678",
+                                "change_password": true
                             }"#;
         let app = test::init_service(
             App::new()
