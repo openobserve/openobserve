@@ -19,7 +19,8 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::alert::AlertError,
 };
 
-pub mod alert;
+#[allow(deprecated)]
+pub mod deprecated;
 pub mod destinations;
 pub mod templates;
 

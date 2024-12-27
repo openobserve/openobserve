@@ -30,6 +30,7 @@ use crate::{
 };
 
 /// CreateAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -71,6 +72,7 @@ pub async fn save_alert(
 }
 
 /// UpdateAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -109,6 +111,7 @@ pub async fn update_alert(
 }
 
 /// ListStreamAlerts
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -170,6 +173,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
 }
 
 /// ListAlerts
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -250,6 +254,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
 }
 
 /// GetAlertByName
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -289,6 +294,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
 }
 
 /// DeleteAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -324,6 +330,7 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// EnableAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -366,6 +373,7 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
 }
 
 /// TriggerAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
