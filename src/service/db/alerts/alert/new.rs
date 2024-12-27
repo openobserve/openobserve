@@ -30,7 +30,7 @@ use itertools::Itertools;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
-pub async fn get(
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -120,7 +120,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     Ok(())
 }
 
-pub async fn delete(
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,

@@ -277,7 +277,7 @@ async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) 
             return MetaHttpResponse::bad_request(e);
         }
     };
-    match alert::get(&org_id, stream_type, &stream_name, &name).await {
+    match alert::get_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(Some(mut data)) => {
             // Hack for frequency: convert seconds to minutes
             data.trigger_condition.frequency /= 60;
@@ -317,7 +317,7 @@ async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpReques
             return MetaHttpResponse::bad_request(e);
         }
     };
-    match alert::delete(&org_id, stream_type, &stream_name, &name).await {
+    match alert::delete_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(e) => e.into(),
     }
@@ -359,7 +359,7 @@ async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpReques
     };
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
-    match alert::enable(&org_id, stream_type, &stream_name, &name, enable).await {
+    match alert::enable_by_name(&org_id, stream_type, &stream_name, &name, enable).await {
         Ok(_) => MetaHttpResponse::json(resp),
         Err(e) => e.into(),
     }
@@ -397,7 +397,7 @@ async fn trigger_alert(
             return MetaHttpResponse::bad_request(e);
         }
     };
-    match alert::trigger(&org_id, stream_type, &stream_name, &name).await {
+    match alert::trigger_by_name(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(e) => e.into(),
     }
