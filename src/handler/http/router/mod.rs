@@ -512,7 +512,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(keys::get)
         .service(keys::delete)
         .service(keys::save)
-        .service(keys::list);
+        .service(keys::list)
+        .service(keys::update);
 
     cfg.service(service);
 }
