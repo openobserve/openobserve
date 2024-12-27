@@ -125,6 +125,13 @@
         :label="t('common.events')"
       >
         <template #left>
+          <div
+            v-if="loading.events"
+            class="text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
+          >
+            <q-spinner-hourglass size="18px" />
+            {{ t("confirmDialog.loading") }}
+          </div>
           <q-icon
             v-if="!!eventsErrorMsg"
             name="info"
@@ -160,7 +167,17 @@
         name="function"
         v-model:is-expanded="expandState.output"
         :label="t('common.output')"
-      />
+      >
+        <template #left>
+          <div
+            v-if="loading.output"
+            class="text-subtitle2 text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
+          >
+            <q-spinner-hourglass size="18px" />
+            {{ t("confirmDialog.loading") }}
+          </div>
+        </template>
+      </FullViewContainer>
 
       <div
         v-show="expandState.output"
@@ -462,10 +479,8 @@ const testFunction = () => {
       outputEvents.value = JSON.stringify(
         JSON.parse(JSON.stringify(res?.data?.results || [])),
       );
-      setTimeout(() => {
-        eventsEditorRef?.value?.formatDocument();
-        outputEventsEditorRef?.value?.formatDocument();
-      }, 1000);
+      eventsEditorRef?.value?.formatDocument();
+      outputEventsEditorRef?.value?.formatDocument();
     })
     .catch((err: any) => {
       const errMsg = err.response?.data?.message || "Error in testing function";
