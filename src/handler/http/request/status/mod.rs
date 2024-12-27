@@ -548,7 +548,6 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            log::debug!("inside redirect error 401");
             audit_message.response_code = 401;
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;

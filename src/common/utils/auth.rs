@@ -445,7 +445,6 @@ impl FromRequest for AuthExtractor {
         };
 
         let auth_str = extract_auth_str(req);
-        log::debug!("Auth_str: {auth_str}\n object_type: {object_type}");
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
@@ -589,7 +588,6 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
             .map(|cookie| cookie.value().to_string())
             .unwrap_or_default()
     };
-    log::debug!("I am here inside extract_auth_str");
 
     if let Some(cookie) = req.cookie("auth_tokens") {
         let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();

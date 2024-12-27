@@ -517,7 +517,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 }
                 format!("q_auth {}", s)
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
-                log::debug!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {

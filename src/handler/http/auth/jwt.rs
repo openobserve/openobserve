@@ -70,7 +70,6 @@ pub async fn process_token(
             }
         }
     };
-    log::debug!("Here is the groups array: {:#?}", groups);
 
     let user_email = res.0.user_email.to_owned();
 
@@ -337,7 +336,6 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut org = "";
     let mut role = "";
     let mut custom_role = None;
-    log::debug!("parse_dn dn is: {dn}");
 
     let o2cfg = get_o2_config();
     if o2cfg.openfga.map_group_to_role {
@@ -467,7 +465,6 @@ async fn map_group_to_custom_role(
         let mut remove_tuples = vec![];
         // user exists in the db with default org hence skip org creation tuples
         let existing_roles = get_roles_for_user(user_email).await;
-        log::debug!("user exists existing roles: {:#?}", existing_roles);
 
         // Find roles to delete: present in existing_role but not in custom_role
         for existing_role in &existing_roles {

@@ -70,7 +70,6 @@ pub async fn validator(
         None => req.request().path(),
     };
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
-        log::debug!("Inside validator auth_ext");
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         validate_credentials_ext(user_id, password, path, auth_token).await
@@ -78,7 +77,6 @@ pub async fn validator(
         validate_credentials(user_id, password.trim(), path).await
     } {
         Ok(res) => {
-            log::debug!("Token Validation Response: {:#?}", res);
             if res.is_valid {
                 // Check and create organization if needed
                 if let Err(e) = check_and_create_org(user_id, req.method(), path).await {
@@ -163,7 +161,6 @@ pub async fn validate_credentials(
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
-        log::debug!("DB User: {:#?}", db_user);
         match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
@@ -191,7 +188,6 @@ pub async fn validate_credentials(
             None => users::get_user(None, user_id).await,
         }
     };
-    println!("Validate creds User: {:#?}", user);
 
     if user.is_none() {
         return Ok(TokenValidationResponse {
@@ -287,7 +283,6 @@ pub async fn validate_credentials_ext(
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
         let db_user = db::user::get_db_user(user_id).await;
-        log::debug!("DB User ext: {:#?}", db_user);
         match db_user {
             Ok(user) => {
                 let all_users = user.get_all_users();
@@ -408,7 +403,6 @@ async fn validate_user_from_db(
         Ok(mut user) => {
             let in_pass = get_hash(user_password, &user.salt);
             if req_time.is_none() && user.password.eq(&in_pass) {
-                log::debug!("Validating internal user");
                 if user.password_ext.is_none() {
                     let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
@@ -752,7 +746,6 @@ pub async fn oo_validator(
             };
         }
     };
-    log::debug!("Auth info: {:#?}", auth_info);
 
     match oo_validator_internal(req, auth_info, path_prefix).await {
         Ok(service_req) => Ok(service_req),
@@ -802,7 +795,6 @@ pub(crate) async fn check_permissions(
     }
 
     let object_str = auth_info.o2_type;
-    log::debug!("Checking permissions for user {user_id} with object {object_str}");
     log::debug!("Role of user {user_id} is {:#?}", role);
     let obj_str = if object_str.contains("##user_id##") {
         object_str.replace("##user_id##", user_id)

@@ -119,8 +119,6 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
         }
     };
 
-    log::debug!("User: {:#?}", user);
-    log::debug!("User name: {}", user.email);
     let orgs = org_users::list_orgs_by_user(&name).await?;
     Ok(DBUser {
         email: user.email,
