@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::HttpResponse;
+use actix_web::{get, web, HttpResponse};
+use infra::db::{connect_to_orm, ORM_CLIENT};
+use svix_ksuid::Ksuid;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::alert::AlertError,
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::alerts::responses::GetAlertResponseBody,
+    service::alerts::alert::{self, AlertError},
 };
 
 #[allow(deprecated)]
@@ -50,5 +54,36 @@ impl From<AlertError> for HttpResponse {
             AlertError::PeriodExceedsMaxQueryRange { .. } => MetaHttpResponse::bad_request(value),
             AlertError::ResolveStreamNameError(_) => MetaHttpResponse::internal_error(value),
         }
+    }
+}
+
+/// GetAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("v2/{org_id}/alerts/{alert_id}")]
+async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::get_by_id(client, &org_id, alert_id).await {
+        Ok(alert) => {
+            let resp_body: GetAlertResponseBody = alert.into();
+            MetaHttpResponse::json(resp_body)
+        }
+        Err(e) => e.into(),
     }
 }

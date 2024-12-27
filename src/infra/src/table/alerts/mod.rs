@@ -144,6 +144,24 @@ impl TryFrom<alerts::Model> for MetaAlert {
     }
 }
 
+/// Gets an alert by its ID.
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<(MetaFolder, MetaAlert)>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let models = get_model_by_id(conn, org_id, alert_id).await?;
+
+    if let Some((folder_model, alert_model)) = models {
+        let folder = folder_model.into();
+        let alert = alert_model.try_into()?;
+        Ok(Some((folder, alert)))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Gets an alert by its name.
 pub async fn get_by_name<C: ConnectionTrait>(
     conn: &C,
@@ -281,6 +299,21 @@ pub async fn list<C: ConnectionTrait>(
         })
         .collect::<Result<_, errors::Error>>()?;
     Ok(alerts)
+}
+
+/// Tries to get an alert ORM entity and its parent folder ORM entity.
+async fn get_model_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
+    let maybe_f_a = alerts::Entity::find_by_id(alert_id.to_string())
+        .filter(alerts::Column::Org.eq(org_id))
+        .find_also_related(folders::Entity)
+        .one(conn)
+        .await?
+        .and_then(|(a, maybe_f)| maybe_f.map(|f| (f, a)));
+    Ok(maybe_f_a)
 }
 
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
