@@ -301,7 +301,12 @@ pub async fn update_user(
                         }
                     }
                 }
-
+                if !self_update && local_user.role.eq(&UserRole::Root) {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "Only root user can update its details".to_string(),
+                    )));
+                }
                 new_user = local_user.clone();
                 if self_update && user.old_password.is_some() && user.new_password.is_some() {
                     if local_user.password.eq(&get_hash(
@@ -366,7 +371,7 @@ pub async fn update_user(
                         message = "Root user role cannot be changed";
                     } else if self_update && local_user.role < new_user.role {
                         message = "Self role cannot be upgraded";
-                    } else {
+                    } else if local_user.role.ne(&new_user.role) {
                         #[cfg(feature = "enterprise")]
                         if new_org_role.custom_role.is_some() {
                             custom_roles_need_change = true;
@@ -384,6 +389,13 @@ pub async fn update_user(
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                         http::StatusCode::BAD_REQUEST.into(),
                         message.to_string(),
+                    )));
+                }
+
+                if !is_updated && !is_org_updated {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        "No changes to update".to_string(),
                     )));
                 }
 
