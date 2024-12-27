@@ -111,8 +111,8 @@ pub async fn validator(
 /// ### Args:
 /// - token: The token to validate
 ///  
-pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
-    match users::get_user_by_token(org_id, token).await {
+pub async fn validate_token(token: &str, org_id: &str, trace_id: &str) -> Result<(), Error> {
+    match users::get_user_by_token(org_id, token, trace_id).await {
         Some(_user) => Ok(()),
         None => Err(ErrorForbidden("User associated with this token not found")),
     }
@@ -516,6 +516,8 @@ pub async fn validator_rum(
     req: ServiceRequest,
     _credentials: Option<BasicAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let start_time = std::time::Instant::now();
+    let trace_id = config::ider::generate();
     let path = req
         .request()
         .path()
@@ -535,11 +537,17 @@ pub async fn validator_rum(
     let query =
         web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
             .unwrap();
-
+    log::info!("[{trace_id}] start to validate token");
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
-        Some(token) => match validate_token(token, org_id_end_point[0]).await {
-            Ok(_res) => Ok(req),
+        Some(token) => match validate_token(token, org_id_end_point[0], &trace_id).await {
+            Ok(_res) => {
+                log::info!(
+                    "[{trace_id}] Time taken to validate token: {:?}",
+                    start_time.elapsed()
+                );
+                Ok(req)
+            }
             Err(err) => {
                 log::error!(
                     "validate_token: Token not found for org_id: {}",

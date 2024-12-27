@@ -111,7 +111,9 @@ pub async fn data(
     body: web::Bytes,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
+    let trace_id = config::ider::generate();
     let org_id: String = path.into_inner();
+    ::log::info!("[{trace_id}] into post /v1/{org_id}/rum");
     let extend_json = &rum_query_data.data;
     Ok(
         match logs::ingest::ingest(
@@ -195,8 +197,9 @@ pub async fn sessionreplay(
     payload: MultipartForm<SegmentEvent>,
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
+    let trace_id = config::ider::generate();
     let org_id = path.into_inner();
-
+    ::log::info!("[{trace_id}] into post /v1/{org_id}/replay");
     let mut segment_payload = String::new();
     if let Err(_e) =
         ZlibDecoder::new(&payload.segment.data[..]).read_to_string(&mut segment_payload)
@@ -214,6 +217,7 @@ pub async fn sessionreplay(
 
     let body = json::to_vec(&ingestion_payload).unwrap();
     let extend_json = &rum_query_data.data;
+    ::log::info!("[{trace_id}] start to ingest /v1/{org_id}/replay");
     Ok(
         match logs::ingest::ingest(
             0,
