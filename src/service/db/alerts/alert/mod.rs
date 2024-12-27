@@ -85,6 +85,15 @@ pub async fn create<C: TransactionTrait>(
     new::create(conn, org_id, folder_id, alert).await
 }
 
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::update(conn, org_id, folder_id, alert).await
+}
+
 pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,

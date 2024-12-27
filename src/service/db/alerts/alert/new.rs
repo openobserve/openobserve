@@ -165,6 +165,43 @@ pub async fn create<C: TransactionTrait>(
     Ok(alert)
 }
 
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let alert = table::update(conn, org_id, folder_id, alert).await?;
+
+    cluster::emit_put_event(org_id, &alert).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, &alert).await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    let trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at: chrono::Utc::now().timestamp_micros(),
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    if db::scheduler::exists(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await {
+        let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
+            log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+            e
+        });
+    } else {
+        let _ = db::scheduler::push(trigger).await.map_err(|e| {
+            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+            e
+        });
+    }
+
+    Ok(alert)
+}
+
 pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
