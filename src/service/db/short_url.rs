@@ -52,6 +52,16 @@ pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<()
     #[cfg(feature = "enterprise")]
     super_cluster::emit_put_event(short_id, entry).await?;
 
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::put(&cache_key, Bytes::new(), true, None)
+            .await?;
+    }
+
     Ok(())
 }
 
