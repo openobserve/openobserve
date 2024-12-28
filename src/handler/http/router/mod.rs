@@ -113,7 +113,7 @@ async fn audit_middleware(
                 // Binary data, encode it with base64
                 general_purpose::STANDARD.encode(&request_body)
             } else {
-                String::from_utf8(request_body.to_vec()).unwrap()
+                String::from_utf8(request_body.to_vec()).unwrap_or_default()
             };
             audit(AuditMessage {
                 user_email,
