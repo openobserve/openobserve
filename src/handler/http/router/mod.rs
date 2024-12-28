@@ -115,7 +115,7 @@ async fn audit_middleware(
                 // Binary data, encode it with base64
                 general_purpose::STANDARD.encode(&request_body)
             } else {
-                String::from_utf8(request_body.to_vec()).unwrap()
+                String::from_utf8(request_body.to_vec()).unwrap_or_default()
             };
             audit(AuditMessage {
                 user_email,
@@ -431,14 +431,21 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(folders::deprecated::update_folder)
         .service(folders::deprecated::get_folder)
         .service(folders::deprecated::delete_folder)
-        .service(alerts::alert::save_alert)
-        .service(alerts::alert::update_alert)
-        .service(alerts::alert::get_alert)
-        .service(alerts::alert::list_alerts)
-        .service(alerts::alert::list_stream_alerts)
-        .service(alerts::alert::delete_alert)
-        .service(alerts::alert::enable_alert)
-        .service(alerts::alert::trigger_alert)
+        .service(alerts::deprecated::save_alert)
+        .service(alerts::deprecated::update_alert)
+        .service(alerts::deprecated::get_alert)
+        .service(alerts::deprecated::list_alerts)
+        .service(alerts::deprecated::list_stream_alerts)
+        .service(alerts::deprecated::delete_alert)
+        .service(alerts::deprecated::enable_alert)
+        .service(alerts::deprecated::trigger_alert)
+        .service(alerts::create_alert)
+        .service(alerts::get_alert)
+        .service(alerts::update_alert)
+        .service(alerts::delete_alert)
+        .service(alerts::list_alerts)
+        .service(alerts::enable_alert)
+        .service(alerts::trigger_alert)
         .service(alerts::templates::save_template)
         .service(alerts::templates::update_template)
         .service(alerts::templates::get_template)
