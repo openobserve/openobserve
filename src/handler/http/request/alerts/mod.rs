@@ -190,7 +190,6 @@ pub async fn update_alert(
     ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
