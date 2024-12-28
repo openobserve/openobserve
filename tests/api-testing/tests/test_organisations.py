@@ -71,3 +71,23 @@ def test_e2e_reset_passcode(create_session, base_url):
     assert (
         resp_put_passcode.status_code == 200
     ), f"Put all passcode list 200, but got {resp_put_passcode.status_code} {resp_put_passcode.content}"
+
+def test_add_organisation(create_session, base_url):
+    """Running an E2E test for adding the organisation """
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    headers = {"Content-Type": "application/json"}
+
+    payload = {
+        "name": "autop",
+    }
+
+    resp_post_addorg = session.post(f"{url}api/organizations", headers=headers, json=payload)
+
+    print(resp_post_addorg.content)
+    assert (
+        resp_post_addorg.status_code == 200
+    ), f"Get all organisations list 200, but got {resp_post_addorg.status_code} {resp_post_addorg.content}"
