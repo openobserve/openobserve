@@ -25,6 +25,7 @@ export class ReportsPage {
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
+    this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
     this.signOutButton = page.getByText('Sign Out');
   }
   
@@ -93,6 +94,68 @@ async reportsURLValidation() {
 
   async createReportContinueButtonStep1() {
     await this.continueButtonStep1.click();
+    await this.page.waitForTimeout(3000);
+  }
+
+  async createReportOnce() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-once-btn"]').click();
+
+  }
+
+  async createReportHours() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-hours-btn"]').click();
+
+  }
+
+  async createReportDays() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-days-btn"]').click();
+
+  }
+
+  async createReportWeeks() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-weeks-btn"]').click();
+
+  }
+
+  async createReportMonths() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-months-btn"]').click();
+
+  }
+
+  async createReportCustom() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-custom-btn"]').click();
+
+  }
+
+  async createReportCron() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-cron-btn"]').click();
+
+  }
+
+  async createReportDateTime() {
+
+    await this.page.getByLabel('Start Date *').fill('29-12-2025');
+    await this.page.getByLabel('Start Time *').fill('11:55');
+    // await this.page.locator('[data-test="add-report-schedule-start-timezone-select"]').click();
+    // //await page.locator('[data-test="add-report-schedule-start-timezone-select"]').click();
+    // await this.page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down').click();
+    // await this.page.getByText('UTC').click();
+
+  }
+
+  async createReportZone() {
+
+    await this.zoneInput.dblclick();
+    await this.page.waitForLoadState("networkidle");
+    await this.zoneInput.pressSequentially('UT', { delay: 100 });
+    await this.page.getByRole('option', { name: 'UTC' }).click();
+
+  }
+
+  async createReportScheduleLater() {
+
+    await this.page.locator('[data-test="add-report-schedule-scheduleLater-btn"]').click();
+    
   }
 
   async createReportContinueButtonStep2() {
