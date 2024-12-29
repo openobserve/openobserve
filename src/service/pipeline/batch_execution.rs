@@ -25,7 +25,10 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
-    utils::{flatten, json::Value},
+    utils::{
+        flatten,
+        json::{get_string_value, Value},
+    },
 };
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
@@ -785,10 +788,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
         // Get and validate the field value
         match record.get(field_name) {
-            Some(stream_name) => match stream_name.as_str() {
-                Some(s) => result.push_str(s),
-                None => return Err(anyhow!("Matched stream name {stream_name} is not a string")),
-            },
+            Some(value) => result.push_str(&get_string_value(value)),
             None => return Err(anyhow!("Field name {field_name} not found in record")),
         }
 
