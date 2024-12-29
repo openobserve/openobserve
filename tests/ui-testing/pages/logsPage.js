@@ -215,7 +215,14 @@ export class LogsPage {
     const search = this.page.waitForResponse("**/api/default/_search**");
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.queryButton).click({ force: true });
-    await expect.poll(async () => (await search).status()).toBe(200);
+    try {
+      const response = await searchResponse;
+      await expect.poll(async () => response.status()).toBe(200);
+      
+        } 
+      catch (error) {
+       throw new Error(`Failed to get response from ${expectedUrl}: ${error.message}`);
+       }   
   }
 
   async applyQueryButton(expectedUrl) {
