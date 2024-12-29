@@ -14,6 +14,7 @@ test.describe("Report test cases Updated", () => {
         dashboardPage = new DashboardPage(page);
         reportsPage = new ReportsPage(page);
         await loginPage.gotoLoginPage();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
     });
@@ -23,7 +24,15 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.createDashboard();
         await expect(page).toHaveURL(/.*\/dashboards/);
         await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReport(dashboardPage.dashboardName);
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput();
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
         await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);

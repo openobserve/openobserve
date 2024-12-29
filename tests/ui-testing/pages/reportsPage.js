@@ -59,6 +59,55 @@ async reportsURLValidation() {
 
 
 
+  async createReportAddReportButton() {
+    await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
+    await this.addReportButton.click();  
+  }
+
+  async createReportReportNameInput() {
+    await this.page.waitForSelector("[aria-label='Name *']");
+    await this.reportNameInput.fill("rreport1");
+    await this.page.waitForTimeout(5000);
+  }
+
+  async createReportFolderInput() {
+    await this.folderInput.dblclick();
+    await this.page.waitForLoadState("networkidle");
+    await this.folderInput.pressSequentially('de', { delay: 100 });
+    await this.page.getByRole('option', { name: 'default' }).click();
+  }
+
+  async createReportDashboardInput(dashboardName) {
+    await this.dashboardInput.dblclick();
+    await this.page.waitForLoadState("networkidle");
+    await this.dashboardInput.pressSequentially(dashboardName, { delay: 100 });
+    await this.page.getByRole('option', { name: dashboardName }).click();
+  }
+
+  async createReportDashboardTabInput() {
+    await this.dashboardTabInput.dblclick();
+    await this.page.waitForLoadState("networkidle");
+    await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
+    await this.page.getByRole('option', { name: 'default' }).click();
+  }
+
+  async createReportContinueButtonStep1() {
+    await this.continueButtonStep1.click();
+  }
+
+  async createReportContinueButtonStep2() {
+    await this.continueButtonStep2.click();
+  }
+
+  async createReportFillDetail() {
+    await this.titleInput.fill("reporterTest");
+    await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  }
+
+  async createReportSaveButton() {
+    await this.saveButton.click();
+  }
+
   async createReport(dashboardName) {
     await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
     await this.addReportButton.click();
