@@ -19,14 +19,17 @@ use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode,
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
-        Result,
+        Result, TableReference,
     },
     physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
-use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
+use super::{
+    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
+    streaming_aggs_exec,
+};
 use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
@@ -40,9 +43,9 @@ impl RemoteScanRewriter {
     pub fn new(
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
-        file_id_lists: HashMap<String, Vec<Vec<i64>>>,
+        file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         idx_file_list: Vec<FileKey>,
-        equal_keys: HashMap<String, Vec<KvItem>>,
+        equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
         index_optimizer_mode: Option<InvertedIndexOptimizeMode>,
@@ -80,7 +83,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 let node_len = self.remote_scan_nodes.nodes.len();
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     input.clone(),
-                    self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                    self.remote_scan_nodes.get_remote_node(&table_name),
                 )?);
                 let partitioning = Partitioning::RoundRobinBatch(node_len);
                 let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
@@ -99,7 +102,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
 
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     new_input,
-                    self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                    self.remote_scan_nodes.get_remote_node(&table_name),
                 )?);
                 let new_node = node.with_new_children(vec![remote_scan])?;
                 self.is_changed = true;
@@ -117,7 +120,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     let table_name = visitor.table_name.clone().unwrap();
                     let remote_scan = Arc::new(RemoteScanExec::new(
                         child.clone(),
-                        self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                        self.remote_scan_nodes.get_remote_node(&table_name),
                     )?);
                     new_children.push(remote_scan);
                 }
@@ -133,7 +136,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
 // visit physical plan to get underlying table name and check is add a remote scan after current
 // physical plan
 struct TableNameVisitor {
-    table_name: Option<String>,
+    table_name: Option<TableReference>,
     is_remote_scan: bool, // is add remote scan after current physical plan
 }
 
@@ -156,10 +159,52 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
             Ok(TreeNodeRecursion::Stop)
         } else if name == "NewEmptyExec" {
             let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
-            self.table_name = Some(table.name().to_string());
+            self.table_name = Some(TableReference::from(table.name()));
             Ok(TreeNodeRecursion::Continue)
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
+    }
+}
+
+pub struct StreamingAggsRewriter {
+    id: String,
+    start_time: i64,
+    end_time: i64,
+}
+
+impl StreamingAggsRewriter {
+    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
+        Self {
+            id,
+            start_time,
+            end_time,
+        }
+    }
+}
+
+impl TreeNodeRewriter for StreamingAggsRewriter {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if node.name() == "RemoteScanExec"
+            && !node.children().is_empty()
+            && node.children().first().unwrap().name() == "AggregateExec"
+            && config::get_config().common.feature_query_streaming_aggs
+        {
+            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
+                .get(&self.id)
+                .unwrap_or_default();
+            let streaming_node: Arc<dyn ExecutionPlan> =
+                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
+                    self.id.clone(),
+                    self.start_time,
+                    self.end_time,
+                    cached_data,
+                    node,
+                )) as _;
+            return Ok(Transformed::yes(streaming_node));
+        }
+        Ok(Transformed::no(node))
     }
 }

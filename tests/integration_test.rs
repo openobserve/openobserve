@@ -386,7 +386,7 @@ mod tests {
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
-        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["log"],"remove":[]}}"#;
+        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["city"],"remove":[]}}"#;
         // app
         let thread_id: usize = 0;
         let app = test::init_service(
@@ -1959,7 +1959,7 @@ mod tests {
             "e2e",
             config::meta::stream::StreamType::Logs,
             "olympics_schema",
-            &alert,
+            alert,
             true,
         )
         .await;
@@ -1999,7 +1999,7 @@ mod tests {
         let trigger = trigger.unwrap();
         assert!(trigger.next_run_at > now && trigger.retries == 0);
 
-        let res = openobserve::service::db::alerts::alert::delete(
+        let res = openobserve::service::db::alerts::alert::delete_by_name(
             "e2e",
             config::meta::stream::StreamType::Logs,
             "olympics_schema",

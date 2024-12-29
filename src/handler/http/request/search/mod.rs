@@ -32,6 +32,8 @@ use config::{
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
+#[cfg(feature = "enterprise")]
+use utils::check_stream_permissions;
 
 use crate::{
     common::{
@@ -52,9 +54,14 @@ use crate::{
     },
 };
 
+#[cfg(feature = "enterprise")]
 pub mod job;
 pub mod multi_streams;
 pub mod saved_view;
+#[cfg(feature = "enterprise")]
+pub mod search_job;
+#[cfg(feature = "enterprise")]
+pub(crate) mod utils;
 
 async fn can_use_distinct_stream(
     org: &str,
@@ -244,44 +251,10 @@ pub async fn search(
 
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
         {
-            use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
-
-            use crate::common::{
-                infra::config::USERS,
-                utils::auth::{is_root_user, AuthExtractor},
-            };
-
-            if !is_root_user(&user_id) {
-                let user: meta::user::User =
-                    USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
-                let stream_type_str = stream_type.to_string();
-
-                if !crate::handler::http::auth::validator::check_permissions(
-                    &user_id,
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
-                            stream_name
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
-                {
-                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
-                }
-                // Check permissions on stream ends
-            }
+            return Ok(res);
         }
     }
 
@@ -293,31 +266,12 @@ pub async fn search(
         Some(user_id),
         &req,
         use_cache,
+        range_error,
     )
     .instrument(http_span)
     .await;
     match res {
-        Ok(mut res) => {
-            if res.is_partial {
-                let partial_err = "Please be aware that the response is based on partial data";
-                res.function_error = if res.function_error.is_empty() {
-                    partial_err.to_string()
-                } else {
-                    format!("{} \n {}", partial_err, res.function_error)
-                };
-            }
-            if !range_error.is_empty() {
-                res.is_partial = true;
-                res.function_error = if res.function_error.is_empty() {
-                    range_error
-                } else {
-                    format!("{} \n {}", range_error, res.function_error)
-                };
-                res.new_start_time = Some(req.query.start_time);
-                res.new_end_time = Some(req.query.end_time);
-            }
-            Ok(HttpResponse::Ok().json(res))
-        }
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "", "500", "_search");
             log::error!("[trace_id {trace_id}] search error: {}", err);
@@ -522,6 +476,8 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: regions.clone(),
@@ -573,6 +529,8 @@ pub async fn around(
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -984,6 +942,7 @@ async fn values_v1(
             Some(user_id.to_string()),
             &req,
             use_cache,
+            "".to_string(),
         )
         .instrument(http_span)
         .await;
@@ -1166,7 +1125,7 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req)
+    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req, false)
         .instrument(http_span)
         .await;
 

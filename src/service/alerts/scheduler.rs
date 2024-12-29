@@ -136,18 +136,19 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let alert = match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
-        Some(alert) => alert,
-        None => {
-            return Err(anyhow::anyhow!(
-                "alert not found: {}/{}/{}/{}",
-                org_id,
-                stream_name,
-                stream_type,
-                alert_name
-            ));
-        }
-    };
+    let alert =
+        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
+            Some(alert) => alert,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "alert not found: {}/{}/{}/{}",
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    alert_name
+                ));
+            }
+        };
     let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
@@ -308,16 +309,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
                 if let Some(mut alert) =
-                    super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
+                    super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await?
                 {
                     alert.enabled = false;
-                    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-                        &org_id,
-                        stream_type,
-                        stream_name,
-                        &alert,
-                    )
-                    .await
+                    if let Err(e) =
+                        db::alerts::alert::set_without_updating_trigger(&org_id, alert).await
                     {
                         log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
                     }
@@ -563,7 +559,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     // Check if the alert has been disabled in the mean time
     let mut old_alert =
-        match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
+        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
             Some(alert) => alert,
             None => {
                 return Err(anyhow::anyhow!(
@@ -579,14 +575,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     if let Some(last_satisfied_at) = last_satisfied_at {
         old_alert.last_satisfied_at = Some(last_satisfied_at);
     }
-    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-        &org_id,
-        stream_type,
-        stream_name,
-        &old_alert,
-    )
-    .await
-    {
+    if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
         log::error!("Failed to update alert: {alert_name} after trigger: {e}");
     }
     // publish the triggers as stream

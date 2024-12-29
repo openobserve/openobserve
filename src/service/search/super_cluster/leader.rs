@@ -19,7 +19,8 @@ use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
     get_config,
-    meta::{cluster::NodeInfo, search::ScanStats},
+    meta::{cluster::NodeInfo, search::ScanStats, sql::TableReferenceExt},
+    utils::json,
 };
 use datafusion::{
     common::{tree_node::TreeNode, DataFusionError},
@@ -27,14 +28,18 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
+use itertools::Itertools;
 use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
-use proto::cluster_rpc::{self};
+use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+    datafusion::distributed_plan::{
+        remote_scan::RemoteScanExec,
+        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+    },
     request::Request,
     sql::Sql,
     utils::ScanStatsVisitor,
@@ -51,6 +56,7 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
+    _query: cluster_rpc::SearchQuery,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
@@ -95,11 +101,17 @@ pub async fn search(
         ));
     }
 
+    let trace_stream_name = json::to_string(
+        &sql.stream_names
+            .iter()
+            .map(|s| (s.get_stream_type(sql.stream_type), s.stream_name()))
+            .collect_vec(),
+    )
+    .unwrap();
     let datafusion_span = info_span!(
         "service:search:flight:super_cluster::datafusion",
         org_id = sql.org_id,
-        stream_name = sql.stream_names.first().unwrap(),
-        stream_type = sql.stream_type.to_string(),
+        stream_name = trace_stream_name,
     );
 
     let trace_id_move = trace_id.to_string();
@@ -214,6 +226,10 @@ async fn run_datafusion(
         })
         .collect::<HashMap<_, _>>();
 
+    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    let streaming_output = req.streaming_output;
+    let streaming_id = req.streaming_id.clone();
+
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
         req,
@@ -241,6 +257,12 @@ async fn run_datafusion(
             physical_plan,
             rewrite.remote_scan_nodes.get_remote_node(table_name),
         )?);
+    }
+
+    // check for streaming aggregation query
+    if streaming_output {
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
+        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
     if cfg.common.print_key_sql {

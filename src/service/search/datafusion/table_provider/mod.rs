@@ -64,6 +64,7 @@ use tokio::sync::Semaphore;
 
 use crate::service::search::index::IndexCondition;
 
+pub mod catalog;
 pub mod empty_table;
 mod helpers;
 pub mod memtable;
@@ -312,7 +313,7 @@ impl TableProvider for NewListingTable {
                 }
             },
             None => {
-                log::debug!("don't not set split_file_groups_by_statistics");
+                log::debug!("did't set split_file_groups_by_statistics");
             } // no ordering required
         };
 
