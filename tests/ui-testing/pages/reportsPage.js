@@ -26,6 +26,7 @@ export class ReportsPage {
     this.absoluteTab = absoluteTabLocator;
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
+    this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.getByText('Sign Out');
   }
   
@@ -136,19 +137,25 @@ async reportsURLValidation() {
 
     await this.page.getByLabel('Start Date *').fill('29-12-2025');
     await this.page.getByLabel('Start Time *').fill('11:55');
-    // await this.page.locator('[data-test="add-report-schedule-start-timezone-select"]').click();
-    // //await page.locator('[data-test="add-report-schedule-start-timezone-select"]').click();
-    // await this.page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down').click();
-    // await this.page.getByText('UTC').click();
-
   }
 
   async createReportZone() {
 
     await this.zoneInput.dblclick();
     await this.page.waitForLoadState("networkidle");
-    await this.zoneInput.pressSequentially('UT', { delay: 100 });
+    await this.zoneInput.pressSequentially('UTC', { delay: 100 });
     await this.page.getByRole('option', { name: 'UTC' }).click();
+
+  }
+
+  async setTimeZone(zone) {
+    await this.zoneInput.click();
+    await this.page.getByRole(this.timeZoneOption(zone)).click();
+  }
+
+  async setTimeIST() {
+    await this.zoneInput.fill("Asia/c");
+    await page.getByText("Asia/Calcutta", { exact: true }).click();
 
   }
 
