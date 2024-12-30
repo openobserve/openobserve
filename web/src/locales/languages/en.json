@@ -1054,6 +1054,9 @@
     "dfcIV": "DFC IV",
     "dfcEncryptedData": "DFC Encrypted Data",
     "providerType": "Type",
-    "algorithm": "Algorithm"
+    "algorithm": "Algorithm",
+    "storeType": "Store Type",
+    "mechanismType": "Mechanism Type",
+    "actions": "Actions"
   }
 }
