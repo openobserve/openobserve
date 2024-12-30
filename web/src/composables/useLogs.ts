@@ -4584,6 +4584,12 @@ const useLogs = () => {
         if (isDistinctQuery(parsedSQL)) {
           delete queryReq.query.track_total_hits;
         }
+
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
