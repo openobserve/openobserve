@@ -517,7 +517,14 @@ pub async fn validator_rum(
     _credentials: Option<BasicAuth>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let start_time = std::time::Instant::now();
-    let trace_id = config::ider::generate();
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
+
     let path = req
         .request()
         .path()
@@ -540,7 +547,7 @@ pub async fn validator_rum(
     log::info!("[{trace_id}] start to validate token");
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
-        Some(token) => match validate_token(token, org_id_end_point[0], &trace_id).await {
+        Some(token) => match validate_token(token, org_id_end_point[0], trace_id).await {
             Ok(_res) => {
                 log::info!(
                     "[{trace_id}] Time taken to validate token: {:?}",
@@ -571,6 +578,14 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
+    log::info!("[{trace_id}] into oo_validator_internal {:?}", auth_info);
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,

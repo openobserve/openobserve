@@ -17,6 +17,7 @@ use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
+use actix_web::http::header;
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
@@ -110,8 +111,15 @@ pub async fn data(
     path: web::Path<String>,
     body: web::Bytes,
     rum_query_data: web::ReqData<RumExtraData>,
+    req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let trace_id = config::ider::generate();
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
     let org_id: String = path.into_inner();
     ::log::info!("[{trace_id}] into post /v1/{org_id}/rum");
     let extend_json = &rum_query_data.data;

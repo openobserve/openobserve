@@ -18,6 +18,7 @@ use std::{collections::HashMap, net::IpAddr, sync::Arc};
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
+    http::header,
     web, Error as ActixErr, HttpMessage,
 };
 use actix_web_lab::middleware::Next;
@@ -83,6 +84,14 @@ impl RumExtraData {
         req: ServiceRequest,
         next: Next<impl MessageBody>,
     ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
+        let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+        let trace_id = req
+            .headers()
+            .get("request_id")
+            .unwrap_or(&t)
+            .to_str()
+            .unwrap();
+        log::info!("[{trace_id}] into RumExtraData::extractor");
         let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
         let mut data =
             web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
@@ -147,7 +156,7 @@ impl RumExtraData {
                 serde_json::to_value(geo_info).unwrap_or_default(),
             );
         }
-
+        log::info!("[{trace_id}] into RumExtraData::extractor geo_info parse done");
         // User-agent parsing
         {
             let user_agent = req
@@ -164,11 +173,12 @@ impl RumExtraData {
                 serde_json::to_value(parsed_user_agent).unwrap_or_default(),
             );
         }
-
+        log::info!("[{trace_id}] into RumExtraData::extractor user_agent parse done");
         let rum_extracted_data = RumExtraData {
             data: user_agent_hashmap,
         };
         req.extensions_mut().insert(rum_extracted_data);
+        log::info!("[{trace_id}] into RumExtraData::extractor ready to call next middleware");
         next.call(req).await
     }
 }
