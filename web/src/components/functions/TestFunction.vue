@@ -571,6 +571,7 @@ const testFunction = async () => {
 };
 
 function getLineRanges(object: any) {
+  if (!outputEventsEditorRef.value) return;
   const model = outputEventsEditorRef.value.getModel(); // Get Monaco Editor model
   const contentLines = model.getLinesContent(); // Get content as an array of lines
   const ranges = [];
@@ -650,7 +651,8 @@ function highlightSpecificEvent() {
   if (errorEventRanges.length) {
     outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
   }
-  outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
+  if (outputEventsEditorRef.value)
+    outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
 }
 
 defineExpose({
