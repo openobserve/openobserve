@@ -2072,6 +2072,12 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
+
         if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -2085,12 +2091,6 @@ const useLogs = () => {
 
         if (isDistinctQuery(parsedSQL)) {
           delete queryReq.query.track_total_hits;
-        }
-
-        // if query has aggregation or groupby then we need to set size to -1 to get all records
-        // issue #5432
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          queryReq.query.size = -1;
         }
       }
 
@@ -4570,6 +4570,12 @@ const useLogs = () => {
       searchObj.meta.resultGrid.showPagination = true;
 
       if (searchObj.meta.sqlMode == true) {
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
+
         if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -4583,12 +4589,6 @@ const useLogs = () => {
 
         if (isDistinctQuery(parsedSQL)) {
           delete queryReq.query.track_total_hits;
-        }
-
-        // if query has aggregation or groupby then we need to set size to -1 to get all records
-        // issue #5432
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          queryReq.query.size = -1;
         }
       }
 
