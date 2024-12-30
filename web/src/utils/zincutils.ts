@@ -505,7 +505,7 @@ export const formatSizeFromMB = (sizeInMB: string) => {
 };
 
 export const addCommasToNumber = (number: number) => {
-  if (number === null || number === undefined) return '0';
+  if (number === null || number === undefined) return "0";
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
@@ -968,4 +968,23 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 
 export const deepCopy = (value: any) => {
   return JSON.parse(JSON.stringify(value));
+};
+
+export const maxLengthCharValidation = (
+  val: string = "",
+  char_length: number = 50,
+) => {
+  return (
+    (val && val.length <= char_length) ||
+    `Maximum ${char_length} characters allowed`
+  );
+};
+
+export const validateUrl = (val) => {
+  try {
+    const url = new URL(val); // Built-in URL constructor
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (error) {
+    return "Please provide correct URL.";
+  }
 };
