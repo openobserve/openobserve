@@ -16,8 +16,7 @@
 use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
-use actix_web::{post, web, HttpResponse};
-use actix_web::http::header;
+use actix_web::{http::header, post, web, HttpResponse};
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
