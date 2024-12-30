@@ -50,15 +50,14 @@ impl TableProvider for StorageProvider {
     > {
         let mut resp = Vec::new();
         // register storage table
-        let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
-        let ctx =
-            storage::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
+        let ctx = storage::create_context(&self.trace_id, org_id, stream_name, time_range, filters)
+            .await?;
         resp.push(ctx);
         // register Wal table
         if self.need_wal {
-            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             let wal_ctx_list =
-                wal::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
+                wal::create_context(&self.trace_id, org_id, stream_name, time_range, filters)
+                    .await?;
             for ctx in wal_ctx_list {
                 resp.push(ctx);
             }

@@ -79,7 +79,7 @@ pub(crate) async fn create_context(
     }
 
     log::info!(
-        "promql->wal->search: load wal files: batches {}, scan_size {}",
+        "[trace_id {trace_id}] promql->wal->search: load wal files: batches {}, scan_size {}",
         arrow_scan_stats.files,
         arrow_scan_stats.original_size,
     );
@@ -89,7 +89,7 @@ pub(crate) async fn create_context(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .map_err(|err| {
-            log::error!("get schema error: {}", err);
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
     if !batches.is_empty() {
@@ -211,7 +211,7 @@ async fn get_file_list(
                     .map_err(|_| DataFusionError::Execution("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                     log::error!(
-                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
                         &node.grpc_addr,
                         err
                     );
