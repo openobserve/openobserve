@@ -15,84 +15,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="add-functions-section tw-pl-4">
-    <div class="add-function-actions tw-pb-2">
+  <div class="add-functions-section tw-pl-4 tw-py-0 tw-pr-0">
+    <div class="add-function-actions tw-pb-2 tw-pt-1">
       <FunctionsToolbar
         v-model:name="formData.name"
         ref="functionsToolbarRef"
         :disable-name="beingUpdated"
         @test="onTestFunction"
         @save="onSubmit"
+        class="tw-pr-4"
       />
       <q-separator />
     </div>
 
-    <div class="tw-flex">
-      <div class="tw-w-2/4 tw-pr-2">
-        <q-form
-          id="addFunctionForm"
-          ref="addJSTransformForm"
-          @submit="onSubmit"
-        >
-          <div class="add-function-name-input q-pb-sm o2-input">
-            <FullViewContainer
-              name="function"
-              v-model:is-expanded="expandState.functions"
-              :label="t('function.jsfunction') + '*'"
-              class="tw-mt-1"
-            />
-            <div
-              v-show="expandState.functions"
-              class="tw-border-[1px] tw-border-gray-200"
+    <div
+      class="tw-flex tw-h-[calc(100vh-112px)] tw-overflow-auto tw-pr-2 tw-pb-4"
+    >
+      <q-splitter
+        v-model="splitterModel"
+        :limits="[30, Infinity]"
+        class="tw-overflow-hidden tw-w-full"
+        reverse
+      >
+        <template v-slot:before>
+          <div class="tw-pr-2">
+            <q-form
+              id="addFunctionForm"
+              ref="addJSTransformForm"
+              @submit="onSubmit"
             >
-              <query-editor
-                data-test="logs-vrl-function-editor"
-                ref="editorRef"
-                editor-id="add-function-editor"
-                class="monaco-editor"
-                v-model:query="formData.function"
-                language="vrl"
-              />
-            </div>
-            <div class="text-subtitle2 q-pb-sm" style="min-height: 21px">
-              <div v-if="vrlFunctionError">
+              <div class="add-function-name-input q-pb-sm o2-input">
                 <FullViewContainer
                   name="function"
-                  v-model:is-expanded="expandState.functionError"
-                  :label="t('function.errorDetails')"
-                  labelClass="tw-text-red-600"
+                  v-model:is-expanded="expandState.functions"
+                  :label="t('function.jsfunction') + '*'"
+                  class="tw-mt-1"
                 />
                 <div
-                  v-if="expandState.functionError"
-                  class="q-px-sm q-pb-sm"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                  "
+                  v-show="expandState.functions"
+                  class="tw-border-[1px] tw-border-gray-200"
                 >
-                  <pre class="q-my-none" style="white-space: pre-wrap">{{
-                    vrlFunctionError
-                  }}</pre>
+                  <query-editor
+                    data-test="logs-vrl-function-editor"
+                    ref="editorRef"
+                    editor-id="add-function-editor"
+                    class="monaco-editor"
+                    v-model:query="formData.function"
+                    language="vrl"
+                  />
+                </div>
+                <div class="text-subtitle2">
+                  <div v-if="vrlFunctionError">
+                    <FullViewContainer
+                      name="function"
+                      v-model:is-expanded="expandState.functionError"
+                      :label="t('function.errorDetails')"
+                      labelClass="tw-text-red-600"
+                    />
+                    <div
+                      v-if="expandState.functionError"
+                      class="q-px-sm q-pb-sm"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
+                      "
+                    >
+                      <pre class="q-my-none" style="white-space: pre-wrap">{{
+                        vrlFunctionError
+                      }}</pre>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
-                                                                                    bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
-            <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
-              compilationErr
-            }}</pre>
+            </q-form>
           </div>
-        </q-form>
-      </div>
-      <div
-        class="tw-w-2/4 tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max"
-      >
-        <TestFunction
-          ref="testFunctionRef"
-          :vrlFunction="formData"
-          @function-error="handleFunctionError"
-        />
-      </div>
+        </template>
+        <template v-slot:after>
+          <div
+            class="tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
+          >
+            <TestFunction
+              ref="testFunctionRef"
+              :vrlFunction="formData"
+              @function-error="handleFunctionError"
+            />
+          </div>
+        </template>
+      </q-splitter>
     </div>
   </div>
 </template>
@@ -155,6 +165,7 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
     const functionsToolbarRef = ref<typeof FunctionsToolbar>();
+    const splitterModel = ref(50);
 
     const expandState = ref({
       functions: true,
@@ -311,6 +322,7 @@ end`;
       handleFunctionError,
       vrlFunctionError,
       functionsToolbarRef,
+      splitterModel,
     };
   },
   created() {

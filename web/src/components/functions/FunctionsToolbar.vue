@@ -36,6 +36,7 @@
         padding="sm"
         no-caps
         icon="fullscreen"
+        @click="handleFullScreen"
       />
       <q-btn
         :label="t('function.testFunction')"
@@ -75,8 +76,11 @@ import {
   defineEmits,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
+
+const q = useQuasar();
 
 const props = defineProps({
   name: {
@@ -102,6 +106,10 @@ const functionName = computed({
   get: () => props.name,
   set: (value) => emit("update:name", value),
 });
+
+const handleFullScreen = () => {
+  q.fullscreen.toggle();
+};
 
 defineExpose({ addFunctionForm });
 </script>
