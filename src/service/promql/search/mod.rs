@@ -75,10 +75,11 @@ async fn search_in_cluster(
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
+    let trace_id = ider::uuid();
     let cfg = get_config();
 
     log::info!(
-        "promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
         req.org_id,
         req.no_cache,
         req.query.as_ref().unwrap().start,
@@ -141,7 +142,6 @@ async fn search_in_cluster(
 
     // partition request, here plus 1 second, because division is integer, maybe
     // lose some precision XXX-REFACTORME: move this into a function
-    let trace_id = ider::uuid();
     let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
         trace_id: trace_id.clone(),
@@ -176,13 +176,14 @@ async fn search_in_cluster(
         worker_start += worker_dt;
 
         log::info!(
-            "promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
+            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{}, {}]",
             &node.grpc_addr,
             req_need_wal,
             req_query.start,
             req_query.end,
         );
 
+        let trace_id = trace_id.to_string();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
@@ -208,7 +209,7 @@ async fn search_in_cluster(
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                     log::error!(
-                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
                         &node.grpc_addr,
                         err
                     );
@@ -233,7 +234,7 @@ async fn search_in_cluster(
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "promql->search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
                             &node.grpc_addr,
                             err
                         );
@@ -247,7 +248,7 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     req_need_wal,
                     response.took,
@@ -299,7 +300,7 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
+        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
         scan_stats.files,
         scan_stats.original_size,

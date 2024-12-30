@@ -264,7 +264,7 @@ impl Metrics for MetricsQuerier {
         // release wal lock files
         crate::common::infra::wal::release_request(trace_id);
 
-        log::info!("[trace_id {trace_id}] grpc->metrics->wal_file->search: search wal parquet success, files: {}, scan_size {}, compressed_size {}, hits_total: {}",
+        log::info!("[trace_id {trace_id}] grpc->metrics->wal_file->search: search wal success, files: {}, scan_size {}, compressed_size {}, hits_total: {}",
             scan_stats.files,
             scan_stats.original_size,
             scan_stats.compressed_size,
