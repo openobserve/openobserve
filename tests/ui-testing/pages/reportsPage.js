@@ -144,7 +144,7 @@ async reportsURLValidation() {
     await this.zoneInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.zoneInput.pressSequentially('UTC', { delay: 1000 });
-    await this.page.getByRole('option', { name: 'UTC' }).click({ force: true });
+    await this.page.getByRole('option', { name: 'UTC' }, { exact: true }).click({ force: true });
     await this.page.waitForTimeout(5000);
   }
 
