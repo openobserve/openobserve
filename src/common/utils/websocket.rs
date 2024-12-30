@@ -180,9 +180,7 @@ mod tests {
         let histogram_interval = 3600;
 
         let updated_sql = update_histogram_interval_in_query(sql, histogram_interval).unwrap();
-        let expected = "SELECT histogram(_timestamp, '3600 seconds') AS 'x_axis_1', count(gold_medals) AS 'y_axis_1', count(silver_medals) AS 'y_axis_2', count(total_medals) AS 'y_axis_3' FROM 'default' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC";
-
-        assert_eq!(sql, expected);
+        assert_eq!(sql, updated_sql);
     }
 
     #[test]
