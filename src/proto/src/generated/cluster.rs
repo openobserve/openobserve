@@ -9,16 +9,6 @@ pub struct EmptyResponse {}
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileDescriptor {
-    #[prost(message, optional, tag = "1")]
-    pub meta: ::core::option::Option<FileMeta>,
-    #[prost(enumeration = "StreamType", tag = "2")]
-    pub file_type: i32,
-}
-#[derive(Eq)]
-#[derive(serde::Serialize)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileMeta {
     /// microseconds
     #[prost(int64, tag = "1")]
@@ -108,47 +98,6 @@ pub struct IdxFileName {
     pub key: ::prost::alloc::string::String,
     #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum StreamType {
-    Logs = 0,
-    Metrics = 1,
-    Traces = 2,
-    Metadata = 3,
-    EnrichmentTables = 4,
-    Filelist = 5,
-    Index = 6,
-}
-impl StreamType {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            StreamType::Logs => "LOGS",
-            StreamType::Metrics => "METRICS",
-            StreamType::Traces => "TRACES",
-            StreamType::Metadata => "METADATA",
-            StreamType::EnrichmentTables => "EnrichmentTables",
-            StreamType::Filelist => "FILELIST",
-            StreamType::Index => "INDEX",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "LOGS" => Some(Self::Logs),
-            "METRICS" => Some(Self::Metrics),
-            "TRACES" => Some(Self::Traces),
-            "METADATA" => Some(Self::Metadata),
-            "EnrichmentTables" => Some(Self::EnrichmentTables),
-            "FILELIST" => Some(Self::Filelist),
-            "INDEX" => Some(Self::Index),
-            _ => None,
-        }
-    }
 }
 /// Generated client implementations.
 pub mod event_client {
@@ -1857,11 +1806,11 @@ pub struct IngestionRequest {
     #[prost(string, tag = "1")]
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub stream_name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag = "4")]
     pub data: ::core::option::Option<IngestionData>,
-    #[prost(enumeration = "StreamType", tag = "4")]
-    pub stream_type: i32,
     #[prost(enumeration = "IngestionType", optional, tag = "5")]
     pub ingestion_type: ::core::option::Option<i32>,
 }
