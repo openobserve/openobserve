@@ -85,7 +85,7 @@ pub async fn test_run_function(
     org_id: &str,
     mut function: String,
     events: Vec<json::Value>,
-) -> Result<HttpResponse, Error> {
+) -> Result<HttpResponse, anyhow::Error> {
     // Append a dot at the end of the function if it doesn't exist
     if !function.ends_with('.') {
         function = format!("{} \n .", function);
@@ -119,7 +119,7 @@ pub async fn test_run_function(
 
     let mut transformed_events = vec![];
     if apply_over_hits {
-        let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
                 program: program.clone(),
@@ -129,6 +129,14 @@ pub async fn test_run_function(
             &org_id,
             &[String::new()],
         );
+
+        if err.is_some() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                err.unwrap(),
+            )));
+        }
+
         ret_val
             .as_array()
             .unwrap()
@@ -136,10 +144,13 @@ pub async fn test_run_function(
             .filter_map(|v| {
                 let flattened_array = v
                     .as_array()
-                    .unwrap()
+                    .unwrap_or(&vec![])
                     .iter()
                     .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
                     .collect::<Vec<_>>();
+                if flattened_array.is_empty() {
+                    return None;
+                }
                 Some(serde_json::Value::Array(flattened_array))
             })
             .for_each(|transform| {
