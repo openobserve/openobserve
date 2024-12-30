@@ -17,7 +17,6 @@ use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{http::header, post, web, HttpResponse};
-use aws_sdk_sns::config::http::HttpRequest;
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
