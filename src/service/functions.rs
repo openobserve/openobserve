@@ -134,7 +134,13 @@ pub async fn test_run_function(
             .unwrap()
             .iter()
             .filter_map(|v| {
-                (!v.is_null()).then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                let flattened_array = v
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
+                    .collect::<Vec<_>>();
+                Some(serde_json::Value::Array(flattened_array))
             })
             .for_each(|transform| {
                 transformed_events.push(VRLResult::new("", transform));
