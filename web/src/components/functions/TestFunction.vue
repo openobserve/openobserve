@@ -509,6 +509,8 @@ const isInputValid = () => {
 const testFunction = async () => {
   loading.value.output = true;
   eventsErrorMsg.value = "";
+  outputEventsErrorMsg.value = "";
+
   if (!isInputValid()) {
     return;
   }
@@ -541,6 +543,7 @@ const testFunction = async () => {
     .catch((err: any) => {
       console.log("Error in testing function", err);
       const errMsg = err.response?.data?.message || "Error in testing function";
+      outputEventsErrorMsg.value = "Error while transforming results";
 
       q.notify({
         type: "negative",
