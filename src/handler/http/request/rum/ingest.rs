@@ -17,6 +17,7 @@ use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{http::header, post, web, HttpResponse};
+use aws_sdk_sns::config::http::HttpRequest;
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
@@ -203,8 +204,15 @@ pub async fn sessionreplay(
     path: web::Path<String>,
     payload: MultipartForm<SegmentEvent>,
     rum_query_data: web::ReqData<RumExtraData>,
+    req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let trace_id = config::ider::generate();
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
     let org_id = path.into_inner();
     ::log::info!("[{trace_id}] into post /v1/{org_id}/replay");
     let mut segment_payload = String::new();
