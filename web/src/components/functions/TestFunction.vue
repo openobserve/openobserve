@@ -34,6 +34,7 @@
               size="xs"
               color="primary"
               type="submit"
+              :disabled="!selectedStream.name || !inputQuery"
             />
           </template>
         </FullViewContainer>
@@ -59,7 +60,7 @@
               filled
               dense
               @update:model-value="updateStreams()"
-              style="min-width: 120px"
+              style="width: 100px"
             />
           </div>
           <div class="function-stream-select-input tw-w-[300px]">
@@ -130,7 +131,9 @@
             class="text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
           >
             <q-spinner-hourglass size="18px" />
-            {{ t("confirmDialog.loading") }}
+            <div class="tw-relative tw-top-[2px]">
+              {{ t("confirmDialog.loading") }}
+            </div>
           </div>
           <q-icon
             v-if="!!eventsErrorMsg"
@@ -174,8 +177,25 @@
             class="text-subtitle2 text-weight-bold tw-flex tw-items-center tw-text-gray-500 tw-ml-2 tw-text-[13px]"
           >
             <q-spinner-hourglass size="18px" />
-            {{ t("confirmDialog.loading") }}
+            <div class="tw-relative tw-top-[2px]">
+              {{ t("confirmDialog.loading") }}
+            </div>
           </div>
+
+          <q-icon
+            v-if="!!outputEventsErrorMsg"
+            name="info"
+            class="tw-text-red-600 tw-mx-1 tw-cursor-pointer"
+            size="16px"
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              :offset="[10, 10]"
+            >
+              {{ outputEventsErrorMsg }}
+            </q-tooltip>
+          </q-icon>
         </template>
       </FullViewContainer>
 
@@ -248,6 +268,29 @@ const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
 
+const dummyEvents = {
+  data: {
+    results: [
+      {
+        event: {
+          _timestamp: 1735128523652186,
+          job: "test",
+          level: "info",
+          log: "test message for openobserve",
+        },
+      },
+      {
+        event: {
+          log: "test message for openobserve",
+        },
+        message: "Error in event",
+      },
+    ],
+  },
+};
+
+const originalOutputEvents = ref<any>("");
+
 const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
@@ -257,6 +300,8 @@ const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const querySelectionRef = ref<any>();
+
+const outputEventsErrorMsg = ref<string>("");
 
 const loading = ref({
   events: false,
@@ -461,7 +506,7 @@ const isInputValid = () => {
     return false;
   }
 };
-const testFunction = () => {
+const testFunction = async () => {
   loading.value.output = true;
   eventsErrorMsg.value = "";
   if (!isInputValid()) {
@@ -473,16 +518,28 @@ const testFunction = () => {
   };
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
-    .then((res: any) => {
+    .then(async (res: any) => {
       expandState.value.query = false;
       expandState.value.output = true;
+      originalOutputEvents.value = JSON.stringify(res?.data?.results);
       outputEvents.value = JSON.stringify(
-        JSON.parse(JSON.stringify(res?.data?.results || [])),
+        JSON.parse(
+          JSON.stringify(
+            res?.data?.results.map(
+              (event: any) => event.event || event.events,
+            ) || [],
+          ),
+        ),
       );
       eventsEditorRef?.value?.formatDocument();
-      outputEventsEditorRef?.value?.formatDocument();
+      await outputEventsEditorRef?.value?.formatDocument();
+
+      setTimeout(() => {
+        highlightSpecificEvent();
+      }, 1000);
     })
     .catch((err: any) => {
+      console.log("Error in testing function", err);
       const errMsg = err.response?.data?.message || "Error in testing function";
 
       q.notify({
@@ -497,6 +554,89 @@ const testFunction = () => {
       loading.value.output = false;
     });
 };
+
+function getLineRanges(object: any) {
+  const model = outputEventsEditorRef.value.getModel(); // Get Monaco Editor model
+  const contentLines = model.getLinesContent(); // Get content as an array of lines
+  const ranges = [];
+
+  // Convert object to JSON string for comparison
+  const serializedObject = JSON.stringify(object.event, null, 4);
+  const serializedLines = serializedObject.split("\n");
+
+  console.log("Serialized Lines:", serializedLines);
+
+  let startLine = -1;
+
+  // Iterate over the editor content lines
+  for (let i = 0; i < contentLines.length; i++) {
+    const line = contentLines[i];
+
+    // Check if the current line matches the first line of the serialized object
+    if (line.trim() === serializedLines[0].trim()) {
+      let isMatch = true;
+
+      // Check subsequent lines to ensure the entire object matches
+      for (let j = 0; j < serializedLines.length; j++) {
+        let editorLine = contentLines[i + j]?.trim();
+        const objectLine = serializedLines[j]?.trim();
+
+        if (editorLine === "},") {
+          editorLine = "}";
+        }
+
+        if (editorLine !== objectLine) {
+          isMatch = false;
+          break;
+        }
+
+        // console.log(
+        //   "is match",
+        //   isMatch,
+        //   "Editor Line:",
+        //   editorLine,
+        //   "Object Line:",
+        //   objectLine,
+        // );
+      }
+
+      // console.log("Is Match:", isMatch, i);
+      if (isMatch) {
+        startLine = i;
+        break; // Exit the loop once a match is found
+      }
+    }
+  }
+
+  if (startLine !== -1) {
+    const endLine = startLine + serializedLines.length - 1;
+    ranges.push({
+      startLine: startLine + 1,
+      endLine: endLine + 1,
+      error: `Error: Failed to apply VRL Function.\n${object.message}`,
+    }); // Monaco uses 1-based indexing
+  }
+
+  return ranges;
+}
+
+function highlightSpecificEvent() {
+  const errorEvents = JSON.parse(originalOutputEvents.value).filter(
+    (event: any) => event.message?.trim(),
+  );
+  const errorEventRanges: any[] = [];
+
+  errorEvents.forEach((event: any) => {
+    const ranges = getLineRanges(event);
+    if (ranges && ranges.length > 0) {
+      errorEventRanges.push(ranges[0]);
+    }
+  });
+  if (errorEventRanges.length) {
+    outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+  }
+  outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
+}
 
 defineExpose({
   testFunction,

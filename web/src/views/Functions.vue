@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       unit="px"
       :limits="[0, 300]"
-      style="min-height: calc(100vh - 57px)"
       class="tw-overflow-hidden"
     >
       <template v-slot:before>
@@ -91,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-sm">
+        <div
+          class="q-ml-sm tw-overflow-auto"
+          style="height: calc(100vh - 57px)"
+        >
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
