@@ -2084,7 +2084,6 @@ const useLogs = () => {
         }
 
         if (isDistinctQuery(parsedSQL)) {
-          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
 
@@ -4583,7 +4582,6 @@ const useLogs = () => {
         }
 
         if (isDistinctQuery(parsedSQL)) {
-          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5020,6 +5018,21 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
     } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+      let aggFlag = false;
+      if (parsedSQL) {
+        aggFlag = hasAggregation(parsedSQL?.columns);
+      }
+      if (
+        queryReq.query.from == 0 &&
+        searchObj.data.queryResults.hits.length > 0 &&
+        !aggFlag
+      ) {
+        setTimeout(async () => {
+          searchObjDebug["pagecountStartTime"] = performance.now();
+          getPageCountThroughSocket(queryReq);
+          searchObjDebug["pagecountEndTime"] = performance.now();
+        }, 0);
+      }
       resetHistogramWithError(
         "Histogram is not available for DISTINCT queries.",
       );
@@ -5035,7 +5048,6 @@ const useLogs = () => {
       ) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
-          // TODO : check the page count request
           getPageCountThroughSocket(queryReq);
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
