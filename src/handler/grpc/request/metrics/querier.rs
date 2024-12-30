@@ -15,17 +15,18 @@
 
 use std::sync::Arc;
 
-use arrow::ipc::writer::StreamWriter;
+use arrow::ipc;
+use arrow_schema::Schema;
 use config::{
-    ider,
-    meta::stream::{FileKey, FileMeta, StreamParams, StreamPartition, StreamType},
-    metrics,
-    utils::{
-        file::{get_file_contents, scan_files},
-        parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
-        schema_ext::SchemaExt,
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::{
+        search::ScanStats,
+        stream::{StreamPartition, StreamType},
     },
+    metrics,
 };
+use datafusion::{catalog::TableProvider, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashMap;
 use infra::errors;
 use opentelemetry::global;
@@ -33,15 +34,24 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::wal,
     handler::grpc::{
         cluster_rpc::{
-            metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
+            metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse,
             MetricsWalFileRequest, MetricsWalFileResponse,
         },
         MetadataMap,
     },
-    service::{promql::search as SearchService, search::match_source},
+    service::{
+        promql::search as SearchService,
+        search::{
+            datafusion::{
+                exec::{prepare_datafusion_context, register_udf},
+                storage as datafusion_storage,
+                table_provider::uniontable::NewUnionTable,
+            },
+            grpc::{wal, QueryParams},
+        },
+    },
 };
 
 pub struct MetricsQuerier;
@@ -93,11 +103,15 @@ impl Metrics for MetricsQuerier {
         &self,
         req: Request<MetricsWalFileRequest>,
     ) -> Result<Response<MetricsWalFileResponse>, Status> {
+        let cfg = get_config();
         let start = std::time::Instant::now();
+
+        let trace_id = &req.get_ref().trace_id;
+        let org_id = &req.get_ref().org_id;
+        let stream_type = StreamType::Metrics;
+        let stream_name = &req.get_ref().stream_name;
         let start_time = req.get_ref().start_time;
         let end_time = req.get_ref().end_time;
-        let org_id = &req.get_ref().org_id;
-        let stream_name = &req.get_ref().stream_name;
         let mut filters = req
             .get_ref()
             .filters
@@ -105,6 +119,12 @@ impl Metrics for MetricsQuerier {
             .map(|f| (f.field.to_string(), f.value.clone()))
             .collect::<Vec<_>>();
         let mut resp = MetricsWalFileResponse::default();
+
+        // get latest schema
+        let schema_latest = infra::schema::get(org_id, stream_name, stream_type)
+            .await
+            .unwrap_or(Schema::empty());
+        let schema_latest = Arc::new(schema_latest);
 
         // format partition keys
         let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Metrics)
@@ -120,166 +140,131 @@ impl Metrics for MetricsQuerier {
                 }
             }
         }
-
-        // get memtable records
-        let mut mem_data = ingester::read_from_memtable(
-            org_id,
-            StreamType::Metrics.to_string().as_str(),
-            stream_name,
-            Some((start_time, end_time)),
-            &filters,
-        )
-        .await
-        .unwrap_or_default();
-
-        // get immutable records
-        mem_data.extend(
-            ingester::read_from_immutable(
-                org_id,
-                StreamType::Metrics.to_string().as_str(),
-                stream_name,
-                Some((start_time, end_time)),
-                &filters,
-            )
-            .await
-            .unwrap_or_default(),
-        );
-
-        // write memory data into arrow files
-        let mut arrow_files = vec![];
-        for (schema, batches) in mem_data {
-            let mut size = 0;
-            let mut body = Vec::new();
-            let mut writer = StreamWriter::try_new(&mut body, &schema).unwrap();
-            for batch in batches {
-                size += batch.data_json_size;
-                writer.write(&batch.data).unwrap();
-            }
-            writer.finish().unwrap();
-            drop(writer);
-
-            let name = format!("{}.arrow", ider::generate());
-            let schema_key = schema.hash_key();
-            arrow_files.push(MetricsWalFile {
-                name,
-                schema_key,
-                body,
-                size: size as i64,
-            });
-        }
-
-        // get parquet files
-        let wal_dir =
-            match std::path::Path::new(&config::get_config().common.data_wal_dir).canonicalize() {
-                Ok(path) => {
-                    let mut path = path.to_str().unwrap().to_string();
-                    // Hack for windows
-                    if path.starts_with("\\\\?\\") {
-                        path = path[4..].to_string();
-                        path = path.replace('\\', "/");
-                    }
-                    path
-                }
-                Err(_) => {
-                    return Ok(Response::new(resp));
-                }
-            };
-
-        let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
-        let files = scan_files(&pattern, "parquet", None).unwrap_or_default();
-
-        if arrow_files.is_empty() && files.is_empty() {
-            return Ok(Response::new(resp));
-        }
-
-        // lock theses files
-        let files = files
+        let search_partition_keys = filters
             .iter()
-            .map(|f| {
-                f.strip_prefix(&wal_dir)
-                    .unwrap()
-                    .to_string()
-                    .replace('\\', "/")
-                    .trim_start_matches('/')
-                    .to_string()
+            .map(|(k, vs)| {
+                vs.iter()
+                    .map(|v| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>()
             })
-            .collect::<Vec<_>>();
-        wal::lock_files(&files);
+            .collect::<Vec<_>>()
+            .concat();
 
-        let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
-        for file in files.iter() {
-            // check time range by filename
-            let (file_min_ts, file_max_ts) = parse_time_range_from_filename(file);
-            if (file_min_ts > 0 && file_max_ts > 0)
-                && ((end_time > 0 && file_min_ts > end_time)
-                    || (start_time > 0 && file_max_ts < start_time))
-            {
-                log::debug!(
-                    "skip wal parquet file: {} time_range: [{},{}]",
-                    &file,
-                    file_min_ts,
-                    file_max_ts
-                );
-                wal::release_files(&[file.clone()]);
-                continue;
-            }
-            // filter by partition keys
-            let file_key = FileKey::new(
-                file,
-                FileMeta {
-                    min_ts: file_min_ts,
-                    max_ts: file_max_ts,
-                    ..Default::default()
-                },
+        // create datafusion context, just used for decode plan, the params can use default
+        let work_group = None;
+        let mut ctx =
+            prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num)
+                .await
+                .map_err(|e| Status::internal(e.to_string()))?;
+
+        // register UDF
+        register_udf(&ctx, org_id).map_err(|e| Status::internal(e.to_string()))?;
+        datafusion_functions_json::register_all(&mut ctx)
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        let query_params = Arc::new(QueryParams {
+            trace_id: trace_id.to_string(),
+            org_id: org_id.clone(),
+            job_id: "".to_string(),
+            stream_type,
+            stream_name: stream_name.to_string(),
+            time_range: Some((start_time, end_time)),
+            work_group: work_group.clone(),
+            use_inverted_index: false,
+        });
+
+        // get all tables
+        let mut tables = Vec::new();
+        let mut scan_stats = ScanStats::new();
+        let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+
+        // search in WAL parquet
+        if LOCAL_NODE.is_ingester() {
+            let (tbls, stats) = match wal::search_parquet(
+                query_params.clone(),
+                schema_latest.clone(),
+                &search_partition_keys,
                 false,
-            );
-            if !match_source(
-                stream_params.clone(),
-                Some((start_time, end_time)),
-                &filters,
-                &file_key,
+                file_stats_cache.clone(),
+                None,
+                vec![],
             )
             .await
             {
-                wal::release_files(&[file.clone()]);
-                continue;
-            }
-            // check time range by parquet metadata
-            let source_file = wal_dir.to_string() + "/" + file;
-            let Ok(body) = get_file_contents(&source_file, None) else {
-                continue;
+                Ok(v) => v,
+                Err(e) => {
+                    // clear session data
+                    datafusion_storage::file_list::clear(trace_id);
+                    // release wal lock files
+                    crate::common::infra::wal::release_request(trace_id);
+                    log::error!(
+                        "[trace_id {trace_id}] grpc->metrics->wal_file->search: search wal parquet error: {}",
+                        e
+                    );
+                    return Err(Status::internal(e.to_string()));
+                }
             };
-            let body = bytes::Bytes::from(body);
-            let parquet_meta = read_metadata_from_bytes(&body).await.unwrap_or_default();
-            if (start_time > 0 && parquet_meta.max_ts < start_time)
-                || (end_time > 0 && parquet_meta.min_ts > end_time)
-            {
-                log::debug!(
-                    "skip wal parquet file: {} time_range: [{},{}]",
-                    file,
-                    parquet_meta.min_ts,
-                    parquet_meta.max_ts
-                );
-                continue;
-            }
-
-            let columns = file.split('/').collect::<Vec<&str>>();
-            let len = columns.len();
-            let name = columns[len - 1].to_string();
-            let schema_key = columns[len - 2].to_string();
-            resp.files.push(MetricsWalFile {
-                name,
-                schema_key,
-                body: body.to_vec(),
-                size: parquet_meta.original_size,
-            });
+            tables.extend(tbls);
+            scan_stats.add(&stats);
         }
 
-        // release all files
-        wal::release_files(&files);
+        // search in WAL memory
+        if LOCAL_NODE.is_ingester() {
+            let (tbls, stats) = match wal::search_memtable(
+                query_params.clone(),
+                schema_latest.clone(),
+                &search_partition_keys,
+                false,
+                None,
+                vec![],
+            )
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    // clear session data
+                    datafusion_storage::file_list::clear(trace_id);
+                    // release wal lock files
+                    crate::common::infra::wal::release_request(trace_id);
+                    log::error!(
+                        "[trace_id {trace_id}] grpc->metrics->wal_file->search: search wal memtable error: {}",
+                        e
+                    );
+                    return Err(Status::internal(e.to_string()));
+                }
+            };
+            tables.extend(tbls);
+            scan_stats.add(&stats);
+        }
 
-        // append arrow files
-        resp.files.extend(arrow_files);
+        // query data
+        let mut sql = format!(
+            "SELECT * FROM tbl WHERE {} >= {} AND {} <= {}",
+            cfg.common.column_timestamp, start_time, cfg.common.column_timestamp, end_time
+        );
+        for (key, value) in search_partition_keys.iter() {
+            sql = format!("{} AND {} = '{}'", sql, key, value);
+        }
+
+        let (hits_total, data) =
+            match query_sql(trace_id, &mut ctx, tables, schema_latest, &sql).await {
+                Ok(v) => v,
+                Err(e) => {
+                    // clear session data
+                    datafusion_storage::file_list::clear(trace_id);
+                    // release wal lock files
+                    crate::common::infra::wal::release_request(trace_id);
+                    return Err(Status::internal(e.to_string()));
+                }
+            };
+        resp.data = data;
+
+        // clear session data
+        datafusion_storage::file_list::clear(trace_id);
+        // release wal lock files
+        crate::common::infra::wal::release_request(trace_id);
+
+        log::info!("[trace_id {trace_id}] grpc->metrics->wal_file->search: search wal parquet success, scan_files: {}, scan_size: {}, hits_total: {}", scan_stats.files, scan_stats.original_size, hits_total);
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
@@ -291,4 +276,47 @@ impl Metrics for MetricsQuerier {
 
         Ok(Response::new(resp))
     }
+}
+
+async fn query_sql(
+    trace_id: &str,
+    ctx: &mut SessionContext,
+    tables: Vec<Arc<dyn TableProvider>>,
+    schema: Arc<Schema>,
+    sql: &str,
+) -> Result<(usize, Vec<u8>), DataFusionError> {
+    let union_table = NewUnionTable::try_new(schema.clone(), tables)?;
+    ctx.register_table("tbl", Arc::new(union_table))?;
+
+    let df = ctx.sql(sql).await?;
+    let schema = df.schema().into();
+    let batches = df.collect().await?;
+
+    // convert batches to arrow ipc
+    let ipc_options = ipc::writer::IpcWriteOptions::default();
+    let ipc_options = ipc_options.try_with_compression(Some(ipc::CompressionType::ZSTD))?;
+    let buf = Vec::new();
+    let mut writer = ipc::writer::FileWriter::try_new_with_options(buf, &schema, ipc_options)?;
+    let mut hits_total = 0;
+    for batch in batches {
+        if batch.num_rows() == 0 {
+            continue;
+        }
+        hits_total += batch.num_rows();
+        if let Err(e) = writer.write(&batch) {
+            log::error!(
+                "[trace_id {trace_id}] grpc->metrics->wal_file->search: write record batch to ipc error: {}",
+                e
+            );
+        }
+    }
+    if let Err(e) = writer.finish() {
+        log::error!(
+            "[trace_id {trace_id}] grpc->metrics->wal_file->search: convert record batch to ipc error: {}",
+            e
+        );
+    }
+
+    let data = writer.into_inner()?;
+    Ok((hits_total, data))
 }

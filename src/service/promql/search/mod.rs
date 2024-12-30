@@ -26,6 +26,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
+    utils::time::{now_micros, second_micros},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -133,7 +134,7 @@ async fn search_in_cluster(
 
     // A span of time covered by an individual querier (worker).
     let worker_dt = if nr_steps > nr_queriers {
-        partition_step * ((nr_steps / nr_queriers) + 1)
+        partition_step * ((nr_steps + nr_queriers - 1) / nr_queriers)
     } else {
         partition_step
     };
@@ -165,7 +166,10 @@ async fn search_in_cluster(
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        if req_query.end == end {
+        // if the end time is within the last 3 retention time, we need to fetch wal data
+        if req_query.end
+            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
+        {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;

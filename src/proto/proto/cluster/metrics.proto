@@ -56,11 +56,12 @@ message Sample {
 }
 
 message MetricsWalFileRequest {
-    string      org_id = 1;
-    string stream_name = 2;
-    int64   start_time = 3;
-    int64     end_time = 4;
-    repeated MetricsWalFileFilter filters = 5;
+    string    trace_id = 1;
+    string      org_id = 2;
+    string stream_name = 3;
+    int64   start_time = 4;
+    int64     end_time = 5;
+    repeated MetricsWalFileFilter filters = 6;
 }
 
 message MetricsWalFileFilter {
@@ -69,12 +70,5 @@ message MetricsWalFileFilter {
 }
 
 message MetricsWalFileResponse {
-    repeated MetricsWalFile files = 1;
-}
-
-message MetricsWalFile {
-    string       name = 1;
-    string schema_key = 2;
-    bytes        body = 3;
-    int64        size = 4;
+    bytes data = 1; // arrow ipc record batch
 }

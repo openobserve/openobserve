@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
-use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
+use arrow::{ipc, record_batch::RecordBatch};
 use config::{
     get_config,
     meta::{
@@ -23,7 +23,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::StreamType,
     },
-    FILE_EXT_PARQUET,
+    utils::record_batch_ext::RecordBatchExt,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -32,7 +32,6 @@ use datafusion::{
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
-use infra::cache::tmpfs;
 use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
@@ -63,8 +62,9 @@ pub(crate) async fn create_context(
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // get file list
-    let files = get_file_list(trace_id, org_id, stream_name, time_range, filters).await?;
-    if files.is_empty() {
+    let (mut arrow_schema, batches) =
+        get_file_list(trace_id, org_id, stream_name, time_range, filters).await?;
+    if batches.is_empty() {
         return Ok(vec![(
             SessionContext::new(),
             Arc::new(Schema::empty()),
@@ -72,57 +72,16 @@ pub(crate) async fn create_context(
         )]);
     }
 
-    let mut num_arrow_files = 0;
-    let mut num_parquet_files = 0;
     let mut arrow_scan_stats = ScanStats::new();
-    let mut parquet_scan_stats = ScanStats::new();
-
-    let metadata = HashMap::new();
-    let mut record_batches_meta: HashMap<String, (Schema, Vec<RecordBatch>)> = HashMap::new();
-
-    let work_dir = trace_id.to_string();
-
-    for file in files {
-        let file_name = format!("/{work_dir}/{}", file.name);
-
-        if file.name.ends_with(FILE_EXT_PARQUET) {
-            num_parquet_files += 1;
-            parquet_scan_stats.original_size += file.size;
-            tmpfs::set(&file_name, file.body.into()).expect("tmpfs set success");
-        } else {
-            num_arrow_files += 1;
-            let record_batch_meta = record_batches_meta
-                .entry(file.schema_key)
-                .or_insert_with(|| (Schema::empty(), Vec::new()));
-
-            let buf_reader = Cursor::new(file.body.clone());
-            let stream_reader = StreamReader::try_new(buf_reader, None)?;
-            for read_result in stream_reader {
-                let record_batch = read_result?;
-                if record_batch.num_rows() > 0 {
-                    if record_batch_meta.0.fields().is_empty() {
-                        record_batch_meta.0 = record_batch
-                            .schema()
-                            .as_ref()
-                            .clone()
-                            .with_metadata(metadata.clone());
-                    }
-                    record_batch_meta.1.push(record_batch);
-                }
-            }
-            arrow_scan_stats.original_size += file.body.len() as i64;
-        }
+    arrow_scan_stats.files = batches.len() as i64;
+    for batch in batches.iter() {
+        arrow_scan_stats.original_size += batch.size() as i64;
     }
 
-    arrow_scan_stats.files = num_arrow_files;
-    parquet_scan_stats.files = num_parquet_files;
-
     log::info!(
-        "promql->wal->search: load files: parquet {}, scan_size {}, arrow {}, scan_size {}",
-        parquet_scan_stats.files,
-        parquet_scan_stats.original_size,
+        "promql->wal->search: load wal files: batches {}, scan_size {}",
         arrow_scan_stats.files,
-        arrow_scan_stats.original_size
+        arrow_scan_stats.original_size,
     );
 
     // fetch all schema versions, get latest schema
@@ -133,41 +92,33 @@ pub(crate) async fn create_context(
             log::error!("get schema error: {}", err);
             DataFusionError::Execution(err.to_string())
         })?;
-    for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
-        if !record_batches.is_empty() {
-            let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
-            // calculate schema diff
-            let mut diff_fields = HashMap::new();
-            let group_fields = arrow_schema.fields();
-            for field in group_fields {
-                if let Ok(v) = schema.field_with_name(field.name()) {
-                    if v.data_type() != field.data_type() {
-                        diff_fields.insert(v.name().clone(), v.data_type().clone());
-                    }
+    if !batches.is_empty() {
+        let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
+        // calculate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = arrow_schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
                 }
             }
-            // add not exists field for wal inferred schema
-            let mut new_fields = Vec::new();
-            for field in schema.fields() {
-                if arrow_schema.field_with_name(field.name()).is_err() {
-                    new_fields.push(field.clone());
-                }
-            }
-            if !new_fields.is_empty() {
-                let new_schema = Schema::new(new_fields);
-                arrow_schema = Schema::try_merge(vec![arrow_schema, new_schema])?;
-            }
-            let arrow_schema = Arc::new(arrow_schema);
-
-            let schema = if let Some(first_batch) = record_batches.first() {
-                first_batch.schema()
-            } else {
-                arrow_schema
-            };
-            let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
-            ctx.register_table(stream_name, mem_table)?;
-            resp.push((ctx, schema, arrow_scan_stats));
         }
+        // add not exists field for wal inferred schema
+        let mut new_fields = Vec::new();
+        for field in schema.fields() {
+            if arrow_schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            arrow_schema = Schema::try_merge(vec![arrow_schema, new_schema])?;
+        }
+        let arrow_schema = Arc::new(arrow_schema);
+        let mem_table = Arc::new(MemTable::try_new(arrow_schema.clone(), vec![batches])?);
+        ctx.register_table(stream_name, mem_table)?;
+        resp.push((ctx, arrow_schema, arrow_scan_stats));
     }
 
     let schema = Arc::new(
@@ -191,7 +142,7 @@ pub(crate) async fn create_context(
         &[],
     )
     .await?;
-    resp.push((ctx, schema, parquet_scan_stats));
+    resp.push((ctx, schema, arrow_scan_stats));
     Ok(resp)
 }
 
@@ -204,10 +155,10 @@ async fn get_file_list(
     stream_name: &str,
     time_range: (i64, i64),
     filters: &[(String, Vec<String>)],
-) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
+) -> Result<(Schema, Vec<RecordBatch>)> {
     let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok(vec![]);
+        return Ok((Schema::empty(), vec![]));
     }
     let nodes = nodes.unwrap();
 
@@ -225,6 +176,7 @@ async fn get_file_list(
         let node_addr = node.grpc_addr.clone();
         let org_id = org_id.to_string();
         let req = cluster_rpc::MetricsWalFileRequest {
+            trace_id: trace_id.to_string(),
             org_id: org_id.clone(),
             stream_name: stream_name.to_string(),
             start_time: time_range.0,
@@ -285,7 +237,7 @@ async fn get_file_list(
                         Ok(response) => response.into_inner(),
                         Err(err) => {
                             log::error!(
-                            "[trace_id {trace_id}] get wal file list from search node error: {}",
+                            "[trace_id {trace_id}] promql->search->grpc:get wal file list from search node error: {}",
                             err
                         );
                             return Err(DataFusionError::Execution(
@@ -300,19 +252,35 @@ async fn get_file_list(
         tasks.push(task);
     }
 
-    let mut results: Vec<cluster_rpc::MetricsWalFile> = Vec::new();
+    let mut batches: Vec<RecordBatch> = Vec::new();
     let task_results = match try_join_all(tasks).await {
         Ok(res) => res,
         Err(err) => {
             return Err(DataFusionError::Execution(format!(
-                "get wal file list from search node error: {}",
+                "[trace_id {trace_id}] promql->search->grpc: get wal file list from search node error: {}",
                 err
             )));
         }
     };
-    for task_result in task_results {
-        results.extend(task_result?.files);
+    for resp in task_results {
+        let buf = Cursor::new(resp?.data);
+        let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+        let batch = reader
+            .into_iter()
+            .map(|v| match v {
+                Ok(v) => v,
+                Err(e) => {
+                    panic!("[trace_id {trace_id}] promql->search->grpc: read ipc error: {e}");
+                }
+            })
+            .collect::<Vec<_>>();
+        batches.extend(batch);
     }
 
-    Ok(results)
+    if batches.is_empty() {
+        return Ok((Schema::empty(), vec![]));
+    }
+
+    let schema = batches.first().unwrap().schema().clone();
+    Ok((schema.as_ref().clone(), batches))
 }

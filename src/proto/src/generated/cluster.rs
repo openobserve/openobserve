@@ -467,14 +467,16 @@ pub struct Sample {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MetricsWalFileRequest {
     #[prost(string, tag = "1")]
-    pub org_id: ::prost::alloc::string::String,
+    pub trace_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub stream_name: ::prost::alloc::string::String,
-    #[prost(int64, tag = "3")]
-    pub start_time: i64,
     #[prost(int64, tag = "4")]
+    pub start_time: i64,
+    #[prost(int64, tag = "5")]
     pub end_time: i64,
-    #[prost(message, repeated, tag = "5")]
+    #[prost(message, repeated, tag = "6")]
     pub filters: ::prost::alloc::vec::Vec<MetricsWalFileFilter>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -488,20 +490,9 @@ pub struct MetricsWalFileFilter {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MetricsWalFileResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub files: ::prost::alloc::vec::Vec<MetricsWalFile>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MetricsWalFile {
-    #[prost(string, tag = "1")]
-    pub name: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub schema_key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", tag = "3")]
-    pub body: ::prost::alloc::vec::Vec<u8>,
-    #[prost(int64, tag = "4")]
-    pub size: i64,
+    /// arrow ipc record batch
+    #[prost(bytes = "vec", tag = "1")]
+    pub data: ::prost::alloc::vec::Vec<u8>,
 }
 /// Generated client implementations.
 pub mod metrics_client {
