@@ -1,8 +1,15 @@
 <template>
-  <div class="tw-flex tw-items-center tw-flex-wrap q-pb-sm">
-    <div class="test-function-query-container tw-w-[100%] tw-mt-2">
+  <div
+    data-test="test-function-section"
+    class="tw-flex tw-items-center tw-flex-wrap q-pb-sm"
+  >
+    <div
+      data-test="test-function-query-section"
+      class="test-function-query-container tw-w-[100%] tw-mt-2"
+    >
       <q-form ref="querySelectionRef" @submit="getResults">
         <FullViewContainer
+          data-test="test-function-query-title-section"
           name="function"
           v-model:is-expanded="expandState.query"
           :label="t('common.query')"
@@ -41,6 +48,7 @@
         <div
           class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
           v-show="expandState.query"
+          data-test="test-function-query-editor-section"
         >
           <div class="function-stream-select-input tw-w-[150px] q-pr-md">
             <div class="tw-text-[12px] tw-text-gray-700">
@@ -121,6 +129,7 @@
   <div>
     <div>
       <FullViewContainer
+        data-test="test-function-input-title-section"
         name="function"
         v-model:is-expanded="expandState.events"
         :label="t('common.events')"
@@ -154,6 +163,7 @@
       <div
         v-show="expandState.events"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
+        data-test="test-function-input-editor-section"
       >
         <query-editor
           data-test="vrl-function-test-events-editor"
@@ -170,6 +180,7 @@
         name="function"
         v-model:is-expanded="expandState.output"
         :label="t('common.output')"
+        data-test="test-function-output-title-section"
       >
         <template #left>
           <div
@@ -202,6 +213,7 @@
       <div
         v-show="expandState.output"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
+        data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
