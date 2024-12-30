@@ -215,6 +215,8 @@ end`;
     };
 
     const onSubmit = () => {
+      if (!functionsToolbarRef.value) return;
+
       functionsToolbarRef.value.addFunctionForm
         .validate()
         .then((valid: any) => {
