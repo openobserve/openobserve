@@ -481,7 +481,6 @@ impl Engine {
         }
 
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
 
@@ -501,9 +500,11 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[PromQL] Loading data for stream: {}, filter: {:?}",
+            "[PromQL] Loading data for stream: {}, filter: {:?}, range: ({}, {})",
             table_name,
-            selector
+            selector,
+            start,
+            end,
         );
 
         let mut filters = selector
@@ -521,7 +522,14 @@ impl Engine {
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &mut filters)
+            .create_context(
+                &self.ctx.org_id,
+                table_name,
+                (start, end),
+                selector.matchers.clone(),
+                self.col_filters.clone(),
+                &mut filters,
+            )
             .await?;
 
         let mut tasks = Vec::new();
