@@ -46,7 +46,7 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         matchers: Matchers,
-        label_selectors: Option<HashSet<String>>,
+        label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<
         Vec<(SessionContext, Arc<Schema>, config::meta::search::ScanStats)>,
@@ -66,7 +66,7 @@ impl TableProvider for StorageProvider {
                 stream_name,
                 time_range,
                 matchers,
-                label_selectors,
+                label_selector,
             )
             .await?;
             for ctx in wal_ctx_list {

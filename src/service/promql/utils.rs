@@ -13,50 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
-use arrow::record_batch::RecordBatch;
-use config::{
-    get_config,
-    meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
-    utils::record_batch_ext::RecordBatchExt,
-};
+use config::get_config;
 use datafusion::{
     arrow::datatypes::Schema,
-    datasource::MemTable,
-    error::{DataFusionError, Result},
-    physical_plan::visit_execution_plan,
-    prelude::{col, lit, DataFrame, SessionContext},
+    error::Result,
+    prelude::{col, lit, DataFrame},
 };
 use promql_parser::label::{MatchOp, Matchers};
-use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::{
-        infra::cluster::get_cached_online_ingester_nodes,
-        meta::prom::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
-    },
-    service::search::{
-        cluster::flight::print_plan,
-        datafusion::{
-            distributed_plan::{
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
-            },
-            exec::prepare_datafusion_context,
-            table_provider::empty_table::NewEmptyTable,
-        },
-        grpc::wal::adapt_batch,
-        utils::ScanStatsVisitor,
-    },
-};
+use crate::common::meta::prom::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL};
 
-pub fn apply_matchers(
-    df: DataFrame,
-    schema: Arc<Schema>,
-    matchers: &Matchers,
-) -> Result<DataFrame> {
+pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
     let cfg = get_config();
     let mut df = df;
     for mat in matchers.matchers.iter() {
@@ -89,4 +58,53 @@ pub fn apply_matchers(
         }
     }
     Ok(df)
+}
+
+pub fn apply_label_selector(
+    df: DataFrame,
+    schema: &Schema,
+    label_selectors: &Option<HashSet<String>>,
+) -> Option<DataFrame> {
+    let cfg = get_config();
+    let mut df = df;
+    if let Some(label_selector) = label_selectors {
+        if !label_selector.is_empty() {
+            let schema_fields = schema
+                .fields()
+                .iter()
+                .map(|f| f.name())
+                .collect::<HashSet<_>>();
+            let mut def_labels = vec![
+                HASH_LABEL.to_string(),
+                VALUE_LABEL.to_string(),
+                BUCKET_LABEL.to_string(),
+                cfg.common.column_timestamp.to_string(),
+            ];
+            for label in label_selector.iter() {
+                if def_labels.contains(label) {
+                    def_labels.retain(|x| x != label);
+                }
+            }
+            // include only found columns and required _timestamp, hash, value, le cols
+            let selected_cols: Vec<_> = label_selector
+                .iter()
+                .chain(def_labels.iter())
+                .filter_map(|label| {
+                    if schema_fields.contains(label) {
+                        Some(col(label))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            df = match df.select(selected_cols) {
+                Ok(df) => df,
+                Err(e) => {
+                    log::error!("Selecting cols error: {}", e);
+                    return None;
+                }
+            };
+        }
+    }
+    Some(df)
 }

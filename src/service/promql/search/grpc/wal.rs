@@ -28,27 +28,27 @@ use datafusion::{
     physical_plan::visit_execution_plan,
     prelude::{col, lit, SessionContext},
 };
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::cluster::get_cached_online_ingester_nodes,
-        meta::prom::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
-    },
-    service::search::{
-        cluster::flight::print_plan,
-        datafusion::{
-            distributed_plan::{
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan::RemoteScanExec,
+    common::infra::cluster::get_cached_online_ingester_nodes,
+    service::{
+        promql::utils::{apply_label_selector, apply_matchers},
+        search::{
+            cluster::flight::print_plan,
+            datafusion::{
+                distributed_plan::{
+                    node::{RemoteScanNode, SearchInfos},
+                    remote_scan::RemoteScanExec,
+                },
+                exec::prepare_datafusion_context,
+                table_provider::empty_table::NewEmptyTable,
             },
-            exec::prepare_datafusion_context,
-            table_provider::empty_table::NewEmptyTable,
+            grpc::wal::adapt_batch,
+            utils::ScanStatsVisitor,
         },
-        grpc::wal::adapt_batch,
-        utils::ScanStatsVisitor,
     },
 };
 
@@ -59,7 +59,7 @@ pub(crate) async fn create_context(
     stream_name: &str,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selectors: Option<HashSet<String>>,
+    label_selector: Option<HashSet<String>>,
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -80,7 +80,7 @@ pub(crate) async fn create_context(
         Arc::clone(&schema),
         time_range,
         matchers,
-        label_selectors,
+        label_selector,
     )
     .await?;
     if batches.is_empty() {
@@ -122,7 +122,7 @@ async fn get_file_list(
     schema: Arc<Schema>,
     time_range: (i64, i64),
     matchers: Matchers,
-    label_selectors: Option<HashSet<String>>,
+    label_selector: Option<HashSet<String>>,
 ) -> Result<Vec<RecordBatch>> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
@@ -151,75 +151,11 @@ async fn get_file_list(
         }
     };
 
-    // TODO: extract to a util function
-    for mat in matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
-            || mat.name == VALUE_LABEL
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            continue;
-        }
-        match &mat.op {
-            MatchOp::Equal => df = df.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?,
-            MatchOp::NotEqual => {
-                df = df.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-            }
-            MatchOp::Re(regex) => {
-                let regexp_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_MATCH_UDF.clone();
-                df = df.filter(
-                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-            MatchOp::NotRe(regex) => {
-                let regexp_not_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_NOT_MATCH_UDF
-                        .clone();
-                df = df.filter(
-                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-        }
-    }
+    df = apply_matchers(df, &schema, &matchers)?;
 
-    if let Some(label_selector) = label_selectors {
-        if !label_selector.is_empty() {
-            let schema_fields = schema
-                .fields()
-                .iter()
-                .map(|f| f.name())
-                .collect::<HashSet<_>>();
-            let mut def_labels = vec![
-                HASH_LABEL.to_string(),
-                VALUE_LABEL.to_string(),
-                BUCKET_LABEL.to_string(),
-                cfg.common.column_timestamp.to_string(),
-            ];
-            for label in label_selector.iter() {
-                if def_labels.contains(label) {
-                    def_labels.retain(|x| x != label);
-                }
-            }
-            // include only found columns and required _timestamp, hash, value, le cols
-            let selected_cols: Vec<_> = label_selector
-                .iter()
-                .chain(def_labels.iter())
-                .filter_map(|label| {
-                    if schema_fields.contains(label) {
-                        Some(col(label))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            df = match df.select(selected_cols) {
-                Ok(df) => df,
-                Err(e) => {
-                    log::error!("Selecting cols error: {}", e);
-                    return Ok(vec![]);
-                }
-            };
-        }
+    match apply_label_selector(df, &schema, &label_selector) {
+        Some(dataframe) => df = dataframe,
+        None => return Ok(vec![]),
     }
 
     let plan = df.logical_plan();
