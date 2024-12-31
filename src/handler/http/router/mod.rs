@@ -36,7 +36,8 @@ use {
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
     },
 };
 
@@ -75,6 +76,7 @@ async fn audit_middleware(
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
     if get_o2_config().common.audit_enabled
+        && !path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
@@ -113,17 +115,19 @@ async fn audit_middleware(
                 // Binary data, encode it with base64
                 general_purpose::STANDARD.encode(&request_body)
             } else {
-                String::from_utf8(request_body.to_vec()).unwrap()
+                String::from_utf8(request_body.to_vec()).unwrap_or_default()
             };
             audit(AuditMessage {
                 user_email,
                 org_id,
-                method,
-                path,
-                body,
-                query_params,
-                response_code: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
+                protocol: Protocol::Http(HttpMeta {
+                    method,
+                    path,
+                    body,
+                    query_params,
+                    response_code: res.response().status().as_u16(),
+                }),
             })
             .await;
         }
@@ -427,14 +431,21 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(folders::deprecated::update_folder)
         .service(folders::deprecated::get_folder)
         .service(folders::deprecated::delete_folder)
-        .service(alerts::alert::save_alert)
-        .service(alerts::alert::update_alert)
-        .service(alerts::alert::get_alert)
-        .service(alerts::alert::list_alerts)
-        .service(alerts::alert::list_stream_alerts)
-        .service(alerts::alert::delete_alert)
-        .service(alerts::alert::enable_alert)
-        .service(alerts::alert::trigger_alert)
+        .service(alerts::deprecated::save_alert)
+        .service(alerts::deprecated::update_alert)
+        .service(alerts::deprecated::get_alert)
+        .service(alerts::deprecated::list_alerts)
+        .service(alerts::deprecated::list_stream_alerts)
+        .service(alerts::deprecated::delete_alert)
+        .service(alerts::deprecated::enable_alert)
+        .service(alerts::deprecated::trigger_alert)
+        .service(alerts::create_alert)
+        .service(alerts::get_alert)
+        .service(alerts::update_alert)
+        .service(alerts::delete_alert)
+        .service(alerts::list_alerts)
+        .service(alerts::enable_alert)
+        .service(alerts::trigger_alert)
         .service(alerts::templates::save_template)
         .service(alerts::templates::update_template)
         .service(alerts::templates::get_template)
@@ -495,7 +506,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(websocket::websocket);
 
     #[cfg(feature = "enterprise")]
     let service = service

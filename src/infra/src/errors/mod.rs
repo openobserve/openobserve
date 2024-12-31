@@ -136,6 +136,12 @@ pub enum PutDashboardError {
 
 #[derive(ThisError, Debug)]
 pub enum PutAlertError {
+    #[error("cannot provide alert ID when creating an alert")]
+    CreateAlertSetID,
+    #[error("must provide alert ID when updating an alert")]
+    UpdateAlertMissingID,
+    #[error("alert to update not found")]
+    UpdateAlertNotFound,
     #[error("error putting alert with folder that does not exist")]
     FolderDoesNotExist,
     #[error("cannot convert {0} into a trigger threshold operator")]
@@ -155,6 +161,7 @@ pub enum ErrorCodes {
     SearchSQLExecuteError(String),
     SearchCancelQuery(String),
     SearchTimeout(String),
+    InvalidParams(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -200,6 +207,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(_) => 20008,
             ErrorCodes::SearchCancelQuery(_) => 20009,
             ErrorCodes::SearchTimeout(_) => 20010,
+            ErrorCodes::InvalidParams(_) => 20011,
         }
     }
 
@@ -224,6 +232,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
             ErrorCodes::SearchCancelQuery(_) => "Search query was cancelled".to_string(),
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
+            ErrorCodes::InvalidParams(_) => "Invalid parameters".to_string(),
         }
     }
 
@@ -240,6 +249,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
+            ErrorCodes::InvalidParams(msg) => msg.to_owned(),
         }
     }
 
@@ -256,6 +266,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
+            ErrorCodes::InvalidParams(msg) => msg.to_owned(),
         }
     }
 
