@@ -53,7 +53,7 @@
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw-w-[150px] q-pr-md">
+          <div class="function-stream-select-input tw-w-[120px] q-pr-md">
             <div
               class="tw-text-[12px]"
               :class="
@@ -200,7 +200,7 @@
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="monaco-editor"
+          class="monaco-editor test-function-input-editor"
           v-model:query="inputEvents"
           language="json"
         />
@@ -270,7 +270,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="monaco-editor"
+          class="monaco-editor test-function-output-editor"
           v-model:query="outputEvents"
           language="json"
           read-only
@@ -699,11 +699,15 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.monaco-editor,
-.test-output-container {
+.monaco-editor {
   width: 100%;
-  min-height: 15rem;
+  min-height: 10rem;
   border-radius: 5px;
+}
+
+.test-function-input-editor,
+.test-function-output-editor {
+  height: calc((100vh - 260px) / 2) !important;
 }
 
 .test-function-option-tabs {
