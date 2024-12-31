@@ -4468,9 +4468,6 @@ const useLogs = () => {
 
   const getDataThroughWebSocket = (isPagination: boolean) => {
     try {
-      // Cancel request if already in progress
-      cancelQuery();
-
       if (!isPagination) {
         resetQueryData();
         searchObj.data.queryResults = {};
