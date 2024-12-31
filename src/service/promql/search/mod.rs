@@ -26,6 +26,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
+    utils::time::{now_micros, second_micros},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -74,10 +75,11 @@ async fn search_in_cluster(
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
+    let trace_id = ider::uuid();
     let cfg = get_config();
 
     log::info!(
-        "promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
         req.org_id,
         req.no_cache,
         req.query.as_ref().unwrap().start,
@@ -133,14 +135,13 @@ async fn search_in_cluster(
 
     // A span of time covered by an individual querier (worker).
     let worker_dt = if nr_steps > nr_queriers {
-        partition_step * ((nr_steps / nr_queriers) + 1)
+        partition_step * ((nr_steps + nr_queriers - 1) / nr_queriers)
     } else {
         partition_step
     };
 
     // partition request, here plus 1 second, because division is integer, maybe
     // lose some precision XXX-REFACTORME: move this into a function
-    let trace_id = ider::uuid();
     let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
         trace_id: trace_id.clone(),
@@ -165,20 +166,24 @@ async fn search_in_cluster(
         let req_query = req.query.as_mut().unwrap();
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
-        if req_query.end == end {
+        // if the end time is within the last 3 retention time, we need to fetch wal data
+        if req_query.end
+            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
+        {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
         worker_start += worker_dt;
 
         log::info!(
-            "promql->search->partition: node: {}, need_wal: {}, start: {}, end: {}",
+            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{}, {}]",
             &node.grpc_addr,
             req_need_wal,
             req_query.start,
             req_query.end,
         );
 
+        let trace_id = trace_id.to_string();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
@@ -204,7 +209,7 @@ async fn search_in_cluster(
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
                 let channel = get_cached_channel(&node_addr).await.map_err(|err| {
                     log::error!(
-                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
                         &node.grpc_addr,
                         err
                     );
@@ -229,7 +234,7 @@ async fn search_in_cluster(
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "promql->search->grpc: node: {}, search err: {:?}",
+                            "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
                             &node.grpc_addr,
                             err
                         );
@@ -243,7 +248,7 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     req_need_wal,
                     response.took,
@@ -295,7 +300,7 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
+        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
         op_start.elapsed().as_millis(),
         scan_stats.files,
         scan_stats.original_size,

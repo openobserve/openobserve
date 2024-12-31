@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -21,6 +22,7 @@ use std::{
 use async_trait::async_trait;
 use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use promql_parser::label::Matchers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -33,6 +35,7 @@ mod functions;
 #[cfg(feature = "enterprise")]
 pub mod name_visitor;
 pub mod search;
+mod utils;
 pub mod value;
 
 pub use engine::Engine;
@@ -53,6 +56,8 @@ pub trait TableProvider: Sync + Send + 'static {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
+        machers: Matchers,
+        label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
