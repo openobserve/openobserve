@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, UNIX_EPOCH},
 };
@@ -21,7 +22,7 @@ use std::{
 use async_trait::async_trait;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
-use promql_parser::parser;
+use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 
 use crate::service::{
@@ -44,6 +45,8 @@ impl TableProvider for StorageProvider {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
+        matchers: Matchers,
+        label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> datafusion::error::Result<
         Vec<(SessionContext, Arc<Schema>, config::meta::search::ScanStats)>,
@@ -57,8 +60,15 @@ impl TableProvider for StorageProvider {
         // register Wal table
         if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
-            let wal_ctx_list =
-                wal::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
+            let wal_ctx_list = wal::create_context(
+                &trace_id,
+                org_id,
+                stream_name,
+                time_range,
+                matchers,
+                label_selector,
+            )
+            .await?;
             for ctx in wal_ctx_list {
                 resp.push(ctx);
             }
@@ -157,11 +167,18 @@ pub async fn search(
         }
         value::Value::Matrix(v) => {
             v.iter().for_each(|v| {
-                resp.result.push(cluster_rpc::Series {
-                    metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                    samples: v.samples.iter().map(|x| x.into()).collect(),
-                    ..Default::default()
-                });
+                let samples = v
+                    .samples
+                    .iter()
+                    .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
+                    .collect::<Vec<_>>();
+                if !samples.is_empty() {
+                    resp.result.push(cluster_rpc::Series {
+                        metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                        samples,
+                        ..Default::default()
+                    });
+                }
             });
         }
         value::Value::Sample(v) => {

@@ -13,22 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod bitvec;
-pub mod cluster;
-pub mod dashboards;
-pub mod folder;
-pub mod function;
-pub mod inverted_index;
-pub mod logger;
-pub mod meta_store;
-pub mod organization;
-pub mod otlp;
-pub mod pipeline;
-pub mod search;
-pub mod self_reporting;
-pub mod short_url;
-pub mod sql;
-pub mod stream;
-pub mod user;
-pub mod websocket;
+use serde::{Deserialize, Serialize};
+
+use crate::meta::search::{Response, SearchEventContext};
+
+pub const MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE: &str = "Reached Max query range limit.";
+
+pub enum SearchResultType {
+    Cached(Response),
+    Search(Response),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SearchEventReq {
+    pub trace_id: String,
+    pub payload: crate::meta::search::Request,
+    pub time_offset: Option<i64>,
+    pub stream_type: crate::meta::stream::StreamType,
+    pub use_cache: bool,
+    pub search_type: crate::meta::search::SearchEventType,
+    #[serde(flatten)]
+    pub search_event_context: Option<SearchEventContext>,
+}

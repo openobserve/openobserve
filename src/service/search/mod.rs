@@ -97,6 +97,8 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+// Please note: `query_fn` which is the vrl needs to be base64::decoded
+// when using this search
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
@@ -1144,7 +1146,7 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 }
 
 // generate parquet file search schema
-fn generate_search_schema_diff(
+pub fn generate_search_schema_diff(
     schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {
