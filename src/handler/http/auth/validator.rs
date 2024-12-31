@@ -183,6 +183,22 @@ pub async fn validate_credentials(
 
     #[cfg(feature = "enterprise")]
     {
+        if !o2_enterprise::enterprise::common::infra::config::get_config()
+            .dex
+            .native_login_enabled
+            && !user.is_external
+        {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+
         if o2_enterprise::enterprise::common::infra::config::get_config()
             .dex
             .root_only_login
