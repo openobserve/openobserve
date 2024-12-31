@@ -38,7 +38,9 @@ use promql_parser::{
 
 use crate::{
     common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    service::promql::{aggregations, binaries, functions, micros, value::*},
+    service::promql::{
+        aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    },
 };
 
 pub struct Engine {
@@ -473,6 +475,11 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
+        let mut data_loaded = self.ctx.data_loading.lock().await;
+        if *data_loaded {
+            return Ok(()); // data is already loading
+        }
+
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
 
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
@@ -493,6 +500,12 @@ impl Engine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
+        log::info!(
+            "[PromQL] Loading data for stream: {}, filter: {:?}",
+            table_name,
+            selector
+        );
+
         let mut filters = selector
             .matchers
             .matchers
@@ -569,6 +582,7 @@ impl Engine {
             .write()
             .await
             .insert(table_name.to_string(), values);
+        *data_loaded = true;
         Ok(())
     }
 
@@ -1097,12 +1111,19 @@ async fn selector_load_data_from_datafusion(
         })
         .collect::<Vec<_>>();
 
+    let max_series = if cfg.limit.metrics_max_series_per_query > 0 {
+        cfg.limit.metrics_max_series_per_query
+    } else {
+        DEFAULT_MAX_SERIES_PER_QUERY
+    };
+
     let sub_batch = df_group
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
             vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
         )?
+        .limit(0, Some(max_series))?
         .collect()
         .await?;
 
