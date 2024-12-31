@@ -190,7 +190,7 @@ async fn get_wal_batches(
     }?;
 
     let mut schema = Arc::new(Schema::empty());
-    if batches.len() > 0 {
+    if !batches.is_empty() {
         schema = Arc::clone(&batches[0].schema());
     }
     Ok((stats, batches, schema))

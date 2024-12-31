@@ -481,6 +481,52 @@ impl Engine {
             return Ok(()); // data is already loading
         }
 
+        let table_name = selector.name.as_ref().unwrap();
+        let metrics = match self.selector_load_data_inner(selector, range).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[PromQL] Failed to load data for stream: {table_name}, error: {e:?}");
+                *data_loaded = true;
+                return Err(e);
+            }
+        };
+
+        // no data, return immediately
+        if metrics.is_empty() {
+            *data_loaded = true;
+            self.ctx
+                .data_cache
+                .write()
+                .await
+                .insert(table_name.to_string(), Value::None);
+            return Ok(());
+        }
+
+        // cache data
+        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
+        for metric in metric_values.iter_mut() {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        }
+        let values = if metric_values.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(metric_values)
+        };
+        self.ctx
+            .data_cache
+            .write()
+            .await
+            .insert(table_name.to_string(), values);
+        *data_loaded = true;
+        Ok(())
+    }
+
+    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
+    async fn selector_load_data_inner(
+        &self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> Result<HashMap<String, RangeValue>> {
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
@@ -565,34 +611,7 @@ impl Engine {
                 metric.samples.extend(value.samples);
             }
         }
-
-        // no data, return immediately
-        if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(table_name.to_string(), Value::None);
-            return Ok(());
-        }
-
-        // cache data
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-        for metric in metric_values.iter_mut() {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-        }
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(table_name.to_string(), values);
-        *data_loaded = true;
-        Ok(())
+        Ok(metrics)
     }
 
     async fn aggregate_exprs(
