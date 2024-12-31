@@ -19,7 +19,6 @@ use arrow::record_batch::RecordBatch;
 use config::{
     get_config,
     meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
-    utils::record_batch_ext::RecordBatchExt,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -72,8 +71,8 @@ pub(crate) async fn create_context(
             })?,
     );
 
-    // get file list
-    let batches = get_file_list(
+    // get wal record batches
+    let (stats, batches) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -83,6 +82,7 @@ pub(crate) async fn create_context(
         label_selector,
     )
     .await?;
+
     if batches.is_empty() {
         return Ok(vec![(
             SessionContext::new(),
@@ -91,22 +91,16 @@ pub(crate) async fn create_context(
         )]);
     }
 
-    let mut arrow_scan_stats = ScanStats::new();
-    arrow_scan_stats.files = batches.len() as i64;
-    for batch in batches.iter() {
-        arrow_scan_stats.original_size += batch.size() as i64;
-    }
-
     log::info!(
         "[trace_id {trace_id}] promql->wal->search: load wal files: batches {}, scan_size {}",
-        arrow_scan_stats.files,
-        arrow_scan_stats.original_size,
+        stats.files,
+        stats.original_size,
     );
 
     let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, arrow_scan_stats));
+    resp.push((ctx, schema, stats));
 
     Ok(resp)
 }
@@ -115,7 +109,7 @@ pub(crate) async fn create_context(
 /// searched
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "promql:search:grpc:wal:get_file_list", skip(trace_id))]
-async fn get_file_list(
+async fn get_wal_batches(
     trace_id: &str,
     org_id: &str,
     stream_name: &str,
@@ -123,11 +117,11 @@ async fn get_file_list(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: Option<HashSet<String>>,
-) -> Result<Vec<RecordBatch>> {
+) -> Result<(ScanStats, Vec<RecordBatch>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok(vec![]);
+        return Ok((ScanStats::new(), vec![]));
     }
     let nodes = nodes.unwrap();
 
@@ -147,7 +141,7 @@ async fn get_file_list(
                 .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
         )?,
         Err(_) => {
-            return Ok(vec![]);
+            return Ok((ScanStats::new(), vec![]));
         }
     };
 
@@ -155,13 +149,11 @@ async fn get_file_list(
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
-        None => return Ok(vec![]),
+        None => return Ok((ScanStats::new(), vec![])),
     }
 
     let plan = df.logical_plan();
-
     let mut physical_plan = ctx.state().create_physical_plan(plan).await?;
-
     if cfg.common.print_key_sql {
         print_plan(&physical_plan, "before");
     }
@@ -173,30 +165,19 @@ async fn get_file_list(
             trace_id: trace_id.to_string(),
             org_id: org_id.to_string(),
             stream_type: StreamType::Metrics.to_string(),
-            partition: 0,
-            job_id: "".to_string(),
+            partition: 0,           // set in FlightSearchRequest
+            job_id: "".to_string(), // set in FlightSearchRequest
         },
         search_infos: SearchInfos {
-            plan: vec![],
-            file_id_list: vec![],
-            idx_file_list: vec![],
+            plan: vec![],          // set in RemoteScanNode
+            file_id_list: vec![],  // not needed for wal
+            idx_file_list: vec![], // not needed for wal
             start_time: time_range.0,
             end_time: time_range.1,
             timeout: cfg.limit.query_timeout as u64,
         },
-        index_info: IndexInfo {
-            use_inverted_index: false,
-            index_condition: "".to_string(),
-            equal_keys: vec![],
-            match_all_keys: vec![],
-            index_optimize_mode: None,
-        },
-        super_cluster_info: cluster_rpc::SuperClusterInfo {
-            is_super_cluster: false,
-            user_id: None,
-            work_group: None,
-            search_event_type: None,
-        },
+        index_info: IndexInfo::default(), // not needed for wal
+        super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal
     };
 
     physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
@@ -209,7 +190,7 @@ async fn get_file_list(
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (mut batches, ..) = if let Err(e) = ret {
+    let (mut batches, stats, ..) = if let Err(e) = ret {
         log::error!("[trace_id {trace_id}] flight->search: datafusion collect error: {e}");
         Err(e)
     } else {
@@ -221,5 +202,5 @@ async fn get_file_list(
         *batch = adapt_batch(Arc::clone(&schema), batch);
     }
 
-    Ok(batches)
+    Ok((stats, batches))
 }
