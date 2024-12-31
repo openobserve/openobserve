@@ -56,7 +56,7 @@ const cipherKeys = {
   list: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/cipher_keys`);
   },
-  get_by_name: (org_identifier: string, name: any) => {
+  get_by_name: (org_identifier: string, name: string) => {
     return http().get(`/api/${org_identifier}/cipher_keys/${name}`);
   },
   delete: (org_identifier: string, name: string) => {
