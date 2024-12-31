@@ -71,12 +71,12 @@
         @click="emit('save')"
       />
       <q-btn
-        v-close-popup="true"
         class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600"
         :label="t('function.cancel')"
         text-color="negative"
         padding="sm md"
         no-caps
+        @click="emit('cancel')"
       />
     </div>
   </div>
@@ -114,7 +114,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["test", "save", "update:name", "back"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
 const addFunctionForm = ref(null);
 
