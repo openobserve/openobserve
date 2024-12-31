@@ -47,7 +47,7 @@
         v-close-popup="true"
         class="text-bold tw-border-primary"
         :label="t('common.fullscreen')"
-        text-color="primary"
+        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
         padding="sm"
         no-caps
         icon="fullscreen"
