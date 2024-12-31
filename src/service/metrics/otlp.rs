@@ -46,7 +46,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords},
+    common::meta::{http::HttpResponse as MetaHttpResponse, promql::*, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
@@ -938,7 +938,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
 
         exemplar_coll.push(exemplar_rec)
     }
-    rec["exemplars"] = exemplar_coll.into();
+    rec[EXEMPLARS_LABEL] = exemplar_coll.into();
 }
 
 fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {

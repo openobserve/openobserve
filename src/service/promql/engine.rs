@@ -37,7 +37,7 @@ use promql_parser::{
 };
 
 use crate::{
-    common::meta::prom::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    common::meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     service::promql::{
         aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
     },

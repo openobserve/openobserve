@@ -33,7 +33,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient, organization::OrganizationSetting, prom::ClusterLeader,
+        maxmind::MaxmindClient, organization::OrganizationSetting, promql::ClusterLeader,
         syslog::SyslogRoute, user::User,
     },
     handler::http::request::websocket::session::WsSession,

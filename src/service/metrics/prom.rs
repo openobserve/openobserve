@@ -43,7 +43,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{prom::*, stream::SchemaRecords},
+        meta::{promql::*, stream::SchemaRecords},
     },
     service::{
         alerts::alert::AlertExt,

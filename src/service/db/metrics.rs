@@ -19,7 +19,7 @@ use bytes::Bytes;
 use config::{cluster::LOCAL_NODE, utils::json};
 
 use crate::{
-    common::{infra::config::METRIC_CLUSTER_LEADER, meta::prom::ClusterLeader},
+    common::{infra::config::METRIC_CLUSTER_LEADER, meta::promql::ClusterLeader},
     service::db,
 };
 

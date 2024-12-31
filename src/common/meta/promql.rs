@@ -27,7 +27,7 @@ pub const VALUE_LABEL: &str = "value";
 pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
-pub const EXEMPLARS_LABEL: &str = "exemplars"; 
+pub const EXEMPLARS_LABEL: &str = "exemplars";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {
@@ -136,17 +136,6 @@ pub struct RequestRangeQuery {
     pub timeout: Option<String>,
     /// Do not use cache.
     pub no_cache: Option<bool>,
-}
-
-/// Query exemplars
-#[derive(Debug, Deserialize)]
-pub struct RequestQueryExemplars {
-    /// PromQL expression.
-    pub query: Option<String>,
-    /// Start timestamp, inclusive.
-    pub start: Option<String>,
-    /// End timestamp, inclusive.
-    pub end: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

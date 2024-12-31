@@ -17,7 +17,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::{
-    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
+    common::meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
     service::promql::value::{
         signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
     },

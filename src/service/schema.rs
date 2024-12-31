@@ -36,7 +36,7 @@ use serde_json::{Map, Value};
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{
-        authz::Authz, ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution,
+        authz::Authz, ingestion::StreamSchemaChk, promql::METADATA_LABEL, stream::SchemaEvolution,
     },
     service::db,
 };

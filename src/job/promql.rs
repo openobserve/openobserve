@@ -18,7 +18,7 @@ use hashbrown::HashMap;
 use tokio::time::{self, Duration};
 
 use crate::{
-    common::{infra::config::METRIC_CLUSTER_LEADER, meta::prom::ClusterLeader},
+    common::{infra::config::METRIC_CLUSTER_LEADER, meta::promql::ClusterLeader},
     service::db,
 };
 

@@ -117,7 +117,7 @@ pub async fn remote_write(
 #[get("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestQuery>,
+    req: web::Query<meta::promql::RequestQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     query(&org_id.into_inner(), req.into_inner(), in_req).await
@@ -126,8 +126,8 @@ pub async fn query_get(
 #[post("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestQuery>,
-    web::Form(form): web::Form<meta::prom::RequestQuery>,
+    req: web::Query<meta::promql::RequestQuery>,
+    web::Form(form): web::Form<meta::promql::RequestQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -140,7 +140,7 @@ pub async fn query_post(
 
 async fn query(
     org_id: &str,
-    req: meta::prom::RequestQuery,
+    req: meta::promql::RequestQuery,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let user_id = _in_req.headers().get("user_id").unwrap();
@@ -215,6 +215,7 @@ async fn query(
         start,
         end,
         step: 300_000_000, // 5m
+        query_exemplars: false,
         no_cache: None,
     };
 
@@ -277,17 +278,17 @@ async fn query(
 #[get("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestRangeQuery>,
+    req: web::Query<meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req).await
+    query_range(&org_id.into_inner(), req.into_inner(), in_req, false).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestRangeQuery>,
-    web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
+    req: web::Query<meta::promql::RequestRangeQuery>,
+    web::Form(form): web::Form<meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -295,13 +296,103 @@ pub async fn query_range_post(
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req).await
+    query_range(&org_id.into_inner(), req, in_req, false).await
+}
+
+/// prometheus query exemplars
+// refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryExemplars",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("query" = String, Query, description = "Prometheus expression query string"),
+        ("start" = String, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, inclusive"),
+        ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+            "status": "success",
+            "data": [
+                {
+                    "seriesLabels": {
+                        "__name__": "test_exemplar_metric_total",
+                        "instance": "localhost:8090",
+                        "job": "prometheus",
+                        "service": "bar"
+                    },
+                    "exemplars": [
+                        {
+                            "labels": {
+                                "trace_id": "EpTxMJ40fUus7aGY"
+                            },
+                            "value": "6",
+                            "timestamp": 1600096945.479
+                        }
+                    ]
+                },
+                {
+                    "seriesLabels": {
+                        "__name__": "test_exemplar_metric_total",
+                        "instance": "localhost:8090",
+                        "job": "prometheus",
+                        "service": "foo"
+                    },
+                    "exemplars": [
+                        {
+                            "labels": {
+                                "trace_id": "Olp9XHlq763ccsfa"
+                            },
+                            "value": "19",
+                            "timestamp": 1600096955.479
+                        },
+                        {
+                            "labels": {
+                                "trace_id": "hCtjygkIHwAN9vs4"
+                            },
+                            "value": "20",
+                            "timestamp": 1600096965.489
+                        }
+                    ]
+                }
+            ]
+        })),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/prometheus/api/v1/query_exemplars")]
+pub async fn query_exemplars_get(
+    org_id: web::Path<String>,
+    req: web::Query<meta::promql::RequestRangeQuery>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    query_range(&org_id.into_inner(), req.into_inner(), in_req, true).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/query_exemplars")]
+pub async fn query_exemplars_post(
+    org_id: web::Path<String>,
+    req: web::Query<meta::promql::RequestRangeQuery>,
+    web::Form(form): web::Form<meta::promql::RequestRangeQuery>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let req = if form.query.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    query_range(&org_id.into_inner(), req, in_req, true).await
 }
 
 async fn query_range(
     org_id: &str,
-    req: meta::prom::RequestRangeQuery,
+    req: meta::promql::RequestRangeQuery,
     _in_req: HttpRequest,
+    query_exemplars: bool,
 ) -> Result<HttpResponse, Error> {
     let user_id = _in_req.headers().get("user_id").unwrap();
     let user_email = user_id.to_str().unwrap();
@@ -423,169 +514,10 @@ async fn query_range(
         start,
         end,
         step,
+        query_exemplars,
         no_cache: req.no_cache,
     };
     search(org_id, &req, user_email, timeout).await
-}
-
-/// prometheus query exemplars
-// refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Metrics",
-    operation_id = "PrometheusQueryExemplars",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("query" = String, Query, description = "Prometheus expression query string"),
-        ("start" = String, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, inclusive"),
-        ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
-            "status": "success",
-            "data": [
-                {
-                    "seriesLabels": {
-                        "__name__": "test_exemplar_metric_total",
-                        "instance": "localhost:8090",
-                        "job": "prometheus",
-                        "service": "bar"
-                    },
-                    "exemplars": [
-                        {
-                            "labels": {
-                                "trace_id": "EpTxMJ40fUus7aGY"
-                            },
-                            "value": "6",
-                            "timestamp": 1600096945.479
-                        }
-                    ]
-                },
-                {
-                    "seriesLabels": {
-                        "__name__": "test_exemplar_metric_total",
-                        "instance": "localhost:8090",
-                        "job": "prometheus",
-                        "service": "foo"
-                    },
-                    "exemplars": [
-                        {
-                            "labels": {
-                                "trace_id": "Olp9XHlq763ccsfa"
-                            },
-                            "value": "19",
-                            "timestamp": 1600096955.479
-                        },
-                        {
-                            "labels": {
-                                "trace_id": "hCtjygkIHwAN9vs4"
-                            },
-                            "value": "20",
-                            "timestamp": 1600096965.489
-                        }
-                    ]
-                }
-            ]
-        })),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[get("/{org_id}/prometheus/api/v1/query_exemplars")]
-pub async fn query_exemplars_get(
-    org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestQueryExemplars>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    query_exemplars(&org_id.into_inner(), req.into_inner(), in_req).await
-}
-
-#[post("/{org_id}/prometheus/api/v1/query_exemplars")]
-pub async fn query_exemplars_post(
-    org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestQueryExemplars>,
-    web::Form(form): web::Form<meta::prom::RequestQueryExemplars>,
-    in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let req = if form.query.is_some() {
-        form
-    } else {
-        req.into_inner()
-    };
-    query_exemplars(&org_id.into_inner(), req, in_req).await
-}
-
-async fn query_exemplars(
-    org_id: &str,
-    req: meta::prom::RequestQueryExemplars,
-    _in_req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
-        };
-
-        let user_id = _in_req.headers().get("user_id").unwrap();
-        let user_email = user_id.to_str().unwrap();
-
-        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("parse promql error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
-            }
-        };
-        let mut visitor = promql::name_visitor::MetricNameVisitor {
-            name: HashSet::new(),
-        };
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-
-        if !is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.to_string();
-            for name in visitor.name {
-                let user: meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
-                    .unwrap()
-                    .clone();
-                if user.is_external
-                    && !crate::handler::http::auth::validator::check_permissions(
-                        user_email,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str.as_str())
-                                    .map_or(stream_type_str.as_str(), |model| model.key),
-                                name
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                {
-                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
-                }
-            }
-        }
-    }
-
-
-    Ok(HttpResponse::NotImplemented().into())
 }
 
 /// prometheus query metric metadata
@@ -633,7 +565,7 @@ async fn query_exemplars(
 #[get("/{org_id}/prometheus/api/v1/metadata")]
 pub async fn metadata(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestMetadata>,
+    req: web::Query<meta::promql::RequestMetadata>,
 ) -> Result<HttpResponse, Error> {
     Ok(
         match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
@@ -689,7 +621,7 @@ pub async fn metadata(
 #[get("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestSeries>,
+    req: web::Query<meta::promql::RequestSeries>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     series(&org_id, req.into_inner(), _in_req).await
@@ -698,9 +630,9 @@ pub async fn series_get(
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestSeries>,
+    req: web::Query<meta::promql::RequestSeries>,
     _in_req: HttpRequest,
-    web::Form(form): web::Form<meta::prom::RequestSeries>,
+    web::Form(form): web::Form<meta::promql::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
         form
@@ -712,10 +644,10 @@ pub async fn series_post(
 
 async fn series(
     org_id: &str,
-    req: meta::prom::RequestSeries,
+    req: meta::promql::RequestSeries,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let meta::prom::RequestSeries {
+    let meta::promql::RequestSeries {
         matcher,
         start,
         end,
@@ -840,7 +772,7 @@ async fn series(
 #[get("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestLabels>,
+    req: web::Query<meta::promql::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
     labels(&org_id, req.into_inner()).await
 }
@@ -848,8 +780,8 @@ pub async fn labels_get(
 #[post("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestLabels>,
-    web::Form(form): web::Form<meta::prom::RequestLabels>,
+    req: web::Query<meta::promql::RequestLabels>,
+    web::Form(form): web::Form<meta::promql::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
         form
@@ -859,8 +791,8 @@ pub async fn labels_post(
     labels(&org_id, req).await
 }
 
-async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResponse, Error> {
-    let meta::prom::RequestLabels {
+async fn labels(org_id: &str, req: meta::promql::RequestLabels) -> Result<HttpResponse, Error> {
+    let meta::promql::RequestLabels {
         matcher,
         start,
         end,
@@ -915,10 +847,10 @@ async fn labels(org_id: &str, req: meta::prom::RequestLabels) -> Result<HttpResp
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
 pub async fn label_values(
     path: web::Path<(String, String)>,
-    req: web::Query<meta::prom::RequestLabelValues>,
+    req: web::Query<meta::promql::RequestLabelValues>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, label_name) = path.into_inner();
-    let meta::prom::RequestLabelValues {
+    let meta::promql::RequestLabelValues {
         matcher,
         start,
         end,
@@ -960,7 +892,7 @@ fn validate_metadata_params(
                 let err = if sel.name.is_none()
                     && sel
                         .matchers
-                        .find_matchers(meta::prom::NAME_LABEL)
+                        .find_matchers(meta::promql::NAME_LABEL)
                         .is_empty()
                 {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
@@ -1020,7 +952,7 @@ fn validate_metadata_params(
 #[get("/{org_id}/prometheus/api/v1/format_query")]
 pub async fn format_query_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestFormatQuery>,
+    req: web::Query<meta::promql::RequestFormatQuery>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     format_query(&org_id, &req.query, _in_req)
@@ -1029,8 +961,8 @@ pub async fn format_query_get(
 #[post("/{org_id}/prometheus/api/v1/format_query")]
 pub async fn format_query_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::prom::RequestFormatQuery>,
-    web::Form(form): web::Form<meta::prom::RequestFormatQuery>,
+    req: web::Query<meta::promql::RequestFormatQuery>,
+    web::Form(form): web::Form<meta::promql::RequestFormatQuery>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let query = if !form.query.is_empty() {

@@ -24,7 +24,7 @@ use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
 use rayon::prelude::*;
 
 use crate::{
-    common::meta::prom::NAME_LABEL,
+    common::meta::promql::NAME_LABEL,
     service::promql::{
         binaries::scalar_binary_operations,
         value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},

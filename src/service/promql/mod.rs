@@ -63,6 +63,7 @@ pub struct MetricsQueryRequest {
     pub start: i64,
     pub end: i64,
     pub step: i64,
+    pub query_exemplars: bool,
     pub no_cache: Option<bool>,
 }
 

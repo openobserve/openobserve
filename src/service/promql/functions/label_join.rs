@@ -19,7 +19,7 @@ use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 
 use crate::{
-    common::meta::prom::NAME_LABEL,
+    common::meta::promql::NAME_LABEL,
     service::promql::value::{InstantValue, Label, Value},
 };
 

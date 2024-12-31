@@ -40,7 +40,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        prom,
+        promql,
         stream::{Stream, StreamProperty},
     },
     service::{db, metrics::get_prom_metadata_from_schema},
@@ -152,18 +152,18 @@ pub fn stream_res(
     stats.created_at = stream_created(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(prom::Metadata {
-            metric_type: prom::MetricType::Empty,
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+            metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),
             unit: "".to_string(),
         });
-        if meta.metric_type == prom::MetricType::Empty
+        if meta.metric_type == promql::MetricType::Empty
             && (stream_name.ends_with("_bucket")
                 || stream_name.ends_with("_sum")
                 || stream_name.ends_with("_count"))
         {
-            meta.metric_type = prom::MetricType::Counter;
+            meta.metric_type = promql::MetricType::Counter;
         }
         Some(meta)
     } else {

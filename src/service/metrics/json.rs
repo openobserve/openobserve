@@ -35,7 +35,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
-        prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         stream::SchemaRecords,
     },
     service::{

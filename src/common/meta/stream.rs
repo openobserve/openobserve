@@ -24,7 +24,7 @@ use datafusion::arrow::datatypes::Schema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::prom::Metadata;
+use super::promql::Metadata;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
