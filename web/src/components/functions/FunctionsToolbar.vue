@@ -3,7 +3,12 @@
     class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
   >
     <div class="tw-flex tw-items-center o2-input">
-      <q-icon class="tw-pr-1" name="arrow_back_ios" size="18px" />
+      <q-icon
+        class="tw-pr-1 tw-cursor-pointer"
+        name="arrow_back_ios"
+        size="18px"
+        @click="redirectToFunctions"
+      />
       <div class="tw-text-lg tw-w-full">Add Function</div>
       <q-form ref="addFunctionForm">
         <q-input
@@ -77,10 +82,16 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 
 const q = useQuasar();
+
+const router = useRouter();
+
+const store = useStore();
 
 const props = defineProps({
   name: {
@@ -93,7 +104,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["test", "save", "update:name"]);
+const emit = defineEmits(["test", "save", "update:name", "back"]);
 
 const addFunctionForm = ref(null);
 
@@ -109,6 +120,10 @@ const functionName = computed({
 
 const handleFullScreen = () => {
   q.fullscreen.toggle();
+};
+
+const redirectToFunctions = () => {
+  emit("back");
 };
 
 defineExpose({ addFunctionForm });

@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable-name="beingUpdated"
         @test="onTestFunction"
         @save="onSubmit"
+        @back="emit('update:list')"
         class="tw-pr-4"
       />
       <q-separator />
@@ -111,7 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  computed,
+  watch,
+  onUnmounted,
+} from "vue";
 
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
@@ -182,6 +190,37 @@ export default defineComponent({
     const beingUpdated = computed(() => props.isUpdated);
 
     const streamTypes = ["logs", "metrics", "traces"];
+
+    const isFunctionDataChanged = ref(false);
+
+    onMounted(() => {
+      window.addEventListener("beforeunload", beforeUnloadHandler);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+    });
+
+    watch(
+      () => formData.value,
+      () => {
+        isFunctionDataChanged.value = true;
+      },
+      {
+        deep: true,
+      },
+    );
+
+    const beforeUnloadHandler = (e: any) => {
+      //check is data updated or not
+      if (isFunctionDataChanged.value) {
+        // Display a confirmation message
+        const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
+        e.returnValue = confirmMessage;
+        return confirmMessage;
+      }
+      return;
+    };
 
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
@@ -303,6 +342,7 @@ end`;
     return {
       t,
       $q,
+      emit,
       disableColor,
       beingUpdated,
       formData,
