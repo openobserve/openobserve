@@ -3579,6 +3579,8 @@ const useLogs = () => {
             searchObj.meta.showHistogram = false;
             searchObj.data.searchAround.histogramHide = true;
           }
+
+          searchObj.data.histogram.chartParams.title = "";
           // segment.track("Button Click", {
           //   button: "Search Around Data",
           //   user_org: store.state.selectedOrganization.identifier,
