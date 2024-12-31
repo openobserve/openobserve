@@ -18,7 +18,8 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use async_recursion::async_recursion;
 use config::{
     get_config,
-    meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    utils::json,
 };
 use datafusion::{
     arrow::{
@@ -41,11 +42,8 @@ use promql_parser::{
 };
 
 use super::utils::{apply_label_selector, apply_matchers};
-use crate::{
-    common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    service::promql::{
-        aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
-    },
+use crate::service::promql::{
+    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
 };
 
 pub struct Engine {
@@ -259,6 +257,7 @@ impl Engine {
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
                             samples: vec![v.sample],
+                            exemplars: None,
                             time_window: time_window.clone(),
                         })
                         .collect(),
@@ -266,6 +265,7 @@ impl Engine {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
                             samples: vec![v.sample],
+                            exemplars: None,
                             time_window,
                         }]
                     }
@@ -274,11 +274,13 @@ impl Engine {
                     Value::Sample(s) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![s],
+                        exemplars: None,
                         time_window,
                     }],
                     Value::Float(val) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![Sample::new(self.time, val)],
+                        exemplars: None,
                         time_window,
                     }],
                     v => {
@@ -471,6 +473,7 @@ impl Engine {
             values.push(RangeValue {
                 labels: metric.labels.clone(),
                 samples,
+                exemplars: None,
                 time_window: Some(TimeWindow::new(eval_ts, range)),
             });
         }
@@ -1242,6 +1245,30 @@ async fn load_exemplars_from_datafusion(
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
+        let exemplars_values = batch
+            .column_by_name(EXEMPLARS_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for i in 0..batch.num_rows() {
+            let hash = hash_values.value(i);
+            let exemplar = exemplars_values.value(i);
+            if let Some(range_val) = metrics.get_mut(hash) {
+                if let Ok(exemplar) = json::from_str::<json::Value>(exemplar) {
+                    if let Some(exemplar) = exemplar.as_object() {
+                        if range_val.exemplars.is_none() {
+                            range_val.exemplars = Some(vec![]);
+                        }
+                        range_val
+                            .exemplars
+                            .as_mut()
+                            .unwrap()
+                            .push(Exemplar::from(exemplar));
+                    }
+                }
+            }
+        }
         // let time_values = batch
         //     .column_by_name(&cfg.common.column_timestamp)
         //     .unwrap()

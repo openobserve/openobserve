@@ -15,7 +15,7 @@
 
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use config::{meta::promql::NAME_LABEL, FxIndexMap};
+use config::{meta::promql::NAME_LABEL, utils::json, FxIndexMap};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -195,6 +195,25 @@ pub struct Exemplar {
     pub labels: Labels,
 }
 
+impl From<&json::Map<String, json::Value>> for Exemplar {
+    fn from(data: &json::Map<String, json::Value>) -> Self {
+        let timestamp = data.get("_timestamp").map(|v| v.as_i64().unwrap_or(0));
+        let value = data.get("value").map(|v| v.as_f64().unwrap_or(0.0));
+        let mut labels = vec![];
+        for (k, v) in data.iter() {
+            if k == "_timestamp" || k == "value" {
+                continue;
+            }
+            labels.push(Arc::new(Label::new(k.to_string(), v.to_string())));
+        }
+        Self {
+            timestamp: timestamp.unwrap_or(0),
+            value: value.unwrap_or(0.0),
+            labels,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InstantValue {
     pub labels: Labels,
@@ -244,7 +263,7 @@ impl TimeWindow {
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
-    // pub exemplars: Vec<InstantValue>,
+    pub exemplars: Option<Vec<Exemplar>>,
     pub time_window: Option<TimeWindow>,
 }
 
@@ -280,6 +299,7 @@ impl RangeValue {
         Self {
             labels,
             samples: Vec::from_iter(samples),
+            exemplars: None,
             time_window: None,
         }
     }
