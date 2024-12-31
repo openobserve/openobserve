@@ -15,7 +15,7 @@
 
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use config::FxIndexMap;
+use config::{meta::promql::NAME_LABEL, FxIndexMap};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -23,8 +23,6 @@ use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,
 };
-
-use crate::common::meta::promql::NAME_LABEL;
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 static RE_VALID_LABEL_NAME: Lazy<Regex> =
@@ -187,6 +185,14 @@ impl Sample {
     pub(crate) fn is_nan(&self) -> bool {
         self.value.is_nan()
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct Exemplar {
+    /// Time in microseconds
+    pub timestamp: i64,
+    pub value: f64,
+    pub labels: Labels,
 }
 
 #[derive(Debug, Clone)]

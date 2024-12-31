@@ -27,12 +27,13 @@ message MetricsQueryStmt {
     int64             start = 2;
     int64               end = 3;
     int64              step = 4;
+    bool    query_exemplars = 5;
 }
 
 message MetricsQueryResponse {
     Job                 job = 1;
     int32              took = 2;
-    string      result_type = 3; // vector, matrix, scalar
+    string      result_type = 3; // vector, matrix, scalar, exemplars
     repeated Series  result = 4;
     ScanStats    scan_stats = 5;
 }
@@ -43,6 +44,7 @@ message Series {
     optional Sample  sample = 3;
     optional double  scalar = 4;
     optional string stringliteral = 5;
+    optional Exemplars  exemplars = 6;
 }
 
 message Label {
@@ -53,6 +55,16 @@ message Label {
 message Sample {
     int64   time = 1;
     double value = 2;
+}
+
+message Exemplars {
+    repeated Exemplar exemplars = 1;
+}
+
+message Exemplar {
+    int64            time = 1;
+    double          value = 2;
+    repeated Label labels = 3;
 }
 
 message MetricsWalFileRequest {

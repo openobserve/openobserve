@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::{Metadata, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 use regex::Regex;
-
-use crate::common::meta::promql::{
-    Metadata, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, VALUE_LABEL,
-};
 
 pub mod json;
 pub mod otlp;

@@ -28,6 +28,7 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
+        promql::*,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -46,7 +47,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, promql::*, stream::SchemaRecords},
+    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,

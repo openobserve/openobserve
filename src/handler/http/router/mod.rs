@@ -384,6 +384,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(promql::query_post)
         .service(promql::query_range_get)
         .service(promql::query_range_post)
+        .service(promql::query_exemplars_get)
+        .service(promql::query_exemplars_post)
         .service(promql::metadata)
         .service(promql::series_get)
         .service(promql::series_post)

@@ -16,6 +16,7 @@
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_recursion::async_recursion;
+use config::meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL};
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -36,11 +37,8 @@ use promql_parser::{
     },
 };
 
-use crate::{
-    common::meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    service::promql::{
-        aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
-    },
+use crate::service::promql::{
+    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
 };
 
 pub struct Engine {
@@ -1127,7 +1125,7 @@ async fn selector_load_data_from_datafusion(
     let sub_batch = df_group
         .clone()
         .aggregate(
-            vec![col(HASH_LABEL)], // exemplars only return once value
+            vec![col(HASH_LABEL)],
             vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
         )?
         .limit(0, Some(max_series))?

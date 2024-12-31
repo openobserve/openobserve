@@ -26,7 +26,7 @@ use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use promql_parser::parser;
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     service::{metrics, promql, promql::MetricsQueryRequest},
 };
 
@@ -117,7 +117,7 @@ pub async fn remote_write(
 #[get("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestQuery>,
+    req: web::Query<config::meta::promql::RequestQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     query(&org_id.into_inner(), req.into_inner(), in_req).await
@@ -126,8 +126,8 @@ pub async fn query_get(
 #[post("/{org_id}/prometheus/api/v1/query")]
 pub async fn query_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestQuery>,
-    web::Form(form): web::Form<meta::promql::RequestQuery>,
+    req: web::Query<config::meta::promql::RequestQuery>,
+    web::Form(form): web::Form<config::meta::promql::RequestQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -140,7 +140,7 @@ pub async fn query_post(
 
 async fn query(
     org_id: &str,
-    req: meta::promql::RequestQuery,
+    req: config::meta::promql::RequestQuery,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let user_id = _in_req.headers().get("user_id").unwrap();
@@ -278,7 +278,7 @@ async fn query(
 #[get("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestRangeQuery>,
+    req: web::Query<config::meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     query_range(&org_id.into_inner(), req.into_inner(), in_req, false).await
@@ -287,8 +287,8 @@ pub async fn query_range_get(
 #[post("/{org_id}/prometheus/api/v1/query_range")]
 pub async fn query_range_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestRangeQuery>,
-    web::Form(form): web::Form<meta::promql::RequestRangeQuery>,
+    req: web::Query<config::meta::promql::RequestRangeQuery>,
+    web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -367,7 +367,7 @@ pub async fn query_range_post(
 #[get("/{org_id}/prometheus/api/v1/query_exemplars")]
 pub async fn query_exemplars_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestRangeQuery>,
+    req: web::Query<config::meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     query_range(&org_id.into_inner(), req.into_inner(), in_req, true).await
@@ -376,8 +376,8 @@ pub async fn query_exemplars_get(
 #[post("/{org_id}/prometheus/api/v1/query_exemplars")]
 pub async fn query_exemplars_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestRangeQuery>,
-    web::Form(form): web::Form<meta::promql::RequestRangeQuery>,
+    req: web::Query<config::meta::promql::RequestRangeQuery>,
+    web::Form(form): web::Form<config::meta::promql::RequestRangeQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
@@ -390,7 +390,7 @@ pub async fn query_exemplars_post(
 
 async fn query_range(
     org_id: &str,
-    req: meta::promql::RequestRangeQuery,
+    req: config::meta::promql::RequestRangeQuery,
     _in_req: HttpRequest,
     query_exemplars: bool,
 ) -> Result<HttpResponse, Error> {
@@ -565,7 +565,7 @@ async fn query_range(
 #[get("/{org_id}/prometheus/api/v1/metadata")]
 pub async fn metadata(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestMetadata>,
+    req: web::Query<config::meta::promql::RequestMetadata>,
 ) -> Result<HttpResponse, Error> {
     Ok(
         match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
@@ -621,7 +621,7 @@ pub async fn metadata(
 #[get("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestSeries>,
+    req: web::Query<config::meta::promql::RequestSeries>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     series(&org_id, req.into_inner(), _in_req).await
@@ -630,9 +630,9 @@ pub async fn series_get(
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestSeries>,
+    req: web::Query<config::meta::promql::RequestSeries>,
     _in_req: HttpRequest,
-    web::Form(form): web::Form<meta::promql::RequestSeries>,
+    web::Form(form): web::Form<config::meta::promql::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
         form
@@ -644,10 +644,10 @@ pub async fn series_post(
 
 async fn series(
     org_id: &str,
-    req: meta::promql::RequestSeries,
+    req: config::meta::promql::RequestSeries,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let meta::promql::RequestSeries {
+    let config::meta::promql::RequestSeries {
         matcher,
         start,
         end,
@@ -772,7 +772,7 @@ async fn series(
 #[get("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestLabels>,
+    req: web::Query<config::meta::promql::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
     labels(&org_id, req.into_inner()).await
 }
@@ -780,8 +780,8 @@ pub async fn labels_get(
 #[post("/{org_id}/prometheus/api/v1/labels")]
 pub async fn labels_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestLabels>,
-    web::Form(form): web::Form<meta::promql::RequestLabels>,
+    req: web::Query<config::meta::promql::RequestLabels>,
+    web::Form(form): web::Form<config::meta::promql::RequestLabels>,
 ) -> Result<HttpResponse, Error> {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
         form
@@ -791,8 +791,11 @@ pub async fn labels_post(
     labels(&org_id, req).await
 }
 
-async fn labels(org_id: &str, req: meta::promql::RequestLabels) -> Result<HttpResponse, Error> {
-    let meta::promql::RequestLabels {
+async fn labels(
+    org_id: &str,
+    req: config::meta::promql::RequestLabels,
+) -> Result<HttpResponse, Error> {
+    let config::meta::promql::RequestLabels {
         matcher,
         start,
         end,
@@ -847,10 +850,10 @@ async fn labels(org_id: &str, req: meta::promql::RequestLabels) -> Result<HttpRe
 #[get("/{org_id}/prometheus/api/v1/label/{label_name}/values")]
 pub async fn label_values(
     path: web::Path<(String, String)>,
-    req: web::Query<meta::promql::RequestLabelValues>,
+    req: web::Query<config::meta::promql::RequestLabelValues>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, label_name) = path.into_inner();
-    let meta::promql::RequestLabelValues {
+    let config::meta::promql::RequestLabelValues {
         matcher,
         start,
         end,
@@ -892,7 +895,7 @@ fn validate_metadata_params(
                 let err = if sel.name.is_none()
                     && sel
                         .matchers
-                        .find_matchers(meta::promql::NAME_LABEL)
+                        .find_matchers(config::meta::promql::NAME_LABEL)
                         .is_empty()
                 {
                     Some("match[] argument must start with a metric name, e.g. `match[]=up`")
@@ -952,7 +955,7 @@ fn validate_metadata_params(
 #[get("/{org_id}/prometheus/api/v1/format_query")]
 pub async fn format_query_get(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestFormatQuery>,
+    req: web::Query<config::meta::promql::RequestFormatQuery>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     format_query(&org_id, &req.query, _in_req)
@@ -961,8 +964,8 @@ pub async fn format_query_get(
 #[post("/{org_id}/prometheus/api/v1/format_query")]
 pub async fn format_query_post(
     org_id: web::Path<String>,
-    req: web::Query<meta::promql::RequestFormatQuery>,
-    web::Form(form): web::Form<meta::promql::RequestFormatQuery>,
+    req: web::Query<config::meta::promql::RequestFormatQuery>,
+    web::Form(form): web::Form<config::meta::promql::RequestFormatQuery>,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let query = if !form.query.is_empty() {

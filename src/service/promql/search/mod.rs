@@ -106,6 +106,7 @@ async fn search_in_cluster(
         start,
         end,
         step,
+        query_exemplars,
     } = req.query.as_ref().unwrap();
 
     // The number of resolution steps; see the diagram at
@@ -282,6 +283,12 @@ async fn search_in_cluster(
         resp.result.into_iter().for_each(|series| {
             series_data.push(series);
         });
+    }
+
+    // TODO: merge exemplars
+    println!("query_exemplars: {:?}", query_exemplars);
+    if query_exemplars {
+        dbg!(&series_data);
     }
 
     // merge result

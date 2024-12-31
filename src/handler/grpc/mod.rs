@@ -51,6 +51,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             start: req.start,
             end: req.end,
             step: req.step,
+            query_exemplars: req.query_exemplars,
         };
 
         let job = cluster_rpc::Job {

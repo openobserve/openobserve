@@ -19,8 +19,12 @@ use actix_web::{http, http::StatusCode, HttpResponse};
 use arrow_schema::DataType;
 use config::{
     is_local_disk_storage,
-    meta::stream::{
-        DistinctField, StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings,
+    meta::{
+        promql,
+        stream::{
+            DistinctField, StreamParams, StreamSettings, StreamStats, StreamType,
+            UpdateStreamSettings,
+        },
     },
     utils::{json, time::now_micros},
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -40,7 +44,6 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        promql,
         stream::{Stream, StreamProperty},
     },
     service::{db, metrics::get_prom_metadata_from_schema},
