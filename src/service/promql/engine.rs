@@ -40,8 +40,12 @@ use promql_parser::{
     },
 };
 
-use crate::service::promql::{
-    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+use super::utils::{apply_label_selector, apply_matchers};
+use crate::{
+    common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    service::promql::{
+        aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    },
 };
 
 pub struct Engine {
@@ -485,8 +489,53 @@ impl Engine {
             return Ok(()); // data is already loading
         }
 
-        // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
+        let table_name = selector.name.as_ref().unwrap();
+        let metrics = match self.selector_load_data_inner(selector, range).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[PromQL] Failed to load data for stream: {table_name}, error: {e:?}");
+                *data_loaded = true;
+                return Err(e);
+            }
+        };
 
+        // no data, return immediately
+        if metrics.is_empty() {
+            *data_loaded = true;
+            self.ctx
+                .data_cache
+                .write()
+                .await
+                .insert(table_name.to_string(), Value::None);
+            return Ok(());
+        }
+
+        // cache data
+        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
+        for metric in metric_values.iter_mut() {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        }
+        let values = if metric_values.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(metric_values)
+        };
+        self.ctx
+            .data_cache
+            .write()
+            .await
+            .insert(table_name.to_string(), values);
+        *data_loaded = true;
+        Ok(())
+    }
+
+    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
+    async fn selector_load_data_inner(
+        &self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> Result<HashMap<String, RangeValue>> {
+        // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
 
@@ -506,9 +555,11 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[PromQL] Loading data for stream: {}, filter: {:?}",
+            "[PromQL] Loading data for stream: {}, filter: {:?}, range: ({}, {})",
             table_name,
-            selector
+            selector,
+            start,
+            end,
         );
 
         let mut filters = selector
@@ -526,7 +577,14 @@ impl Engine {
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &mut filters)
+            .create_context(
+                &self.ctx.org_id,
+                table_name,
+                (start, end),
+                selector.matchers.clone(),
+                self.col_filters.clone(),
+                &mut filters,
+            )
             .await?;
 
         let mut tasks = Vec::new();
@@ -570,34 +628,7 @@ impl Engine {
                 metric.samples.extend(value.samples);
             }
         }
-
-        // no data, return immediately
-        if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(table_name.to_string(), Value::None);
-            return Ok(());
-        }
-
-        // cache data
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-        for metric in metric_values.iter_mut() {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-        }
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(table_name.to_string(), values);
-        *data_loaded = true;
-        Ok(())
+        Ok(metrics)
     }
 
     async fn aggregate_exprs(
@@ -1040,76 +1071,11 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
-    for mat in selector.matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
-            || mat.name == VALUE_LABEL
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            continue;
-        }
-        match &mat.op {
-            MatchOp::Equal => {
-                df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
-            }
-            MatchOp::NotEqual => {
-                df_group = df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-            }
-            MatchOp::Re(regex) => {
-                let regexp_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_MATCH_UDF.clone();
-                df_group = df_group.filter(
-                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-            MatchOp::NotRe(regex) => {
-                let regexp_not_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_NOT_MATCH_UDF
-                        .clone();
-                df_group = df_group.filter(
-                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-        }
-    }
+    df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
 
-    if let Some(label_selector) = label_selector {
-        if !label_selector.is_empty() {
-            let schema_fields = schema
-                .fields()
-                .iter()
-                .map(|f| f.name())
-                .collect::<HashSet<_>>();
-            let mut def_labels = vec![
-                HASH_LABEL.to_string(),
-                VALUE_LABEL.to_string(),
-                BUCKET_LABEL.to_string(),
-                cfg.common.column_timestamp.to_string(),
-            ];
-            for label in label_selector.iter() {
-                if def_labels.contains(label) {
-                    def_labels.retain(|x| x != label);
-                }
-            }
-            // include only found columns and required _timestamp, hash, value, le cols
-            let selected_cols: Vec<_> = label_selector
-                .iter()
-                .chain(def_labels.iter())
-                .filter_map(|label| {
-                    if schema_fields.contains(label) {
-                        Some(col(label))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            df_group = match df_group.select(selected_cols) {
-                Ok(df) => df,
-                Err(e) => {
-                    log::error!("Selecting cols error: {}", e);
-                    return Ok(HashMap::default());
-                }
-            };
-        }
+    match apply_label_selector(df_group, &schema, label_selector) {
+        Some(dataframe) => df_group = dataframe,
+        None => return Ok(HashMap::default()),
     }
 
     let label_cols = df_group
