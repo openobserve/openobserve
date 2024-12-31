@@ -25,7 +25,8 @@ use promql_parser::parser::EvalStmt;
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
 use crate::service::promql::{
-    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
+    micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
+    DEFAULT_LOOKBACK,
 };
 
 #[derive(Clone)]
@@ -208,42 +209,21 @@ impl Query {
         self.end = micros_since_epoch(stmt.end);
 
         // pick all selectors from stmt
-        // let selectors = stmt.expr.selectors();
+        let mut visitor = MetricSelectorVisitor::default();
+        promql_parser::util::walk_expr(&mut visitor, &stmt.expr).unwrap();
+        let _selectors = visitor.exprs_to_string();
 
         let ctx = Arc::new(self.clone());
-        let expr = Arc::new(stmt.expr);
-        let mut result_type: Option<String> = None;
 
-        // range query always be matrix result type.
-        if self.start != self.end {
-            result_type = Some("matrix".to_string());
-        } else {
-            // Instant query
-            let mut engine = super::Engine::new(ctx, self.start);
-            let (mut value, result_type_exec) = engine.exec(&expr).await?;
-            if let Value::Float(val) = value {
-                value = Value::Sample(Sample::new(self.end, val));
-            }
-            value.sort();
-            if result_type_exec.is_some() {
-                result_type = result_type_exec;
-            }
-            return Ok((value, result_type, *self.scan_stats.read().await));
-        }
+        // always be exemplars result type.
+        let result_type = Some("exemplars".to_string());
 
-        // Range query
-        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
         let mut instant_vectors = Vec::new();
-        let mut string_literals = Vec::new();
         let mut tasks = Vec::new();
-        let mut nr_steps = ((self.end - self.start) / self.interval) + 1;
-        if self.query_exemplars {
-            nr_steps = 1;
-        }
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-        for i in 0..nr_steps {
-            let time = self.start + (self.interval * i);
-            let expr = expr.clone();
+        for expr in visitor.exprs {
+            let time = self.start;
+            let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let mut engine = super::Engine::new(ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
@@ -255,8 +235,8 @@ impl Query {
             tasks.push((time, task));
         }
 
-        for (time, ret) in tasks {
-            let (result, result_type_exec) = match ret.await {
+        for (_time, ret) in tasks {
+            let (result, _result_type_exec) = match ret.await {
                 Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
                     log::error!("Error executing query engine: {}", e);
@@ -267,34 +247,11 @@ impl Query {
                     return Err(DataFusionError::Execution(e.to_string()));
                 }
             };
-            if result_type.is_none() && result_type_exec.is_some() {
-                result_type = result_type_exec;
-            }
-            match result {
-                Value::Instant(v) => {
-                    instant_vectors.push(RangeValue::new(v.labels.to_owned(), [v.sample]))
-                }
-                Value::Vector(vs) => instant_vectors.extend(
-                    vs.into_iter()
-                        .map(|v| RangeValue::new(v.labels.to_owned(), [v.sample])),
-                ),
-                Value::Range(v) => instant_vectors.push(v),
-                Value::Matrix(vs) => instant_vectors.extend(vs),
-                Value::Sample(s) => instant_vectors.push(RangeValue::new(Labels::default(), [s])),
-                Value::Float(val) => instant_vectors
-                    .push(RangeValue::new(Labels::default(), [Sample::new(time, val)])),
-                Value::String(val) => string_literals.push(val),
-                Value::None => continue,
-            };
-        }
 
-        if !string_literals.is_empty() {
-            let output_str = string_literals.join(", ");
-            return Ok((
-                Value::String(output_str),
-                result_type,
-                *self.scan_stats.read().await,
-            ));
+            match result {
+                Value::Matrix(vs) => instant_vectors.extend(vs),
+                _ => continue,
+            };
         }
 
         // empty result quick return
@@ -309,13 +266,16 @@ impl Query {
             merged_data
                 .entry(signature(&value.labels))
                 .or_insert_with(Vec::new)
-                .extend(value.samples);
+                .extend(value.exemplars.unwrap_or_default());
             merged_metrics.insert(signature(&value.labels), value.labels);
         }
         let merged_data = merged_data
             .into_iter()
-            .map(|(sig, samples)| {
-                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
+            .map(|(sig, exemplars)| {
+                RangeValue::new_with_exemplars(
+                    merged_metrics.get(&sig).unwrap().to_owned(),
+                    exemplars,
+                )
             })
             .collect::<Vec<_>>();
 

@@ -177,10 +177,15 @@ pub async fn search(
                     .iter()
                     .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
                     .collect::<Vec<_>>();
-                if !samples.is_empty() {
+                let exemplars = v.exemplars.as_ref().map(|v| {
+                    let exemplars = v.iter().map(|x| x.into()).collect::<Vec<_>>();
+                    cluster_rpc::Exemplars { exemplars }
+                });
+                if !samples.is_empty() || exemplars.is_some() {
                     resp.result.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                         samples,
+                        exemplars,
                         ..Default::default()
                     });
                 }

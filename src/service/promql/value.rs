@@ -204,7 +204,10 @@ impl From<&json::Map<String, json::Value>> for Exemplar {
             if k == "_timestamp" || k == "value" {
                 continue;
             }
-            labels.push(Arc::new(Label::new(k.to_string(), v.to_string())));
+            labels.push(Arc::new(Label::new(
+                k.to_string(),
+                json::get_string_value(v),
+            )));
         }
         Self {
             timestamp: timestamp.unwrap_or(0),
@@ -300,6 +303,18 @@ impl RangeValue {
             labels,
             samples: Vec::from_iter(samples),
             exemplars: None,
+            time_window: None,
+        }
+    }
+
+    pub(crate) fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
+    where
+        S: IntoIterator<Item = Exemplar>,
+    {
+        Self {
+            labels,
+            samples: vec![],
+            exemplars: Some(Vec::from_iter(exemplars)),
             time_window: None,
         }
     }

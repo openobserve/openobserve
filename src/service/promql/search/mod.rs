@@ -79,7 +79,7 @@ async fn search_in_cluster(
     let cfg = get_config();
 
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), query: {}",
         req.org_id,
         req.no_cache,
         req.query.as_ref().unwrap().start,
@@ -108,7 +108,7 @@ async fn search_in_cluster(
         start,
         end,
         step,
-        query_exemplars,
+        query_exemplars: _,
     } = req.query.as_ref().unwrap();
 
     // The number of resolution steps; see the diagram at
@@ -177,7 +177,7 @@ async fn search_in_cluster(
         worker_start += worker_dt;
 
         log::info!(
-            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{}, {}]",
+            "[trace_id {trace_id}] promql->search->partition: node: {}, need_wal: {}, time_range: [{},{})",
             &node.grpc_addr,
             req_need_wal,
             req_query.start,
@@ -290,12 +290,6 @@ async fn search_in_cluster(
         });
     }
 
-    // TODO: merge exemplars
-    println!("query_exemplars: {:?}", query_exemplars);
-    if query_exemplars {
-        dbg!(&series_data);
-    }
-
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
@@ -303,6 +297,8 @@ async fn search_in_cluster(
         merge_vector_query(&series_data)
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
+    } else if result_type == "exemplars" {
+        merge_exemplars_query(&series_data)
     } else {
         return Err(server_internal_error("invalid result type"));
     };
@@ -411,4 +407,43 @@ fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
         }
     }
     Value::Sample(sample)
+}
+
+fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
+    let mut merged_data = HashMap::new();
+    let mut merged_metrics = HashMap::new();
+    for ser in series {
+        let labels: Labels = ser
+            .metric
+            .iter()
+            .map(|v| Arc::new(Label::from(v)))
+            .collect();
+        let entry = merged_data
+            .entry(signature(&labels))
+            .or_insert_with(HashMap::new);
+        ser.exemplars
+            .as_ref()
+            .unwrap()
+            .exemplars
+            .iter()
+            .for_each(|v| {
+                entry.insert(v.time, v);
+            });
+        merged_metrics.insert(signature(&labels), labels);
+    }
+    let merged_data = merged_data
+        .into_iter()
+        .map(|(sig, exemplars)| {
+            let mut exemplars: Vec<Exemplar> = exemplars
+                .into_iter()
+                .map(|(_ts, v)| v.into())
+                .collect::<Vec<_>>();
+            exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
+        })
+        .collect();
+
+    let mut value = Value::Matrix(merged_data);
+    value.sort();
+    value
 }

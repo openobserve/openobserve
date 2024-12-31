@@ -470,10 +470,15 @@ impl Engine {
                 })
                 .filter(|v| start < v.timestamp && v.timestamp <= eval_ts)
                 .collect();
+            let exemplars = if self.ctx.query_exemplars {
+                metric.exemplars.clone()
+            } else {
+                None
+            };
             values.push(RangeValue {
                 labels: metric.labels.clone(),
                 samples,
-                exemplars: None,
+                exemplars,
                 time_window: Some(TimeWindow::new(eval_ts, range)),
             });
         }
@@ -517,6 +522,13 @@ impl Engine {
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         for metric in metric_values.iter_mut() {
             metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            if self.ctx.query_exemplars {
+                metric
+                    .exemplars
+                    .as_mut()
+                    .unwrap()
+                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            }
         }
         let values = if metric_values.is_empty() {
             Value::None
@@ -558,11 +570,11 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[PromQL] Loading data for stream: {}, filter: {:?}, range: ({}, {})",
+            "[PromQL] Loading data for stream: {}, range: [{},{}), filter: {:?}",
             table_name,
-            selector,
             start,
             end,
+            selector.to_string(),
         );
 
         let mut filters = selector
@@ -1233,6 +1245,7 @@ async fn load_exemplars_from_datafusion(
 ) -> Result<()> {
     let cfg = get_config();
     let batches = df
+        .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
@@ -1255,34 +1268,22 @@ async fn load_exemplars_from_datafusion(
             let hash = hash_values.value(i);
             let exemplar = exemplars_values.value(i);
             if let Some(range_val) = metrics.get_mut(hash) {
-                if let Ok(exemplar) = json::from_str::<json::Value>(exemplar) {
-                    if let Some(exemplar) = exemplar.as_object() {
-                        if range_val.exemplars.is_none() {
-                            range_val.exemplars = Some(vec![]);
+                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
+                    for exemplar in exemplars {
+                        if let Some(exemplar) = exemplar.as_object() {
+                            if range_val.exemplars.is_none() {
+                                range_val.exemplars = Some(vec![]);
+                            }
+                            range_val
+                                .exemplars
+                                .as_mut()
+                                .unwrap()
+                                .push(Exemplar::from(exemplar));
                         }
-                        range_val
-                            .exemplars
-                            .as_mut()
-                            .unwrap()
-                            .push(Exemplar::from(exemplar));
                     }
                 }
             }
         }
-        // let time_values = batch
-        //     .column_by_name(&cfg.common.column_timestamp)
-        //     .unwrap()
-        //     .as_any()
-        //     .downcast_ref::<Int64Array>()
-        //     .unwrap();
-        // for i in 0..batch.num_rows() {
-        //     let hash = hash_values.value(i);
-        //     if let Some(range_val) = metrics.get_mut(hash) {
-        //         range_val
-        //             .samples
-        //             .push(Sample::new(time_values.value(i), value_values.value(i)));
-        //     }
-        // }
     }
 
     Ok(())
