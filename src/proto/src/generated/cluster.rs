@@ -9,16 +9,6 @@ pub struct EmptyResponse {}
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileDescriptor {
-    #[prost(message, optional, tag = "1")]
-    pub meta: ::core::option::Option<FileMeta>,
-    #[prost(enumeration = "StreamType", tag = "2")]
-    pub file_type: i32,
-}
-#[derive(Eq)]
-#[derive(serde::Serialize)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileMeta {
     /// microseconds
     #[prost(int64, tag = "1")]
@@ -108,47 +98,6 @@ pub struct IdxFileName {
     pub key: ::prost::alloc::string::String,
     #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum StreamType {
-    Logs = 0,
-    Metrics = 1,
-    Traces = 2,
-    Metadata = 3,
-    EnrichmentTables = 4,
-    Filelist = 5,
-    Index = 6,
-}
-impl StreamType {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            StreamType::Logs => "LOGS",
-            StreamType::Metrics => "METRICS",
-            StreamType::Traces => "TRACES",
-            StreamType::Metadata => "METADATA",
-            StreamType::EnrichmentTables => "EnrichmentTables",
-            StreamType::Filelist => "FILELIST",
-            StreamType::Index => "INDEX",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "LOGS" => Some(Self::Logs),
-            "METRICS" => Some(Self::Metrics),
-            "TRACES" => Some(Self::Traces),
-            "METADATA" => Some(Self::Metadata),
-            "EnrichmentTables" => Some(Self::EnrichmentTables),
-            "FILELIST" => Some(Self::Filelist),
-            "INDEX" => Some(Self::Index),
-            _ => None,
-        }
-    }
 }
 /// Generated client implementations.
 pub mod event_client {
@@ -514,46 +463,6 @@ pub struct Sample {
     #[prost(double, tag = "2")]
     pub value: f64,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MetricsWalFileRequest {
-    #[prost(string, tag = "1")]
-    pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub stream_name: ::prost::alloc::string::String,
-    #[prost(int64, tag = "3")]
-    pub start_time: i64,
-    #[prost(int64, tag = "4")]
-    pub end_time: i64,
-    #[prost(message, repeated, tag = "5")]
-    pub filters: ::prost::alloc::vec::Vec<MetricsWalFileFilter>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MetricsWalFileFilter {
-    #[prost(string, tag = "1")]
-    pub field: ::prost::alloc::string::String,
-    #[prost(string, repeated, tag = "2")]
-    pub value: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MetricsWalFileResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub files: ::prost::alloc::vec::Vec<MetricsWalFile>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MetricsWalFile {
-    #[prost(string, tag = "1")]
-    pub name: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub schema_key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", tag = "3")]
-    pub body: ::prost::alloc::vec::Vec<u8>,
-    #[prost(int64, tag = "4")]
-    pub size: i64,
-}
 /// Generated client implementations.
 pub mod metrics_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -661,28 +570,6 @@ pub mod metrics_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "Query"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn wal_file(
-            &mut self,
-            request: impl tonic::IntoRequest<super::MetricsWalFileRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::MetricsWalFileResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
-            let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Metrics/WalFile");
-            let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Metrics", "WalFile"));
-            self.inner.unary(req, path, codec).await
-        }
     }
 }
 /// Generated server implementations.
@@ -697,13 +584,6 @@ pub mod metrics_server {
             request: tonic::Request<super::MetricsQueryRequest>,
         ) -> std::result::Result<
             tonic::Response<super::MetricsQueryResponse>,
-            tonic::Status,
-        >;
-        async fn wal_file(
-            &self,
-            request: tonic::Request<super::MetricsWalFileRequest>,
-        ) -> std::result::Result<
-            tonic::Response<super::MetricsWalFileResponse>,
             tonic::Status,
         >;
     }
@@ -817,52 +697,6 @@ pub mod metrics_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = QuerySvc(inner);
-                        let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
-                        let res = grpc.unary(method, req).await;
-                        Ok(res)
-                    };
-                    Box::pin(fut)
-                }
-                "/cluster.Metrics/WalFile" => {
-                    #[allow(non_camel_case_types)]
-                    struct WalFileSvc<T: Metrics>(pub Arc<T>);
-                    impl<
-                        T: Metrics,
-                    > tonic::server::UnaryService<super::MetricsWalFileRequest>
-                    for WalFileSvc<T> {
-                        type Response = super::MetricsWalFileResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
-                        fn call(
-                            &mut self,
-                            request: tonic::Request<super::MetricsWalFileRequest>,
-                        ) -> Self::Future {
-                            let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Metrics>::wal_file(&inner, request).await
-                            };
-                            Box::pin(fut)
-                        }
-                    }
-                    let accept_compression_encodings = self.accept_compression_encodings;
-                    let send_compression_encodings = self.send_compression_encodings;
-                    let max_decoding_message_size = self.max_decoding_message_size;
-                    let max_encoding_message_size = self.max_encoding_message_size;
-                    let inner = self.inner.clone();
-                    let fut = async move {
-                        let inner = inner.0;
-                        let method = WalFileSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1857,11 +1691,11 @@ pub struct IngestionRequest {
     #[prost(string, tag = "1")]
     pub org_id: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub stream_name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag = "4")]
     pub data: ::core::option::Option<IngestionData>,
-    #[prost(enumeration = "StreamType", tag = "4")]
-    pub stream_type: i32,
     #[prost(enumeration = "IngestionType", optional, tag = "5")]
     pub ingestion_type: ::core::option::Option<i32>,
 }
