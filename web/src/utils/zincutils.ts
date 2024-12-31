@@ -150,9 +150,9 @@ export const invlidateLoginData = () => {
   userService.logout().then((res: any) => {});
 };
 
-export const getLoginURL = () => {
-  return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
-};
+// export const getLoginURL = () => {
+//   return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
+// };
 
 export const getLogoutURL = () => {
   return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${
