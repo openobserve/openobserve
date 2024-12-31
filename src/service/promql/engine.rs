@@ -16,7 +16,10 @@
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_recursion::async_recursion;
-use config::meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL};
+use config::{
+    get_config,
+    meta::promql::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+};
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -24,7 +27,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, SessionContext},
+    prelude::{col, lit, DataFrame, SessionContext},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -530,9 +533,18 @@ impl Engine {
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
+            let query_exemplars = self.ctx.query_exemplars;
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(ctx, schema, selector, start, end, col_filters)
-                    .await
+                selector_load_data_from_datafusion(
+                    ctx,
+                    schema,
+                    selector,
+                    start,
+                    end,
+                    col_filters,
+                    query_exemplars,
+                )
+                .await
             });
             tasks.push(task);
             // update stats
@@ -1013,6 +1025,7 @@ async fn selector_load_data_from_datafusion(
     start: i64,
     end: i64,
     label_selector: &Option<HashSet<String>>,
+    query_exemplars: bool,
 ) -> Result<HashMap<String, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
@@ -1193,7 +1206,21 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    let batches = df_group
+    if query_exemplars {
+        load_exemplars_from_datafusion(&mut metrics, df_group).await?;
+    } else {
+        load_samples_from_datafusion(&mut metrics, df_group).await?;
+    }
+
+    Ok(metrics)
+}
+
+async fn load_samples_from_datafusion(
+    metrics: &mut HashMap<String, RangeValue>,
+    df: DataFrame,
+) -> Result<()> {
+    let cfg = get_config();
+    let batches = df
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
@@ -1227,5 +1254,43 @@ async fn selector_load_data_from_datafusion(
             }
         }
     }
-    Ok(metrics)
+
+    Ok(())
+}
+
+async fn load_exemplars_from_datafusion(
+    metrics: &mut HashMap<String, RangeValue>,
+    df: DataFrame,
+) -> Result<()> {
+    let cfg = get_config();
+    let batches = df
+        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
+        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
+        .collect()
+        .await?;
+
+    for batch in &batches {
+        let hash_values = batch
+            .column_by_name(HASH_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        // let time_values = batch
+        //     .column_by_name(&cfg.common.column_timestamp)
+        //     .unwrap()
+        //     .as_any()
+        //     .downcast_ref::<Int64Array>()
+        //     .unwrap();
+        // for i in 0..batch.num_rows() {
+        //     let hash = hash_values.value(i);
+        //     if let Some(range_val) = metrics.get_mut(hash) {
+        //         range_val
+        //             .samples
+        //             .push(Sample::new(time_values.value(i), value_values.value(i)));
+        //     }
+        // }
+    }
+
+    Ok(())
 }

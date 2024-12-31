@@ -105,10 +105,15 @@ pub async fn search(
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
         },
+        query.query_exemplars,
         timeout,
     );
 
-    let (value, result_type, mut scan_stats) = engine.exec(eval_stmt).await?;
+    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+        engine.query_exemplars(eval_stmt).await?
+    } else {
+        engine.exec(eval_stmt).await?
+    };
     let result_type = match result_type {
         Some(v) => v,
         None => value.get_type().to_string(),

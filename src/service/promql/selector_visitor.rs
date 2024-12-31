@@ -16,7 +16,7 @@
 use std::collections::HashSet;
 
 use promql_parser::{
-    parser::{Expr, VectorSelector},
+    parser::{self, Expr},
     util::ExprVisitor,
 };
 
@@ -24,7 +24,7 @@ pub struct MetricNameVisitor {
     pub(crate) name: HashSet<String>,
 }
 
-fn get_name_from_expr(vector_selector: &VectorSelector) -> String {
+fn get_name_from_expr(vector_selector: &parser::VectorSelector) -> String {
     vector_selector.name.as_ref().unwrap().to_string()
 }
 
