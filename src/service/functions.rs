@@ -126,7 +126,7 @@ pub async fn test_run_function(
                 fields: fields.clone(),
             },
             json::Value::Array(events),
-            &org_id,
+            org_id,
             &[String::new()],
         );
 
