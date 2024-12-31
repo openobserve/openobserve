@@ -37,6 +37,7 @@ export const convertPanelData = async (
   hoveredSeriesState: any,
   resultMetaData: any,
   metadata: any,
+  chartPanelStyle: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -72,19 +73,24 @@ export const convertPanelData = async (
         };
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
-
-        return {
-          chartType: panelSchema.type,
-          ...(await convertMultiSQLData(
-            panelSchema,
-            data,
-            store,
-            chartPanelRef,
-            hoveredSeriesState,
-            resultMetaData,
-            metadata,
-          )),
-        };
+        try {
+          return {
+            chartType: panelSchema.type,
+            ...(await convertMultiSQLData(
+              panelSchema,
+              data,
+              store,
+              chartPanelRef,
+              hoveredSeriesState,
+              resultMetaData,
+              metadata,
+              chartPanelStyle,
+            )),
+          };
+        } catch (error) {
+          console.error(error);
+          return {};
+        }
       }
     }
     case "table": {

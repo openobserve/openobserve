@@ -58,6 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :added-users="addedUsers"
           :removed-users="removedUsers"
         />
+        <GroupServiceAccounts
+          data-test="edit-role-users-section"
+          v-show="activeTab === 'serviceAccounts'"
+          :groupUsers="roleUsers"
+          :activeTab="activeTab"
+          :added-users="addedUsers"
+          :removed-users="removedUsers"
+        />
 
         <div
           v-show="activeTab === 'permissions'"
@@ -335,11 +343,13 @@ import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
 import dashboardService from "@/services/dashboards";
+import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
+import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
@@ -409,6 +419,10 @@ const tabs = [
   {
     value: "users",
     label: "Users",
+  },
+  {
+    value: "serviceAccounts",
+    label: "Service Accounts",
   },
 ];
 
@@ -1263,6 +1277,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     dashboard: getDashboards,
     metadata: getMetadataStreams,
     report: getReports,
+    service_accounts: getServiceAccounts,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1301,7 +1316,8 @@ const getDashboards = async (resource: Entity | Resource) => {
     false,
     "",
     store.state.selectedOrganization.identifier,
-    resource.name
+    resource.name,
+    ""
   );
 
   updateEntityEntities(
@@ -1543,6 +1559,18 @@ const getReports = async () => {
   );
 
   updateResourceEntities("report", ["name"], [...reports.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getServiceAccounts = async () => {
+  const accounts = await serviceAccountService.list(
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("service_accounts", ["email"], accounts.data.data);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1913,11 +1941,13 @@ const saveRole = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      q.notify({
-        type: "negative",
-        message: `Error while updating role!`,
-        timeout: 3000,
-      });
+      if(err.response.status != 403){
+        q.notify({
+          type: "negative",
+          message: `Error while updating role!`,
+          timeout: 3000,
+        });
+      }
       console.log(err);
     });
 };

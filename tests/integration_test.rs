@@ -30,7 +30,7 @@ mod tests {
                 destinations::{Destination, DestinationType},
                 Operator, QueryCondition, TriggerCondition,
             },
-            dashboards::{v1, Dashboard, Dashboards},
+            dashboards::{v1, Dashboard},
         },
         utils::json,
     };
@@ -120,13 +120,15 @@ mod tests {
         });
 
         // register node
-        openobserve::common::infra::cluster::register_and_keepalive()
+        openobserve::common::infra::cluster::register_and_keep_alive()
             .await
             .unwrap();
         // init config
         config::init().await.unwrap();
         // init infra
         infra::init().await.unwrap();
+        // db migration steps, since it's separated out
+        infra::table::migrate().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();
@@ -176,7 +178,7 @@ mod tests {
         {
             let board = e2e_create_dashboard().await;
             let list = e2e_list_dashboards().await;
-            assert_eq!(list.dashboards[0], board.clone());
+            assert_eq!(list[0], board.clone());
 
             let board = e2e_update_dashboard(
                 v1::Dashboard {
@@ -192,7 +194,7 @@ mod tests {
                 board
             );
             e2e_delete_dashboard(&board.v1.unwrap().dashboard_id).await;
-            assert!(e2e_list_dashboards().await.dashboards.is_empty());
+            assert!(e2e_list_dashboards().await.is_empty());
         }
 
         // alert
@@ -384,7 +386,7 @@ mod tests {
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
-        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["log"],"remove":[]}}"#;
+        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["city"],"remove":[]}}"#;
         // app
         let thread_id: usize = 0;
         let app = test::init_service(
@@ -863,7 +865,7 @@ mod tests {
         json::from_slice(&body).unwrap()
     }
 
-    async fn e2e_list_dashboards() -> Dashboards {
+    async fn e2e_list_dashboards() -> Vec<Dashboard> {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -881,8 +883,17 @@ mod tests {
             .append_header(auth)
             .to_request();
 
+        // Try to parse the response body as a list of dashboards.
         let body = test::call_and_read_body(&app, req).await;
-        json::from_slice(&body).unwrap()
+        let mut body_json: json::Value = json::from_slice(&body).unwrap();
+        let list_json = body_json
+            .as_object_mut()
+            .unwrap()
+            .remove("dashboards")
+            .unwrap();
+        let dashboards: Vec<Dashboard> = json::from_value(list_json).unwrap();
+
+        dashboards
     }
 
     async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
@@ -1948,7 +1959,7 @@ mod tests {
             "e2e",
             config::meta::stream::StreamType::Logs,
             "olympics_schema",
-            &alert,
+            alert,
             true,
         )
         .await;
@@ -1988,7 +1999,7 @@ mod tests {
         let trigger = trigger.unwrap();
         assert!(trigger.next_run_at > now && trigger.retries == 0);
 
-        let res = openobserve::service::db::alerts::alert::delete(
+        let res = openobserve::service::db::alerts::alert::delete_by_name(
             "e2e",
             config::meta::stream::StreamType::Logs,
             "olympics_schema",

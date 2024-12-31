@@ -176,11 +176,6 @@ impl Dashboard {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Dashboards {
-    pub dashboards: Vec<Dashboard>,
-}
-
 pub mod reports;
 pub mod v1;
 pub mod v2;
@@ -188,15 +183,59 @@ pub mod v3;
 pub mod v4;
 pub mod v5;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveDashboard {
-    pub from: String,
-    pub to: String,
-}
-
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
         "BUG", // This can't possibly fail. Can it?
     ))
+}
+
+/// Parameters for listing dashboards.
+#[derive(Debug, Clone)]
+pub struct ListDashboardsParams {
+    /// The org ID surrogate key with which to filter dashboards.
+    pub org_id: String,
+
+    /// The optional folder ID surrogate key with which to filter dashboards.
+    pub folder_id: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    pub title_pat: Option<String>,
+
+    /// The optional page size and page index of results to retrieve.
+    pub page_size_and_idx: Option<(u64, u64)>,
+}
+
+impl ListDashboardsParams {
+    /// Returns new parameters to list dashboards for the given org ID surrogate
+    /// key.
+    pub fn new(org_id: &str) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            folder_id: None,
+            title_pat: None,
+            page_size_and_idx: None,
+        }
+    }
+
+    /// Filter dashboards by the given folder ID surrogate key.
+    pub fn with_folder_id(mut self, folder_id: &str) -> Self {
+        self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Filter dashboards by the case-insensitive title pattern.
+    ///
+    /// Listed dashboards will only include dashboards with a title that
+    /// contains the case-insitive title pattern.
+    pub fn where_title_contains(mut self, title_pat: &str) -> Self {
+        self.title_pat = Some(title_pat.to_string());
+        self
+    }
+
+    /// Paginate the results by the given page size and page index.
+    pub fn paginate(mut self, page_size: u64, page_idx: u64) -> Self {
+        self.page_size_and_idx = Some((page_size, page_idx));
+        self
+    }
 }

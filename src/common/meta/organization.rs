@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{alerts::alert::Alert, function::Transform};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -56,15 +55,31 @@ pub struct OrganizationResponse {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgSummary {
     pub streams: StreamSummary,
-    pub functions: Vec<Transform>,
-    pub alerts: Vec<Alert>,
+    pub pipelines: PipelineSummary,
+    pub alerts: AlertSummary,
+    pub total_functions: i64,
+    pub total_dashboards: i64,
+}
+
+#[derive(Default, Serialize, Deserialize, ToSchema)]
+pub struct StreamSummary {
+    pub num_streams: i64,
+    pub total_records: i64,
+    pub total_storage_size: f64,
+    pub total_compressed_size: f64,
+    pub total_index_size: f64,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct StreamSummary {
-    pub num_streams: i64,
-    pub total_storage_size: i64,
-    pub total_compressed_size: i64,
+pub struct PipelineSummary {
+    pub num_realtime: i64,
+    pub num_scheduled: i64,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct AlertSummary {
+    pub num_realtime: i64,
+    pub num_scheduled: i64,
 }
 
 /// A container for passcodes and rumtokens
@@ -112,6 +127,10 @@ fn default_toggle_ingestion_logs() -> bool {
     false
 }
 
+fn default_enable_websocket_search() -> bool {
+    false
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -124,6 +143,8 @@ pub struct OrganizationSettingPayload {
     pub span_id_field_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_websocket_search: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -138,6 +159,8 @@ pub struct OrganizationSetting {
     pub span_id_field_name: String,
     #[serde(default = "default_toggle_ingestion_logs")]
     pub toggle_ingestion_logs: bool,
+    #[serde(default = "default_enable_websocket_search")]
+    pub enable_websocket_search: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -147,6 +170,7 @@ impl Default for OrganizationSetting {
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
+            enable_websocket_search: default_enable_websocket_search(),
         }
     }
 }

@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable-name="beingUpdated"
         @test="onTestFunction"
         @save="onSubmit"
+        @back="closeAddFunction"
+        @cancel="cancelAddFunction"
         class="tw-pr-4"
       />
       <q-separator />
@@ -93,7 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:after>
           <div
-            class="tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
+            class="q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
+            :class="
+              store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-zinc-100'
+            "
           >
             <TestFunction
               ref="testFunctionRef"
@@ -105,10 +110,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-splitter>
     </div>
   </div>
+  <confirm-dialog
+    :title="confirmDialogMeta.title"
+    :message="confirmDialogMeta.message"
+    @update:ok="confirmDialogMeta.onConfirm()"
+    @update:cancel="resetConfirmDialog"
+    v-model="confirmDialogMeta.show"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, computed, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  computed,
+  watch,
+  onUnmounted,
+} from "vue";
 
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
@@ -119,6 +138,7 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -148,6 +168,7 @@ export default defineComponent({
     FunctionsToolbar,
     FullViewContainer,
     TestFunction,
+    ConfirmDialog,
   },
   emits: ["update:list", "cancel:hideform"],
   setup(props, { emit }) {
@@ -155,7 +176,12 @@ export default defineComponent({
     // let beingUpdated: boolean = false;
     const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
-    const formData: any = ref(defaultValue());
+    const formData: any = ref({
+      name: "",
+      function: "",
+      params: "row",
+      transType: "0",
+    });
     const indexOptions = ref([]);
     const { t } = useI18n();
     const $q = useQuasar();
@@ -166,6 +192,13 @@ export default defineComponent({
     const testFunctionRef = ref<typeof TestFunction>();
     const functionsToolbarRef = ref<typeof FunctionsToolbar>();
     const splitterModel = ref(50);
+    const confirmDialogMeta = ref({
+      title: "",
+      message: "",
+      show: false,
+      onConfirm: () => {},
+      data: null,
+    });
 
     const expandState = ref({
       functions: true,
@@ -179,6 +212,26 @@ export default defineComponent({
     const beingUpdated = computed(() => props.isUpdated);
 
     const streamTypes = ["logs", "metrics", "traces"];
+
+    const isFunctionDataChanged = ref(false);
+
+    watch(
+      () => formData.value.name + formData.value.function,
+      () => {
+        isFunctionDataChanged.value = true;
+      },
+    );
+
+    const beforeUnloadHandler = (e: any) => {
+      //check is data updated or not
+      if (isFunctionDataChanged.value) {
+        // Display a confirmation message
+        const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
+        e.returnValue = confirmMessage;
+        return confirmMessage;
+      }
+      return;
+    };
 
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
@@ -215,6 +268,8 @@ end`;
     };
 
     const onSubmit = () => {
+      if (!functionsToolbarRef.value) return;
+
       functionsToolbarRef.value.addFunctionForm
         .validate()
         .then((valid: any) => {
@@ -295,9 +350,46 @@ end`;
       vrlFunctionError.value = err;
     };
 
+    const closeAddFunction = () => {
+      if (isFunctionDataChanged.value) {
+        confirmDialogMeta.value.show = true;
+        confirmDialogMeta.value.title = t("common.usavedTitle");
+        confirmDialogMeta.value.message = t("common.unsavedMessage");
+        confirmDialogMeta.value.onConfirm = () => {
+          emit("cancel:hideform");
+          resetConfirmDialog();
+        };
+      } else {
+        emit("cancel:hideform");
+      }
+    };
+
+    const cancelAddFunction = () => {
+      if (isFunctionDataChanged.value) {
+        confirmDialogMeta.value.show = true;
+        confirmDialogMeta.value.title = t("common.cancelTitle");
+        confirmDialogMeta.value.message = t("common.cancelMessage");
+        confirmDialogMeta.value.onConfirm = () => {
+          emit("cancel:hideform");
+          resetConfirmDialog();
+        };
+      } else {
+        emit("cancel:hideform");
+      }
+    };
+
+    const resetConfirmDialog = () => {
+      confirmDialogMeta.value.show = false;
+      confirmDialogMeta.value.title = "";
+      confirmDialogMeta.value.message = "";
+      confirmDialogMeta.value.onConfirm = () => {};
+      confirmDialogMeta.value.data = null;
+    };
+
     return {
       t,
       $q,
+      emit,
       disableColor,
       beingUpdated,
       formData,
@@ -323,6 +415,10 @@ end`;
       vrlFunctionError,
       functionsToolbarRef,
       splitterModel,
+      closeAddFunction,
+      confirmDialogMeta,
+      resetConfirmDialog,
+      cancelAddFunction,
     };
   },
   created() {
@@ -343,18 +439,6 @@ end`;
 </script>
 
 <style scoped lang="scss">
-.add-functions-section {
-  :deep(.monaco-editor-background),
-  :deep(.test-output-container) {
-    background-color: #ffffff !important;
-  }
-
-  :deep(.monaco-editor .margin),
-  :deep(.monaco-editor) {
-    background-color: #ffffff !important;
-  }
-}
-
 .monaco-editor {
   width: 100%;
   height: calc(100vh - 160px);

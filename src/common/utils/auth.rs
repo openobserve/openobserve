@@ -285,7 +285,7 @@ impl FromRequest for AuthExtractor {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 }
-                if method.eq("PUT") || method.eq("DELETE") {
+                if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -315,6 +315,7 @@ impl FromRequest for AuthExtractor {
                 || path_columns[1].starts_with("reports")
                 || path_columns[1].starts_with("savedviews")
                 || path_columns[1].starts_with("functions")
+                || path_columns[1].starts_with("service_accounts")
             {
                 format!(
                     "{}:{}",
@@ -397,7 +398,7 @@ impl FromRequest for AuthExtractor {
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
-            if (method.eq("POST") && path_columns[1].starts_with("_search"))
+            if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")
                 || path.contains("/format_query")
@@ -406,6 +407,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("clusters")
                 || path.contains("query_manager")
                 || path.contains("/short")
+                || path.contains("/ws")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -448,7 +450,7 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 }));
             }
-            if object_type.contains("dashboard") {
+            if object_type.contains("dashboard") && url_len > 1 {
                 let object_type = if method.eq("POST") || method.eq("LIST") {
                     format!(
                         "{}:{}",

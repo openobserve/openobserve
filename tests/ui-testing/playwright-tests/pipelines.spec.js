@@ -1,9 +1,11 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
-import { log } from "console";
+// import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
-import { pipeline } from "stream";
+// import { pipeline } from "stream";
+// import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -23,8 +25,34 @@ async function login(page) {
     .locator('[data-cy="login-password"]')
     .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
   await page.locator('[data-cy="login-sign-in"]').click();
-  //     await page.waitForTimeout(4000);
-  // await page.goto(process.env["ZO_BASE_URL"]);
+  
+}
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logsdata)
+    });
+    return await fetchResponse.json();
+  }, {
+    url: process.env.INGESTION_URL,
+    headers: headers,
+    orgId: orgId,
+    streamName: streamName,
+    logsdata: logsdata
+  });
+  console.log(response);
 }
 
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -38,6 +66,46 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
     .first()
     .click({ force: true });
 };
+async function exploreStreamAndNavigateToPipeline(page, streamName) {
+  // Navigate to the streams menu
+  await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+  
+  // Search for the stream
+  await page.getByPlaceholder('Search Stream').click();
+  await page.getByPlaceholder('Search Stream').fill(streamName);
+  
+  // Click on the 'Explore' button
+  await page.getByRole('button', { name: 'Explore' }).first().click();
+  
+  // Expand the log table menu
+  await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+  
+  // Navigate to the pipeline menu
+  await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+}
+
+async function exploreStreamAndInteractWithLogDetails(page, streamName) {
+  // Navigate to the streams menu
+  await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+  
+  // Search for the stream
+  await page.getByPlaceholder('Search Stream').click();
+  await page.getByPlaceholder('Search Stream').fill(streamName);
+  
+  // Click on the 'Explore' button
+  await page.getByRole('button', { name: 'Explore' }).first().click();
+  
+  // Expand the log table menu
+  await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
+  
+  // Interact with the log detail key
+  await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
+  
+  // Navigate to the pipeline menu
+  await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+}
+
+
 async function deletePipeline(page, randomPipelineName) {
   // Click the back button
   await page.locator('[data-test="add-pipeline-back-btn"]').click();
@@ -77,16 +145,11 @@ test.describe("Pipeline testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
-
-  //   console.log("--logData--", logData);
-  // });
+ 
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(5000);
+    
 
     // ("ingests logs via API", () => {
     const orgId = process.env["ORGNAME"];
@@ -100,31 +163,7 @@ test.describe("Pipeline testcases", () => {
       "Content-Type": "application/json",
     };
 
-    // const logsdata = {}; // Fill this with your actual data
-
-    // Making a POST request using fetch API
-    const response = await page.evaluate(
-      async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(
-          `${url}/api/${orgId}/${streamName}/_json`,
-          {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(logsdata),
-          }
-        );
-        return await fetchResponse.json();
-      },
-      {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata,
-      }
-    );
-
-    console.log(response);
+    await ingestion(page);
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
@@ -190,6 +229,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -220,6 +261,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
 
     // Delete the pipeline and confirm
     await pipelinePage.deletePipeline();
@@ -244,15 +287,11 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
-
-    // Select the second stream, drag, and drop
-    await pipelinePage.selectAndDragSecondStream();
-    await page.waitForTimeout(2000);
-
-    // Select the previous node
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
+    await page.waitForTimeout(3000);
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -271,6 +310,9 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
+    await ingestion(page);
+    // Verify the data ingested in destination and verify under logs page
+    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
@@ -348,21 +390,23 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.selectAndDragFunction(); // Function drag
+    // await pipelinePage.selectAndDragFunction(); // Function drag
     await page.waitForTimeout(2000);
-    await pipelinePage.selectPreviousNode();
-    await page.getByText("input").click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page.locator(".view-lines").click();
     // Type the function text with a delay to ensure each character registers
-    await page.keyboard.type(".a=2", { delay: 100 });
+    await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });
     await page.getByText("Note: The function will be").click();
 
     // Check if the required text is present in the editor
-    await page.getByText(".a=2 .");
+    await page.getByText(".a=41 .");
 
     // Optional: Add a short wait to confirm the action is processed
     await page.waitForTimeout(1000);
@@ -372,15 +416,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
-
-    // Select the second stream, drag, and drop
-    await pipelinePage.selectAndDragSecondStream();
-    await page.waitForTimeout(2000);
-
-    // // Select the previous node
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
+    await page.getByRole("button", { name: randomFunctionName }).hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -399,6 +436,9 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
+    await ingestion(page);
+    // Verify the data ingested in destination & function and verify under logs page 
+    await exploreStreamAndInteractWithLogDetails(page, 'destination_node');
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
@@ -409,7 +449,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDeletePipeline();
     await pipelinePage.verifyPipelineDeleted();
   });
-
 
   test("should display error when function name is not added", async ({
     page,
@@ -424,8 +463,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.toggleCreateFunction();
     await page.waitForTimeout(1000);
     await pipelinePage.saveFunction();
-    await pipelinePage. assertFunctionNameRequiredErrorVisible() 
-   
+    await pipelinePage.assertFunctionNameRequiredErrorVisible();
   });
 
   test("should display error when function name added but function is not added", async ({
@@ -442,11 +480,12 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.enterFunctionName(randomFunctionName);
     await pipelinePage.saveFunction();
-    await pipelinePage.assertFunctionRequiredErrorVisible()
+    await pipelinePage.assertFunctionRequiredErrorVisible();
   });
 
-
-  test.skip("should display error if query added without sql", async ({ page }) => {
+  test.skip("should display error if query added without sql", async ({
+    page,
+  }) => {
     const pipelinePage = new PipelinePage(page);
 
     // Open the pipeline menu and wait for a moment
@@ -462,11 +501,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
     // TODO: Change the locator to the correct one, once fixed
-    await page.getByText('Invalid SQL Query : undefined').click()
-
+    await page.getByText("Invalid SQL Query").click();
   });
-
-
 
   test("should display error when save clicked directly while adding destination", async ({
     page,
@@ -479,7 +515,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
     await pipelinePage.saveStream();
-    await pipelinePage.assertStreamSelectionErrorVisible()
+    await pipelinePage.assertStreamSelectionErrorVisible();
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({
@@ -501,23 +537,29 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(2000);
-
-    await pipelinePage.selectAndDragCondition() // Condition drag
-    await pipelinePage.selectPreviousNode();
-    await pipelinePage.selectPreviousNodeDrop();
-    await page.getByPlaceholder('Column').click();
-    await page.getByPlaceholder('Column').fill('container_name');
-    await page.getByRole('option', { name: 'kubernetes_container_name' }).click();
-    await page.locator('div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
-    await page.getByText('Contains', { exact: true }).click();
-    await page.getByPlaceholder('Value').click();
-    await page.getByPlaceholder('Value').fill('prometheus');
-    await pipelinePage.saveCondition()
-    await pipelinePage.selectAndDragSecondStream();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Stream", exact: true }).click();
+    await page.getByPlaceholder("Column").click();
+    await page.getByPlaceholder("Column").fill("container_name");
+    await page
+      .getByRole("option", { name: "kubernetes_container_name" })
+      .click();
+    await page
+      .locator(
+        "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
+      )
+      .click();
+    await page.getByText("Contains", { exact: true }).click();
+    await page.getByPlaceholder("Value").click();
+    await page.getByPlaceholder("Value").fill("prometheus");
+    await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
-
-    await page.locator('.previous-drop-down > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
-    await page.getByText('Condition 1').click();
+    await page
+      .getByRole("button", { name: "kubernetes_container_name" })
+      .hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -536,6 +578,9 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
+    await ingestion(page);
+    // Verify the data ingested in destination and verify under logs page
+    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await page.waitForTimeout(1000);
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
@@ -547,7 +592,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDeletePipeline();
     await pipelinePage.verifyPipelineDeleted();
   });
-
 
   test("should display error when function is not selected under select function", async ({
     page,
@@ -563,7 +607,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.verifyFieldRequiredError();
   });
 
-
   test("should display error when condition is not added but user clicks save", async ({
     page,
   }) => {
@@ -571,12 +614,11 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
-    await pipelinePage.selectAndDragCondition() // Function drag;
+    await pipelinePage.selectAndDragCondition(); // Function drag;
     await page.waitForTimeout(1000);
-    await pipelinePage.saveCondition()
+    await pipelinePage.saveCondition();
     await pipelinePage.verifyFieldRequiredError();
   });
-
 
   test("should add source & destination node without connection and error to be displayed", async ({
     page,
@@ -596,15 +638,14 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
+    await page.waitForTimeout(1000);
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
     // Select the second stream, drag, and drop
     await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
-
-    // Select the previous node
-    // await pipelinePage.selectPreviousNode();
-    // await pipelinePage.selectPreviousNodeDrop();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -623,9 +664,81 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
-    await page.getByText('Please connect all nodes').click();
-  
+    await page.getByText("Please connect all nodes").click();
   });
 
-});
 
+  test("should navigate to dashboard page if user accepts dialog box", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+
+    await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pipelinePage.addPipeline();
+    await pipelinePage.selectStream();
+    await pipelinePage.streamButton.waitFor({ state: "visible" });
+    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
+    await pipelinePage.selectLogs();
+
+    // Interact with stream name and save
+    await page.waitForTimeout(2000);
+    await pipelinePage.enterStreamName("e2e");
+    await pipelinePage.enterStreamName("e2e_automate");
+    await page.waitForTimeout(2000);
+    await pipelinePage.selectStreamOption();
+    await pipelinePage.saveInputNodeStream();
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    page.once('dialog', async (dialog) => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      await dialog.accept();
+    });
+    
+    // Click on the first menu link
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    
+    // Assert the page navigates to the desired URL containing "dashboards"
+    await page.waitForURL(/dashboards/);
+    
+  });
+
+  test("should stay on pipeline page if user dismisses the dialog box", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+
+    await pipelinePage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pipelinePage.addPipeline();
+    await pipelinePage.selectStream();
+    await pipelinePage.streamButton.waitFor({ state: "visible" });
+    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
+    await pipelinePage.selectLogs();
+
+    // Interact with stream name and save
+    await page.waitForTimeout(2000);
+    await pipelinePage.enterStreamName("e2e");
+    await pipelinePage.enterStreamName("e2e_automate");
+    await page.waitForTimeout(2000);
+    await pipelinePage.selectStreamOption();
+    await pipelinePage.saveInputNodeStream();
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    page.once('dialog', async (dialog) => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      await dialog.dismiss();
+    });
+    
+    // Click on the first menu link
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    
+    
+    // Assert page url to have pipeline
+    await expect(page).toHaveURL(/pipeline/);
+
+    // Log confirmation
+    console.log('URL contains "pipeline"!')
+    
+  });
+
+  
+});

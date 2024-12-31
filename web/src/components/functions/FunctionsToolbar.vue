@@ -2,10 +2,25 @@
   <div
     class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
   >
-    <div class="tw-flex tw-items-center o2-input">
-      <q-icon class="tw-pr-1" name="arrow_back_ios" size="18px" />
+    <div class="tw-flex tw-items-center">
+      <div class="tw-mr-2">
+        <div
+          data-test="add-function-back-btn"
+          class="flex justify-center items-center cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="redirectToFunctions"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+      </div>
       <div class="tw-text-lg tw-w-full">Add Function</div>
-      <q-form ref="addFunctionForm">
+      <q-form ref="addFunctionForm" class="o2-input">
         <q-input
           v-model="functionName"
           :label="t('function.name')"
@@ -32,7 +47,7 @@
         v-close-popup="true"
         class="text-bold tw-border-primary"
         :label="t('common.fullscreen')"
-        text-color="primary"
+        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
         padding="sm"
         no-caps
         icon="fullscreen"
@@ -56,12 +71,12 @@
         @click="emit('save')"
       />
       <q-btn
-        v-close-popup="true"
         class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600"
         :label="t('function.cancel')"
         text-color="negative"
         padding="sm md"
         no-caps
+        @click="emit('cancel')"
       />
     </div>
   </div>
@@ -77,10 +92,16 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 
 const q = useQuasar();
+
+const router = useRouter();
+
+const store = useStore();
 
 const props = defineProps({
   name: {
@@ -93,7 +114,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["test", "save", "update:name"]);
+const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
 const addFunctionForm = ref(null);
 
@@ -109,6 +130,10 @@ const functionName = computed({
 
 const handleFullScreen = () => {
   q.fullscreen.toggle();
+};
+
+const redirectToFunctions = () => {
+  emit("back");
 };
 
 defineExpose({ addFunctionForm });

@@ -475,6 +475,7 @@ pub async fn filter_file_list_by_tantivy_index(
         start.elapsed().as_millis()
     );
 
+    let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (mut index_parquet_files, query_limit) =
@@ -499,7 +500,6 @@ pub async fn filter_file_list_by_tantivy_index(
 
     let mut no_more_files = false;
     let mut total_hits = 0;
-    let mut is_add_filter_back = false;
     let group_num = index_parquet_files.len();
     let max_group_len = index_parquet_files
         .iter()
@@ -616,11 +616,12 @@ pub async fn filter_file_list_by_tantivy_index(
     }
 
     log::info!(
-        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {}, is_add_filter_back: {}",
+        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}",
         query.trace_id,
         index_condition,
         total_hits,
         is_add_filter_back,
+        file_list_map.len()
     );
     file_list.extend(file_list_map.into_values());
     Ok((
@@ -721,7 +722,7 @@ async fn search_tantivy_index(
 
     let tantivy_searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
-    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     // generate the tantivy query
     let condition: IndexCondition = index_condition.ok_or(anyhow::anyhow!(

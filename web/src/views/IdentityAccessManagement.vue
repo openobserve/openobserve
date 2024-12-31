@@ -1,6 +1,6 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
-    <div class="flex no-wrap" style="height: calc(100vh - 60px) !important">
+    <div class="flex no-wrap" style="height: calc(100vh - 50px) !important">
       <div style="width: 160px" class="iam-tabs">
         <route-tabs
           ref="iamRouteTabsRef"
@@ -47,6 +47,18 @@ const tabs = ref([
       },
     },
     label: t("iam.users"),
+    class: "tab_content",
+  },
+  {
+    dataTest: "iam-service-accounts-tab",
+    name: "serviceAccounts",
+    to: {
+      name: "serviceAccounts",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.serviceAccounts"),
     class: "tab_content",
   },
   {
@@ -117,11 +129,12 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations"];
+  const cloud = ["users", "organizations", "serviceAccounts"];
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users"];
+  const os = ["users", "serviceAccounts"];
+
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";

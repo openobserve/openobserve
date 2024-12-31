@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: 22px;
           "
           title="Go Back"
-          @click="router.back()"
+          @click="$emit('cancel:hideform')"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>alert_period, alert_operator, alert_threshold</div>
             <div>alert_count, alert_agg_value</div>
             <div>alert_start_time, alert_end_time, alert_url</div>
+            <div>alert_trigger_time, alert_trigger_time_str</div>
             <div><b>rows</b> multiple lines of row template</div>
             <div><b>All of the stream fields are variables.</b></div>
             <div>{rows:N} {var:N} used to limit rows or string length.</div>
@@ -377,6 +378,9 @@ const saveTemplate = () => {
         });
       })
       .catch((err) => {
+      if(err.response?.status == 403){
+          return;
+        }
         dismiss();
         q.notify({
           type: "negative",
@@ -406,6 +410,9 @@ const saveTemplate = () => {
           });
         })
         .catch((err) => {
+          if(err.response?.status == 403){
+            return;
+          }
           dismiss();
           q.notify({
             type: "negative",

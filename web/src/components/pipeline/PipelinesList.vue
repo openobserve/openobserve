@@ -335,9 +335,9 @@ const updateActiveTab = () => {
       ...pipeline,
       "#": index + 1,
     }));
+    columns.value = getColumnsForActiveTab(activeTab.value);
     filteredPipelines.value = pipelines.value;
     resultTotal.value = pipelines.value.length;
-    columns.value = getColumnsForActiveTab(activeTab.value);
     return;
   }
 
@@ -358,8 +358,9 @@ const updateActiveTab = () => {
 
 
 const toggleAlertState = (row : any) =>{
-  row.enabled = !row.enabled;
-  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+  const newState = !row.enabled;
+  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,newState).then((response) => {
+    row.enabled = newState;
     const message = row.enabled 
     ? `${row.name} state resumed successfully` 
     : `${row.name} state paused successfully`;
@@ -370,12 +371,14 @@ const toggleAlertState = (row : any) =>{
       timeout: 3000,
     });
   }).catch((error) => {
-    q.notify({
+    if(error.response.status != 403){
+      q.notify({
       message: error.response?.data?.message || "Error while updating pipeline state",
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
+    }
   });
 }
 
@@ -536,6 +539,7 @@ const savePipeline = (data: any) => {
     })
     .then(() => {
       getPipelines();
+      dismiss();
       showCreatePipeline.value = false;
       q.notify({
         message: "Pipeline created successfully",
@@ -545,16 +549,16 @@ const savePipeline = (data: any) => {
       });
     })
     .catch((error) => {
-      q.notify({
+      dismiss();
+      if(error.response.status != 403){
+        q.notify({
         message: error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      } 
     })
-    .finally(() => {
-      dismiss();
-    });
 };
 
 const deletePipeline = async () => {
@@ -571,7 +575,7 @@ const deletePipeline = async () => {
       org_id
     })
     .then(async () => {
-      updateActiveTab();
+     
       q.notify({
         message: "Pipeline deleted successfully",
         color: "positive",
@@ -580,16 +584,18 @@ const deletePipeline = async () => {
       });
     })
     .catch((error) => {
-      q.notify({
-        message: error.response?.data?.message || "Error while saving pipeline",
+      if(error.response.status != 403){
+        q.notify({
+        message: error.response?.data?.message || "Error while deleting pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
     })
-    .finally(() => {
-      getPipelines();
-      updateActiveTab(); 
+    .finally(async () => {
+      await getPipelines();
+      updateActiveTab();
          dismiss();
     });
 

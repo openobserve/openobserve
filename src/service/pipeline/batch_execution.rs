@@ -25,7 +25,10 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
-    utils::{flatten, json::Value},
+    utils::{
+        flatten,
+        json::{get_string_value, Value},
+    },
 };
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
@@ -242,20 +245,7 @@ impl ExecutablePipeline {
             log::debug!("[Pipeline]: starts result collecting job");
             let mut count: usize = 0;
             let mut results = HashMap::new();
-            while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
-                if stream_params.stream_name.contains("{") {
-                    match resolve_stream_name(&stream_params.stream_name, &record) {
-                        Ok(stream_name) => {
-                            stream_params.stream_name = stream_name.into();
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped."
-                            );
-                            continue;
-                        }
-                    }
-                }
+            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
@@ -528,9 +518,36 @@ async fn process_node(
                         };
                     }
 
-                    if let Err(send_err) = result_sender
-                        .send((idx, stream_params.clone(), record))
-                        .await
+                    let mut destination_stream = stream_params.clone();
+                    if destination_stream.stream_name.contains("{") {
+                        match resolve_stream_name(&destination_stream.stream_name, &record) {
+                            Ok(stream_name) if !stream_name.is_empty() => {
+                                destination_stream.stream_name = stream_name.into();
+                            }
+                            resolve_res => {
+                                let err_msg = if let Err(e) = resolve_res {
+                                    format!("Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped")
+                                } else {
+                                    "Dynamic Stream Name resolved to empty. Record dropped"
+                                        .to_string()
+                                };
+                                log::warn!("{err_msg}");
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
+                    }
+
+                    if let Err(send_err) =
+                        result_sender.send((idx, destination_stream, record)).await
                     {
                         log::error!(
                             "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
@@ -751,10 +768,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     if haystack.starts_with("{") && haystack.ends_with("}") {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
-            Some(stream_name) => stream_name
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| anyhow!("Matched stream name {stream_name} is not a string")),
+            Some(stream_name) => Ok(get_string_value(stream_name)),
             None => Err(anyhow!("Field name {field_name} not found in record")),
         };
     }
@@ -771,10 +785,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
         // Get and validate the field value
         match record.get(field_name) {
-            Some(stream_name) => match stream_name.as_str() {
-                Some(s) => result.push_str(s),
-                None => return Err(anyhow!("Matched stream name {stream_name} is not a string")),
-            },
+            Some(value) => result.push_str(&get_string_value(value)),
             None => return Err(anyhow!("Field name {field_name} not found in record")),
         }
 
@@ -802,6 +813,8 @@ mod tests {
             ("{container_name}", "compactor"),
             ("abc-{container_name}", "abc-compactor"),
             ("abc-{container_name}-xyz", "abc-compactor-xyz"),
+            ("abc-{value}-xyz", "abc-123-xyz"),
+            ("{value}", "123"),
         ];
         for (test, expected) in ok_cases {
             let result = resolve_stream_name(test, &record);

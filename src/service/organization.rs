@@ -15,17 +15,22 @@
 
 use std::io::{Error, ErrorKind};
 
-use config::{meta::stream::StreamType, utils::rand::generate_random_string};
+use config::{
+    meta::{
+        dashboards::ListDashboardsParams, pipeline::components::PipelineSource, stream::StreamType,
+    },
+    utils::rand::generate_random_string,
+};
 
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
-                IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                RumIngestionToken,
+                AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary,
+                Organization, PipelineSummary, RumIngestionToken, StreamSummary,
             },
-            user::UserOrg,
+            user::{UserOrg, UserRole},
         },
         utils::auth::is_root_user,
     },
@@ -34,29 +39,48 @@ use crate::{
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
-    let functions = db::functions::list(org_id).await.unwrap();
-    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
-    let mut num_streams = 0;
-    let mut total_storage_size = 0;
-    let mut total_compressed_size = 0;
+    let mut stream_summary = StreamSummary::default();
     for stream in streams.iter() {
         if !stream.stream_type.eq(&StreamType::Index)
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
-            num_streams += 1;
-            total_storage_size += stream.stats.storage_size;
-            total_compressed_size += stream.stats.compressed_size;
+            stream_summary.num_streams += 1;
+            stream_summary.total_records += stream.stats.doc_num;
+            stream_summary.total_storage_size += stream.stats.storage_size;
+            stream_summary.total_compressed_size += stream.stats.compressed_size;
+            stream_summary.total_index_size += stream.stats.index_size;
         }
     }
 
+    let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
+    let pipeline_summary = PipelineSummary {
+        num_realtime: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Realtime(_)))
+            .count() as i64,
+        num_scheduled: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
+            .count() as i64,
+    };
+
+    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
+    let alert_summary = AlertSummary {
+        num_realtime: alerts.iter().filter(|a| a.is_real_time).count() as i64,
+        num_scheduled: alerts.iter().filter(|a| !a.is_real_time).count() as i64,
+    };
+
+    let functions = db::functions::list(org_id).await.unwrap_or_default();
+    let dashboards = super::dashboards::list_dashboards(ListDashboardsParams::new(org_id))
+        .await
+        .unwrap_or_default();
+
     OrgSummary {
-        streams: crate::common::meta::organization::StreamSummary {
-            num_streams,
-            total_storage_size,
-            total_compressed_size,
-        },
-        functions,
-        alerts,
+        streams: stream_summary,
+        pipelines: pipeline_summary,
+        alerts: alert_summary,
+        total_functions: functions.len() as i64,
+        total_dashboards: dashboards.len() as i64,
     }
 }
 
@@ -67,6 +91,11 @@ pub async fn get_passcode(
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
+    if user.role.eq(&UserRole::ServiceAccount) && user.is_external {
+        return Err(anyhow::Error::msg(
+            "Not allowed for external service accounts",
+        ));
+    }
     Ok(IngestionPasscode {
         user: user.email,
         passcode: user.token,
@@ -104,6 +133,7 @@ pub async fn update_passcode(
     let is_rum_update = false;
     match update_passcode_inner(org_id, user_id, is_rum_update).await {
         Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
+        Err(e) => Err(e),
         _ => Err(anyhow::Error::msg("User not found")),
     }
 }
@@ -151,6 +181,12 @@ async fn update_passcode_inner(
 
         // Invalidate the local cache
         let org_to_update = &existing_org[0];
+
+        if org_to_update.role.eq(&UserRole::ServiceAccount) && db_user.is_external {
+            return Err(anyhow::Error::msg(
+                "Not allowed for external service accounts",
+            ));
+        }
         USERS_RUM_TOKEN.clone().remove(&format!(
             "{}/{}",
             org_to_update.name,

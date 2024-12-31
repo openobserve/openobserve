@@ -15,7 +15,7 @@
 
 use std::{cmp::max, fmt::Display};
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
@@ -83,7 +83,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
-            "enrichment_tables" => StreamType::EnrichmentTables,
+            "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
             "index" => StreamType::Index,
@@ -283,9 +283,9 @@ pub struct StreamStats {
     pub doc_time_max: i64,
     pub doc_num: i64,
     pub file_num: i64,
-    pub storage_size: i64,
-    pub compressed_size: i64,
-    pub index_size: i64,
+    pub storage_size: f64,
+    pub compressed_size: f64,
+    pub index_size: f64,
 }
 
 impl StreamStats {
@@ -322,20 +322,20 @@ impl StreamStats {
         self.doc_num = max(0, self.doc_num + meta.records);
         self.doc_time_min = self.doc_time_min.min(meta.min_ts);
         self.doc_time_max = self.doc_time_max.max(meta.max_ts);
-        self.storage_size += meta.original_size;
-        self.compressed_size += meta.compressed_size;
-        self.index_size += meta.index_size;
+        self.storage_size += meta.original_size as f64;
+        self.compressed_size += meta.compressed_size as f64;
+        self.index_size += meta.index_size as f64;
         if self.doc_time_min == 0 {
             self.doc_time_min = meta.min_ts;
         }
-        if self.storage_size < 0 {
-            self.storage_size = 0;
+        if self.storage_size < 0.0 {
+            self.storage_size = 0.0;
         }
-        if self.compressed_size < 0 {
-            self.compressed_size = 0;
+        if self.compressed_size < 0.0 {
+            self.compressed_size = 0.0;
         }
-        if self.index_size < 0 {
-            self.index_size = 0;
+        if self.index_size < 0.0 {
+            self.index_size = 0.0;
         }
     }
 
@@ -379,9 +379,9 @@ impl From<Stats> for StreamStats {
             doc_time_max: meta.max_ts,
             doc_num: meta.records,
             file_num: 0,
-            storage_size: meta.original_size as i64,
-            compressed_size: meta.compressed_size.unwrap_or_default() as i64,
-            index_size: meta.index_size.unwrap_or_default() as i64,
+            storage_size: meta.original_size,
+            compressed_size: meta.compressed_size.unwrap_or_default(),
+            index_size: meta.index_size.unwrap_or_default(),
         }
     }
 }
@@ -396,9 +396,9 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             doc_num: self.doc_num - rhs.records,
             doc_time_min: self.doc_time_min.min(rhs.min_ts),
             doc_time_max: self.doc_time_max.max(rhs.max_ts),
-            storage_size: self.storage_size - rhs.original_size,
-            compressed_size: self.compressed_size - rhs.compressed_size,
-            index_size: self.index_size - rhs.index_size,
+            storage_size: self.storage_size - rhs.original_size as f64,
+            compressed_size: self.compressed_size - rhs.compressed_size as f64,
+            index_size: self.index_size - rhs.index_size as f64,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;
@@ -497,15 +497,11 @@ impl std::fmt::Display for PartitionTimeLevel {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
-pub struct UpdateStreamPartition {
-    pub add: Vec<StreamPartition>,
-    pub remove: Vec<StreamPartition>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
-pub struct UpdateStringSettingsArray {
-    pub add: Vec<String>,
-    pub remove: Vec<String>,
+pub struct UpdateSettingsWrapper<D> {
+    #[serde(default)]
+    pub add: Vec<D>,
+    #[serde(default)]
+    pub remove: Vec<D>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -514,13 +510,13 @@ pub struct UpdateStreamSettings {
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    pub partition_keys: UpdateStreamPartition,
+    pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
-    pub full_text_search_keys: UpdateStringSettingsArray,
+    pub full_text_search_keys: UpdateSettingsWrapper<String>,
     #[serde(default)]
-    pub index_fields: UpdateStringSettingsArray,
+    pub index_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
-    pub bloom_filter_fields: UpdateStringSettingsArray,
+    pub bloom_filter_fields: UpdateSettingsWrapper<String>,
     #[serde(skip_serializing_if = "Option::None")]
     #[serde(default)]
     pub data_retention: Option<i64>,
@@ -528,15 +524,110 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
-    pub defined_schema_fields: UpdateStringSettingsArray,
+    pub defined_schema_fields: UpdateSettingsWrapper<String>,
+    #[serde(default)]
+    pub distinct_value_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
+    #[serde(default)]
+    pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+/// WARNING: this implements Eq trait based only on the name,
+/// so the timestamp will not be considered when comparing two entries
+pub struct DistinctField {
+    pub name: String,
+    pub added_ts: i64,
+}
+
+impl PartialEq for DistinctField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Eq for DistinctField {}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct TimeRange {
+    /// Start timestamp in microseconds
+    pub start: i64,
+    /// End timestamp in microseconds
+    pub end: i64,
+}
+
+impl Display for TimeRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let time_range_start: DateTime<Utc> = Utc.timestamp_nanos(self.start * 1000);
+        let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(self.end * 1000);
+        write!(f, "{} to {}", time_range_start, time_range_end)
+    }
+}
+impl TimeRange {
+    pub fn new(start: i64, end: i64) -> Self {
+        Self { start, end }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start == 0 && self.end == 0
+    }
+
+    pub fn contains(&self, other: &Self) -> bool {
+        self.start <= other.start && self.end >= other.end
+    }
+
+    pub fn intersects(&self, other: &Self) -> bool {
+        self.start < other.end && self.end > other.start
+    }
+
+    /// Returns the intersection of two time ranges
+    /// If the time ranges do not intersect, returns nothing
+    /// If the time ranges intersect, returns the inverse of the intersection
+    pub fn split_by_range(&self, other: &Self) -> anyhow::Result<(Option<Self>, Option<Self>)> {
+        let mut left = None;
+        let mut right = None;
+
+        if self == other {
+            return Ok((left, right));
+        }
+
+        if !self.intersects(other) {
+            return Err(anyhow::anyhow!("Time ranges do not intersect"));
+        }
+
+        if self.start < other.start {
+            left = Some(Self::new(self.start, other.start));
+        }
+        if self.end > other.end {
+            right = Some(Self::new(other.end, self.end));
+        }
+        Ok((left, right))
+    }
+
+    pub fn flatten_overlapping_ranges(ranges: Vec<Self>) -> Vec<Self> {
+        if ranges.is_empty() {
+            return ranges;
+        }
+        let mut ranges = ranges;
+        ranges.sort_by(|a, b| a.start.cmp(&b.start));
+        let mut result = Vec::new();
+        let mut current = ranges[0].clone();
+        for range in ranges.iter().skip(1) {
+            if current.intersects(range) {
+                current.end = range.end;
+            } else {
+                result.push(current.clone());
+                current = range.clone();
+            }
+        }
+        result.push(current);
+        result
+    }
+}
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
@@ -559,11 +650,18 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub defined_schema_fields: Option<Vec<String>>,
     #[serde(default)]
-    pub max_query_range: i64,
+    pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub distinct_value_fields: Vec<DistinctField>,
+    #[serde(default)]
+    pub index_updated_at: i64,
+    #[serde(default)]
+    pub extended_retention_days: Vec<TimeRange>,
 }
 
 impl Serialize for StreamSettings {
@@ -584,10 +682,13 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("index_fields", &self.index_fields)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
+        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
+        state.serialize_field("index_updated_at", &self.index_updated_at)?;
+        state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -703,6 +804,35 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let mut distinct_value_fields = Vec::new();
+        let fields = settings.get("distinct_value_fields");
+        if let Some(value) = fields {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                distinct_value_fields.push(json::from_value(item.clone()).unwrap())
+            }
+        }
+
+        let index_updated_at = settings
+            .get("index_updated_at")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+
+        let mut extended_retention_days = vec![];
+        if let Some(values) = settings
+            .get("extended_retention_days")
+            .and_then(|v| v.as_array())
+        {
+            for item in values {
+                let start = item
+                    .get("start")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or_default();
+                let end = item.get("end").and_then(|v| v.as_i64()).unwrap_or_default();
+                extended_retention_days.push(TimeRange::new(start, end));
+            }
+        }
+
         Self {
             partition_time_level,
             partition_keys,
@@ -715,6 +845,9 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            distinct_value_fields,
+            index_updated_at,
+            extended_retention_days,
         }
     }
 }
@@ -822,13 +955,14 @@ impl RoutingCondition {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
+                // field not found -> dropped
                 return false;
             }
         };
         match val {
             Value::String(v) => {
                 let val = v.as_str();
-                let con_val = self.value.as_str().unwrap_or_default();
+                let con_val = self.value.as_str().unwrap_or_default().trim_matches('"'); // "" is interpreted as empty string
                 match self.operator {
                     Operator::EqualTo => val == con_val,
                     Operator::NotEqualTo => val != con_val,
@@ -877,6 +1011,10 @@ impl RoutingCondition {
                     Operator::NotEqualTo => val != con_val,
                     _ => false,
                 }
+            }
+            Value::Null => {
+                matches!(self.operator, Operator::EqualTo)
+                    && matches!(&self.value, Value::String(v) if v == "null")
             }
             _ => false,
         }
@@ -1014,5 +1152,55 @@ mod tests {
         map.insert(param2, 2);
         map.insert(param3, 2);
         assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn test_split_ranges() {
+        // contains
+        let range = TimeRange::new(0, 400);
+        let other = TimeRange::new(50, 150);
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.as_ref().and(right.as_ref()).is_some());
+        assert_eq!(left.unwrap(), TimeRange::new(0, 50));
+        assert_eq!(right.unwrap(), TimeRange::new(150, 400));
+
+        // partial overlap
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(50, 100);
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.as_ref().is_some());
+        assert!(!right.is_some());
+        assert_eq!(left.unwrap(), TimeRange::new(0, 50));
+
+        // equals
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(0, 100);
+        let (left, right) = range.split_by_range(&other).unwrap();
+        assert!(left.and(right).is_none());
+
+        // does not intersect
+        let range = TimeRange::new(0, 100);
+        let other = TimeRange::new(200, 300);
+        let res = range.split_by_range(&other);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_flatten_ranges() {
+        let ranges = vec![TimeRange::new(0, 150), TimeRange::new(100, 200)];
+        let expected_res = TimeRange::new(0, 200);
+        let mut ranges = TimeRange::flatten_overlapping_ranges(ranges);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0], expected_res);
+
+        ranges.clear();
+
+        ranges = vec![
+            TimeRange::new(0, 150),
+            TimeRange::new(200, 300),
+            TimeRange::new(100, 199),
+        ];
+        let expected_res = vec![TimeRange::new(0, 199), TimeRange::new(200, 300)];
+        assert_eq!(TimeRange::flatten_overlapping_ranges(ranges), expected_res);
     }
 }

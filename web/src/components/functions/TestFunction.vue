@@ -1,8 +1,15 @@
 <template>
-  <div class="tw-flex tw-items-center tw-flex-wrap q-pb-sm">
-    <div class="test-function-query-container tw-w-[100%] tw-mt-2">
+  <div
+    data-test="test-function-section"
+    class="tw-flex tw-items-center tw-flex-wrap q-pb-sm"
+  >
+    <div
+      data-test="test-function-query-section"
+      class="test-function-query-container tw-w-[100%] tw-mt-2"
+    >
       <q-form ref="querySelectionRef" @submit="getResults">
         <FullViewContainer
+          data-test="test-function-query-title-section"
           name="function"
           v-model:is-expanded="expandState.query"
           :label="t('common.query')"
@@ -34,16 +41,27 @@
               size="xs"
               color="primary"
               type="submit"
-              :disabled="!selectedStream.name || !inputQuery"
+              :disabled="!selectedStream.name || !inputQuery || loading.events"
             />
           </template>
         </FullViewContainer>
         <div
-          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
+          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%]"
+          :class="
+            store.state.theme === 'dark' ? 'tw-bg-gray-950' : ' tw-bg-white'
+          "
           v-show="expandState.query"
+          data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw-w-[150px] q-pr-md">
-            <div class="tw-text-[12px] tw-text-gray-700">
+          <div class="function-stream-select-input tw-w-[120px] q-pr-md">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("alerts.streamType") + " *" }}
             </div>
 
@@ -64,7 +82,14 @@
             />
           </div>
           <div class="function-stream-select-input tw-w-[300px]">
-            <div class="tw-text-[12px] tw-text-gray-700">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("alerts.stream_name") + " *" }}
             </div>
             <q-select
@@ -86,13 +111,27 @@
             />
           </div>
           <div class="functions-duration-input tw-w-[330px]">
-            <div class="tw-text-[12px] tw-text-gray-700">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("common.duration") + " *" }}
             </div>
             <DateTime label="Start Time" class="q-py-xs tw-w-full" />
           </div>
 
-          <div class="tw-text-[12px] tw-text-gray-700 tw-w-[100%] q-mt-xs">
+          <div
+            class="tw-text-[12px] tw-w-[100%] q-mt-xs"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-700'
+            "
+          >
             {{ t("common.query") + " *" }}
           </div>
           <div
@@ -121,6 +160,7 @@
   <div>
     <div>
       <FullViewContainer
+        data-test="test-function-input-title-section"
         name="function"
         v-model:is-expanded="expandState.events"
         :label="t('common.events')"
@@ -154,12 +194,13 @@
       <div
         v-show="expandState.events"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
+        data-test="test-function-input-editor-section"
       >
         <query-editor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="monaco-editor"
+          class="monaco-editor test-function-input-editor"
           v-model:query="inputEvents"
           language="json"
         />
@@ -170,6 +211,7 @@
         name="function"
         v-model:is-expanded="expandState.output"
         :label="t('common.output')"
+        data-test="test-function-output-title-section"
       >
         <template #left>
           <div
@@ -202,17 +244,25 @@
       <div
         v-show="expandState.output"
         class="tw-border-[1px] tw-border-gray-200 tw-relative"
+        data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
-          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-bg-white tw-opacity-90"
+          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-opacity-90"
         >
           <q-icon
             :name="outlinedLightbulb"
             size="40px"
             class="tw-text-orange-400"
           />
-          <div class="tw-text-[15px] tw-text-gray-600">
+          <div
+            class="tw-text-[15px] tw-text-gray-600"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-600'
+            "
+          >
             {{ outputMessage }}
           </div>
         </div>
@@ -220,7 +270,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="monaco-editor"
+          class="monaco-editor test-function-output-editor"
           v-model:query="outputEvents"
           language="json"
           read-only
@@ -509,6 +559,8 @@ const isInputValid = () => {
 const testFunction = async () => {
   loading.value.output = true;
   eventsErrorMsg.value = "";
+  outputEventsErrorMsg.value = "";
+
   if (!isInputValid()) {
     return;
   }
@@ -541,6 +593,7 @@ const testFunction = async () => {
     .catch((err: any) => {
       console.log("Error in testing function", err);
       const errMsg = err.response?.data?.message || "Error in testing function";
+      outputEventsErrorMsg.value = "Error while transforming results";
 
       q.notify({
         type: "negative",
@@ -556,6 +609,7 @@ const testFunction = async () => {
 };
 
 function getLineRanges(object: any) {
+  if (!outputEventsEditorRef.value) return;
   const model = outputEventsEditorRef.value.getModel(); // Get Monaco Editor model
   const contentLines = model.getLinesContent(); // Get content as an array of lines
   const ranges = [];
@@ -635,7 +689,8 @@ function highlightSpecificEvent() {
   if (errorEventRanges.length) {
     outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
   }
-  outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
+  if (outputEventsEditorRef.value)
+    outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
 }
 
 defineExpose({
@@ -644,11 +699,15 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.monaco-editor,
-.test-output-container {
+.monaco-editor {
   width: 100%;
-  min-height: 15rem;
+  min-height: 10rem;
   border-radius: 5px;
+}
+
+.test-function-input-editor,
+.test-function-output-editor {
+  height: calc((100vh - 260px) / 2) !important;
 }
 
 .test-function-option-tabs {

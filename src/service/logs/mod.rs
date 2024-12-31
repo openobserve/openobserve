@@ -42,7 +42,10 @@ use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use super::{
     db::organization::get_org_setting,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
+    metadata::{
+        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
+        write, MetadataItem, MetadataType,
+    },
     schema::stream_schema_exists,
 };
 use crate::{
@@ -66,15 +69,20 @@ pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 fn parse_bulk_index(v: &Value) -> Option<(String, String, Option<String>)> {
     let local_val = v.as_object().unwrap();
     for action in BULK_OPERATORS {
-        if local_val.contains_key(action) {
-            let local_val = local_val.get(action).unwrap().as_object().unwrap();
-            let index = match local_val.get("_index") {
-                Some(v) => v.as_str().unwrap().to_string(),
-                None => return None,
+        if let Some(val) = local_val.get(action) {
+            let Some(local_val) = val.as_object() else {
+                log::warn!("Invalid bulk index action: {}", action);
+                continue;
+            };
+            let Some(index) = local_val
+                .get("_index")
+                .and_then(|v| v.as_str().map(|v| v.to_string()))
+            else {
+                continue;
             };
             let doc_id = local_val
                 .get("_id")
-                .map(|v| v.as_str().unwrap().to_string());
+                .and_then(|v| v.as_str().map(|v| v.to_string()));
             return Some((action.to_string(), index, doc_id));
         };
     }
@@ -268,6 +276,10 @@ async fn write_logs(
     )
     .await;
 
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
+        .await
+        .unwrap_or_default();
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
@@ -431,18 +443,25 @@ async fn write_logs(
         // end check for alert triggers
 
         // get distinct_value items
-        let mut to_add_distinct_values = vec![];
-        for field in DISTINCT_FIELDS.iter() {
+        let mut map = Map::new();
+        for field in DISTINCT_FIELDS.iter().chain(
+            stream_settings
+                .distinct_value_fields
+                .iter()
+                .map(|f| &f.name),
+        ) {
             if let Some(val) = record_val.get(field) {
-                to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    field_name: field.to_string(),
-                    field_value: val.as_str().unwrap().to_string(),
-                    filter_name: "".to_string(),
-                    filter_value: "".to_string(),
-                }));
+                map.insert(field.clone(), val.clone());
             }
+        }
+
+        if !map.is_empty() {
+            // add distinct values
+            distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                stream_type: StreamType::Logs,
+                stream_name: stream_name.to_string(),
+                value: map,
+            }));
         }
 
         // get hour key
@@ -482,9 +501,6 @@ async fn write_logs(
                 );
             }
         }
-
-        // add distinct values
-        distinct_values.extend(to_add_distinct_values);
     }
 
     // write data to wal
@@ -495,13 +511,16 @@ async fn write_logs(
         stream_name,
     )
     .await;
-    let req_stats = write_file(&writer, stream_name, write_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let req_stats = write_file(
+        &writer,
+        stream_name,
+        write_buf,
+        !cfg.common.wal_fsync_disabled,
+    )
+    .await;
 
     // send distinct_values
-    if !distinct_values.is_empty() {
+    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }

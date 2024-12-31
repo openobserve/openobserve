@@ -22,6 +22,7 @@ use config::{
     meta::{
         function::VRLResultResolver,
         search,
+        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -190,9 +191,6 @@ pub async fn search_multi(
 
     for mut req in queries {
         sqls.push(req.query.sql.clone());
-        let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
-        rpc_req.org_id = org_id.to_string();
-        rpc_req.stream_type = stream_type.to_string();
         let stream_name = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v[0].clone(),
             Err(e) => {
@@ -242,26 +240,26 @@ pub async fn search_multi(
                     USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
                 let stream_type_str = stream_type.to_string();
 
-                if user.is_external
-                    && !crate::handler::http::auth::validator::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str.as_str())
-                                    .map_or(stream_type_str.as_str(), |model| model.key),
-                                stream_name
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                        },
-                        Some(user.role),
-                    )
-                    .await
+                if !crate::handler::http::auth::validator::check_permissions(
+                    user_id,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            stream_name
+                        ),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user.role,
+                    user.is_external,
+                )
+                .await
                 {
                     return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
                 }
@@ -397,11 +395,13 @@ pub async fn search_multi(
 
                 if res.is_partial {
                     multi_res.is_partial = true;
-                    let partial_err = "Please be aware that the response is based on partial data";
                     multi_res.function_error = if res.function_error.is_empty() {
-                        partial_err.to_string()
+                        PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
                     } else {
-                        format!("{} \n {}", partial_err, res.function_error)
+                        format!(
+                            "{} \n {}",
+                            PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
+                        )
                     };
                 }
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
@@ -926,6 +926,8 @@ pub async fn around_multi(
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),
@@ -999,6 +1001,8 @@ pub async fn around_multi(
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: regions.clone(),

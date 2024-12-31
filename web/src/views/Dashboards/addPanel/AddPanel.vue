@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
+  <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex items-center q-table__title q-mr-md">
         <span>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
+    <div class="row" style="height: calc(100vh - 99px); overflow-y: auto">
       <div
         class="col scroll"
         style="
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               class="col scroll"
-              style="height: calc(100vh - 115px); overflow-y: auto"
+              style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               class="row"
-              style="height: calc(100vh - 115px); overflow-y: auto"
+              style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="col" style="height: 100%">
                 <q-splitter
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :dashboard-id="queryParams?.dashboard"
                           :folder-id="queryParams?.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="variablesData"
+                          :variablesData="updatedVariablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
@@ -353,6 +353,7 @@ import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
+  checkIfVariablesAreLoaded,
   getDashboard,
   getPanel,
   updatePanel,
@@ -405,7 +406,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     RelativeTime,
     DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue")
+      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
     QueryInspector,
     CustomHTMLEditor,
@@ -476,6 +477,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
+    let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
@@ -485,7 +487,7 @@ export default defineComponent({
       data.values.forEach((variable: any) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value
+            (item: any) => item.name && item.operator && item.value,
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -493,12 +495,13 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters)
+            JSON.stringify(encodedFilters),
           );
         } else {
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });
+
       router.replace({
         query: {
           ...route.query,
@@ -507,13 +510,11 @@ export default defineComponent({
         },
       });
 
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        !updatedVariablesData?.values?.length && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+      if (needsVariablesAutoUpdate) {
+        // check if the length is > 0
+        if (checkIfVariablesAreLoaded(variablesData)) {
+          needsVariablesAutoUpdate = false;
+        }
         Object.assign(updatedVariablesData, variablesData);
       }
     };
@@ -558,13 +559,17 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId,
           route.query.folder,
-          route.query.tab
+          route.query.tab,
         );
 
-        Object.assign(
-          dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData ?? {})),
-        );
+        try {
+          Object.assign(
+            dashboardPanelData.data,
+            JSON.parse(JSON.stringify(panelData ?? {})),
+          );
+        } catch (e) {
+          console.error("Error while parsing panel data", e);
+        }
 
         // check if vrl function exists
         if (
@@ -611,8 +616,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -628,9 +633,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
+            route.query.folder ?? "default",
+          ),
+        ),
       );
       // console.timeEnd("AddPanel:loadDashboard");
 
@@ -725,7 +730,7 @@ export default defineComponent({
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // console.timeEnd("watch:dashboardPanelData.data.type");
-      }
+      },
     );
 
     watch(selectedDate, () => {
@@ -741,7 +746,7 @@ export default defineComponent({
         // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
-      }
+      },
     );
 
     // resize the chart when query editor is opened and closed
@@ -758,7 +763,7 @@ export default defineComponent({
           }
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
-      }
+      },
     );
 
     const runQuery = () => {
@@ -770,7 +775,7 @@ export default defineComponent({
       // Also update variables data
       Object.assign(
         updatedVariablesData,
-        JSON.parse(JSON.stringify(variablesData))
+        JSON.parse(JSON.stringify(variablesData)),
       );
 
       // copy the data object excluding the reactivity
@@ -841,7 +846,7 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.data");
       },
-      { deep: true }
+      { deep: true },
     );
 
     const beforeUnloadHandler = (e: any) => {
@@ -861,8 +866,8 @@ export default defineComponent({
 
     onBeforeRouteLeave((to, from, next) => {
       // check if it is a force navigation, then allow
-      if(forceSkipBeforeUnloadListener) {
-        next()
+      if (forceSkipBeforeUnloadListener) {
+        next();
         return;
       }
 
@@ -915,7 +920,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
       }
 
@@ -939,11 +944,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration : " + errorMessageOnSave.message
+              "Error saving panel configuration : " +
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -959,12 +965,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
               "Error saving panel configuration  : " +
-                errorMessageOnSave.message
+                errorMessageOnSave.message,
             );
             return;
           }
@@ -992,7 +998,7 @@ export default defineComponent({
               error?.message ??
               (editMode.value
                 ? "Error while updating panel"
-                : "Error while creating panel")
+                : "Error while creating panel"),
           );
         } else {
           showErrorNotification(
@@ -1002,7 +1008,7 @@ export default defineComponent({
                 : "Error while creating panel"),
             {
               timeout: 2000,
-            }
+            },
           );
         }
       }
@@ -1102,7 +1108,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias
+          ]?.fields?.latitude.alias,
         );
       }
 
@@ -1118,7 +1124,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias
+          ]?.fields?.longitude.alias,
         );
       }
 
@@ -1134,7 +1140,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias
+          ]?.fields?.weight.alias,
         );
       }
 
@@ -1150,7 +1156,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias
+          ]?.fields?.source.alias,
         );
       }
 
@@ -1166,7 +1172,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias
+          ]?.fields?.target.alias,
         );
       }
 
@@ -1182,7 +1188,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias
+          ]?.fields?.value.alias,
         );
       }
 
@@ -1244,7 +1250,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -1269,12 +1275,12 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -1290,7 +1296,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });

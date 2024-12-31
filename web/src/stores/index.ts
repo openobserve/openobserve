@@ -35,6 +35,7 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   allDashboardList: {},
+  allDashboardData: {},
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -65,7 +66,7 @@ export default createStore({
     theme: "",
     printMode: false,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
-    zoConfig: {},
+    zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
       ? useLocalTimezone()
       : Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -75,6 +76,8 @@ export default createStore({
     savedFunctionDialog: false,
     regionInfo: [],
     hiddenMenus: [],
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {
@@ -125,6 +128,9 @@ export default createStore({
     // },
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
+    },
+    setDashboardData(state, payload) {
+      state.organizationData.allDashboardData = payload;
     },
     setAllDashboardListHash(state, payload) {
       state.organizationData.allDashboardListHash = payload;
@@ -235,6 +241,9 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setDashboardData(context, payload) {
+      context.commit("setDashboardData", payload);
     },
     setAllDashboardListHash(context, payload) {
       context.commit("setAllDashboardListHash", payload);

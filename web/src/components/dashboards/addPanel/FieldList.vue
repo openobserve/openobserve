@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div class="col-auto">
+      <!-- stream type selection will be hidden for metrics page -->
       <q-select
+        v-if="dashboardPanelDataPageKey !== 'metrics'"
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -221,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       props.row.type == 'Utf8'
                         ? 'text_fields'
                         : props.row.type == 'Int64'
-                        ? 'tag'
-                        : 'toggle_off'
+                          ? 'tag'
+                          : 'toggle_off'
                     "
                     color="grey-6"
                     class="q-mr-xs"
@@ -669,9 +671,9 @@ export default defineComponent({
   name: "FieldList",
   props: ["editMode"],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
 
     const userDefinedSchemaBtnGroupOption = [
@@ -748,7 +750,7 @@ export default defineComponent({
           it.name ==
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream
+          ].fields.stream,
       )?.metrics_meta?.metric_type;
     });
 
@@ -762,7 +764,7 @@ export default defineComponent({
       streamDataLoading.execute(
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type
+        ].fields.stream_type,
       );
     };
 
@@ -774,7 +776,7 @@ export default defineComponent({
         ].fields.stream_type,
       async () => {
         loadStreamsListBasedOnType();
-      }
+      },
     );
 
     onMounted(() => {
@@ -784,7 +786,7 @@ export default defineComponent({
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
         return await getStream(fieldName, streamType, true);
-      }
+      },
     );
 
     // update the selected stream fields list
@@ -810,7 +812,7 @@ export default defineComponent({
             it.stream_type ==
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type
+              ].fields.stream_type,
         );
 
         // if fields found and stream result is of same type
@@ -823,13 +825,27 @@ export default defineComponent({
         ) {
           try {
             await extractFields();
+
+            // if promql mode
+            // NOTE: For the metrics page, we added one watch that resets the query on stream change.
+            // Because of that, the default query overrides the original/saved query on the edit panel.
+            // To prevent this, we added the dashboardPanelDataPageKey condition.
+            if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
+              // set the query
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].query =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream?.toString() + "{}";
+            }
           } catch (error: any) {
             showErrorNotification(
-              error?.message ?? "Failed to get stream fields"
+              error?.message ?? "Failed to get stream fields",
             );
           }
         }
-      }
+      },
     );
 
     watch(
@@ -877,7 +893,7 @@ export default defineComponent({
                 it.name ==
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream
+                ].fields.stream,
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
@@ -889,7 +905,7 @@ export default defineComponent({
               dashboardPanelData.meta.stream.streamResults[0]?.name;
           }
         }
-      }
+      },
     );
     // update the current list fields if any of the lists changes
     watch(
@@ -929,7 +945,7 @@ export default defineComponent({
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
-      }
+      },
     );
 
     watch(
@@ -938,7 +954,7 @@ export default defineComponent({
         // set the custom query fields length
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length;
-      }
+      },
     );
 
     // get the stream list by making an API call
@@ -991,7 +1007,7 @@ export default defineComponent({
               .includes(terms)
           ) {
             filtered.push(
-              selectedStreamFieldsBasedOnUserDefinedSchema.value[i]
+              selectedStreamFieldsBasedOnUserDefinedSchema.value[i],
             );
           }
         }
@@ -1045,7 +1061,7 @@ export default defineComponent({
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.stream_type ?? "logs",
-            true
+            true,
           ).then((res) => {
             return res;
           });
@@ -1148,6 +1164,7 @@ export default defineComponent({
     };
 
     return {
+      dashboardPanelDataPageKey,
       t,
       store,
       router,
@@ -1193,7 +1210,7 @@ export default defineComponent({
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /
-            pagination.value.rowsPerPage
+            pagination.value.rowsPerPage,
         );
       }),
     };

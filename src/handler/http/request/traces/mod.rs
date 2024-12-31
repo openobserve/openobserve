@@ -74,9 +74,9 @@ async fn handle_req(
         .get(&get_config().grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
-        traces::traces_proto(&org_id, body, in_stream_name).await
+        traces::otlp_proto(&org_id, body, in_stream_name).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        traces::traces_json(&org_id, body, in_stream_name).await
+        traces::otlp_json(&org_id, body, in_stream_name).await
     } else {
         Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -164,26 +164,26 @@ pub async fn get_latest_traces(
                 .clone();
             let stream_type_str = StreamType::Traces.to_string();
 
-            if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
-                    user_id.to_str().unwrap(),
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
-                            stream_name
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    Some(user.role),
-                )
-                .await
+            if !crate::handler::http::auth::validator::check_permissions(
+                user_id.to_str().unwrap(),
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str.as_str())
+                            .map_or(stream_type_str.as_str(), |model| model.key),
+                        stream_name
+                    ),
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
             {
                 return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
@@ -266,6 +266,8 @@ pub async fn get_latest_traces(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

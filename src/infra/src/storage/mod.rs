@@ -28,7 +28,6 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 pub const MULTI_PART_UPLOAD_DATA_SIZE: f64 = 100.0;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
-pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
 pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 
 /// Returns the default object store based on the configuration.
@@ -50,12 +49,6 @@ fn default() -> Box<dyn ObjectStore> {
     } else {
         Box::<remote::Remote>::default()
     }
-}
-
-fn local_cache() -> Box<dyn ObjectStore> {
-    let cfg = get_config();
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
-    Box::new(local::Local::new(&cfg.common.data_cache_dir, true))
 }
 
 fn local_wal() -> Box<dyn ObjectStore> {
@@ -125,9 +118,10 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
                 }
                 Err(e) => {
                     // TODO: need a better solution for identifying the error
-                    if file.ends_with(".puffin") {
-                        // ignore puffin file deletion error
-                    } else {
+                    if file.ends_with(".result.json") {
+                        // ignore search job file deletion error
+                        log::debug!("Failed to delete object: {}, error: {:?}", file, e);
+                    } else if !is_local_disk_storage() {
                         log::error!("Failed to delete object: {:?}", e);
                     }
                 }

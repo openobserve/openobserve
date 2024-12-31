@@ -266,6 +266,8 @@ pub struct PanelConfig {
     mappings: Option<Vec<Mapping>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     color: Option<ColorCfg>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trellis: Option<Trellis>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -377,6 +379,10 @@ pub struct DrillDownData {
     pass_all_variables: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variables: Option<Vec<DrillDownVariables>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs_query: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -495,6 +501,12 @@ pub struct MapView {
     pub zoom: OrdF64,
     pub lat: OrdF64,
     pub lng: OrdF64,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct Trellis {
+    pub layout: Option<String>,
+    pub num_of_columns: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

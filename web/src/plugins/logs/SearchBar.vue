@@ -204,8 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete"
-color="grey" size="xs" />
+                            <q-icon name="delete" color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -385,8 +384,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -1234,7 +1232,7 @@ export default defineComponent({
 
     const getColumnNames = (parsedSQL: any) => {
       const columnData = parsedSQL?.columns;
-      const columnNames = [];
+      let columnNames = [];
       for (const item of columnData) {
         if (item.expr.type === "column_ref") {
           columnNames.push(item.expr.column?.expr?.value);
@@ -1253,13 +1251,14 @@ export default defineComponent({
         }
       }
 
-      if(parsedSQL?._next) {
+      if (parsedSQL?._next) {
         columnNames = getColumnNames(parsedSQL._next);
       }
       return columnNames;
     };
 
     const updateQueryValue = (value: string) => {
+      searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
@@ -1315,7 +1314,10 @@ export default defineComponent({
 
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
-        if (Object.hasOwn(parsedSQL, "from")) {
+        if (
+          Object.hasOwn(parsedSQL, "from") ||
+          Object.hasOwn(parsedSQL, "select")
+        ) {
           setSelectedStreams(value);
           // onStreamChange(value);
         }
@@ -1326,18 +1328,19 @@ export default defineComponent({
         if (searchObj.meta.sqlMode === true) {
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
+            const tableName: string =
+              searchObj.data.parsedQuery.from[0].table ||
+              searchObj.data.parsedQuery.from[0].expr?.ast?.from?.[0]?.table;
             if (
-              !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table,
-              ) &&
-              searchObj.data.parsedQuery.from[0].table !== streamName
+              !searchObj.data.stream.selectedStream.includes(tableName) &&
+              tableName !== streamName
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
 
-              streamName = searchObj.data.parsedQuery.from[0].table;
+              streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
-                if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+                if (stream.name == streamName) {
                   streamFound = true;
                   let itemObj = {
                     label: stream.name,

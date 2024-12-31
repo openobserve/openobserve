@@ -23,14 +23,15 @@ use config::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
+        sql::TableReferenceExt,
         stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::inverted_index::split_token,
+    utils::{inverted_index::split_token, json},
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
-    common::tree_node::TreeNode,
+    common::{tree_node::TreeNode, TableReference},
     error::DataFusionError,
     physical_plan::{displayable, visit_execution_plan, ExecutionPlan},
     prelude::SessionContext,
@@ -38,9 +39,10 @@ use datafusion::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
-    errors::{Error, Result},
+    errors::{Error, ErrorCodes, Result},
     file_list::FileId,
 };
+use itertools::Itertools;
 use proto::cluster_rpc::{self, SearchQuery};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -49,10 +51,13 @@ use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
         datafusion::{
-            distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+            distributed_plan::{
+                remote_scan::RemoteScanExec,
+                rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+            },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
-            table_provider::empty_table::NewEmptyTable,
+            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
         },
         generate_filter_from_equal_items,
         request::Request,
@@ -149,7 +154,7 @@ pub async fn search(
     let file_list_took = start.elapsed().as_millis() as usize;
     #[cfg(not(feature = "enterprise"))]
     let (took_wait, work_group_str, locker) =
-        check_work_group(&req, trace_id, &nodes, start, file_list_took).await?;
+        check_work_group(&req, trace_id, start, file_list_took).await?;
     #[cfg(feature = "enterprise")]
     let (took_wait, work_group_str, work_group) = check_work_group(
         &req,
@@ -241,10 +246,17 @@ pub async fn search(
         ));
     }
 
+    let trace_stream_name = json::to_string(
+        &sql.stream_names
+            .iter()
+            .map(|s| (s.get_stream_type(sql.stream_type), s.stream_name()))
+            .collect_vec(),
+    )
+    .unwrap();
     let datafusion_span = info_span!(
         "service:search:flight:datafusion",
         org_id = sql.org_id,
-        stream_name = sql.stream_names.first().unwrap(),
+        stream_name = trace_stream_name,
         stream_type = sql.stream_type.to_string(),
     );
 
@@ -298,7 +310,12 @@ pub async fn search(
     let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => Err(Error::Message(err.to_string())),
+        Err(err) => match err {
+            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
+                ErrorCodes::SearchCancelQuery(err.to_string()),
+            )),
+            _ => Err(Error::Message(err.to_string())),
+        },
     }?;
 
     log::info!("[trace_id {trace_id}] flight->search: search finished");
@@ -320,7 +337,7 @@ pub async fn run_datafusion(
     req: Request,
     sql: Arc<Sql>,
     nodes: Vec<Node>,
-    partitioned_file_lists: HashMap<String, Vec<Vec<i64>>>,
+    partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
@@ -358,11 +375,15 @@ pub async fn run_datafusion(
     {
         for (stream, items) in sql.prefix_items.iter() {
             equal_keys
-                .entry(stream.to_string())
+                .entry(stream.clone())
                 .or_insert_with(Vec::new)
                 .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
         }
     }
+
+    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    let streaming_output = req.streaming_output;
+    let streaming_id = req.streaming_id.clone();
 
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
@@ -384,10 +405,14 @@ pub async fn run_datafusion(
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
-            rewrite
-                .remote_scan_nodes
-                .get_remote_node(table_name.as_str()),
+            rewrite.remote_scan_nodes.get_remote_node(table_name),
         )?);
+    }
+
+    // check for streaming aggregation query
+    if streaming_output {
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
+        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
     if cfg.common.print_key_sql {
@@ -439,7 +464,6 @@ pub async fn get_online_querier_nodes(
 pub async fn check_work_group(
     req: &Request,
     trace_id: &str,
-    nodes: &[Node],
     start: std::time::Instant,
     file_list_took: usize, // the time took to get file list
 ) -> Result<(usize, String, Option<infra::dist_lock::Locker>)> {
@@ -450,11 +474,7 @@ pub async fn check_work_group(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        let node_ids = nodes
-            .iter()
-            .map(|node| node.uuid.to_string())
-            .collect::<HashSet<_>>();
-        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64)
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -507,11 +527,7 @@ pub async fn check_work_group(
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
-        let node_ids = nodes
-            .iter()
-            .map(|node| node.uuid.to_string())
-            .collect::<HashSet<_>>();
-        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64, Some(node_ids))
+        dist_lock::lock_with_trace_id(trace_id, &locker_key, req.timeout as u64)
             .await
             .map_err(|e| {
                 metrics::QUERY_PENDING_NUMS
@@ -568,10 +584,10 @@ pub async fn check_work_group(
 
 #[tracing::instrument(name = "service:search:cluster:flight:partition_file_lists", skip_all)]
 pub async fn partition_file_lists(
-    file_id_lists: HashMap<String, Vec<FileId>>,
+    file_id_lists: HashMap<TableReference, Vec<FileId>>,
     nodes: &[Node],
     group: Option<RoleGroup>,
-) -> Result<HashMap<String, Vec<Vec<i64>>>> {
+) -> Result<HashMap<TableReference, Vec<Vec<i64>>>> {
     let mut file_partitions = HashMap::with_capacity(file_id_lists.len());
     for (stream_name, file_id_list) in file_id_lists {
         let partitions = partition_filt_list(file_id_list, nodes, group).await?;
@@ -721,16 +737,34 @@ pub async fn generate_context(
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
-    for (stream_name, schema) in &sql.schemas {
+    // register schema provider
+    let mut registed_schema = HashSet::new();
+    for (stream, _) in &sql.schemas {
+        let stream_type = stream.stream_type();
+        if !stream.has_stream_type() || registed_schema.contains(&stream_type) {
+            continue;
+        }
+        registed_schema.insert(stream_type.clone());
+        let schema_provider = StreamTypeProvider::create(&stream_type).await?;
+        let _ = ctx
+            .catalog("datafusion")
+            .unwrap()
+            .as_ref()
+            .register_schema(&stream_type, schema_provider);
+    }
+
+    // register table
+    for (stream, schema) in &sql.schemas {
         let schema = schema.schema().as_ref().clone();
+        let stream_name = stream.to_quoted_string();
         let table = Arc::new(
-            NewEmptyTable::new(stream_name, Arc::new(schema))
+            NewEmptyTable::new(&stream_name, Arc::new(schema))
                 .with_partitions(ctx.state().config().target_partitions())
                 .with_sorted_by_time(sql.sorted_by_time),
         );
-        let stream_name = format!("\"{}\"", stream_name);
-        ctx.register_table(stream_name, table)?;
+        ctx.register_table(&stream_name, table)?;
     }
+
     Ok(())
 }
 
@@ -738,15 +772,17 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 pub async fn get_file_id_lists(
     org_id: &str,
     stream_type: StreamType,
-    stream_names: &[String],
+    stream_names: &[TableReference],
     time_range: Option<(i64, i64)>,
-) -> Result<HashMap<String, Vec<FileId>>> {
+) -> Result<HashMap<TableReference, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
-    for name in stream_names {
+    for stream in stream_names {
+        let name = stream.stream_name();
+        let stream_type = stream.get_stream_type(stream_type);
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(org_id, stream_type, name, time_range).await?;
-        file_lists.insert(name.clone(), file_id_list);
+            crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;
+        file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
 }
@@ -775,13 +811,13 @@ async fn get_inverted_index_file_lists(
         return Ok((use_ttv_inverted_index, vec![], 0, 0));
     }
 
-    let stream_name = sql.stream_names.first().unwrap();
+    let stream_name = sql.stream_names.first().unwrap().stream_name();
     let match_terms = sql.match_items.clone().unwrap_or_default();
     let index_terms = generate_filter_from_equal_items(&index_terms);
     let (idx_file_list, idx_scan_size, idx_took) = get_inverted_index_file_list(
         req.clone(),
         query.clone(),
-        stream_name,
+        &stream_name, // for inverted index search, only have on stream
         &match_terms,
         &index_terms,
     )

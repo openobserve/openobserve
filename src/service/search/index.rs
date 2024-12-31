@@ -8,8 +8,9 @@ use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
+    physical_expr::ScalarFunctionExpr,
     physical_plan::{
-        expressions::{BinaryExpr, Column, LikeExpr, Literal},
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
     },
     scalar::ScalarValue,
@@ -17,12 +18,15 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{BooleanQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
+    query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
 
-use super::utils::{is_field, is_value, split_conjunction, trim_quotes};
+use super::{
+    datafusion::udf::fuzzy_match_udf,
+    utils::{is_field, is_value, split_conjunction, trim_quotes},
+};
 
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
@@ -78,7 +82,9 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    In(String, Vec<String>),
     MatchAll(String),
+    FuzzyMatchAll(String, u8),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
 }
@@ -96,14 +102,14 @@ impl IndexCondition {
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         let queries = self
             .conditions
             .iter()
             .map(|condition| {
                 condition
-                    .to_tantivy_query(&schema, default_fields)
+                    .to_tantivy_query(&schema, default_field)
                     .map(|condition| (Occur::Must, condition))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -158,7 +164,12 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
+            Condition::FuzzyMatchAll(value, distance) => format!(
+                "{}:fuzzy({}, {})",
+                INDEX_FIELD_NAME_FOR_ALL, value, distance
+            ),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -182,15 +193,39 @@ impl Condition {
                 };
                 Condition::Equal(field, value)
             }
+            Expr::InList {
+                expr,
+                list,
+                negated: _,
+            } => {
+                let field = get_field_name(expr);
+                let values = list.iter().map(get_value).collect();
+                Condition::In(field, values)
+            }
             Expr::Function(func) => {
-                if func.name.to_string().to_lowercase() != "match_all" {
-                    unreachable!()
-                }
-                if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() != 1 {
+                let fn_name = func.name.to_string().to_lowercase();
+                if fn_name == "match_all" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 1 {
+                            unreachable!()
+                        }
+                        Condition::MatchAll(trim_quotes(list.args[0].to_string().as_str()))
+                    } else {
                         unreachable!()
                     }
-                    Condition::MatchAll(trim_quotes(list.args[0].to_string().as_str()))
+                } else if fn_name == "fuzzy_match_all" {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let value = trim_quotes(list.args[0].to_string().as_str());
+                        let distance = trim_quotes(list.args[1].to_string().as_str())
+                            .parse()
+                            .unwrap_or(1);
+                        Condition::FuzzyMatchAll(value, distance)
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     unreachable!()
                 }
@@ -219,7 +254,7 @@ impl Condition {
     pub fn to_tantivy_query(
         &self,
         schema: &Schema,
-        default_fields: Field,
+        default_field: Option<Field>,
     ) -> anyhow::Result<Box<dyn Query>> {
         Ok(match self {
             Condition::Equal(field, value) => {
@@ -227,18 +262,32 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
+            Condition::In(field, values) => {
+                let field = schema.get_field(field)?;
+                let terms: Vec<Box<dyn Query>> = values
+                    .iter()
+                    .map(|value| {
+                        let term = Term::from_field_text(field, value);
+                        Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
+                    })
+                    .collect();
+                Box::new(BooleanQuery::union(terms))
+            }
             Condition::MatchAll(value) => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
+                })?;
                 if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else if value.to_lowercase().starts_with("re:") {
                     let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_fields)?)
+                    Box::new(RegexQuery::from_pattern(value, default_field)?)
                 } else if value.ends_with("*") {
                     let value = value.strip_suffix("*").unwrap();
                     Box::new(PhrasePrefixQuery::new_with_offset(vec![(
                         0,
-                        Term::from_field_text(default_fields, value),
+                        Term::from_field_text(default_field, value),
                     )]))
                 } else {
                     if value.is_empty() {
@@ -246,38 +295,43 @@ impl Condition {
                             "The value of match_all() function can't be empty"
                         ));
                     }
-                    let mut terms: Vec<(Occur, Box<dyn Query>)> = o2_collect_tokens(value)
+                    let mut terms: Vec<Box<dyn Query>> = o2_collect_tokens(value)
                         .into_iter()
                         .map(|value| {
-                            let term = Term::from_field_text(default_fields, &value);
-                            (
-                                Occur::Must,
-                                Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
-                            )
+                            let term = Term::from_field_text(default_field, &value);
+                            Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
                     if terms.len() > 1 {
-                        Box::new(BooleanQuery::new(terms))
+                        Box::new(BooleanQuery::intersection(terms))
                     } else {
-                        terms.remove(0).1
+                        terms.remove(0)
                     }
                 }
             }
+            Condition::FuzzyMatchAll(value, distance) => {
+                let default_field = default_field.ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "There's no FullTextSearch field for fuzzy_match_all() function"
+                    )
+                })?;
+                if value.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "The value of fuzzy_match_all() function can't be empty"
+                    ));
+                }
+                let term = Term::from_field_text(default_field, value);
+                Box::new(FuzzyTermQuery::new(term, *distance, false))
+            }
             Condition::Or(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
-                Box::new(BooleanQuery::new(vec![
-                    (Occur::Should, left_query),
-                    (Occur::Should, right_query),
-                ]))
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
+                Box::new(BooleanQuery::union(vec![left_query, right_query]))
             }
             Condition::And(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_fields)?;
-                let right_query = right.to_tantivy_query(schema, default_fields)?;
-                Box::new(BooleanQuery::new(vec![
-                    (Occur::Must, left_query),
-                    (Occur::Must, right_query),
-                ]))
+                let left_query = left.to_tantivy_query(schema, default_field)?;
+                let right_query = right.to_tantivy_query(schema, default_field)?;
+                Box::new(BooleanQuery::intersection(vec![left_query, right_query]))
             }
         })
     }
@@ -288,7 +342,13 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
+            Condition::In(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::MatchAll(_) => {
+                fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
+            }
+            Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
@@ -305,7 +365,13 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
+            Condition::In(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::MatchAll(_) => {
+                fields.extend(fst_fields.iter().cloned());
+            }
+            Condition::FuzzyMatchAll(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
             Condition::Or(left, right) | Condition::And(left, right) => {
@@ -329,14 +395,29 @@ impl Condition {
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
+            Condition::In(name, values) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let values: Vec<Arc<dyn PhysicalExpr>> = values
+                    .iter()
+                    .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Arc::new(InListExpr::new(left, values, false, None)))
+            }
             Condition::MatchAll(value) => {
+                let value = value
+                    .trim_start_matches("re:") // regex
+                    .trim_start_matches('*') // contains
+                    .trim_end_matches('*') // prefix or contains
+                    .to_string();
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
                     let new_expr = Arc::new(LikeExpr::new(
                         false,
-                        false,
+                        true,
                         Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                         term.clone(),
                     ));
@@ -345,6 +426,32 @@ impl Condition {
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
                         "Using match_all() function in a stream that don't have full text search field"
+                    )); // already check this in sql.rs
+                }
+                Ok(disjunction(expr_list))
+            }
+            Condition::FuzzyMatchAll(value, distance) => {
+                let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
+                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))));
+                let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
+                let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
+                    Vec::with_capacity(fst_fields.len());
+                for field in fst_fields.iter() {
+                    let new_expr = Arc::new(ScalarFunctionExpr::new(
+                        fuzzy_expr.name(),
+                        fuzzy_expr.clone(),
+                        vec![
+                            Arc::new(Column::new(field, schema.index_of(field).unwrap())),
+                            term.clone(),
+                            distance.clone(),
+                        ],
+                        DataType::Boolean,
+                    ));
+                    expr_list.push(new_expr);
+                }
+                if expr_list.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "Using fuzzy_match_all() function in a stream that don't have full text search field"
                     )); // already check this in sql.rs
                 }
                 Ok(disjunction(expr_list))
@@ -385,6 +492,23 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 return false;
             }
         }
+        Expr::InList {
+            expr,
+            list,
+            negated,
+        } => {
+            if *negated {
+                return false;
+            }
+            if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
+                return false;
+            }
+            for value in list {
+                if !is_value(value) {
+                    return false;
+                }
+            }
+        }
         Expr::BinaryOp {
             left,
             op: BinaryOperator::And | BinaryOperator::Or,
@@ -394,11 +518,21 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 && is_expr_valid_for_index(right, index_fields);
         }
         Expr::Function(func) => {
-            if func.name.to_string().to_lowercase() != "match_all" {
-                return false;
-            }
-            if let FunctionArguments::List(list) = &func.args {
-                if list.args.len() != 1 {
+            let fn_name = func.name.to_string().to_lowercase();
+            if fn_name == "match_all" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 1 {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } else if fn_name == "fuzzy_match_all" {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 2 {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             } else {

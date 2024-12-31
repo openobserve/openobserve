@@ -223,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destinations="destinations"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
+        @refresh:destinations="refreshDestination"
       />
     </template>
     <ConfirmDialog
@@ -559,7 +560,7 @@ export default defineComponent({
         if (!action) showAddAlertDialog.value = false;
       }
     );
-    const getDestinations = () => {
+    const getDestinations = async () => {
       destinationService
         .list({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -703,6 +704,11 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            if(e.response?.status == 403){
+              showForm.value = false;
+              isSubmitting.value = false;
+              return;
+            }
             dismiss();
             $q.notify({
               type: "negative",
@@ -802,6 +808,9 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if(err.response?.status == 403){
+            return;
+          }
           $q.notify({
             type: "negative",
             message: err?.data?.message || "Error while deleting alert.",
@@ -909,6 +918,12 @@ export default defineComponent({
       });
     };
 
+    const refreshDestination = async () =>{
+
+      await getDestinations();
+
+    }
+
     return {
       t,
       qTable,
@@ -995,6 +1010,7 @@ export default defineComponent({
       alertStateLoadingMap,
       templates,
       routeTo,
+      refreshDestination,
     };
   },
 });

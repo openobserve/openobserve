@@ -49,8 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0
+                (searchObj.communicationMethod === 'ws'
+                  ? searchObj.data.queryResults?.pagination?.length
+                  : searchObj.data.queryResults?.partitionDetail?.paginations
+                      ?.length) || 0,
               )
             "
             :input="false"
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data.histogram.errorMsg == ''">
+      <div v-if="searchObj.data?.histogram?.errorMsg == ''">
         <ChartRenderer
           v-if="searchObj.meta.showHistogram"
           data-test="logs-search-result-bar-chart"
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          searchObj.data.histogram.errorMsg != '' &&
+          searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram
         "
       >
@@ -123,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram.errorMsg }}
+            {{ searchObj.data.histogram?.errorMsg }}
           </span>
         </h6>
         <h6 class="text-center" v-else>
-          {{ searchObj.data.histogram.errorMsg }}
+          {{ searchObj.data.histogram?.errorMsg }}
         </h6>
       </div>
       <tenstack-table
@@ -156,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @view-trace="redirectToTraces"
       />
 
       <q-dialog
@@ -169,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @before-hide="reDrawChart"
       >
         <DetailTable
+          v-if="searchObj.data.queryResults?.hits?.length"
           :key="
             'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex
           "
@@ -191,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             redirectToTraces(
               searchObj.data.queryResults.hits[
                 searchObj.meta.resultGrid.navigation.currentRowIndex
-              ]
+              ],
             )
           "
         />
@@ -208,6 +212,7 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -227,7 +232,7 @@ export default defineComponent({
   components: {
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
@@ -293,7 +298,7 @@ export default defineComponent({
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
             this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+              this.searchObj.meta.resultGrid.rowsPerPage,
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -305,16 +310,19 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        this.refreshPartitionPagination(true);
+        this.searchObj.communicationMethod === "ws"
+          ? this.refreshPagination()
+          : this.refreshPartitionPagination(true);
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        if (
-          this.pageNumberInput >
-          Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length
-          )
-        ) {
+        const maxPages =
+          this.searchObj.communicationMethod === "ws"
+            ? this.searchObj.data.queryResults.pagination.length
+            : this.searchObj.data.queryResults.partitionDetail.paginations
+                .length;
+
+        if (this.pageNumberInput > Math.ceil(maxPages)) {
           this.$q.notify({
             type: "negative",
             message:
@@ -382,6 +390,7 @@ export default defineComponent({
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
+      refreshPagination,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -410,7 +419,7 @@ export default defineComponent({
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
+          searchObj.data.histogram.chartParams,
         );
         // plotChart.value.forceReLayout();
       }
@@ -437,7 +446,7 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
@@ -472,7 +481,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName
+            (v: any) => v !== fieldName,
           );
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
@@ -490,7 +499,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
     };
 
@@ -539,8 +548,28 @@ export default defineComponent({
 
     const getColumns = computed(() => {
       return searchObj.data?.resultGrid?.columns?.filter(
-        (col: any) => !!col.id
+        (col: any) => !!col.id,
       );
+    });
+
+    const getPartitionPaginations = computed(() => {
+      return searchObj.data.queryResults?.partitionDetail?.paginations || [];
+    });
+
+    const getSocketPaginations = computed(() => {
+      return searchObj.data.queryResults.pagination || [];
+    });
+
+    const getPaginations = computed(() => {
+      try {
+        if (searchObj.communicationMethod === "http") {
+          return getPartitionPaginations.value || [];
+        } else {
+          return getSocketPaginations.value || [];
+        }
+      } catch (e) {
+        return [];
+      }
     });
 
     return {
@@ -578,6 +607,8 @@ export default defineComponent({
       scrollTableToTop,
       getColumns,
       reorderSelectedFields,
+      getPaginations,
+      refreshPagination,
     };
   },
   computed: {

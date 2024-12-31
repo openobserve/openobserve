@@ -18,10 +18,13 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use config::meta::{
     cluster::{IntoArcVec, RoleGroup},
     search::{ScanStats, SearchEventType},
+    sql::TableReferenceExt,
     stream::FileKey,
 };
 use datafusion::{
-    common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
+    common::{tree_node::TreeNode, TableReference},
+    physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
@@ -106,7 +109,10 @@ pub async fn search(
         .unwrap();
 
     // get stream name
-    let stream_name = empty_exec.name();
+    let stream = TableReference::from(empty_exec.name());
+    let stream_name = stream.stream_name();
+    let stream_type = stream.get_stream_type(req.stream_type);
+
     let schema_latest = empty_exec.schema();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
@@ -116,8 +122,8 @@ pub async fn search(
     // 1. get file id list
     let file_id_list = crate::service::file_list::query_ids(
         &req.org_id,
-        req.stream_type,
-        stream_name,
+        stream_type,
+        &stream_name,
         req.time_range,
     )
     .await?;
@@ -137,16 +143,17 @@ pub async fn search(
     };
 
     // 2. get inverted index file list
-    let (_use_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
+    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
         get_inverted_index_file_lists(
             &trace_id,
             &req,
-            stream_name,
+            &stream_name, // for inverted index search, only have on stream
             &flight_request.index_info.equal_keys,
             &flight_request.index_info.match_all_keys,
         )
         .await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
+    req.set_use_inverted_index(use_ttv_inverted_index);
 
     // get nodes
     let node_group = req
@@ -252,15 +259,17 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
-    let use_inverted_index =
-        req.use_inverted_index && cfg.common.inverted_index_search_format == "parquet";
+    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
+    let use_inverted_index = req.use_inverted_index;
+    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
+    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
-        use_inverted_index
+        use_parquet_inverted_index
     );
 
-    if !use_inverted_index {
-        return Ok((false, vec![], 0, 0));
+    if !use_parquet_inverted_index {
+        return Ok((use_ttv_inverted_index, vec![], 0, 0));
     }
 
     // construct partition filters
@@ -296,5 +305,10 @@ async fn get_inverted_index_file_lists(
         idx_took,
     );
 
-    Ok((true, idx_file_list, idx_scan_size, idx_took))
+    Ok((
+        use_ttv_inverted_index,
+        idx_file_list,
+        idx_scan_size,
+        idx_took,
+    ))
 }

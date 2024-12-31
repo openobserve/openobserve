@@ -141,6 +141,8 @@ export default defineComponent({
         },
       });
 
+      // Dispose the provider if it already exists before registering a new one
+      provider.value?.dispose();
       registerAutoCompleteProvider();
 
       let editorElement = document.getElementById(props.editorId);
@@ -234,7 +236,6 @@ export default defineComponent({
 
     onMounted(async () => {
       provider.value?.dispose();
-
       if (props.language === "vrl") {
         monaco.languages.register({ id: "vrl" });
 
@@ -273,12 +274,12 @@ export default defineComponent({
     });
 
     onActivated(async () => {
-      provider.value?.dispose();
-      registerAutoCompleteProvider();
-
       if (!editorObj) {
         setupEditor();
         editorObj?.layout();
+      } else {
+        provider.value?.dispose();
+        registerAutoCompleteProvider();
       }
     });
 

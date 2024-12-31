@@ -75,6 +75,7 @@ use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
+    transport::{Identity, ServerTlsConfig},
 };
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -188,7 +189,7 @@ async fn main() -> Result<(), anyhow::Error> {
         let _guard = rt.enter();
         rt.block_on(async move {
             // it must be initialized before the server starts
-            if let Err(e) = cluster::register_and_keepalive().await {
+            if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
                 panic!("cluster init failed: {}", e);
             }
@@ -220,15 +221,23 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
+
+            #[allow(deprecated)]
+            migration::upgrade_resource_names()
+                .await
+                .expect("migrate resource names into supported ofga format failed");
+
+            // migrate infra_sea_orm
+            if let Err(e) = infra::table::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("infra sea_orm migrate failed: {}", e);
+            }
+
             // migrate dashboards
             if let Err(e) = migration::dashboards::run().await {
                 job_init_tx.send(false).ok();
                 panic!("migrate dashboards failed: {}", e);
             }
-
-            migration::upgrade_resource_names()
-                .await
-                .expect("migrate resource names into supported ofga format failed");
 
             // ingester init
             if let Err(e) = ingester::init().await {
@@ -258,6 +267,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // flush distinct values
             _ = metadata::close().await;
             // flush WAL cache to disk
+            _ = ingester::flush_all().await;
             common_infra::wal::flush_all_to_disk().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
@@ -421,9 +431,21 @@ async fn init_common_grpc_server(
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
 
-    log::info!("starting gRPC server at {}", gaddr);
+    log::info!(
+        "starting gRPC server {} at {}",
+        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
+        gaddr
+    );
     init_tx.send(()).ok();
-    tonic::transport::Server::builder()
+    let builder = if cfg.grpc.tls_enabled {
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
+        let identity = Identity::from_pem(cert, key);
+        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
+    } else {
+        tonic::transport::Server::builder()
+    };
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -467,9 +489,21 @@ async fn init_router_grpc_server(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
-    log::info!("starting gRPC server at {}", gaddr);
+    log::info!(
+        "starting gRPC server {} at {}",
+        if cfg.grpc.tls_enabled { "with TLS" } else { "" },
+        gaddr
+    );
     init_tx.send(()).ok();
-    tonic::transport::Server::builder()
+    let builder = if cfg.grpc.tls_enabled {
+        let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+        let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
+        let identity = Identity::from_pem(cert, key);
+        tonic::transport::Server::builder().tls_config(ServerTlsConfig::new().identity(identity))?
+    } else {
+        tonic::transport::Server::builder()
+    };
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)

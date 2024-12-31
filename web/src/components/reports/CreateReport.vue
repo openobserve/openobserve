@@ -1019,11 +1019,14 @@ onBeforeMount(async () => {
         originalReportData.value = JSON.stringify(formData.value);
       })
       .catch((err) => {
-        q.notify({
+        if(err.response.status != 403){
+          q.notify({
           type: "negative",
           message: err?.data?.message || "Error while fetching report!",
           timeout: 4000,
-        });
+          });
+        }
+        
       })
       .finally(() => {
         isFetchingReport.value = false;
@@ -1101,7 +1104,8 @@ const setDashboardOptions = (id: string) => {
         false,
         "",
         store.state.selectedOrganization.identifier,
-        id
+        id,
+        ""
       )
       .then((response: any) => {
         response.data.dashboards
@@ -1368,7 +1372,8 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
-      q.notify({
+      if(error.response.status != 403){
+        q.notify({
         type: "negative",
         message:
           error?.response?.data?.message ||
@@ -1376,7 +1381,8 @@ const saveReport = async () => {
             isEditingReport.value ? "updating" : "saving"
           } report.`,
         timeout: 4000,
-      });
+        });
+      } 
     })
     .finally(() => {
       dismiss();

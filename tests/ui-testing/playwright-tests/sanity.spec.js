@@ -302,14 +302,14 @@ test.describe("Sanity testcases", () => {
     await page.getByRole("button", { name: "Create new function" }).click();
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");
-    await page.locator(".view-line").click();
-    await page.getByLabel("Editor content;Press Alt+F1").fill("sanity=1");
-    await page.getByText("sanity=").click();
-    await page.getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
-    await page.getByLabel("Editor content;Press Alt+F1").fill(".sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill("sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByText("sanity=").click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').getByLabel("Editor content;Press Alt+F1").fill(".sanity=1");
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("sanity");
@@ -406,18 +406,13 @@ test.describe("Sanity testcases", () => {
   test("create template, destination and alert and then delete it", async ({
     page,
   }) => {
-    await page.locator('[data-test="menu-link-\\/alerts-item"]').click();
+    await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page
-      .locator('[data-test="alerts-page"] div')
-      .filter({
-        hasText:
-          "AlertsDestinationsTemplateskeyboard_arrow_upkeyboard_arrow_down",
-      })
-      .first()
+      .locator('[data-test="alert-destinations-tab"]')
       .click();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="alert-alerts-tab"]').click({ force: true });
+    // await page.locator('[data-test="alert-alerts-tab"]').click({ force: true });
     await page.locator('[data-test="alert-templates-tab"]').click();
     await page.waitForTimeout(2000);
     await page
@@ -443,8 +438,8 @@ test.describe("Sanity testcases", () => {
         .first()
     ).toBeVisible();
     await page.waitForTimeout(1000);
-    await page.getByText("AlertsDestinationsTemplates").click();
-    await page.waitForTimeout(2000);
+    // await page.getByText("AlertsDestinationsTemplates").click();
+    // await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-destinations-tab"]').click();
     await page
       .locator('[data-test="alert-destination-list-add-alert-btn"]')
@@ -464,7 +459,8 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="add-destination-header--key-input"]')
       .click();
     await page.locator('[data-test="add-destination-submit-btn"]').click();
-    await page.locator('[data-test="alert-alerts-tab"]').click();
+    await page.locator('[data-test="menu-link-\\/alerts-item"]').click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-list-add-alert-btn"]').click();
     await page
       .locator('[data-test="add-alert-name-input"]')
@@ -533,6 +529,8 @@ test.describe("Sanity testcases", () => {
       .click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
+    await page.locator('[data-test="menu-link-settings-item"]').click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-destinations-tab"]').click();
     await page.locator('[data-test="destination-list-search-input"]').click();
     await page
@@ -593,7 +591,7 @@ test.describe("Sanity testcases", () => {
 
   test("should change settings successfully", async ({ page }) => {
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="menu-link-\\/settings\\/-item"]').click();
+    await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.getByText("General SettingsScrape").click();
     await page.getByRole("tab", { name: "General Settings" }).click();

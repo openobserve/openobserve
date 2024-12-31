@@ -43,7 +43,7 @@ use config::{
     metrics,
     utils::{
         arrow::record_batches_to_json_rows,
-        asynchronism::file::get_file_meta,
+        async_file::get_file_meta,
         file::scan_files_with_channel,
         inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
@@ -819,8 +819,9 @@ pub(crate) async fn generate_index_on_ingester(
         return Ok(());
     }
 
+    let cfg = get_config();
     let index_stream_name =
-        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+        if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
         } else {
             format!("{}_{}", stream_name, stream_type)
@@ -887,7 +888,7 @@ pub(crate) async fn generate_index_on_ingester(
         .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
-        if get_config().common.inverted_index_old_format
+        if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
         {
@@ -939,7 +940,7 @@ pub(crate) async fn generate_index_on_ingester(
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for row in json_rows {
         let timestamp: i64 = row
-            .get(&get_config().common.column_timestamp)
+            .get(&cfg.common.column_timestamp)
             .unwrap()
             .as_i64()
             .unwrap();
@@ -970,10 +971,13 @@ pub(crate) async fn generate_index_on_ingester(
         &index_stream_name,
     )
     .await;
-    let _ = crate::service::ingestion::write_file(&writer, &index_stream_name, data_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let _ = crate::service::ingestion::write_file(
+        &writer,
+        &index_stream_name,
+        data_buf,
+        !cfg.common.wal_fsync_disabled,
+    )
+    .await;
 
     log::info!(
         "[INGESTER:JOB] Written index wal file successfully, took: {} ms",
@@ -1346,7 +1350,7 @@ pub(crate) async fn create_tantivy_index(
     let caller = format!("[{caller}:JOB]");
 
     let dir = PuffinDirWriter::new();
-    let _index = generate_tantivy_index(
+    let index = generate_tantivy_index(
         dir.clone(),
         reader,
         full_text_search_fields,
@@ -1354,6 +1358,10 @@ pub(crate) async fn create_tantivy_index(
         schema,
     )
     .await?;
+    if index.is_none() {
+        return Ok(0);
+    }
+
     let puffin_bytes = dir.to_puffin_bytes()?;
     let index_size = puffin_bytes.len();
 
@@ -1362,7 +1370,6 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
-
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
@@ -1423,6 +1430,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
+    // no fields need to create index, return
     if tantivy_fields.is_empty() {
         return Ok(None);
     }
@@ -1494,6 +1502,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
                 doc.add_text(field, column_data.value(i));
             }
         }
+
+        // yield, this operation is time-consuming
+        tokio::task::yield_now().await;
+    }
+
+    // no docs need to create index, return
+    if docs.is_empty() {
+        return Ok(None);
     }
 
     let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();

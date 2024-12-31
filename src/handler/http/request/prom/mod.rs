@@ -165,26 +165,26 @@ async fn query(
                     .get(&format!("{org_id}/{}", user_email))
                     .unwrap()
                     .clone();
-                if user.is_external
-                    && !crate::handler::http::auth::validator::check_permissions(
-                        user_email,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get(stream_type_str.as_str())
-                                    .map_or(stream_type_str.as_str(), |model| model.key),
-                                name
-                            ),
-                            org_id: org_id.to_string(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                        },
-                        Some(user.role),
-                    )
-                    .await
+                if !crate::handler::http::auth::validator::check_permissions(
+                    user_email,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(stream_type_str.as_str())
+                                .map_or(stream_type_str.as_str(), |model| model.key),
+                            name
+                        ),
+                        org_id: org_id.to_string(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    user.role,
+                    user.is_external,
+                )
+                .await
                 {
                     return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
                 }
@@ -215,9 +215,10 @@ async fn query(
         start,
         end,
         step: 300_000_000, // 5m
+        no_cache: None,
     };
 
-    search(org_id, timeout, &req, user_email).await
+    search(org_id, &req, user_email, timeout).await
 }
 
 /// prometheus range queries
@@ -352,7 +353,8 @@ async fn query_range(
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
-                        Some(user.role),
+                        user.role,
+                        user.is_external,
                     )
                     .await
                 {
@@ -408,8 +410,7 @@ async fn query_range(
         },
     };
     if step == 0 {
-        // Grafana: Time range / max data points = step
-        step = (end - start) / promql::MAX_DATA_POINTS;
+        step = promql::round_step((end - start) / promql::MAX_DATA_POINTS);
     }
     if step < promql::micros(promql::MINIMAL_INTERVAL) {
         step = promql::micros(promql::MINIMAL_INTERVAL);
@@ -422,8 +423,9 @@ async fn query_range(
         start,
         end,
         step,
+        no_cache: req.no_cache,
     };
-    search(org_id, timeout, &req, user_email).await
+    search(org_id, &req, user_email, timeout).await
 }
 
 /// prometheus query metric metadata
@@ -608,7 +610,8 @@ async fn series(
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
-                    Some(user.role),
+                    user.role,
+                    user.is_external,
                 )
                 .await
             {
@@ -905,11 +908,11 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 
 async fn search(
     org_id: &str,
-    timeout: i64,
     req: &MetricsQueryRequest,
     user_email: &str,
+    timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(org_id, req, timeout, user_email).await {
+    match promql::search::search(org_id, req, user_email, timeout).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {

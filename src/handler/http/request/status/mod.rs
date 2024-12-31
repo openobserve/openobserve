@@ -49,11 +49,11 @@ use {
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
-            auditor::AuditMessage,
+            auditor::{AuditMessage, HttpMeta, Protocol},
             infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
             settings::{get_logo, get_logo_text},
         },
-        dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
+        dex::service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     std::io::ErrorKind,
 };
@@ -95,6 +95,7 @@ struct ConfigResponse<'a> {
     timestamp_column: String,
     syslog_enabled: bool,
     data_retention_days: i64,
+    extended_data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
@@ -115,6 +116,7 @@ struct ConfigResponse<'a> {
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
+    websocket_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -258,6 +260,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         timestamp_column: cfg.common.column_timestamp.clone(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
+        extended_data_retention_days: cfg.compact.extended_data_retention_days,
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
@@ -289,6 +292,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
+        websocket_enabled: cfg.common.websocket_enabled,
     }))
 }
 
@@ -378,12 +382,14 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         // Since this is not a protected route, there is no way to get the user email
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
         _timestamp: chrono::Utc::now().timestamp_micros(),
-        path: "/config/reload".to_string(),
-        query_params: "".to_string(),
-        body: "".to_string(),
-        response_code: 200,
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/reload".to_string(),
+            query_params: "".to_string(),
+            body: "".to_string(),
+            response_code: 200,
+        }),
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
@@ -437,12 +443,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
-        path: "/config/redirect".to_string(),
-        body: "".to_string(),
-        query_params: req.query_string().to_string(),
-        response_code: 302,
         _timestamp: chrono::Utc::now().timestamp_micros(),
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/redirect".to_string(),
+            body: "".to_string(),
+            query_params: req.query_string().to_string(),
+            response_code: 302,
+        }),
     };
 
     match query.get("state") {
@@ -452,7 +460,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                audit_message.response_code = 400;
+                if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                    http_meta.response_code = 400;
+                }
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
@@ -460,7 +470,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            audit_message.response_code = 400;
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
+            }
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -472,10 +484,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         Ok(login_data) => {
             let login_url;
             let access_token = login_data.access_token;
-            let keys = get_jwks().await;
-            let token_ver =
-                verify_decode_token(&access_token, &keys, &get_o2_config().dex.client_id, true)
-                    .await;
+            let keys = get_dex_jwks().await;
+            let token_ver = verify_decode_token(
+                &access_token,
+                &keys,
+                &get_o2_config().dex.client_id,
+                true,
+                true,
+            )
+            .await;
             let id_token;
             match token_ver {
                 Ok(res) => {
@@ -497,7 +514,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    audit_message.response_code = 401;
+                    if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                        http_meta.response_code = 400;
+                    }
                     audit_message._timestamp = chrono::Utc::now().timestamp_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -541,7 +560,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            audit_message.response_code = 401;
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
+            }
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
@@ -688,12 +709,14 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         audit(AuditMessage {
             user_email,
             org_id: "".to_string(),
-            method: "GET".to_string(),
             _timestamp: chrono::Utc::now().timestamp_micros(),
-            path: "/config/logout".to_string(),
-            query_params: req.query_string().to_string(),
-            body: "".to_string(),
-            response_code: 200,
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/config/logout".to_string(),
+                query_params: req.query_string().to_string(),
+                body: "".to_string(),
+                response_code: 200,
+            }),
         })
         .await;
     }

@@ -61,7 +61,9 @@ use super::{
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
-use crate::service::search::index::IndexCondition;
+use crate::service::{
+    metadata::distinct_values::DISTINCT_STREAM_PREFIX, search::index::IndexCondition,
+};
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -85,11 +87,22 @@ pub async fn merge_parquet_files(
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
-        && stream_name == "distinct_values"
+        && stream_name.starts_with(DISTINCT_STREAM_PREFIX)
     {
+        let fields = schema
+            .fields()
+            .iter()
+            .filter(|f| f.name() != &cfg.common.column_timestamp && f.name() != "count")
+            .map(|x| x.name().to_string())
+            .collect::<Vec<_>>();
+        let fields_str = fields.join(", ");
         format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
-            cfg.common.column_timestamp, cfg.common.column_timestamp, cfg.common.column_timestamp
+            "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
+            cfg.common.column_timestamp,
+            cfg.common.column_timestamp,
+            fields_str,
+            fields_str,
+            cfg.common.column_timestamp
         )
     } else {
         format!(
@@ -97,6 +110,7 @@ pub async fn merge_parquet_files(
             cfg.common.column_timestamp
         )
     };
+    log::debug!("merge_parquet_files sql: {}", sql);
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -181,6 +195,14 @@ pub fn create_session_config(
     if sorted_by_time {
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     }
+
+    // When set to true, skips verifying that the schema produced by planning the input of
+    // `LogicalPlan::Aggregate` exactly matches the schema of the input plan.
+    config = config.set_bool(
+        "datafusion.execution.skip_physical_aggregate_schema_check",
+        true,
+    );
+
     Ok(config)
 }
 
@@ -237,26 +259,10 @@ pub async fn prepare_datafusion_context(
     #[cfg(not(feature = "enterprise"))]
     let (memory_size, target_partition) = (cfg.memory_cache.datafusion_max_size, target_partitions);
     #[cfg(feature = "enterprise")]
-    let (mut memory_size, mut target_partition) =
-        (cfg.memory_cache.datafusion_max_size, target_partitions);
+    let (target_partition, memory_size) = (target_partitions, cfg.memory_cache.datafusion_max_size);
     #[cfg(feature = "enterprise")]
-    if let Some(wg) = _work_group {
-        if let Ok(wg) = WorkGroup::from_str(&wg) {
-            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
-            })?;
-            if get_o2_config().search_group.cpu_limit_enabled {
-                target_partition = target_partition * cpu as usize / 100;
-            }
-            memory_size = memory_size * mem as usize / 100;
-            log::debug!(
-                "[datafusion:{}] target_partition: {}, memory_size: {}",
-                wg,
-                target_partition,
-                memory_size
-            );
-        }
-    }
+    let (target_partition, memory_size) =
+        get_cpu_and_mem_limit(_work_group.clone(), target_partition, memory_size).await?;
 
     let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
@@ -278,8 +284,9 @@ pub async fn prepare_datafusion_context(
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
-    ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
@@ -300,6 +307,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));
@@ -362,7 +370,7 @@ pub async fn create_parquet_table(
     fst_fields: Vec<String>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
-    let mut target_partitions = if session.target_partitions == 0 {
+    let target_partitions = if session.target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
         std::cmp::max(
@@ -370,9 +378,16 @@ pub async fn create_parquet_table(
             session.target_partitions,
         )
     };
-    if target_partitions == 0 {
-        target_partitions = DATAFUSION_MIN_PARTITION;
-    }
+
+    #[cfg(feature = "enterprise")]
+    let (target_partitions, _) =
+        get_cpu_and_mem_limit(session.work_group.clone(), target_partitions, 0).await?;
+
+    let target_partitions = if target_partitions == 0 {
+        DATAFUSION_MIN_PARTITION
+    } else {
+        target_partitions
+    };
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -443,4 +458,30 @@ pub async fn create_parquet_table(
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))
+}
+
+#[cfg(feature = "enterprise")]
+async fn get_cpu_and_mem_limit(
+    work_group: Option<String>,
+    mut target_partitions: usize,
+    mut memory_size: usize,
+) -> Result<(usize, usize)> {
+    if let Some(wg) = work_group {
+        if let Ok(wg) = WorkGroup::from_str(&wg) {
+            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
+            })?;
+            if get_o2_config().search_group.cpu_limit_enabled {
+                target_partitions = target_partitions * cpu as usize / 100;
+            }
+            memory_size = memory_size * mem as usize / 100;
+            log::debug!(
+                "[datafusion:{}] target_partition: {}, memory_size: {}",
+                wg,
+                target_partitions,
+                memory_size
+            );
+        }
+    }
+    Ok((target_partitions, memory_size))
 }

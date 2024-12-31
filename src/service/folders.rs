@@ -13,179 +13,195 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{http, HttpResponse};
 use config::{
     ider,
-    meta::folder::{Folder, FolderList, DEFAULT_FOLDER},
+    meta::{
+        alerts::alert::ListAlertsParams,
+        dashboards::ListDashboardsParams,
+        folder::{Folder, DEFAULT_FOLDER},
+    },
+};
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    table::{self, folders::FolderType},
 };
 
-use crate::{
-    common::{
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{remove_ownership, set_ownership},
-    },
-    service::db,
+use crate::common::{
+    meta::authz::Authz,
+    utils::auth::{remove_ownership, set_ownership},
 };
+
+/// Errors that can occur when interacting with folders.
+#[derive(Debug, thiserror::Error)]
+pub enum FolderError {
+    /// An error that occurs while interacting with the database through the
+    /// [infra] crate.
+    #[error("InfraError# {0}")]
+    InfraError(#[from] infra::errors::Error),
+
+    /// An error that occurs when trying to set a folder name to the empty string.
+    #[error("Folder name cannot be empty")]
+    MissingName,
+
+    /// An error that occurs when trying to update the special "default" folder.
+    #[error("Can't update default folder")]
+    UpdateDefaultFolder,
+
+    /// An error that occurs when trying to delete a folder that contains dashboards.
+    #[error("Folder contains dashboards. Please move/delete dashboards from folder.")]
+    DeleteWithDashboards,
+
+    /// An error that occurs when trying to delete a folder that contains alerts.
+    #[error("Folder contains alerts. Please move/delete alerts from folder.")]
+    DeleteWithAlerts,
+
+    /// An error that occurs when trying to delete a folder that cannot be found.
+    #[error("Folder not found")]
+    NotFound,
+
+    /// An error occured trying to get the list of permitted folders in
+    /// enterprise mode because no user_id was provided.
+    #[error("user_id required to get permitted folders in enterprise mode")]
+    PermittedFoldersMissingUser,
+
+    /// An error occured trying to get the list of permitted folders in
+    /// enterprise mode using the validator.
+    #[error("PermittedFoldersValidator# {0}")]
+    PermittedFoldersValidator(String),
+}
 
 #[tracing::instrument(skip(folder))]
 pub async fn save_folder(
     org_id: &str,
     mut folder: Folder,
+    folder_type: FolderType,
     is_internal: bool,
-) -> Result<HttpResponse, Error> {
+) -> Result<Folder, FolderError> {
     folder.name = folder.name.trim().to_string();
     if folder.name.is_empty() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "folder name not allow empty".to_string(),
-            )),
-        );
+        return Err(FolderError::MissingName);
     }
 
     if !is_internal && folder.folder_id == DEFAULT_FOLDER {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "can't update default Dashboard folder".to_string(),
-            )),
-        );
+        return Err(FolderError::UpdateDefaultFolder);
     }
+
     if folder.folder_id != DEFAULT_FOLDER {
         folder.folder_id = ider::generate();
     }
 
-    match db::folders::put(org_id, folder).await {
-        Ok(folder) => {
-            set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
-            Ok(HttpResponse::Ok().json(folder))
-        }
-        Err(error) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        ),
-    }
+    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+    Ok(folder)
 }
 
 #[tracing::instrument(skip(folder))]
 pub async fn update_folder(
     org_id: &str,
     folder_id: &str,
+    folder_type: FolderType,
     mut folder: Folder,
-) -> Result<HttpResponse, Error> {
+) -> Result<Folder, FolderError> {
     if folder_id.eq(DEFAULT_FOLDER) {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "can't update default Dashboard folder".to_string(),
-            )),
-        );
+        return Err(FolderError::UpdateDefaultFolder);
     }
+
     folder.folder_id = folder_id.to_string();
-
-    if let Err(error) = db::folders::put(org_id, folder).await {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        );
-    }
-
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "Dashboard folder updated".to_string(),
-    )))
+    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    Ok(folder)
 }
 
 #[tracing::instrument()]
 pub async fn list_folders(
     org_id: &str,
-    permitted_folders: Option<Vec<String>>,
-) -> Result<HttpResponse, Error> {
-    if let Ok(folders) = db::folders::list_dashboard_folders(org_id).await {
-        let filtered = match permitted_folders {
-            Some(permitted_folders) => {
-                if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
-                    folders
-                } else {
-                    folders
-                        .into_iter()
-                        .filter(|folder_loc| {
-                            permitted_folders
-                                .contains(&format!("{}:{}", "dfolder", folder_loc.folder_id))
-                        })
-                        .collect::<Vec<_>>()
-                }
+    user_id: Option<&str>,
+    folder_type: FolderType,
+) -> Result<Vec<Folder>, FolderError> {
+    let permitted_folders = permitted_folders(org_id, user_id).await?;
+    let folders = table::folders::list_folders(org_id, folder_type).await?;
+    let filtered = match permitted_folders {
+        Some(permitted_folders) => {
+            if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
+                folders
+            } else {
+                folders
+                    .into_iter()
+                    .filter(|folder_loc| {
+                        permitted_folders
+                            .contains(&format!("{}:{}", "dfolder", folder_loc.folder_id))
+                    })
+                    .collect::<Vec<_>>()
             }
-            None => folders,
-        };
-
-        Ok(HttpResponse::Ok().json(FolderList { list: filtered }))
-    } else {
-        Ok(HttpResponse::Ok().json(FolderList { list: vec![] }))
-    }
+        }
+        None => folders,
+    };
+    Ok(filtered)
 }
 
 #[tracing::instrument()]
-pub async fn get_folder(org_id: &str, folder_id: &str) -> HttpResponse {
-    match db::folders::get(org_id, folder_id).await {
-        Ok(Some(folder)) => HttpResponse::Ok().json(folder),
-        Ok(None) => HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Dashboard folder not found".to_string(),
-        )),
-        Err(_) => HttpResponse::InternalServerError().into(),
-    }
+pub async fn get_folder(
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get(org_id, folder_id, folder_type)
+        .await?
+        .ok_or(FolderError::NotFound)
 }
 
 #[tracing::instrument()]
-pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, Error> {
-    let dashboards = db::dashboards::list(org_id, folder_id).await.unwrap();
-    if !dashboards.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Dashboard folder contains dashboards, please move/delete dashboards from folder "
-                .to_string(),
-        )));
+pub async fn delete_folder(
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<(), FolderError> {
+    match folder_type {
+        FolderType::Dashboards => {
+            let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
+            let dashboards = table::dashboards::list(params).await?;
+            if !dashboards.is_empty() {
+                return Err(FolderError::DeleteWithDashboards);
+            }
+        }
+        FolderType::Alerts => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let params = ListAlertsParams::new(org_id).in_folder(folder_id);
+            let alerts = table::alerts::list(client, params).await?;
+            if !alerts.is_empty() {
+                return Err(FolderError::DeleteWithAlerts);
+            }
+        }
+    };
+
+    if !table::folders::exists(org_id, folder_id, folder_type).await? {
+        return Err(FolderError::NotFound);
     }
 
-    match db::folders::exists(org_id, folder_id).await {
-        Ok(true) => { // Continue with deleting the folder.
-        }
-        Ok(false) => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "Dashboard folder not found".to_string(),
-            )));
-        }
-        Err(e) => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            );
-        }
-    }
+    table::folders::delete(org_id, folder_id, folder_type).await?;
+    remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+    Ok(())
+}
 
-    match db::folders::delete(org_id, folder_id).await {
-        Ok(_) => {
-            remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Dashboard folder deleted".to_string(),
-            )))
-        }
-        Err(e) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                e.to_string(),
-            )),
-        ),
-    }
+#[cfg(not(feature = "enterprise"))]
+async fn permitted_folders(
+    _org_id: &str,
+    _user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, FolderError> {
+    Ok(None)
+}
+
+#[cfg(feature = "enterprise")]
+async fn permitted_folders(
+    org_id: &str,
+    user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, FolderError> {
+    let Some(user_id) = user_id else {
+        return Err(FolderError::PermittedFoldersMissingUser);
+    };
+    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "dfolder",
+    )
+    .await
+    .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+    Ok(stream_list)
 }

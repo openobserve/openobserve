@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::file::set_permission;
-use infra::file_list as infra_file_list;
+use infra::{file_list as infra_file_list, table};
 
 use crate::{
     cli::data::{
@@ -117,6 +117,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .help("the parquet file name"),
                 ),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
+            clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
+                .subcommand(
+                    clap::Command::new("all")
+                    .about("rollback all SeaORM migration steps")
+                )
+                .subcommand(
+                    clap::Command::new("last")
+                    .about("rollback last N SeaORM migration steps")
+                    .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
+                ),
         ])
         .get_matches();
 
@@ -172,7 +182,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::alerts::alert::reset().await?;
                 }
                 "dashboard" => {
-                    db::dashboards::reset().await?;
+                    table::dashboards::delete_all().await?;
                 }
                 "report" => {
                     db::dashboards::reports::reset().await?;
@@ -271,8 +281,29 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "migrate-schemas" => {
             println!("Running schema migration to row per schema version");
+            #[allow(deprecated)]
             migration::schema::run().await?
         }
+        "seaorm-rollback" => match command.subcommand() {
+            Some(("all", _)) => {
+                println!("Rolling back all");
+                infra::table::down(None).await?
+            }
+            Some(("last", sub_matches)) => {
+                let n = sub_matches
+                    .get_one::<u32>("N")
+                    .map(|n| n.to_owned())
+                    .unwrap_or(1);
+                println!("Rolling back {n}");
+                infra::table::down(Some(n)).await?
+            }
+            Some((name, _)) => {
+                return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+            }
+            None => {
+                return Err(anyhow::anyhow!("missing sub command"));
+            }
+        },
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }

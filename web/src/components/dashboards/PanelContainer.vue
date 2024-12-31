@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="1px"
           @click="
             PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
-              props.data.title
+              props.data.title,
             )
           "
           title="Download as a CSV"
@@ -140,7 +140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onRefreshPanel"
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
-        />
+          :color="variablesDataUpdated ? 'warning' : ''"
+        >
+          <q-tooltip>
+            {{
+              variablesDataUpdated
+                ? "Refresh to apply latest variable changes"
+                : "Refresh"
+            }}
+          </q-tooltip>
+        </q-btn>
         <q-btn-dropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
           dense
@@ -296,6 +305,7 @@ import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vu
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import { isEqual } from "lodash-es";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -325,7 +335,8 @@ export default defineComponent({
     "forceLoad",
     "searchType",
     "folderId",
-    "reportId"
+    "reportId",
+    "currentVariablesData",
   ],
   components: {
     PanelSchemaRenderer,
@@ -366,7 +377,7 @@ export default defineComponent({
             query.function_error,
             query.new_start_time,
             query.new_end_time,
-            store.state.timezone
+            store.state.timezone,
           );
           combinedWarnings.push(combinedMessage);
         }
@@ -386,7 +397,7 @@ export default defineComponent({
     // to store and show warning if the cached data is different with current time range
     const isCachedDataDifferWithCurrentTimeRange: any = ref(false);
     const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      isDiffer: boolean
+      isDiffer: boolean,
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
     };
@@ -408,7 +419,7 @@ export default defineComponent({
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
         const vars = it?.variables?.filter(
-          (it: any) => it.type === "dynamicVariable"
+          (it: any) => it.type === "dynamicVariable",
         );
         return vars?.length == adhocVariables?.length;
       });
@@ -455,7 +466,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? data.panels[0]?.tabId
+          route.query.tab ?? data.panels[0]?.tabId,
         );
 
         // Show a success notification.
@@ -480,7 +491,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel duplication failed"
+              "Panel duplication failed",
           );
         } else {
           showErrorNotification(error?.message ?? "Panel duplication failed");
@@ -501,6 +512,60 @@ export default defineComponent({
     const onRefreshPanel = () => {
       emit("refreshPanelRequest", props.data.id);
     };
+
+    const createVariableRegex = (name: any) =>
+      new RegExp(
+        `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+      );
+      
+    const getDependentVariablesData = () =>
+      props.variablesData?.values
+        ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
+        ?.filter((it: any) => {
+          const regexForVariable = createVariableRegex(it.name);
+          return props.data.queries
+            ?.map((q: any) => regexForVariable.test(q?.query))
+            ?.includes(true);
+        });
+
+    // Check if any dependent variable's value has changed
+    const variablesDataUpdated = computed(() => {
+      // Get dependent variables
+      const dependentVariables = getDependentVariablesData();
+
+      // Validate dependentVariables and currentVariablesData
+      if (!Array.isArray(dependentVariables)) {
+        return false;
+      }
+      if (!Array.isArray(props.currentVariablesData.values)) {
+        return false;
+      }
+
+      // Check if any dependent variable's value has changed
+      return dependentVariables.some((dependentVariable) => {
+        if (!dependentVariable || !dependentVariable.name) {
+          return false;
+        }
+
+        // Find the corresponding variable in currentVariablesData
+        const refreshedVariable = props.currentVariablesData.values.find(
+          (varData: any) => varData.name === dependentVariable.name,
+        );
+
+        if (!refreshedVariable) {
+          return false; // Assume no change if no matching variable
+        }
+
+        // Compare values
+        const currentValue = dependentVariable.value;
+        const refreshedValue = refreshedVariable.value;
+
+        // Handle both array and primitive types for value comparison
+        return Array.isArray(currentValue)
+          ? !isEqual(currentValue, refreshedValue)
+          : currentValue !== refreshedValue;
+      });
+    });
 
     return {
       props,
@@ -527,6 +592,7 @@ export default defineComponent({
       confirmMovePanelDialog,
       movePanelDialog,
       onRefreshPanel,
+      variablesDataUpdated,
     };
   },
   methods: {

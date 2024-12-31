@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.13.2"
+version = "0.14.1"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -145,6 +145,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
+sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -153,6 +154,7 @@ snafu.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
 strum = { version = "0.25", features = ["derive"] }
+svix-ksuid.workspace = true
 sysinfo.workspace = true
 syslog_loose = "0.18.0"
 thiserror.workspace = true
@@ -180,11 +182,14 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+futures-util = "0.3.31"
+tokio-tungstenite = "0.24.0"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
+async-walkdir.workspace = true
 expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
@@ -234,7 +239,7 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
-dashmap = { version = "6.0", features = ["serde"] }
+dashmap = { version = "6.1", features = ["serde"] }
 datafusion = "43.0.0"
 datafusion-proto = "43.0.0"
 datafusion-functions-aggregate-common = "43.0.0"
@@ -256,12 +261,12 @@ futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
-hashlink = "0.9.1"
-hashbrown = { version = "0.14", features = ["serde"] }
+hashlink = "0.10"
+hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
-indexmap = { version = "2.0", features = ["serde"] }
+indexmap = { version = "2.7", features = ["serde"] }
 ipnetwork = "0.20"
-itertools = "0.12"
+itertools = "0.13"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
     "hostname",
@@ -274,8 +279,8 @@ log = "0.4"
 md5 = "0.7.0"
 memchr = "2.7"
 murmur3 = "0.5"
-async-nats = "0.37"
-once_cell = "1.17"
+async-nats = "0.38"
+once_cell = "1.20"
 ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = "0.13"
@@ -305,7 +310,7 @@ serde_json = "1"
 sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
-sqlx = { version = "0.8.1", features = [
+sqlx = { version = "0.8.2", features = [
     "runtime-tokio-rustls",
     "postgres",
     "mysql",
@@ -321,15 +326,15 @@ time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.12.3", features = ["prost", "gzip"] }
+tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.26"
 tracing-subscriber = { version = "0.3.0", features = [
-    "registry",
     "env-filter",
     "json",
+    "registry",
 ] }
 url = "2.2"
 urlencoding = "2.1"

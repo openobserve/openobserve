@@ -275,6 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
+                @view-trace="
+                  viewTrace(formattedRows[virtualRow.index]?.original)
+                "
               />
             </td>
             <template v-else>
@@ -420,6 +423,7 @@ const emits = defineEmits([
   "update:columnSizes",
   "update:columnOrder",
   "expandRow",
+  "view-trace",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -490,12 +494,6 @@ watch(
   },
 );
 
-const tableCellClass = computed(() => [
-  hasDefaultSourceColumn.value && !props.wrap ? "tw-table-cell" : "tw-block",
-  !props.wrap && "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap",
-  props.wrap && "tw-break-words",
-]);
-
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
@@ -544,6 +542,27 @@ onMounted(() => {
 
 const hasDefaultSourceColumn = computed(
   () => props.defaultColumns && columnOrder.value.includes("source"),
+);
+
+const tableCellClass = ref<string[]>([]);
+
+watch(
+  () => [hasDefaultSourceColumn.value, props.wrap],
+  () => {
+    tableCellClass.value = [
+      hasDefaultSourceColumn.value && !props.wrap
+        ? "tw-table-cell"
+        : "tw-block",
+      !props.wrap
+        ? "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap"
+        : "",
+      props.wrap ? "tw-break-words" : "",
+    ];
+  },
+  {
+    immediate: true,
+    deep: true,
+  },
 );
 
 const updateTableWidth = async () => {
@@ -757,6 +776,10 @@ const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
 
 const handleCellMouseLeave = () => {
   activeCellActionId.value = "";
+};
+
+const viewTrace = (row: any) => {
+  emits("view-trace", row);
 };
 
 defineExpose({

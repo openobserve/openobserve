@@ -21,7 +21,7 @@ use actix_web::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config, dex::service::auth::get_jwks,
+    common::infra::config::get_config as get_o2_config, dex::service::auth::get_dex_jwks,
 };
 
 use crate::common::utils::auth::AuthExtractor;
@@ -40,7 +40,7 @@ pub async fn token_validator(
     use super::validator::check_permissions;
 
     let user;
-    let keys = get_jwks().await;
+    let keys = get_dex_jwks().await;
     let path = match req
         .request()
         .path()
@@ -56,6 +56,7 @@ pub async fn token_validator(
         &keys,
         &get_o2_config().dex.client_id,
         false,
+        true,
     )
     .await
     {
@@ -105,7 +106,8 @@ pub async fn token_validator(
                             header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                         );
                         if auth_info.bypass_check
-                            || check_permissions(user_id, auth_info, Some(user.role)).await
+                            || check_permissions(user_id, auth_info, user.role, user.is_external)
+                                .await
                         {
                             Ok(req)
                         } else {
@@ -124,12 +126,13 @@ pub async fn token_validator(
 
 #[cfg(feature = "enterprise")]
 pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
-    let keys = get_jwks().await;
+    let keys = get_dex_jwks().await;
     match jwt::verify_decode_token(
         auth_str.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &get_o2_config().dex.client_id,
         false,
+        true,
     )
     .await
     {

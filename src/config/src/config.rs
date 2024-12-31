@@ -49,8 +49,8 @@ pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
-pub const SIZE_IN_MB: i64 = 1024 * 1024;
-pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
+pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
@@ -485,6 +485,14 @@ pub struct Grpc {
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
     pub connect_timeout: u64,
+    #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
+    pub tls_enabled: bool,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
+    pub tls_cert_domain: String,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -584,8 +592,10 @@ pub struct Common {
     pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
     pub feature_query_without_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = false)]
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
+    pub feature_query_streaming_aggs: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -604,6 +614,8 @@ pub struct Common {
         help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
     )]
     pub bloom_filter_ndv_ratio: u64,
+    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
+    pub wal_fsync_disabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -693,7 +705,7 @@ pub struct Common {
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
     #[env_config(
-        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        name = "ZO_MMDB_GEOLITE_ASNDB_SHA256_URL",
         default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
     )]
     pub mmdb_geolite_asndb_sha256_url: String,
@@ -736,13 +748,13 @@ pub struct Common {
     pub inverted_index_old_format: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "parquet",
+        default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "",
+        default = "tantivy",
         help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,
@@ -831,7 +843,7 @@ pub struct Common {
     )]
     pub self_metrics_consumption_interval: u64,
     #[env_config(
-        name = "ZO_SELF_METRIC_CONSUMPTION_WHITELIST",
+        name = "ZO_SELF_METRIC_CONSUMPTION_ACCEPTLIST",
         default = "",
         help = "only these metrics will be self-consumed, comma separated"
     )]
@@ -864,6 +876,8 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -901,8 +915,6 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
-    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
-    pub wal_fsync_disabled: bool,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -944,6 +956,10 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
+    pub metrics_max_series_per_query: usize,
+    #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
+    pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -998,6 +1014,24 @@ pub struct Limit {
     pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
+    pub search_job_workers: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
+    pub search_job_scheduler_interval: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_RUM_TIMEOUT",
+        default = 600, // seconds
+        help = "Timeout for update check"
+    )]
+    pub search_job_run_timeout: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_DELETE_INTERVAL", default = 600)] // seconds
+    pub search_job_delete_interval: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_TIMEOUT",
+        default = 36000, // seconds
+        help = "Timeout for query"
+    )]
+    pub search_job_timeout: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
@@ -1062,8 +1096,18 @@ pub struct Limit {
     pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
     pub consistent_hash_vnodes: usize,
-    #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
+    #[env_config(
+        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
+    )]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the streaming aggs cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub datafusion_streaming_aggs_cache_max_entries: usize,
     #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
     pub datafusion_min_partition_num: usize,
     #[env_config(
@@ -1102,6 +1146,8 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
     pub max_file_size: usize,
+    #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
+    pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -1290,6 +1336,12 @@ pub struct Nats {
         To update this, delete and recreate the bucket."
     )]
     pub history: i64,
+    #[env_config(
+        name = "ZO_NATS_DELIVER_POLICY",
+        default = "all",
+        help = "The point in the stream from which to receive messages, default is: all, valid option is: all, last, new."
+    )]
+    pub deliver_policy: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
@@ -1483,6 +1535,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check grpc config
+    if let Err(e) = check_grpc_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1642,6 +1699,17 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    Ok(())
+}
+
+fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.grpc.tls_enabled
+        && (cfg.grpc.tls_cert_domain.is_empty()
+            || cfg.grpc.tls_cert_path.is_empty()
+            || cfg.grpc.tls_key_path.is_empty())
+    {
+        return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+    }
     Ok(())
 }
 

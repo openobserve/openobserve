@@ -16,8 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
-    <div ref="chartPanelRef" style="height: 100%; position: relative">
-      <div v-if="!errorDetail" style="height: 100%; width: 100%">
+    <div
+      ref="chartPanelRef"
+      style="height: 100%; position: relative"
+      :class="chartPanelClass"
+    >
+      <div
+        v-if="!errorDetail"
+        :style="{ height: chartPanelHeight, width: '100%' }"
+      >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -175,10 +182,14 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
+import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { generateDurationLabel } from "../../utils/date";
+import { onBeforeMount } from "vue";
+import { useLoading } from "@/composables/useLoading";
+import useNotifications from "@/composables/useNotifications";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -272,6 +283,10 @@ export default defineComponent({
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+    const chartPanelStyle = ref({
+      height: "100%",
+      width: "100%",
+    });
 
     // get refs from props
     const {
@@ -396,10 +411,13 @@ export default defineComponent({
               hoveredSeriesState,
               resultMetaData,
               metadata.value,
+              chartPanelStyle.value,
             );
 
             errorDetail.value = "";
           } catch (error: any) {
+            console.error("error", error);
+            
             errorDetail.value = error.message;
           }
         } else {
@@ -425,14 +443,6 @@ export default defineComponent({
       metadata,
       () => {
         emit("metadata-update", metadata.value);
-      },
-      { deep: true },
-    );
-
-    watch(
-      resultMetaData,
-      () => {
-        emit("result-metadata-update", resultMetaData.value);
       },
       { deep: true },
     );
@@ -550,7 +560,7 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {
+    watch(errorDetail, () => {      
       //check if there is an error message or not
       if (!errorDetail.value) return;
       emit("error", errorDetail);
@@ -667,10 +677,128 @@ export default defineComponent({
         hideDrilldownPopUp();
       }
     };
+    
+    const { showErrorNotification } = useNotifications();
 
+    let parser: any;
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+
+    // get interval from resultMetaData if it exists
+    const interval = computed(
+      () => resultMetaData?.value?.[0]?.histogram_interval,
+    );
+
+    // get interval in micro seconds
+    const intervalMicro = computed(() => interval.value * 1000 * 1000);
+
+    watch(
+      () => resultMetaData.value,
+      (newVal) => {
+        emit("result-metadata-update", newVal);
+      },
+      { deep: true },
+    );
+
+    const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
+      const originalQuery = metadata?.value?.queries[0]?.query;
+      const streamName = queryDetails?.queries[0]?.fields?.stream;
+
+      if (!originalQuery || !streamName) {
+        console.error("Missing query or stream name.");
+        return null;
+      }
+
+      return { originalQuery, streamName };
+    };
+
+    const calculateTimeRange = (
+      hoveredTimestamp: number | null,
+      interval: number | undefined,
+    ) => {
+      if (interval && hoveredTimestamp) {
+        const startTime = hoveredTimestamp * 1000; // Convert to microseconds
+        return {
+          startTime,
+          endTime: startTime + interval,
+        };
+      }
+      return {
+        startTime: selectedTimeObj.value.start_time.getTime(),
+        endTime: selectedTimeObj.value.end_time.getTime(),
+      };
+    };
+
+    const parseQuery = async (originalQuery: string, parser: any) => {
+      try {
+        return parser.astify(originalQuery);
+      } catch (error) {
+        console.error("Failed to parse query:", error);
+        return null;
+      }
+    };
+
+    const buildWhereClause = (
+      ast: any,
+      breakdownColumn?: string,
+      breakdownValue?: string,
+    ): string => {
+      let whereClause = ast?.where
+        ? parser
+            .sqlify({ type: "select", where: ast.where })
+            .slice("SELECT".length)
+        : "";
+
+      if (breakdownColumn && breakdownValue) {
+        const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
+        whereClause += whereClause
+          ? ` AND ${breakdownCondition}`
+          : ` WHERE ${breakdownCondition}`;
+      }
+
+      return whereClause;
+    };
+
+    const constructLogsUrl = (
+      streamName: string,
+      calculatedTimeRange: { startTime: number; endTime: number },
+      encodedQuery: string,
+      queryDetails: any,
+      currentUrl: string,
+    ) => {
+      const logsUrl = new URL(currentUrl + "/logs");
+      logsUrl.searchParams.set(
+        "stream_type",
+        queryDetails.queries[0]?.fields?.stream_type,
+      );
+      logsUrl.searchParams.set("stream", streamName);
+      logsUrl.searchParams.set(
+        "from",
+        calculatedTimeRange.startTime.toString(),
+      );
+      logsUrl.searchParams.set("to", calculatedTimeRange.endTime.toString());
+      logsUrl.searchParams.set("sql_mode", "true");
+      logsUrl.searchParams.set("query", encodedQuery);
+      logsUrl.searchParams.set(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
+      logsUrl.searchParams.set("quick_mode", "false");
+      logsUrl.searchParams.set("show_histogram", "true");
+
+      return logsUrl;
+    };
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
       hideDrilldownPopUp();
+
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -683,6 +811,80 @@ export default defineComponent({
 
         // find drilldown data
         const drilldownData = panelSchema.value.config.drilldown[index];
+
+        const navigateToLogs = async () => {
+          const queryDetails = panelSchema.value;
+          if (!queryDetails) {
+            console.error("Panel schema is undefined.");
+            return;
+          }
+
+          const { originalQuery, streamName } =
+            getOriginalQueryAndStream(queryDetails, metadata) || {};
+          if (!originalQuery || !streamName) return;
+
+          const hoveredTime = drilldownParams[0]?.value?.[0];
+          const hoveredTimestamp = hoveredTime
+            ? new Date(hoveredTime).getTime()
+            : null;
+          const breakdown = queryDetails.queries[0].fields?.breakdown || [];
+
+          const calculatedTimeRange = calculateTimeRange(
+            hoveredTimestamp,
+            intervalMicro.value,
+          );
+
+          if (!parser) {
+            await importSqlParser();
+          }
+
+          const ast = await parseQuery(originalQuery, parser);
+          if (!ast) return;
+
+          const breakdownColumn = breakdown[0]?.column;
+          const breakdownValue = drilldownParams[0]?.seriesName;
+          const whereClause = buildWhereClause(
+            ast,
+            breakdownColumn,
+            breakdownValue,
+          );
+
+          const modifiedQuery =
+            drilldownData.data.logsMode === "auto"
+              ? `SELECT * FROM "${streamName}" ${whereClause}`
+              : drilldownData.data.logsQuery;
+
+          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+
+          const pos = window.location.pathname.indexOf("/web/");
+          const currentUrl =
+            pos > -1
+              ? window.location.origin +
+                window.location.pathname.slice(0, pos) +
+                "/web"
+              : window.location.origin;
+
+          const logsUrl = constructLogsUrl(
+            streamName,
+            calculatedTimeRange,
+            encodedQuery,
+            queryDetails,
+            currentUrl,
+          );
+
+          try {
+            if (drilldownData.targetBlank) {
+              window.open(logsUrl.toString(), "_blank");
+            } else {
+              await router.push({
+                path: "/logs",
+                query: Object.fromEntries(logsUrl.searchParams.entries()),
+              });
+            }
+          } catch (error) {
+            console.error("Failed to navigate to logs:", error);
+          }
+        };
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
         // if pie, donut or heatmap then series name will come in name field
@@ -784,6 +986,12 @@ export default defineComponent({
               drilldownData.targetBlank ? "_blank" : "_self",
             );
           } catch (error) {}
+        } else if (drilldownData.type == "logs") {
+          try {
+            navigateToLogs();
+          } catch (error) {
+            showErrorNotification("Failed to navigate to logs",)
+          }
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
           // so we have to get id of folder, dashboard and tab
@@ -810,12 +1018,18 @@ export default defineComponent({
             store,
             folderId,
           );
-          const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
-          );
+
+          const dashboardId = allDashboardData?.find(
+            (dashboard: any) =>
+              dashboard.title === drilldownData.data.dashboard
+          )?.dashboardId;
+
+          const dashboardData = await getDashboard(store, dashboardId, folderId);
 
           if (!dashboardData) {
-            console.error(`Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`);
+            console.error(
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
+            );
             return;
           }
 
@@ -912,6 +1126,30 @@ export default defineComponent({
       }
     };
 
+    const chartPanelHeight = computed(() => {
+      if (
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        panelSchema.value.config?.trellis?.layout &&
+        !loading.value
+      ) {
+        return chartPanelStyle.value.height;
+      }
+
+      return "100%";
+    });
+
+    const chartPanelClass = computed(() => {
+      if (
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        panelSchema.value.config?.trellis?.layout &&
+        !loading.value
+      ) {
+        return "overflow-auto";
+      }
+
+      return "";
+    });
+
     return {
       store,
       chartPanelRef,
@@ -928,6 +1166,8 @@ export default defineComponent({
       openDrilldown,
       drilldownPopUpRef,
       hideDrilldownPopUp,
+      chartPanelClass,
+      chartPanelHeight,
     };
   },
 });
