@@ -36,7 +36,6 @@ use crate::{
     service::{
         promql::utils::{apply_label_selector, apply_matchers},
         search::{
-            cluster::flight::print_plan,
             datafusion::{
                 distributed_plan::{
                     node::{RemoteScanNode, SearchInfos},
@@ -154,9 +153,6 @@ async fn get_wal_batches(
 
     let plan = df.logical_plan();
     let mut physical_plan = ctx.state().create_physical_plan(plan).await?;
-    if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
-    }
 
     let remote_scan_node = RemoteScanNode {
         nodes: nodes.into_arc_vec(),
@@ -182,22 +178,19 @@ async fn get_wal_batches(
 
     physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
 
-    if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
-    }
-
     // run datafusion
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
     let (mut batches, stats, ..) = if let Err(e) = ret {
-        log::error!("[trace_id {trace_id}] flight->search: datafusion collect error: {e}");
+        log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
         Err(e)
     } else {
-        log::info!("[trace_id {trace_id}] flight->search: datafusion collect done");
+        log::info!("[trace_id {trace_id}] promql->wal->search: datafusion collect done");
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
     }?;
 
+    // TODO: do we have other way?
     for batch in batches.iter_mut() {
         *batch = adapt_batch(Arc::clone(&schema), batch);
     }
