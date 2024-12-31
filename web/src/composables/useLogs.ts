@@ -288,6 +288,15 @@ const intervalMap: any = {
   "1 day": 24 * 60 * 60 * 1000 * 1000,
 };
 
+const {
+  fetchQueryDataWithWebSocket,
+  sendSearchMessageBasedOnRequestId,
+  cancelSearchQueryBasedOnRequestId,
+  closeSocketBasedOnRequestId,
+} = useSearchWebSocket();
+
+const searchPartitionMap = reactive<{ [key: string]: number }>({});
+
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
@@ -300,13 +309,6 @@ const useLogs = () => {
   const fieldValues = ref();
 
   const notificationMsg = ref("");
-
-  const {
-    fetchQueryDataWithWebSocket,
-    sendSearchMessageBasedOnRequestId,
-    cancelSearchQueryBasedOnRequestId,
-    closeSocketBasedOnRequestId,
-  } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -3441,7 +3443,6 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
-      return true;
     } catch (e: any) {
       console.log("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
@@ -4111,7 +4112,9 @@ const useLogs = () => {
 
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
-      sendCancelSearchMessage();
+      sendCancelSearchMessage([
+        ...searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+      ]);
       return;
     }
 
@@ -4465,9 +4468,10 @@ const useLogs = () => {
 
   const getDataThroughWebSocket = (isPagination: boolean) => {
     try {
-      if (isPagination) {
-        searchObj.data.queryResults.hits = [];
-      } else {
+      // Cancel request if already in progress
+      cancelQuery();
+
+      if (!isPagination) {
         resetQueryData();
         searchObj.data.queryResults = {};
       }
@@ -4685,6 +4689,11 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
+    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+      ? searchPartitionMap[payload.traceId]
+      : 0;
+    searchPartitionMap[payload.traceId]++;
+
     if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
@@ -4692,6 +4701,7 @@ const useLogs = () => {
           payload.isPagination,
           payload.traceId,
           response,
+          searchPartitionMap[payload.traceId] > 1,
         );
       }
 
@@ -4720,6 +4730,7 @@ const useLogs = () => {
     isPagination: boolean,
     traceId: string,
     response: any,
+    appendResult: boolean = false,
   ) => {
     try {
       const parsedSQL = fnParsedSQL();
@@ -4796,10 +4807,7 @@ const useLogs = () => {
         // Scan-size and took time in histogram title
         // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
         // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-        if (
-          searchObj.data.queryResults.hasOwnProperty("hits") &&
-          searchObj.data.queryResults.hits.length > 0
-        ) {
+        if (appendResult) {
           searchObj.data.queryResults.hits.push(
             ...response.content.results.hits,
           );
@@ -4949,8 +4957,10 @@ const useLogs = () => {
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
 
-    generateHistogramData();
-    refreshPagination(true); // check whats this
+    (async () => {
+      generateHistogramData();
+      refreshPagination(true); // check whats this
+    })();
 
     // queryReq.query.start_time =
     //   searchObj.data.queryResults.partitionDetail.paginations[
@@ -5238,8 +5248,6 @@ const useLogs = () => {
 
       totalPages = Math.ceil(total / rowsPerPage);
 
-      console.log("Total Pages", searchObj.data.queryResults.total, totalPages);
-
       for (let i = 0; i < totalPages; i++) {
         if (i + 1 > currentPage + 10) {
           break;
@@ -5272,16 +5280,16 @@ const useLogs = () => {
     addRequestId(requestId, payload.traceId);
   };
 
-  const sendCancelSearchMessage = () => {
+  const sendCancelSearchMessage = (searchRequests: any[]) => {
     try {
+      if (!searchRequests.length) return;
+
       searchObj.data.isOperationCancelled = true;
 
       // loop on all requestIds
-      searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
-        ({ requestId, traceId }) => {
-          cancelSearchQueryBasedOnRequestId(requestId, traceId);
-        },
-      );
+      searchRequests.forEach(({ requestId, traceId }) => {
+        cancelSearchQueryBasedOnRequestId(requestId, traceId);
+      });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
       showErrorNotification("Failed to cancel search operations");
