@@ -313,6 +313,16 @@ pub async fn authentication(
         audit_message.user_email = auth.name.clone();
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        if get_o2_config().dex.root_only_login
+            && !crate::common::utils::auth::is_root_user(&auth.name)
+        {
+            audit_unauthorized_error(audit_message).await;
+            return unauthorized_error(resp);
+        }
+    }
+
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
