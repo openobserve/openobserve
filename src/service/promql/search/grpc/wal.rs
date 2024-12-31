@@ -44,7 +44,6 @@ use crate::{
                 exec::prepare_datafusion_context,
                 table_provider::empty_table::NewEmptyTable,
             },
-            grpc::wal::adapt_batch,
             utils::ScanStatsVisitor,
         },
     },
@@ -71,7 +70,7 @@ pub(crate) async fn create_context(
     );
 
     // get wal record batches
-    let (stats, batches) = get_wal_batches(
+    let (stats, batches, schema) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -116,15 +115,15 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: Option<HashSet<String>>,
-) -> Result<(ScanStats, Vec<RecordBatch>)> {
+) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok((ScanStats::new(), vec![]));
+        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
     }
     let nodes = nodes.unwrap();
 
-    let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
+    let ctx = prepare_datafusion_context(None, vec![], false, cfg.limit.cpu_num).await?;
     let table = Arc::new(
         NewEmptyTable::new(stream_name, Arc::clone(&schema))
             .with_partitions(ctx.state().config().target_partitions()),
@@ -140,7 +139,7 @@ async fn get_wal_batches(
                 .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
         )?,
         Err(_) => {
-            return Ok((ScanStats::new(), vec![]));
+            return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
         }
     };
 
@@ -148,7 +147,7 @@ async fn get_wal_batches(
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
-        None => return Ok((ScanStats::new(), vec![])),
+        None => return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty()))),
     }
 
     let plan = df.logical_plan();
@@ -182,7 +181,7 @@ async fn get_wal_batches(
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (mut batches, stats, ..) = if let Err(e) = ret {
+    let (batches, stats, ..) = if let Err(e) = ret {
         log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
         Err(e)
     } else {
@@ -190,10 +189,9 @@ async fn get_wal_batches(
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
     }?;
 
-    // TODO: do we have other way?
-    for batch in batches.iter_mut() {
-        *batch = adapt_batch(Arc::clone(&schema), batch);
+    let mut schema = Arc::new(Schema::empty());
+    if batches.len() > 0 {
+        schema = Arc::clone(&batches[0].schema());
     }
-
-    Ok((stats, batches))
+    Ok((stats, batches, schema))
 }
