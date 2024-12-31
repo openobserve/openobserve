@@ -66,6 +66,13 @@ pub struct MetricsQueryRequest {
     pub no_cache: Option<bool>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct MetricsQueryExemplarsRequest {
+    pub query: String,
+    pub start: i64,
+    pub end: i64,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {

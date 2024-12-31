@@ -1127,7 +1127,7 @@ async fn selector_load_data_from_datafusion(
     let sub_batch = df_group
         .clone()
         .aggregate(
-            vec![col(HASH_LABEL)],
+            vec![col(HASH_LABEL)], // exemplars only return once value
             vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
         )?
         .limit(0, Some(max_series))?

@@ -238,6 +238,7 @@ impl TimeWindow {
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
+    // pub exemplars: Vec<InstantValue>,
     pub time_window: Option<TimeWindow>,
 }
 

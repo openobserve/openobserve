@@ -138,6 +138,17 @@ pub struct RequestRangeQuery {
     pub no_cache: Option<bool>,
 }
 
+/// Query exemplars
+#[derive(Debug, Deserialize)]
+pub struct RequestQueryExemplars {
+    /// PromQL expression.
+    pub query: Option<String>,
+    /// Start timestamp, inclusive.
+    pub start: Option<String>,
+    /// End timestamp, inclusive.
+    pub end: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RequestMetadata {
     /// Maximum number of metrics to return.

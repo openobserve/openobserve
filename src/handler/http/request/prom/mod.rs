@@ -428,6 +428,166 @@ async fn query_range(
     search(org_id, &req, user_email, timeout).await
 }
 
+/// prometheus query exemplars
+// refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusQueryExemplars",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("query" = String, Query, description = "Prometheus expression query string"),
+        ("start" = String, Query, description = "<rfc3339 | unix_timestamp>: Start timestamp, inclusive"),
+        ("end" = String, Query, description = "<rfc3339 | unix_timestamp>: End timestamp, inclusive"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!({
+            "status": "success",
+            "data": [
+                {
+                    "seriesLabels": {
+                        "__name__": "test_exemplar_metric_total",
+                        "instance": "localhost:8090",
+                        "job": "prometheus",
+                        "service": "bar"
+                    },
+                    "exemplars": [
+                        {
+                            "labels": {
+                                "trace_id": "EpTxMJ40fUus7aGY"
+                            },
+                            "value": "6",
+                            "timestamp": 1600096945.479
+                        }
+                    ]
+                },
+                {
+                    "seriesLabels": {
+                        "__name__": "test_exemplar_metric_total",
+                        "instance": "localhost:8090",
+                        "job": "prometheus",
+                        "service": "foo"
+                    },
+                    "exemplars": [
+                        {
+                            "labels": {
+                                "trace_id": "Olp9XHlq763ccsfa"
+                            },
+                            "value": "19",
+                            "timestamp": 1600096955.479
+                        },
+                        {
+                            "labels": {
+                                "trace_id": "hCtjygkIHwAN9vs4"
+                            },
+                            "value": "20",
+                            "timestamp": 1600096965.489
+                        }
+                    ]
+                }
+            ]
+        })),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/prometheus/api/v1/query_exemplars")]
+pub async fn query_exemplars_get(
+    org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestQueryExemplars>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    query_exemplars(&org_id.into_inner(), req.into_inner(), in_req).await
+}
+
+#[post("/{org_id}/prometheus/api/v1/query_exemplars")]
+pub async fn query_exemplars_post(
+    org_id: web::Path<String>,
+    req: web::Query<meta::prom::RequestQueryExemplars>,
+    web::Form(form): web::Form<meta::prom::RequestQueryExemplars>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let req = if form.query.is_some() {
+        form
+    } else {
+        req.into_inner()
+    };
+    query_exemplars(&org_id.into_inner(), req, in_req).await
+}
+
+async fn query_exemplars(
+    org_id: &str,
+    req: meta::prom::RequestQueryExemplars,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        let user_email = user_id.to_str().unwrap();
+
+        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("parse promql error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
+                    status: promql::Status::Error,
+                    data: None,
+                    error_type: Some("bad_data".to_string()),
+                    error: Some(e.to_string()),
+                }));
+            }
+        };
+        let mut visitor = promql::name_visitor::MetricNameVisitor {
+            name: HashSet::new(),
+        };
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+
+        if !is_root_user(user_email) {
+            let stream_type_str = StreamType::Metrics.to_string();
+            for name in visitor.name {
+                let user: meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_email))
+                    .unwrap()
+                    .clone();
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        user_email,
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get(stream_type_str.as_str())
+                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                name
+                            ),
+                            org_id: org_id.to_string(),
+                            bypass_check: false,
+                            parent_id: "".to_string(),
+                        },
+                        user.role,
+                        user.is_external,
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
+            }
+        }
+    }
+
+
+    Ok(HttpResponse::NotImplemented().into())
+}
+
 /// prometheus query metric metadata
 // refer: https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 #[utoipa::path(
