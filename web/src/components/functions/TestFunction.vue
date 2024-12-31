@@ -217,14 +217,21 @@
       >
         <div
           v-if="!outputEvents"
-          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-bg-white tw-opacity-90"
+          class="tw-absolute tw-z-10 tw-flex tw-flex-col tw-justify-center tw-items-center tw-w-full tw-h-full tw-opacity-90"
         >
           <q-icon
             :name="outlinedLightbulb"
             size="40px"
             class="tw-text-orange-400"
           />
-          <div class="tw-text-[15px] tw-text-gray-600">
+          <div
+            class="tw-text-[15px] tw-text-gray-600"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-600'
+            "
+          >
             {{ outputMessage }}
           </div>
         </div>

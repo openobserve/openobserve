@@ -93,7 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:after>
           <div
-            class="tw-bg-zinc-100 q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
+            class="q-px-md q-pt-sm q-pb-md tw-rounded-md tw-border-1 tw-border-gray-900 tw-h-max q-ml-sm"
+            :class="
+              store.state.theme === 'dark' ? 'tw-bg-gray-700' : 'tw-bg-zinc-100'
+            "
           >
             <TestFunction
               ref="testFunctionRef"
@@ -345,18 +348,6 @@ end`;
 </script>
 
 <style scoped lang="scss">
-.add-functions-section {
-  :deep(.monaco-editor-background),
-  :deep(.test-output-container) {
-    background-color: #ffffff !important;
-  }
-
-  :deep(.monaco-editor .margin),
-  :deep(.monaco-editor) {
-    background-color: #ffffff !important;
-  }
-}
-
 .monaco-editor {
   width: 100%;
   height: calc(100vh - 160px);
