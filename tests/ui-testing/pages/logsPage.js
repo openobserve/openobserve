@@ -92,10 +92,6 @@ export class LogsPage {
   }
 
   async selectIndexAndStreamJoin() {
-    // Select index and stream
-    //await this.page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-    //await this.page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-
     await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(3000);
     await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
@@ -216,13 +212,11 @@ export class LogsPage {
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.queryButton).click({ force: true });
     try {
-      const response = await searchResponse;
+      const response = await search;
       await expect.poll(async () => response.status()).toBe(200);
-      
-        } 
-      catch (error) {
-       throw new Error(`Failed to get response from ${expectedUrl}: ${error.message}`);
-       }   
+    } catch (error) {
+      throw new Error(`Failed to get response: ${error.message}`);
+       }
   }
 
   async applyQueryButton(expectedUrl) {

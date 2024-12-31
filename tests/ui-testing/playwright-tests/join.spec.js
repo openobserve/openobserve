@@ -130,8 +130,8 @@ test.describe("Join for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
         await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
         await logsPage.validateInterestingFields();
     });
@@ -141,8 +141,8 @@ test.describe("Join for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
         await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
         await logsPage.validateInterestingFieldsQuery();
     });
@@ -152,10 +152,9 @@ test.describe("Join for logs", () => {
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
-        await logsPage.selectRunQuery();
         await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
-
         await logsPage.addRemoveInteresting();
     });
 
