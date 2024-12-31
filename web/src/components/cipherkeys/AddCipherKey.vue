@@ -272,7 +272,7 @@ const setupTemplateData = () => {
   if (router.currentRoute.value.query.action === "edit") {
     isUpdatingCipherKey.value = true;
     if (router.currentRoute.value.query.name) {
-      const name = router.currentRoute.value.query.name || "";
+      const name = String(router.currentRoute.value.query.name) || "";
       if (name === "") {
         $q.notify({
           type: "negative",
