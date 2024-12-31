@@ -62,7 +62,7 @@ pub(crate) async fn create_context(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
-            log::error!("get schema error: {}", err);
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
             return Err(datafusion::error::DataFusionError::Execution(
                 err.to_string(),
             ));
@@ -108,27 +108,27 @@ pub(crate) async fn create_context(
     let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
-            log::error!("calculate files size error: {}", err);
+            log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
             return Err(datafusion::error::DataFusionError::Execution(
                 "calculate files size error".to_string(),
             ));
         }
     };
     log::info!(
-        "promql->search->storage: load files {}, scan_size {}, compressed_size {}",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, scan_size {}, compressed_size {}",
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size
     );
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(&files, &scan_stats).await?;
+    let (cache_type, deleted_files) = cache_parquet_files(trace_id, &files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files
         files.retain(|f| !deleted_files.contains(&f.key));
     }
     log::info!(
-        "promql->search->storage: load files {}, into {:?} cache done",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, into {:?} cache done",
         scan_stats.files,
         cache_type
     );
@@ -207,6 +207,7 @@ async fn get_file_list(
 
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
 async fn cache_parquet_files(
+    trace_id: &str,
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>)> {
@@ -262,11 +263,11 @@ async fn cache_parquet_files(
                     // delete file from file list
                     log::warn!("found invalid file: {}", file_name);
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("promql->search->storage: delete from file_list err: {}", e);
+                        log::error!("[trace_id {trace_id}] promql->search->storage: delete from file_list err: {}", e);
                     }
                     Some(file_name)
                 } else {
-                    log::error!("promql->search->storage: download file to cache err: {}", e);
+                    log::error!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}", e);
                     None
                 }
             } else {
@@ -287,7 +288,10 @@ async fn cache_parquet_files(
                 }
             }
             Err(e) => {
-                log::error!("promql->search->storage: load file task err: {}", e);
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->storage: load file task err: {}",
+                    e
+                );
             }
         }
     }
