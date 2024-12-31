@@ -37,7 +37,7 @@ use promql_parser::{
 };
 
 use crate::{
-    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    common::meta::prom::{BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     service::promql::{
         aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
     },
@@ -133,6 +133,10 @@ impl Engine {
     /// Help function to extract columns from [LabelModifier].
     /// Aggregation function topk & bottomk are special cases where
     /// modifier is applied to grouped result -> not columns filtered.
+    /// For promql:
+    ///     sum(irate(zo_incoming_requests{namespace="ziox"}[5m])) by (exported_endpoint)
+    /// we need to extract the columns `exported_endpoint` from the modifier. Because
+    /// the result will be grouped by `exported_endpoint`, and don't consider other labesl.
     fn extract_columns_from_modifier(
         &mut self,
         modifier: &Option<LabelModifier>,
@@ -1103,7 +1107,10 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp || name == VALUE_LABEL {
+            if name == &cfg.common.column_timestamp
+                || name == VALUE_LABEL
+                || name == EXEMPLARS_LABEL
+            {
                 None
             } else {
                 Some(col(name))

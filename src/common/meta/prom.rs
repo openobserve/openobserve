@@ -27,6 +27,7 @@ pub const VALUE_LABEL: &str = "value";
 pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
+pub const EXEMPLARS_LABEL: &str = "exemplars"; 
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {
