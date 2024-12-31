@@ -70,7 +70,11 @@
     "fullscreen": "Go Full Screen",
     "query": "Query",
     "output": "Output",
-    "selectStream": "Select Stream"
+    "selectStream": "Select Stream",
+    "usavedTitle": "Unsaved Changes",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "cancelTitle": "Cancel Changes",
+    "cancelMessage": "Are you sure you want to cancel the changes?"
   },
   "search": {
     "metrics": "Metrics",

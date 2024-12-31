@@ -23,7 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable-name="beingUpdated"
         @test="onTestFunction"
         @save="onSubmit"
-        @back="emit('update:list')"
+        @back="closeAddFunction"
+        @cancel="cancelAddFunction"
         class="tw-pr-4"
       />
       <q-separator />
@@ -109,6 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-splitter>
     </div>
   </div>
+  <confirm-dialog
+    :title="confirmDialogMeta.title"
+    :message="confirmDialogMeta.message"
+    @update:ok="confirmDialogMeta.onConfirm()"
+    @update:cancel="resetConfirmDialog"
+    v-model="confirmDialogMeta.show"
+  />
 </template>
 
 <script lang="ts">
@@ -130,6 +138,7 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const defaultValue: any = () => {
   return {
@@ -159,6 +168,7 @@ export default defineComponent({
     FunctionsToolbar,
     FullViewContainer,
     TestFunction,
+    ConfirmDialog,
   },
   emits: ["update:list", "cancel:hideform"],
   setup(props, { emit }) {
@@ -166,7 +176,12 @@ export default defineComponent({
     // let beingUpdated: boolean = false;
     const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
-    const formData: any = ref(defaultValue());
+    const formData: any = ref({
+      name: "",
+      function: "",
+      params: "row",
+      transType: "0",
+    });
     const indexOptions = ref([]);
     const { t } = useI18n();
     const $q = useQuasar();
@@ -177,6 +192,13 @@ export default defineComponent({
     const testFunctionRef = ref<typeof TestFunction>();
     const functionsToolbarRef = ref<typeof FunctionsToolbar>();
     const splitterModel = ref(50);
+    const confirmDialogMeta = ref({
+      title: "",
+      message: "",
+      show: false,
+      onConfirm: () => {},
+      data: null,
+    });
 
     const expandState = ref({
       functions: true,
@@ -193,21 +215,10 @@ export default defineComponent({
 
     const isFunctionDataChanged = ref(false);
 
-    onMounted(() => {
-      window.addEventListener("beforeunload", beforeUnloadHandler);
-    });
-
-    onUnmounted(() => {
-      window.removeEventListener("beforeunload", beforeUnloadHandler);
-    });
-
     watch(
-      () => formData.value,
+      () => formData.value.name + formData.value.function,
       () => {
         isFunctionDataChanged.value = true;
-      },
-      {
-        deep: true,
       },
     );
 
@@ -339,6 +350,42 @@ end`;
       vrlFunctionError.value = err;
     };
 
+    const closeAddFunction = () => {
+      if (isFunctionDataChanged.value) {
+        confirmDialogMeta.value.show = true;
+        confirmDialogMeta.value.title = t("common.usavedTitle");
+        confirmDialogMeta.value.message = t("common.unsavedMessage");
+        confirmDialogMeta.value.onConfirm = () => {
+          emit("cancel:hideform");
+          resetConfirmDialog();
+        };
+      } else {
+        emit("cancel:hideform");
+      }
+    };
+
+    const cancelAddFunction = () => {
+      if (isFunctionDataChanged.value) {
+        confirmDialogMeta.value.show = true;
+        confirmDialogMeta.value.title = t("common.cancelTitle");
+        confirmDialogMeta.value.message = t("common.cancelMessage");
+        confirmDialogMeta.value.onConfirm = () => {
+          emit("cancel:hideform");
+          resetConfirmDialog();
+        };
+      } else {
+        emit("cancel:hideform");
+      }
+    };
+
+    const resetConfirmDialog = () => {
+      confirmDialogMeta.value.show = false;
+      confirmDialogMeta.value.title = "";
+      confirmDialogMeta.value.message = "";
+      confirmDialogMeta.value.onConfirm = () => {};
+      confirmDialogMeta.value.data = null;
+    };
+
     return {
       t,
       $q,
@@ -368,6 +415,10 @@ end`;
       vrlFunctionError,
       functionsToolbarRef,
       splitterModel,
+      closeAddFunction,
+      confirmDialogMeta,
+      resetConfirmDialog,
+      cancelAddFunction,
     };
   },
   created() {
