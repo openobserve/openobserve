@@ -2,15 +2,25 @@
   <div
     class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
   >
-    <div class="tw-flex tw-items-center o2-input">
-      <q-icon
-        class="tw-pr-1 tw-cursor-pointer"
-        name="arrow_back_ios"
-        size="18px"
-        @click="redirectToFunctions"
-      />
+    <div class="tw-flex tw-items-center">
+      <div class="tw-mr-2">
+        <div
+          data-test="add-function-back-btn"
+          class="flex justify-center items-center cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="redirectToFunctions"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+      </div>
       <div class="tw-text-lg tw-w-full">Add Function</div>
-      <q-form ref="addFunctionForm">
+      <q-form ref="addFunctionForm" class="o2-input">
         <q-input
           v-model="functionName"
           :label="t('function.name')"
