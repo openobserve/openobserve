@@ -4776,23 +4776,16 @@ const useLogs = () => {
 
       resetFieldValues();
 
-      // Refresh Interval
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs" &&
-        searchObj.data.queryResults.hasOwnProperty("hits") &&
-        searchObj.data.queryResults.hits.length > 0
+        router.currentRoute.value.name == "logs"
       ) {
-        searchObj.data.queryResults.from = response.content.from;
-        searchObj.data.queryResults.scan_size = response.content.scan_size;
-        searchObj.data.queryResults.took = response.content.took;
-        searchObj.data.queryResults.aggs = response.content.aggs;
-        const lastRecordTimeStamp = parseInt(
-          searchObj.data.queryResults.hits[0][
-            store.state.zoConfig.timestamp_column
-          ],
-        );
-        searchObj.data.queryResults.hits = response.content.hits;
+        searchObj.data.queryResults.from = response.content.results.from;
+        searchObj.data.queryResults.scan_size =
+          response.content.results.scan_size;
+        searchObj.data.queryResults.took = response.content.results.took;
+        searchObj.data.queryResults.aggs = response.content.results.aggs;
+        searchObj.data.queryResults.hits = response.content.results.hits;
       }
 
       if (!searchObj.meta.refreshInterval) {
