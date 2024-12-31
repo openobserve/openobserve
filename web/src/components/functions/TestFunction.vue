@@ -46,12 +46,22 @@
           </template>
         </FullViewContainer>
         <div
-          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%] tw-bg-white"
+          class="tw-flex tw-items-center tw-flex-wrap q-px-md q-py-sm tw-w-[100%]"
+          :class="
+            store.state.theme === 'dark' ? 'tw-bg-gray-950' : ' tw-bg-white'
+          "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
           <div class="function-stream-select-input tw-w-[150px] q-pr-md">
-            <div class="tw-text-[12px] tw-text-gray-700">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("alerts.streamType") + " *" }}
             </div>
 
@@ -72,7 +82,14 @@
             />
           </div>
           <div class="function-stream-select-input tw-w-[300px]">
-            <div class="tw-text-[12px] tw-text-gray-700">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("alerts.stream_name") + " *" }}
             </div>
             <q-select
@@ -94,13 +111,27 @@
             />
           </div>
           <div class="functions-duration-input tw-w-[330px]">
-            <div class="tw-text-[12px] tw-text-gray-700">
+            <div
+              class="tw-text-[12px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-gray-200'
+                  : 'tw-text-gray-700'
+              "
+            >
               {{ t("common.duration") + " *" }}
             </div>
             <DateTime label="Start Time" class="q-py-xs tw-w-full" />
           </div>
 
-          <div class="tw-text-[12px] tw-text-gray-700 tw-w-[100%] q-mt-xs">
+          <div
+            class="tw-text-[12px] tw-w-[100%] q-mt-xs"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw-text-gray-200'
+                : 'tw-text-gray-700'
+            "
+          >
             {{ t("common.query") + " *" }}
           </div>
           <div
