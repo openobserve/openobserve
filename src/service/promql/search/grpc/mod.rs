@@ -26,7 +26,7 @@ use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 
 use crate::service::{
-    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
+    promql::{value, PromqlContext, TableProvider, DEFAULT_LOOKBACK},
     search,
 };
 
@@ -109,7 +109,7 @@ pub async fn search(
         config::get_config().limit.query_timeout
     };
 
-    let mut engine = Query::new(
+    let mut ctx = PromqlContext::new(
         org_id,
         StorageProvider {
             trace_id: trace_id.to_string(),
@@ -120,9 +120,9 @@ pub async fn search(
     );
 
     let (value, result_type, mut scan_stats) = if query.query_exemplars {
-        engine.query_exemplars(eval_stmt).await?
+        ctx.query_exemplars(eval_stmt).await?
     } else {
-        engine.exec(eval_stmt).await?
+        ctx.exec(eval_stmt).await?
     };
     let result_type = match result_type {
         Some(v) => v,

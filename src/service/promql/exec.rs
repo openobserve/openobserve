@@ -24,13 +24,14 @@ use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
+use super::Engine;
 use crate::service::promql::{
     micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
     DEFAULT_LOOKBACK,
 };
 
 #[derive(Clone)]
-pub struct Query {
+pub struct PromqlContext {
     pub org_id: String,
     pub table_provider: Arc<Box<dyn TableProvider>>,
     /// The time boundaries for the evaluation. If start equals end an instant
@@ -49,7 +50,7 @@ pub struct Query {
     pub data_loading: Arc<Mutex<bool>>,
 }
 
-impl Query {
+impl PromqlContext {
     pub fn new<P>(org_id: &str, provider: P, query_exemplars: bool, timeout: u64) -> Self
     where
         P: TableProvider,
@@ -92,7 +93,7 @@ impl Query {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = super::Engine::new(ctx, self.start);
+            let mut engine = Engine::new(ctx, self.start);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
@@ -115,7 +116,7 @@ impl Query {
             let time = self.start + (self.interval * i);
             let expr = expr.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = super::Engine::new(ctx.clone(), time);
+            let mut engine = Engine::new(ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;
@@ -225,7 +226,7 @@ impl Query {
             let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = super::Engine::new(ctx.clone(), time);
+            let mut engine = Engine::new(ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;

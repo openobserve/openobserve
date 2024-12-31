@@ -41,13 +41,16 @@ use promql_parser::{
     },
 };
 
-use super::utils::{apply_label_selector, apply_matchers};
+use super::{
+    utils::{apply_label_selector, apply_matchers},
+    PromqlContext,
+};
 use crate::service::promql::{
     aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
 };
 
 pub struct Engine {
-    ctx: Arc<super::exec::Query>,
+    ctx: Arc<PromqlContext>,
     /// The time boundaries for the evaluation.
     time: i64,
     /// Filters to include certain columns
@@ -56,7 +59,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(ctx: Arc<super::exec::Query>, time: i64) -> Self {
+    pub fn new(ctx: Arc<PromqlContext>, time: i64) -> Self {
         Self {
             ctx,
             time,

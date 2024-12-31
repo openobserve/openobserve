@@ -40,7 +40,7 @@ mod utils;
 pub mod value;
 
 pub use engine::Engine;
-pub use exec::Query;
+pub use exec::PromqlContext;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
