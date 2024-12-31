@@ -3301,13 +3301,13 @@ const useLogs = () => {
       let endCount;
 
       let totalCount = Math.max(
-        searchObj.data.queryResults.hits.length,
+        searchObj.data.queryResults.hits?.length,
         searchObj.data.queryResults.total,
       );
 
       if (!searchObj.meta.resultGrid.showPagination) {
-        endCount = searchObj.data.queryResults.hits.length;
-        totalCount = searchObj.data.queryResults.hits.length;
+        endCount = searchObj.data.queryResults.hits?.length;
+        totalCount = searchObj.data.queryResults.hits?.length;
       } else {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
@@ -5002,7 +5002,7 @@ const useLogs = () => {
     searchObj.data.queryResults.aggs = [];
     if (shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
-      if (searchObj.data.queryResults.hits.length > 0) {
+      if (searchObj.data.queryResults.hits?.length > 0) {
         searchObjDebug["histogramStartTime"] = performance.now();
         resetHistogramError();
 
@@ -5030,7 +5030,7 @@ const useLogs = () => {
       }
       if (
         queryReq.query.from == 0 &&
-        searchObj.data.queryResults.hits.length > 0 &&
+        searchObj.data.queryResults.hits?.length > 0 &&
         !aggFlag
       ) {
         setTimeout(async () => {
@@ -5049,7 +5049,7 @@ const useLogs = () => {
       }
       if (
         queryReq.query.from == 0 &&
-        searchObj.data.queryResults.hits.length > 0 &&
+        searchObj.data.queryResults.hits?.length > 0 &&
         !aggFlag
       ) {
         setTimeout(async () => {
@@ -5092,11 +5092,7 @@ const useLogs = () => {
     if (requestId) removeRequestId(requestId);
 
     // Any case where below logic may end in recursion
-    console.log(
-      "handleSearchClose",
-      requestId,
-      searchObj.data.isOperationCancelled,
-    );
+    if (payload.traceId) delete searchPartitionMap[payload.traceId];
 
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
