@@ -41,7 +41,7 @@
               size="xs"
               color="primary"
               type="submit"
-              :disabled="!selectedStream.name || !inputQuery"
+              :disabled="!selectedStream.name || !inputQuery || loading.events"
             />
           </template>
         </FullViewContainer>
