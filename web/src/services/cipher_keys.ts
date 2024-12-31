@@ -15,11 +15,42 @@
 
 import http from "./http";
 
+interface AkeylessStore {
+  store: {
+    akeyless: {
+      access_id: string;
+      base_url: string;
+      auth: {
+        type: string;
+        access_key: string;
+        ldap: {
+          username: string;
+          password: string;
+        };
+      };
+      store: {
+        type: string;
+        static_secret: string;
+        dfc: {
+          name: string;
+          iv: string;
+          encrypted_data: string;
+        };
+      };
+    };
+  };
+}
+
+interface CipherKeyData {
+  name: string;
+  key: AkeylessStore;
+  provider: Object;
+}
 const cipherKeys = {
-  create: (org_identifier: string, data: any) => {
+  create: (org_identifier: string, data: CipherKeyData) => {
     return http().post(`/api/${org_identifier}/cipher_keys`, data);
   },
-  update: (org_identifier: string, data: any) => {
+  update: (org_identifier: string, data: CipherKeyData) => {
     return http().put(`/api/${org_identifier}/cipher_keys`, data);
   },
   list: (org_identifier: string) => {
