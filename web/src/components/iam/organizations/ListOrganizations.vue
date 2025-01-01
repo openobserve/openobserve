@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="q-table__title">{{ t("organization.header") }}</div>
           <q-btn
+            v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
             color="secondary"
@@ -61,9 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :label="t(`organization.add`)"
             @click="addOrganization"
-            v-if="(config.isEnterprise == 'true' 
-              || config.isCloud == 'true' 
-            )"
           />
         </div>
         <q-input
@@ -110,45 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-update-organization @updated="updateOrganizationList" />
     </q-dialog>
-
-    <q-dialog
-      v-model="showJoinOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideJoinOrgDialog"
-    >
-      <join-organization v-model="organization" @updated="joinOrganization" />
-    </q-dialog>
-    <q-dialog v-model="showOrgAPIKeyDialog">
-      <q-card>
-        <q-card-section>
-          <div class="text-h6">Organization API Key</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none" wrap>
-          <q-item>
-            <q-item-section
-              ><q-item-label lines="3" style="word-wrap: break-word">{{
-                organizationAPIKey
-              }}</q-item-label></q-item-section
-            >
-            <q-item-section side>
-              <q-btn
-                unelevated
-                round
-                flat
-                padding="sm"
-                size="sm"
-                icon="content_copy"
-                @click="copyAPIKey"
-                :title="t('organization.copyapikey')"
-              />
-            </q-item-section>
-          </q-item>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
@@ -164,9 +123,11 @@ import organizationsService from "@/services/organizations";
 import AddUpdateOrganization from "./AddUpdateOrganization.vue";
 import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
+import { onBeforeMount } from "vue";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -176,6 +137,7 @@ export default defineComponent({
     JoinOrganization,
     QTablePagination,
     NoData,
+    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
@@ -344,8 +306,8 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading organizations...",
       });
-      organizationsService.list(0, 100000, "name", false, "").then((res) => {
-        // Update store with the organizations for navbar consistency
+      organizationsService.list(0, 1000000, "name", false, "").then((res) => {
+        // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 
         resultTotal.value = res.data.data.length;
@@ -408,56 +370,23 @@ export default defineComponent({
       });
     };
 
-
-    const onAddTeam = (props: any) => {
-      console.log(props);
-    };
-
-    const inviteTeam = (props: any) => {
-      organization.value = {
-        id: props.row.id,
-        name: props.row.name,
-        role: props.row.role,
-        identifier: props.row.identifier,
-        member_lists: [],
-      };
-      showJoinOrganizationDialog.value = true;
-
-      segment.track("Button Click", {
-        button: "Invite Member",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Organizations",
-      });
-    };
-
-    getOrganizations();
-
-    const redirectToInviteMember = (props) => {
+    const addOrganization = (evt) => {
       router.push({
-        name: "organizations",
         query: {
-          action: "invite",
-          id: props.row.identifier,
+          action: "add",
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-    };
 
-    const hideAddOrgDialog = () => {
-      router.push({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    const hideJoinOrgDialog = () => {
-      router.push({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      if (evt) {
+        let button_txt = evt.target.innerText;
+        segment.track("Button Click", {
+          button: button_txt,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Organizations",
+        });
+      }
     };
 
     return {
@@ -465,6 +394,7 @@ export default defineComponent({
       store,
       router,
       qTable,
+      config,
       loading: ref(false),
       organizations,
       organization,
@@ -495,10 +425,7 @@ export default defineComponent({
         }
         return filtered;
       },
-      redirectToInviteMember,
-      hideAddOrgDialog,
-      hideJoinOrgDialog,
-      config
+      addOrganization,
     };
   },
   methods: {

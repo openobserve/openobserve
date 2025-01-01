@@ -326,7 +326,6 @@ import {
   getImageURL,
   useLocalCurrentUser,
   useLocalUserInfo,
-  getLogoutURL,
   invlidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -480,15 +479,10 @@ export default defineComponent({
         invlidateLoginData();
       }
 
-      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
 
       this.$router.push("/logout");
     },

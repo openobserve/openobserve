@@ -224,7 +224,7 @@ export default defineComponent({
         callOrganization
           .then((res: { data: any }) => {
             const data = res.data;
-            // if (res.data.data.status == "active") {
+            if (res.data.data.status == "active") {
               this.organizationData = {
                 id: "",
                 name: "",
@@ -234,11 +234,10 @@ export default defineComponent({
               this.$emit("updated");
               this.addOrganizationForm.resetValidation();
               dismiss();
-              // Handle sub during billing imprelementaion
-              // } else {
-              // this.proPlanRequired = true;
-              // this.proPlanMsg = res.data.message;
-              // this.newOrgIdentifier = res.data.identifier;
+            } else {
+              this.proPlanRequired = true;
+              this.proPlanMsg = res.data.message;
+              this.newOrgIdentifier = res.data.identifier;
               // this.store.state.dispatch("setSelectedOrganization", {
               //   identifier: data.identifier,
               //   name: data.name,
@@ -250,25 +249,23 @@ export default defineComponent({
               //   subscription_type: "Free-Plan-USD-Monthly",
               // });
               // window.location.href = `/organizations?org_identifier=${data.data.identifier}&action=subscribe`;
-              // this.router.push({
-              //   name: "organizations",
-              //   query: {
-              //     org_identifier: data.data.identifier,
-              //     action: "subscribe",
-              //     update_org: Date.now(),
-              //   },
-              // });
-            // }
-          })
-          .catch((err: any) => {
-            if(err.status !== 403){
-              this.$q.notify({
-                type: "negative",
-                message: JSON.stringify(
-                  err.response.data["error"] || "Organization creation failed."
-                ),
+              this.router.push({
+                name: "organizations",
+                query: {
+                  org_identifier: data.data.identifier,
+                  action: "subscribe",
+                  update_org: Date.now(),
+                },
               });
             }
+          })
+          .catch((err: any) => {
+            this.$q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err.response.data["error"] || "Organization creation failed."
+              ),
+            });
             dismiss();
           });
       });

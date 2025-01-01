@@ -145,9 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-
-          <div class="col-6">
-              <!-- v-if="showAddUserBtn" -->
+          <div class="col-6" v-if="config.isCloud == 'true'">
+            <member-invitation
+              :key="currentUserRole"
+              v-model:currentrole="currentUserRole"
+            />
+          </div>
+          <div class="col-6" v-else>
             <q-btn
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
@@ -215,7 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true"
+unelevated no-caps
+class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -248,6 +254,7 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
+import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import {
   getImageURL,
   verifyOrganizationStatus,
@@ -262,7 +269,13 @@ import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
-  components: { QTablePagination, UpdateUserRole, NoData, AddUser },
+  components: {
+    QTablePagination,
+    UpdateUserRole,
+    NoData,
+    AddUser,
+    MemberInvitation,
+  },
   emits: [
     "updated:fields",
     "deleted:fields",
@@ -400,14 +413,7 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         usersService
-          .orgUsers(
-            0,
-            1000,
-            "email",
-            false,
-            "",
-            store.state.selectedOrganization.identifier
-          )
+          .orgUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
             resultTotal.value = res.data.data.length;
             let counter = 1;
@@ -430,11 +436,11 @@ export default defineComponent({
                 role: data.role,
                 member_created: date.formatDate(
                   parseInt(data.member_created),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 member_updated: date.formatDate(
                   parseInt(data.member_updated),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 org_member_id: data.org_member_id,
                 isLoggedinUser: store.state.userInfo.email == data.email,
@@ -610,7 +616,7 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         addUser({}, false);
@@ -777,7 +783,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
               color: "negative",
               message: "Error while deleting user.",
@@ -801,7 +807,7 @@ export default defineComponent({
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
