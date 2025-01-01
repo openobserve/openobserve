@@ -52,6 +52,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin-bottom: 2px; height: 44px"
         >
           <div class="q-table__title">{{ t("organization.header") }}</div>
+          <q-btn
+            v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            icon="add"
+            dense
+            :label="t(`organization.add`)"
+            @click="addOrganization"
+          />
         </div>
         <div class="full-width row q-mb-xs items-start">
           <div class="col">
@@ -126,15 +137,14 @@ import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
-import AddUpdateOrganization from "./AddUpdateOrganization.vue";
 import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
+import { onBeforeMount } from "vue";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -386,14 +396,6 @@ export default defineComponent({
       }
     };
 
-    const hideAddOrgDialog = () => {
-      router.push({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
     return {
       t,
       store,
@@ -432,7 +434,6 @@ export default defineComponent({
         return filtered;
       },
       addOrganization,
-      hideAddOrgDialog,
     };
   },
   methods: {

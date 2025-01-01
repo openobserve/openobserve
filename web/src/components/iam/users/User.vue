@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true"
+unelevated no-caps
+class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
