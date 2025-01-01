@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
+use bytes::Bytes;
 use config::{
     meta::{
         alerts::alert::{Alert, ListAlertsParams},
@@ -24,6 +23,7 @@ use config::{
     utils::json,
 };
 use infra::{
+    cluster_coordinator::alerts as cluster,
     db::{connect_to_orm, ORM_CLIENT},
     table::alerts as table,
 };
@@ -256,85 +256,66 @@ pub async fn list<C: ConnectionTrait>(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch("/alerts/").await?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching alerts");
-    loop {
-        let ev = match events.recv().await {
-            Some(ev) => ev,
-            None => {
-                log::error!("watch_alerts: event channel closed");
-                break;
+    cluster::watch_events(put_into_cache, delete_from_cache).await
+}
+
+async fn put_into_cache(
+    org: String,
+    stream_type: StreamType,
+    stream_name: String,
+    alert_name: String,
+    value: Option<Bytes>,
+) -> Result<(), anyhow::Error> {
+    let item_value: Alert = if config::get_config().common.meta_store_external {
+        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        match table::get_by_name(
+            client,
+            &org,
+            "default",
+            stream_type,
+            &stream_name,
+            &alert_name,
+        )
+        .await
+        {
+            Ok(Some(val)) => val.1,
+            Ok(None) => {
+                log::error!("Tried to get alert that does not exist in DB");
+                return Ok(());
             }
-        };
-        match ev {
-            db::Event::Put(ev) => {
-                let Some((org, stream_type, stream_name, alert_name)) =
-                    cluster::parse_alert_key(&ev.key)
-                else {
-                    log::error!("watch_alerts: failed to parse event key {}", &ev.key);
-                    continue;
-                };
-
-                let item_value: Alert = if config::get_config().common.meta_store_external {
-                    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-                    match table::get_by_name(
-                        client,
-                        &org,
-                        "default",
-                        stream_type,
-                        &stream_name,
-                        &alert_name,
-                    )
-                    .await
-                    {
-                        Ok(Some(val)) => val.1,
-                        Ok(None) => {
-                            log::error!("Tried to get alert that does not exist in DB");
-                            continue;
-                        }
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
-
-                let mut cacher = STREAM_ALERTS.write().await;
-                let stream_key = cache_stream_key(&org, stream_type, &stream_name);
-                let group = cacher.entry(stream_key.to_string()).or_default();
-                if group.contains(&item_value) {
-                    let idx = group.iter().position(|x| x.eq(&item_value)).unwrap();
-                    let _ = std::mem::replace(&mut group[idx], item_value);
-                } else {
-                    group.push(item_value);
-                }
-                drop(cacher);
+            Err(e) => {
+                log::error!("Error getting value: {}", e);
+                return Ok(());
             }
-            db::Event::Delete(ev) => {
-                let Some((org, stream_type, stream_name, alert_name)) =
-                    cluster::parse_alert_key(&ev.key)
-                else {
-                    log::error!("watch_alerts: failed to parse event key {}", &ev.key);
-                    continue;
-                };
-
-                let mut cacher = STREAM_ALERTS.write().await;
-                let stream_key = cache_stream_key(&org, stream_type, &stream_name);
-                let group = match cacher.get_mut(&stream_key) {
-                    Some(v) => v,
-                    None => continue,
-                };
-                group.retain(|v| !v.name.eq(&alert_name));
-
-                drop(cacher);
-            }
-            db::Event::Empty => {}
         }
+    } else {
+        json::from_slice(&value.unwrap()).unwrap()
+    };
+    let mut cacher = STREAM_ALERTS.write().await;
+    let stream_key = cache_stream_key(&org, stream_type, &stream_name);
+    let group = cacher.entry(stream_key.to_string()).or_default();
+    if group.contains(&item_value) {
+        let idx = group.iter().position(|x| x.eq(&item_value)).unwrap();
+        let _ = std::mem::replace(&mut group[idx], item_value);
+    } else {
+        group.push(item_value);
     }
+    Ok(())
+}
+
+async fn delete_from_cache(
+    org: String,
+    stream_type: StreamType,
+    stream_name: String,
+    alert_name: String,
+) -> Result<(), anyhow::Error> {
+    let mut cacher = STREAM_ALERTS.write().await;
+    let stream_key = cache_stream_key(&org, stream_type, &stream_name);
+    let group = match cacher.get_mut(&stream_key) {
+        Some(v) => v,
+        None => return Ok(()),
+    };
+    group.retain(|v| !v.name.eq(&alert_name));
     Ok(())
 }
 
@@ -366,62 +347,6 @@ fn cache_stream_key(org: &str, stream_type: StreamType, stream_name: &str) -> St
 /// Returns the key used to schedule a trigger for the alert.
 fn scheduler_key(stream_type: StreamType, stream_name: &str, alert_name: &str) -> String {
     format!("{stream_type}/{stream_name}/{alert_name}")
-}
-
-/// Helper functions for sending events to cache watchers in the cluster.
-mod cluster {
-    use config::meta::{alerts::alert::Alert, stream::StreamType};
-    use itertools::Itertools;
-
-    /// Sends event to the cluster cache watchers indicating that an alert has been
-    /// put into the database.
-    pub async fn emit_put_event(org: &str, alert: &Alert) -> Result<(), infra::errors::Error> {
-        let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
-        let cluster_coordinator = infra::db::get_coordinator().await;
-        cluster_coordinator
-            .put(&key, bytes::Bytes::from(""), true, None)
-            .await?;
-        Ok(())
-    }
-
-    /// Sends event to the cluster cache watchers indicating that an alert has been
-    /// deleted from the database.
-    pub async fn emit_delete_event(
-        org: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        alert_name: &str,
-    ) -> Result<(), infra::errors::Error> {
-        let key = alert_key(org, stream_type, stream_name, alert_name);
-        let cluster_coordinator = infra::db::get_coordinator().await;
-        cluster_coordinator.delete(&key, false, true, None).await
-    }
-
-    /// Returns the key used to identify an individual alert in events sent to
-    /// cluster cache watchers.
-    fn alert_key(
-        org: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        alert_name: &str,
-    ) -> String {
-        format!("/alerts/{org}/{stream_type}/{stream_name}/{alert_name}")
-    }
-
-    /// Tries to parse the key used to identify an individual alert in avents
-    /// sent to cluster cache watchers. Returns the organization, stream type,
-    /// stream name, and alert name from the key.
-    pub fn parse_alert_key(key: &str) -> Option<(String, StreamType, String, String)> {
-        let parts = key.trim_start_matches("/").split('/').collect_vec();
-        if parts.len() < 5 || parts[0] != "alerts" {
-            return None;
-        }
-        let org = parts[1].to_owned();
-        let stream_type: StreamType = parts[2].into();
-        let stream_name = parts[3].to_owned();
-        let alert_name = parts[4].to_owned();
-        Some((org, stream_type, stream_name, alert_name))
-    }
 }
 
 /// Helper functions for sending events to the super cluster queue.
