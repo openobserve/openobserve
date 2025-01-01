@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
+    <q-card-section class="q-w-md">
       <q-form ref="addOrganizationForm" @submit="onSubmit">
         <q-input
           v-if="beingUpdated"
@@ -54,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-model="organizationData.name"
-          :placeholder="t('organization.nameHolder')"
           :label="t('organization.name') + '*'"
           color="input-border"
           bg-color="input-bg"
@@ -67,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="org-name"
         />
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex q-mt-lg">
           <q-btn
             v-close-popup="true"
             class="q-mb-md text-bold"
