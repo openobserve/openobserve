@@ -137,7 +137,7 @@ impl LabelsExt for Labels {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Label {
     pub name: String,
     pub value: String,
@@ -187,7 +187,7 @@ impl Sample {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Exemplar {
     /// Time in microseconds
     pub timestamp: i64,
@@ -275,6 +275,18 @@ impl RangeValue {
     pub fn get_sample_values(&self) -> Vec<f64> {
         self.samples.iter().map(|sample| sample.value).collect()
     }
+
+    pub fn extend(&mut self, other: RangeValue) {
+        self.samples.extend(other.samples);
+        // check exemplars
+        if let Some(exemplars) = &other.exemplars {
+            if let Some(self_exemplars) = &mut self.exemplars {
+                self_exemplars.extend(exemplars.iter().cloned());
+            } else {
+                self.exemplars = Some(exemplars.clone());
+            }
+        }
+    }
 }
 
 impl Serialize for RangeValue {
@@ -282,15 +294,27 @@ impl Serialize for RangeValue {
     where
         S: Serializer,
     {
-        let mut seq = serializer.serialize_struct("range_value", 2)?;
-        let labels_map = self
-            .labels
-            .iter()
-            .map(|l| (l.name.as_str(), l.value.as_str()))
-            .collect::<FxIndexMap<_, _>>();
-        seq.serialize_field("metric", &labels_map)?;
-        seq.serialize_field("values", &self.samples)?;
-        seq.end()
+        if self.exemplars.is_none() {
+            let mut seq = serializer.serialize_struct("range_value", 2)?;
+            let labels_map = self
+                .labels
+                .iter()
+                .map(|l| (l.name.as_str(), l.value.as_str()))
+                .collect::<FxIndexMap<_, _>>();
+            seq.serialize_field("metric", &labels_map)?;
+            seq.serialize_field("values", &self.samples)?;
+            seq.end()
+        } else {
+            let mut seq = serializer.serialize_struct("range_value", 2)?;
+            let labels_map = self
+                .labels
+                .iter()
+                .map(|l| (l.name.as_str(), l.value.as_str()))
+                .collect::<FxIndexMap<_, _>>();
+            seq.serialize_field("seriesLabels", &labels_map)?;
+            seq.serialize_field("exemplars", &self.exemplars.as_ref().unwrap())?;
+            seq.end()
+        }
     }
 }
 

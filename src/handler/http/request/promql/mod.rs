@@ -1004,12 +1004,18 @@ async fn search(
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
     match promql::search::search(org_id, req, user_email, timeout).await {
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
+        Ok(data) if !req.query_exemplars => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {
                 result_type: data.get_type().to_string(),
                 result: data,
             }),
+            error_type: None,
+            error: None,
+        })),
+        Ok(data) => Ok(HttpResponse::Ok().json(promql::ExemplarsResponse {
+            status: promql::Status::Success,
+            data: Some(promql::ExemplarsResult { result: data }),
             error_type: None,
             error: None,
         })),

@@ -21,7 +21,7 @@ use std::{
 use config::{
     get_config, ider,
     meta::{
-        cluster::{get_internal_grpc_token, RoleGroup},
+        cluster::RoleGroup,
         search::ScanStats,
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
@@ -32,23 +32,17 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
-use tonic::{
-    codec::CompressionEncoding,
-    metadata::{MetadataKey, MetadataValue},
-    Request,
-};
 use tracing::{info_span, Instrument};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster,
     service::{
-        grpc::get_cached_channel,
+        grpc::make_grpc_metrics_client,
         promql::{
             adjust_start_end, micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK,
             DEFAULT_MAX_POINTS_PER_SERIES,
         },
-        search::{server_internal_error, MetadataMap},
+        search::server_internal_error,
         self_reporting::report_request_usage_stats,
     },
 };
@@ -185,58 +179,21 @@ async fn search_in_cluster(
         );
 
         let trace_id = trace_id.to_string();
-        let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
-                let cfg = config::get_config();
-                let org_id: MetadataValue<_> = req
-                    .org_id
-                    .parse()
-                    .map_err(|_| Error::Message(format!("invalid org_id: {}", req.org_id)))?;
+                let node = Arc::new(node) as _;
+                let org_id = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let org_header_key: MetadataKey<_> = cfg.grpc.org_header_key.parse().map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        req.metadata_mut()
-                            .insert(org_header_key.clone(), org_id.clone());
-                        Ok(req)
-                    },
-                );
-                 client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let mut client = make_grpc_metrics_client(&trace_id, &org_id, &mut request, &node)
+                    .await?;
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
                             "[trace_id {trace_id}] promql->search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
+                            &node.get_grpc_addr(),
                             err
                         );
                         if err.code() == tonic::Code::Internal {
@@ -250,7 +207,7 @@ async fn search_in_cluster(
 
                 log::info!(
                     "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
-                    &node.grpc_addr,
+                    &node.get_grpc_addr(),
                     req_need_wal,
                     response.took,
                     scan_stats.files,

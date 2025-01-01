@@ -525,7 +525,7 @@ impl Engine {
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         for metric in metric_values.iter_mut() {
             metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            if self.ctx.query_exemplars {
+            if self.ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
@@ -640,10 +640,11 @@ impl Engine {
                 break;
             }
             for (key, value) in task_result? {
-                let metric = metrics
-                    .entry(key)
-                    .or_insert_with(|| RangeValue::new(value.labels, Vec::with_capacity(20)));
-                metric.samples.extend(value.samples);
+                if let Some(metric) = metrics.get_mut(&key) {
+                    metric.extend(value);
+                } else {
+                    metrics.insert(key, value);
+                }
             }
         }
         Ok(metrics)

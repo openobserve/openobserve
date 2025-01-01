@@ -20,6 +20,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
 use promql_parser::{label::Matchers, parser};
@@ -48,9 +49,7 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<
-        Vec<(SessionContext, Arc<Schema>, config::meta::search::ScanStats)>,
-    > {
+    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut resp = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
