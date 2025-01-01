@@ -52,30 +52,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin-bottom: 2px; height: 44px"
         >
           <div class="q-table__title">{{ t("organization.header") }}</div>
-          <q-btn
-            v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            icon="add"
-            dense
-            :label="t(`organization.add`)"
-            @click="addOrganization"
-          />
         </div>
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-ml-none q-mb-xs"
-          style="width: 400px"
-          :placeholder="t('organization.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
+        <div class="full-width row q-mb-xs items-start">
+          <div class="col">
+            <q-input
+              v-model="filterQuery"
+              filled
+              dense
+              class="col-6 q-pr-sm"
+              style="width: 400px"
+              :placeholder="t('organization.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
+          <div class="col-3">
+            <q-btn
+              v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
+              class="q-ml-md q-mb-xs text-bold no-border float-right"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              icon="add"
+              dense
+              :label="t(`organization.add`)"
+              @click="addOrganization"
+            />
+          </div>
+        </div>
 
         <QTablePagination
           :scope="scope"
@@ -113,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, onUpdated, watch, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -127,8 +133,8 @@ import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrgan
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
-import { onBeforeMount } from "vue";
 import config from "@/aws-exports";
+import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -151,6 +157,7 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
+    const showAddOrganizationDialog = ref(false);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -272,6 +279,21 @@ export default defineComponent({
       }
     });
 
+    onMounted(() => {
+      if (router.currentRoute.value.query?.action == "add") {
+        showAddOrganizationDialog.value = true;
+      }
+    });
+
+    watch(
+      () => router.currentRoute.value.query?.action,
+      (value) => {
+        if (value == "add") {
+          showAddOrganizationDialog.value = true;
+        }
+      },
+    );
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -389,6 +411,14 @@ export default defineComponent({
       }
     };
 
+    const hideAddOrgDialog = () => {
+      router.push({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     return {
       t,
       store,
@@ -412,8 +442,9 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       changePagination,
-      // maxRecordToReturn,
-      // changeMaxRecordToReturn,
+      maxRecordToReturn,
+      changeMaxRecordToReturn,
+      showAddOrganizationDialog,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
@@ -426,6 +457,7 @@ export default defineComponent({
         return filtered;
       },
       addOrganization,
+      hideAddOrgDialog,
     };
   },
   methods: {
