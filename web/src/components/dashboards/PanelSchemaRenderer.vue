@@ -864,7 +864,7 @@ export default defineComponent({
               ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
               : drilldownData.data.logsQuery;
 
-          const encodedQuery = b64EncodeUnicode(modifiedQuery);
+          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
 
           const pos = window.location.pathname.indexOf("/web/");
           const currentUrl =
