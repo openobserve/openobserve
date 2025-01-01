@@ -756,6 +756,8 @@ export default defineComponent({
             .slice("SELECT".length)
         : "";
 
+      whereClause = whereClause.replace(/`/g, '"');
+
       if (breakdownColumn && breakdownValue) {
         const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
         whereClause += whereClause
@@ -837,10 +839,18 @@ export default defineComponent({
           if (!parser) {
             await importSqlParser();
           }
-
+          
           const ast = await parseQuery(originalQuery, parser);
           if (!ast) return;
+          
+          const tableAliases = ast.from
+            ?.filter((fromEntry: any) => fromEntry.as)
+            .map((fromEntry: any) => fromEntry.as);
 
+          const aliasClause = tableAliases?.length
+            ? ` AS ${tableAliases.join(", ")}`
+            : "";
+            
           const breakdownColumn = breakdown[0]?.column;
           const breakdownValue = drilldownParams[0]?.seriesName;
           const whereClause = buildWhereClause(
@@ -851,10 +861,10 @@ export default defineComponent({
 
           const modifiedQuery =
             drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}" ${whereClause}`
+              ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
               : drilldownData.data.logsQuery;
 
-          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+          const encodedQuery = b64EncodeUnicode(modifiedQuery);
 
           const pos = window.location.pathname.indexOf("/web/");
           const currentUrl =
