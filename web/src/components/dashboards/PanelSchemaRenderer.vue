@@ -756,8 +756,6 @@ export default defineComponent({
             .slice("SELECT".length)
         : "";
 
-      whereClause = whereClause.replace(/`/g, '"');
-
       if (breakdownColumn && breakdownValue) {
         const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
         whereClause += whereClause
@@ -859,10 +857,12 @@ export default defineComponent({
             breakdownValue,
           );
 
-          const modifiedQuery =
+          let modifiedQuery =
             drilldownData.data.logsMode === "auto"
               ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
               : drilldownData.data.logsQuery;
+
+          modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
           const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
 
