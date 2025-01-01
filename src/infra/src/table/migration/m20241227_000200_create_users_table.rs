@@ -52,8 +52,8 @@ fn create_users_table_statement() -> TableCreateStatement {
                 .primary_key(),
         )
         .col(ColumnDef::new(Users::Email).string_len(100).not_null())
-        .col(ColumnDef::new(Users::FirstName).string_len(80).not_null())
-        .col(ColumnDef::new(Users::LastName).string_len(80).not_null())
+        .col(ColumnDef::new(Users::FirstName).string_len(100).not_null())
+        .col(ColumnDef::new(Users::LastName).string_len(100).not_null())
         .col(ColumnDef::new(Users::Password).string_len(256).not_null())
         .col(ColumnDef::new(Users::Salt).string_len(256).not_null())
         .col(ColumnDef::new(Users::IsRoot).boolean().not_null())
@@ -113,8 +113,8 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "users" (
                 "id" char(27) NOT NULL PRIMARY KEY,
                 "email" varchar(100) NOT NULL,
-                "first_name" varchar(80) NOT NULL,
-                "last_name" varchar(80) NOT NULL,
+                "first_name" varchar(100) NOT NULL,
+                "last_name" varchar(100) NOT NULL,
                 "password" varchar(256) NOT NULL,
                 "salt" varchar(256) NOT NULL,
                 "is_root" bool NOT NULL,
@@ -138,8 +138,8 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS `users` (
                 `id` char(27) NOT NULL PRIMARY KEY,
                 `email` varchar(100) NOT NULL,
-                `first_name` varchar(80) NOT NULL,
-                `last_name` varchar(80) NOT NULL,
+                `first_name` varchar(100) NOT NULL,
+                `last_name` varchar(100) NOT NULL,
                 `password` varchar(256) NOT NULL,
                 `salt` varchar(256) NOT NULL,
                 `is_root` bool NOT NULL,
@@ -163,8 +163,8 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "users" (
                 "id" char(27) NOT NULL PRIMARY KEY,
                 "email" varchar(100) NOT NULL,
-                "first_name" varchar(80) NOT NULL,
-                "last_name" varchar(80) NOT NULL,
+                "first_name" varchar(100) NOT NULL,
+                "last_name" varchar(100) NOT NULL,
                 "password" varchar(256) NOT NULL,
                 "salt" varchar(256) NOT NULL,
                 "is_root" boolean NOT NULL,

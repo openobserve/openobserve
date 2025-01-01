@@ -289,9 +289,9 @@ mod users {
         pub id: String,
         #[sea_orm(column_type = "String(StringLen::N(100))")]
         pub email: String,
-        #[sea_orm(column_type = "String(StringLen::N(80))")]
+        #[sea_orm(column_type = "String(StringLen::N(100))")]
         pub first_name: String,
-        #[sea_orm(column_type = "String(StringLen::N(80))")]
+        #[sea_orm(column_type = "String(StringLen::N(100))")]
         pub last_name: String,
         #[sea_orm(column_type = "Text")]
         pub password: String,
