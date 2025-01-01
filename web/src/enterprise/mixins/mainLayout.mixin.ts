@@ -22,11 +22,6 @@ const MainLayoutCloudMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      // linksList.value.splice(7, 0, {
-      //   title: t("menu.billings"),
-      //   icon: "payment",
-      //   link: "/billings",
-      // });
       linksList.value.splice(5, 0, {
         title: t("menu.pipeline"),
         iconComponent: markRaw(PipelineIcon),

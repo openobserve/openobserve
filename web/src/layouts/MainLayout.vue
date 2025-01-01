@@ -457,7 +457,6 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
-  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
@@ -558,16 +557,11 @@ export default defineComponent({
       if (config.isEnterprise == "true") {
         invlidateLoginData();
       }
-
-      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
       this.$router.push("/logout");
     },
     goToHome() {

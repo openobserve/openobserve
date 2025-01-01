@@ -37,7 +37,7 @@ const users = {
   getOrgUsers: (org_identifier: string) => {
     return new Promise((resolve, reject) => {
       usersService
-        .orgUsers(0, 100000, "email", false, "", org_identifier)
+        .orgUsers(org_identifier)
         .then((res) => {
           resolve(res.data.data);
         })
