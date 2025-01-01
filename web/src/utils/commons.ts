@@ -453,14 +453,13 @@ const retrieveAndStoreDashboardData = async (
   store: any,
   dashboardId: any,
   folderId: any,
-  fetchDashboardFn: Function,
+  apiResponse: any,
 ) => {
   try {
-    const res = await fetchDashboardFn();
-    const version = res.data.version;
+    const version = apiResponse.data.version;
     const dashboardKey = `v${version}`;
-    const dashboardData = res.data[dashboardKey];
-    const hash = res.data.hash.toString();
+    const dashboardData = apiResponse.data[dashboardKey];
+    const hash = apiResponse.data.hash.toString();
 
     const convertedData = convertDashboardSchemaVersion(dashboardData);
 
@@ -495,13 +494,17 @@ export const updateDashboard = async (
       store.state.organizationData.allDashboardListHash[dashboardId],
     );
 
-    await retrieveAndStoreDashboardData(store, dashboardId, folderId, () =>
-      dashboardService.get_Dashboard(
-        store.state.selectedOrganization.identifier,
-        dashboardId,
-      ),
+    const apiResponse = await dashboardService.get_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
     );
 
+    await retrieveAndStoreDashboardData(
+      store,
+      dashboardId,
+      folderId,
+      apiResponse,
+    );
     await getAllDashboards(store, folderId);
 
     return res;
@@ -520,11 +523,16 @@ export const getDashboard = async (
     return store.state.organizationData.allDashboardData[dashboardId];
   }
 
-  return await retrieveAndStoreDashboardData(store, dashboardId, folderId, () =>
-    dashboardService.get_Dashboard(
-      store.state.selectedOrganization.identifier,
-      dashboardId,
-    ),
+  const apiResponse = await dashboardService.get_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+  );
+
+  return await retrieveAndStoreDashboardData(
+    store,
+    dashboardId,
+    folderId,
+    apiResponse,
   );
 };
 
