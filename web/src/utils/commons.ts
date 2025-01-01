@@ -449,6 +449,36 @@ export const updatePanel = async (
   }
 };
 
+const retrieveAndStoreDashboardData = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  fetchDashboardFn: Function,
+) => {
+  try {
+    const res = await fetchDashboardFn();
+    const version = res.data.version;
+    const dashboardKey = `v${version}`;
+    const dashboardData = res.data[dashboardKey];
+    const hash = res.data.hash.toString();
+
+    const convertedData = convertDashboardSchemaVersion(dashboardData);
+
+    store.dispatch("setAllDashboardListHash", {
+      [dashboardId]: hash,
+    });
+
+    store.dispatch("setDashboardData", {
+      [dashboardId]: convertedData,
+      hash: hash,
+    });
+
+    return store.state.organizationData.allDashboardData[dashboardId];
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const updateDashboard = async (
   store: any,
   org: any,
@@ -465,13 +495,12 @@ export const updateDashboard = async (
       store.state.organizationData.allDashboardListHash[dashboardId],
     );
 
-    const updatedDashboard = await getDashboard(store, dashboardId, folderId);
-
-    // Update the store with the latest dashboard data
-    store.dispatch("setDashboardData", {
-      dashboardId,
-      data: updatedDashboard,
-    });
+    await retrieveAndStoreDashboardData(store, dashboardId, folderId, () =>
+      dashboardService.get_Dashboard(
+        store.state.selectedOrganization.identifier,
+        dashboardId,
+      ),
+    );
 
     await getAllDashboards(store, folderId);
 
@@ -486,34 +515,17 @@ export const getDashboard = async (
   dashboardId: any,
   folderId: any,
 ) => {
-  try {
-    // check if dashboard data is present in store
-    if (store.state.organizationData.allDashboardData[dashboardId]) {
-      return store.state.organizationData.allDashboardData[dashboardId];
-    }
+   // check if dashboard data is present in store
+  if (store.state.organizationData.allDashboardData[dashboardId]) {
+    return store.state.organizationData.allDashboardData[dashboardId];
+  }
 
-    const res = await dashboardService.get_Dashboard(
+  return await retrieveAndStoreDashboardData(store, dashboardId, folderId, () =>
+    dashboardService.get_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardId,
-    );
-
-    const version = res.data.version;
-    const dashboardKey = `v${version}`;
-    const dashboardData = res.data[dashboardKey];
-    const hash = res.data.hash.toString();
-
-    const convertedData = convertDashboardSchemaVersion(dashboardData);
-
-    store.dispatch("setAllDashboardListHash", {
-      [dashboardId]: hash,
-    });
-
-    store.dispatch("setDashboardData", {[dashboardId]: convertedData, hash: hash});
-
-    return store.state.organizationData.allDashboardData[dashboardId];
-  } catch (error) {
-    throw error;
-  }
+    ),
+  );
 };
 
 export const deleteDashboardById = async (
