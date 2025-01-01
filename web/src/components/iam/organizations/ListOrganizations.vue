@@ -33,6 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #top="scope">
         <div class="full-width q-mb-md">
           <div class="q-table__title">{{ t("organization.header") }}</div>
+          <q-btn
+            v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            icon="add"
+            dense
+            :label="t(`organization.add`)"
+            @click="addOrganization"
+          />
         </div>
         <q-input
           v-model="filterQuery"
@@ -69,6 +80,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
+
+    <q-dialog
+      v-model="showAddOrganizationDialog"
+      position="right"
+      full-height
+      maximized
+      @before-hide="hideAddOrgDialog"
+    >
+      <add-update-organization @updated="updateOrganizationList" />
+    </q-dialog>
   </q-page>
 </template>
 
@@ -82,15 +103,18 @@ import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertToTitleCase } from "@/utils/zincutils";
 import { onBeforeMount } from "vue";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     QTablePagination,
     NoData,
+    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
@@ -170,7 +194,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading organizations...",
       });
-      organizationsService.list(0, 100000, "name", false, "").then((res) => {
+      organizationsService.list(0, 1000000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 
@@ -190,11 +214,31 @@ export default defineComponent({
       });
     };
 
+    const addOrganization = (evt) => {
+      router.push({
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+
+      if (evt) {
+        let button_txt = evt.target.innerText;
+        segment.track("Button Click", {
+          button: button_txt,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Organizations",
+        });
+      }
+    };
+
     return {
       t,
       store,
       router,
       qTable,
+      config,
       loading: ref(false),
       organizations,
       organization,
@@ -218,6 +262,7 @@ export default defineComponent({
         }
         return filtered;
       },
+      addOrganization,
     };
   },
 });
