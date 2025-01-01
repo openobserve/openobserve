@@ -59,7 +59,6 @@ test.describe("Change Organisation", () => {
     });
 
     test("Home Page change organisation validation", async ({ page }) => {
-
         await homePage.homePageDefaultMultiOrg();
         await homePage.homePageValidation();
         await homePage.homePageURLValidation();
