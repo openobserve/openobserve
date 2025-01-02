@@ -517,7 +517,16 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(_f, a)| is_all_permitted || permissions.contains(&format!("alert:{}", a.name)))
+        .filter(|(_f, a)| {
+            // Include the alert if all alerts are permitted.
+            is_all_permitted
+                // Include the alert if the alert is permitted with the old OpenFGA identifier.
+                || permissions.contains(&format!("alert:{}", a.name))
+                // Include the alert if the alert is permitted with the new OpenFGA identifier.
+                || a.id
+                    .filter(|id| permissions.contains(&format!("alert:{id}")))
+                    .is_some()
+        })
         .collect_vec();
     Ok(alerts)
 }
@@ -1135,7 +1144,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1146,6 +1155,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
             function_content,
+            SearchEventType::Alerts
         )
     } else {
         match alert.query_condition.query_type {
@@ -1173,7 +1183,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1184,6 +1194,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query),
             alert.org_id,
             function_content,
+            SearchEventType::Alerts
         )
     };
 

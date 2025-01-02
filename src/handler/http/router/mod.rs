@@ -36,7 +36,8 @@ use {
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
     },
 };
 
@@ -75,6 +76,7 @@ async fn audit_middleware(
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
     if get_o2_config().common.audit_enabled
+        && !path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
@@ -118,12 +120,14 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                method,
-                path,
-                body,
-                query_params,
-                response_code: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
+                protocol: Protocol::Http(HttpMeta {
+                    method,
+                    path,
+                    body,
+                    query_params,
+                    response_code: res.response().status().as_u16(),
+                }),
             })
             .await;
         }
@@ -375,19 +379,21 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(traces::get_latest_traces)
         .service(metrics::ingest::json)
         .service(metrics::ingest::otlp_metrics_write)
-        .service(prom::remote_write)
-        .service(prom::query_get)
-        .service(prom::query_post)
-        .service(prom::query_range_get)
-        .service(prom::query_range_post)
-        .service(prom::metadata)
-        .service(prom::series_get)
-        .service(prom::series_post)
-        .service(prom::labels_get)
-        .service(prom::labels_post)
-        .service(prom::label_values)
-        .service(prom::format_query_get)
-        .service(prom::format_query_post)
+        .service(promql::remote_write)
+        .service(promql::query_get)
+        .service(promql::query_post)
+        .service(promql::query_range_get)
+        .service(promql::query_range_post)
+        .service(promql::query_exemplars_get)
+        .service(promql::query_exemplars_post)
+        .service(promql::metadata)
+        .service(promql::series_get)
+        .service(promql::series_post)
+        .service(promql::labels_get)
+        .service(promql::labels_post)
+        .service(promql::label_values)
+        .service(promql::format_query_get)
+        .service(promql::format_query_post)
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
@@ -502,7 +508,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(websocket::websocket);
 
     #[cfg(feature = "enterprise")]
     let service = service
