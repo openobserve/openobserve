@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
+        promql::VALUE_LABEL,
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -32,11 +33,17 @@ use infra::{
     cache::file_data,
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
+use promql_parser::label::{MatchOp, Matchers};
 use tokio::sync::Semaphore;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec::register_table, match_source},
+    search::{
+        datafusion::exec::register_table,
+        grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+        index::{Condition, IndexCondition},
+        match_source,
+    },
 };
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
@@ -45,6 +52,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
+    matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // check if we are allowed to search
@@ -147,6 +155,32 @@ pub(crate) async fn create_context(
             .with_metadata(std::collections::HashMap::new()),
     );
 
+    let query = Arc::new(QueryParams {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.to_string(),
+        job_id: "".to_string(),
+        stream_type: StreamType::Metrics,
+        stream_name: stream_name.to_string(),
+        time_range: Some(time_range),
+        work_group: None,
+        use_inverted_index: true,
+    });
+
+    // search tantivy index
+    let index_condition = convert_matchers_to_index_condition(&matchers, &schema)?;
+    if !matchers.matchers.is_empty() && cfg.common.inverted_index_enabled {
+        let (idx_took, ..) =
+            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id}] filter file list by tantivy index error: {e}"
+                    );
+                    DataFusionError::Execution(e.to_string())
+                })?;
+        log::info!("[trace_id {trace_id}] filter file list by tantivy index took: {idx_took} ms",);
+    }
+
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Memory,
@@ -205,6 +239,7 @@ async fn get_file_list(
     Ok(files)
 }
 
+// TODO: unify cache_parquet_files and cache_files
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
 async fn cache_parquet_files(
     trace_id: &str,
@@ -297,4 +332,27 @@ async fn cache_parquet_files(
     }
 
     Ok((cache_type, delete_files))
+}
+
+fn convert_matchers_to_index_condition(
+    matchers: &Matchers,
+    schema: &Arc<Schema>,
+) -> Result<IndexCondition> {
+    let mut index_condition = IndexCondition::default();
+    let cfg = get_config();
+    for mat in matchers.matchers.iter() {
+        if mat.name == cfg.common.column_timestamp
+            || mat.name == VALUE_LABEL
+            || schema.field_with_name(&mat.name).is_err()
+        {
+            continue;
+        }
+        let condition = match &mat.op {
+            MatchOp::Equal => Condition::Equal(mat.name.clone(), mat.value.clone()),
+            MatchOp::Re(regex) => Condition::Regex(mat.name.clone(), regex.to_string()),
+            _ => continue,
+        };
+        index_condition.add_condition(condition);
+    }
+    Ok(index_condition)
 }
