@@ -546,8 +546,8 @@ const isInputValid = () => {
   try {
     JSON.parse(inputEvents.value);
     return true;
-  } catch (e) {
-    eventsErrorMsg.value = `Invalid events: ${e.message}`;
+  } catch (e: any) {
+    eventsErrorMsg.value = `Invalid events: ${e?.message}`;
     q.notify({
       type: "negative",
       message: eventsErrorMsg.value,
