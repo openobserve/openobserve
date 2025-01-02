@@ -331,15 +331,7 @@ const saveFunction = () => {
       });
       return;
     }
-    if (addFunctionRef.value.formData.function == "") {
-      q.notify({
-        message: "Function is required",
-        color: "negative",
-        position: "bottom",
-        timeout: 2000,
-      });
-      return;
-    }
+
     addFunctionRef.value.onSubmit();
     return;
   }

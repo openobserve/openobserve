@@ -255,6 +255,10 @@ async assertFunctionNameRequiredErrorVisible() {
   await expect(this.functionNameRequiredError).toBeVisible();
 }
 
+async assertFunctionNameRequiredErrorNotToBeVisible() {
+  await expect(this.functionNameRequiredError).not.toBeVisible();
+}
+
 async assertFunctionRequiredErrorVisible() {
   await expect(this.functionRequiredError).toBeVisible();
 }

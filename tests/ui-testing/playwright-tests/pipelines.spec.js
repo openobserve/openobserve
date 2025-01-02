@@ -466,7 +466,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.assertFunctionNameRequiredErrorVisible();
   });
 
-  test("should display error when function name added but function is not added", async ({
+  test("should create function when name added but function is not added", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -480,7 +480,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.enterFunctionName(randomFunctionName);
     await pipelinePage.saveNewFunction();
-    await pipelinePage.assertFunctionRequiredErrorVisible();
+    await pipelinePage.assertFunctionNameRequiredErrorNotToBeVisible();
   });
 
   test.skip("should display error if query added without sql", async ({
