@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(feature = "enterprise")]
-use std::collections::HashSet;
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
@@ -147,9 +145,9 @@ async fn query(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{is_root_user, AuthExtractor},
+            service::db::org_users::get_cached_user_org,
         };
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
@@ -159,10 +157,8 @@ async fn query(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
-                    .unwrap()
-                    .clone();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if !crate::handler::http::auth::validator::check_permissions(
                     user_email,
                     AuthExtractor {
@@ -396,9 +392,9 @@ async fn query_range(
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{is_root_user, AuthExtractor},
+            service::db::org_users::get_cached_user_org,
         };
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -419,10 +415,8 @@ async fn query_range(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
-                    .unwrap()
-                    .clone();
+                let user: config::meta::user::User =
+                    get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
                         user_email,
@@ -659,9 +653,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{
-            infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+        use crate::{
+            common::utils::auth::{is_root_user, AuthExtractor},
+            service::db::org_users::get_cached_user_org,
         };
 
         let metric_name = match selector
@@ -676,10 +670,7 @@ async fn series(
         let user_email = user_id.to_str().unwrap();
 
         if !is_root_user(user_email) {
-            let user: meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_email))
-                .unwrap()
-                .clone();
+            let user: config::meta::user::User = get_cached_user_org(org_id, user_email).unwrap();
             let stream_type_str = StreamType::Metrics.to_string();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
