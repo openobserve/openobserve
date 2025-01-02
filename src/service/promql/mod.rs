@@ -101,16 +101,10 @@ pub struct QueryResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExemplarsResult {
-    pub result: value::Value,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ExemplarsResponse {
     pub status: Status,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<ExemplarsResult>,
+    pub data: Option<value::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

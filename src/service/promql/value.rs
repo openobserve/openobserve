@@ -187,12 +187,30 @@ impl Sample {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
 pub struct Exemplar {
     /// Time in microseconds
     pub timestamp: i64,
     pub value: f64,
     pub labels: Labels,
+}
+
+impl Serialize for Exemplar {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_struct("exemplars", 3)?;
+        let labels_map = self
+            .labels
+            .iter()
+            .map(|l| (l.name.as_str(), l.value.as_str()))
+            .collect::<FxIndexMap<_, _>>();
+        seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
+        seq.serialize_field("value", &self.value.to_string())?;
+        seq.serialize_field("labels", &labels_map)?;
+        seq.end()
+    }
 }
 
 impl From<&json::Map<String, json::Value>> for Exemplar {

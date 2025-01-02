@@ -1015,7 +1015,7 @@ async fn search(
         })),
         Ok(data) => Ok(HttpResponse::Ok().json(promql::ExemplarsResponse {
             status: promql::Status::Success,
-            data: Some(promql::ExemplarsResult { result: data }),
+            data: Some(data),
             error_type: None,
             error: None,
         })),
