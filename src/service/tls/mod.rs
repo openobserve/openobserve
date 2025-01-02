@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod danger;
-
 use std::{io::BufReader, sync::Arc};
 
 use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
