@@ -1,7 +1,10 @@
+#[cfg(feature = "enterprise")]
 use config::utils::json;
+#[cfg(feature = "enterprise")]
+use infra::table::distinct_values::BatchDeleteMessage;
 use infra::{
     errors,
-    table::distinct_values::{BatchDeleteMessage, DistinctFieldRecord, OriginType},
+    table::distinct_values::{DistinctFieldRecord, OriginType},
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config;
