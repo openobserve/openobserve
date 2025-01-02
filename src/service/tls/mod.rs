@@ -73,7 +73,7 @@ pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
 
     let protos = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.alpn_protocols = protos;
-    if !cfg.http.tls_http_root_certificates_enabled {
+    if cfg.http.tls_http_check_certificates_disabled {
         config
             .dangerous()
             .set_certificate_verifier(Arc::new(danger::NoCertificateVerification));

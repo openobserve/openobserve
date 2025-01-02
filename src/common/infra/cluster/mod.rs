@@ -184,13 +184,10 @@ pub async fn register_and_keep_alive() -> Result<()> {
     tokio::task::spawn(async move {
         let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
 
-        let cfg = get_config();
-        let mut client_builder = reqwest::ClientBuilder::new();
-        if cfg.http.tls_enabled && !cfg.http.tls_http_root_certificates_enabled {
-            client_builder = client_builder.danger_accept_invalid_certs(true);
-        }
-
-        let client = client_builder.build().unwrap();
+        let client = reqwest::ClientBuilder::new()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;

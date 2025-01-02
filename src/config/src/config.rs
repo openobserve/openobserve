@@ -472,11 +472,11 @@ pub struct Http {
     #[env_config(name = "ZO_HTTP_TLS_MIN_VERSION", default = "", help = "Supported values: "1.2" or "1.3", default is all_version")]
     pub tls_min_version: String,
     #[env_config(
-        name = "ZO_HTTP_ROOT_CERTIFICATES_ENABLED",
+        name = "ZO_HTTP_CHECK_CERTIFICATES_DISABLED",
         default = "false",
-        help = "enable root certificates verify"
+        help = "http check certificates disabled"
     )]
-    pub tls_http_root_certificates_enabled: bool,
+    pub tls_http_check_certificates_disabled: bool,
     #[env_config(
         name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
         default = "native",
