@@ -542,8 +542,14 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+        let scheme = if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        };
         log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
+            "Starting {} server at: {}, thread_id: {}",
+            scheme,
             haddr,
             local_id
         );
@@ -641,11 +647,19 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+
+        let scheme = if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        };
         log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
+            "Starting {} server at: {}, thread_id: {}",
+            scheme,
             haddr,
             local_id
         );
+
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
