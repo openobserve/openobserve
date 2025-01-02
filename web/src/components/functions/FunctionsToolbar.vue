@@ -25,6 +25,7 @@
       <q-form ref="addFunctionForm" class="o2-input">
         <div class="tw-flex tw-items-center">
           <q-input
+            data-test="add-function-name-input"
             v-model="functionName"
             :label="t('function.name')"
             color="input-border"
@@ -66,6 +67,7 @@
     </div>
     <div class="add-function-actions flex justify-center">
       <q-btn
+        data-test="add-function-fullscreen-btn"
         v-close-popup="true"
         class="text-bold tw-border-primary add-function-fullscreen-btn"
         :label="t('common.fullscreen')"
@@ -76,6 +78,7 @@
         @click="handleFullScreen"
       />
       <q-btn
+        data-test="add-function-test-btn"
         :label="t('function.testFunction')"
         class="text-bold no-border tw-ml-[12px] add-function-test-btn"
         color="primary"
@@ -84,6 +87,7 @@
         @click="emit('test')"
       />
       <q-btn
+        data-test="add-function-save-btn"
         :label="t('function.save')"
         class="text-bold no-border tw-ml-[12px] add-function-save-btn"
         color="secondary"
@@ -93,6 +97,7 @@
         @click="emit('save')"
       />
       <q-btn
+        data-test="add-function-cancel-btn"
         class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600 add-function-cancel-btn"
         :label="t('function.cancel')"
         text-color="negative"
