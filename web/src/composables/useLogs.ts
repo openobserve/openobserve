@@ -4651,6 +4651,7 @@ const useLogs = () => {
     try {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
+        showCancelSearchNotification();
         return;
       }
 
@@ -4720,7 +4721,7 @@ const useLogs = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
-      handleCancelQuery();
+      showCancelSearchNotification();
     }
   };
 
@@ -5169,7 +5170,7 @@ const useLogs = () => {
 
     // 20009 is the code for query cancelled
     if (code === 20009) {
-      handleCancelQuery();
+      showCancelSearchNotification();
     }
 
     if (trace_id) removeTraceId(trace_id);
@@ -5284,7 +5285,7 @@ const useLogs = () => {
     }
   };
 
-  const handleCancelQuery = () => {
+  const showCancelSearchNotification = () => {
     $q.notify({
       message: "Running query cancelled successfully",
       color: "positive",
