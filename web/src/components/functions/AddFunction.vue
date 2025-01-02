@@ -279,10 +279,10 @@ end`;
             return false;
           }
 
-          const dismiss = $q.notify({
+          const loadingNotification = $q.notify({
             spinner: true,
             message: "Please wait...",
-            timeout: 2000,
+            timeout: 0,
           });
 
           if (!beingUpdated.value) {
@@ -317,7 +317,7 @@ end`;
 
               emit("update:list", _formData);
               addJSTransformForm.value.resetValidation();
-              dismiss();
+              loadingNotification();
               $q.notify({
                 type: "positive",
                 message: res.data.message || "Function saved successfully",
@@ -328,11 +328,9 @@ end`;
               $q.notify({
                 type: "negative",
                 message:
-                  JSON.stringify(err.response.data?.error) ||
-                  err.response.data?.message ||
-                  "Function creation failed",
+                  err.response?.data?.message ?? "Function creation failed",
               });
-              dismiss();
+              loadingNotification();
             });
 
           segment.track("Button Click", {

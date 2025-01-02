@@ -547,10 +547,10 @@ const isInputValid = () => {
     JSON.parse(inputEvents.value);
     return true;
   } catch (e) {
-    eventsErrorMsg.value = "Invalid JSON in events";
+    eventsErrorMsg.value = `Invalid events: ${e.message}`;
     q.notify({
       type: "negative",
-      message: "Invalid JSON in events",
+      message: eventsErrorMsg.value,
       timeout: 3000,
     });
     return false;
@@ -591,7 +591,7 @@ const testFunction = async () => {
       }, 1000);
     })
     .catch((err: any) => {
-      console.log("Error in testing function", err);
+      console.error("Error in testing function:", err);
       const errMsg = err.response?.data?.message || "Error in testing function";
       outputEventsErrorMsg.value = "Error while transforming results";
 
@@ -644,18 +644,8 @@ function getLineRanges(object: any) {
             isMatch = false;
             break;
           }
-
-          // console.log(
-          //   "is match",
-          //   isMatch,
-          //   "Editor Line:",
-          //   editorLine,
-          //   "Object Line:",
-          //   objectLine,
-          // );
         }
 
-        // console.log("Is Match:", isMatch, i);
         if (isMatch) {
           startLine = i;
           break; // Exit the loop once a match is found

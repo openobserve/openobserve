@@ -148,8 +148,11 @@ const addFunctionForm = ref(null);
 
 const isValidMethodName = () => {
   if (!functionName.value) return "Field is required!";
-  const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
-  return methodPattern.test(props.name) || "Invalid method name.";
+  const methodPattern = /^[A-Z_][A-Z0-9_]*$/i;
+  return (
+    methodPattern.test(functionName.value) ||
+    "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores."
+  );
 };
 
 const functionName = computed({
