@@ -12,25 +12,22 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-#[cfg(feature = "enterprise")]
-use config::meta::stream::StreamType;
 use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use promql_parser::parser;
-
 #[cfg(feature = "enterprise")]
-use crate::common::meta;
+use {
+    config::meta::stream::StreamType,
+    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS,
+};
+
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{
-        metrics,
-        promql::{self, MetricsQueryRequest},
-    },
+    service::{metrics, promql},
 };
 
 /// prometheus remote-write endpoint for metrics
@@ -162,7 +159,7 @@ async fn query(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = USERS
+                let user: crate::common::meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
                     .unwrap()
                     .clone();
@@ -211,7 +208,7 @@ async fn query(
     let end = start;
     let timeout = search_timeout(req.timeout);
 
-    let req = MetricsQueryRequest {
+    let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -422,7 +419,7 @@ async fn query_range(
         if !is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.to_string();
             for name in visitor.name {
-                let user: meta::user::User = USERS
+                let user: crate::common::meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
                     .unwrap()
                     .clone();
@@ -508,7 +505,7 @@ async fn query_range(
 
     let timeout = search_timeout(req.timeout);
 
-    let req = MetricsQueryRequest {
+    let req = promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -679,7 +676,7 @@ async fn series(
         let user_email = user_id.to_str().unwrap();
 
         if !is_root_user(user_email) {
-            let user: meta::user::User = USERS
+            let user: crate::common::meta::user::User = USERS
                 .get(&format!("{org_id}/{}", user_email))
                 .unwrap()
                 .clone();
@@ -1002,7 +999,7 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 
 async fn search(
     org_id: &str,
-    req: &MetricsQueryRequest,
+    req: &promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
