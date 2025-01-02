@@ -109,8 +109,11 @@ async fn run_download_files() {
 pub async fn update_global_maxmind_client(fname: &str) {
     match MaxmindClient::new_with_path(fname) {
         Ok(maxminddb_client) => {
-            let mut client = MAXMIND_DB_CLIENT.write().await;
-            *client = Some(maxminddb_client);
+            // Acquire the lock only when updating the shared state
+            {
+                let mut client = MAXMIND_DB_CLIENT.write().await;
+                *client = Some(maxminddb_client);
+            } // Lock is released here
 
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
                 let mut geoip_city = GEOIP_CITY_TABLE.write();
