@@ -20,6 +20,7 @@ use config::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
         dashboards::reports,
         function::Transform,
+        promql::ClusterLeader,
         stream::StreamParams,
         user::User,
     },
@@ -36,7 +37,6 @@ use crate::{
     common::meta::{
         maxmind::MaxmindClient,
         organization::{Organization, OrganizationSetting},
-        prom::ClusterLeader,
         syslog::SyslogRoute,
     },
     handler::http::request::websocket::session::WsSession,

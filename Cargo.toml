@@ -133,7 +133,7 @@ opentelemetry-proto = { version = "0.25", features = [
 ] }
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = "0.3"
+promql-parser = "0.4"
 prost.workspace = true
 proto.workspace = true
 pyroscope = { version = "0.5.6", optional = true }
@@ -317,7 +317,7 @@ sqlx = { version = "0.8.2", features = [
     "sqlite",
     "chrono",
 ] }
-strum = { version = "0.25", features = ["derive"] }
+strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tantivy = { version = "0.22.0", features = ["quickwit"] }
