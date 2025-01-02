@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod danger;
+
 use std::{io::BufReader, sync::Arc};
 
 use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert_store};
@@ -72,5 +74,8 @@ pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     let protos = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.alpn_protocols = protos;
 
+    config
+        .dangerous()
+        .set_certificate_verifier(Arc::new(danger::NoCertificateVerification));
     Ok(Arc::new(config))
 }
