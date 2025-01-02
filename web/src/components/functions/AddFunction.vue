@@ -356,7 +356,7 @@ end`;
     const closeAddFunction = () => {
       if (isFunctionDataChanged.value) {
         confirmDialogMeta.value.show = true;
-        confirmDialogMeta.value.title = t("common.usavedTitle");
+        confirmDialogMeta.value.title = t("common.unsavedTitle");
         confirmDialogMeta.value.message = t("common.unsavedMessage");
         confirmDialogMeta.value.onConfirm = () => {
           emit("cancel:hideform");

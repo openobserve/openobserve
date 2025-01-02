@@ -609,88 +609,97 @@ const testFunction = async () => {
 };
 
 function getLineRanges(object: any) {
-  if (!outputEventsEditorRef.value) return;
-  const model = outputEventsEditorRef.value.getModel(); // Get Monaco Editor model
-  const contentLines = model.getLinesContent(); // Get content as an array of lines
-  const ranges = [];
+  try {
+    if (!outputEventsEditorRef.value) return;
+    const model = outputEventsEditorRef.value.getModel(); // Get Monaco Editor model
+    const contentLines = model.getLinesContent(); // Get content as an array of lines
+    const ranges = [];
 
-  // Convert object to JSON string for comparison
-  const serializedObject = JSON.stringify(object.event, null, 4);
-  const serializedLines = serializedObject.split("\n");
+    // Convert object to JSON string for comparison
+    const serializedObject = JSON.stringify(object.event, null, 4);
+    const serializedLines = serializedObject.split("\n");
 
-  console.log("Serialized Lines:", serializedLines);
+    console.log("Serialized Lines:", serializedLines);
 
-  let startLine = -1;
+    let startLine = -1;
 
-  // Iterate over the editor content lines
-  for (let i = 0; i < contentLines.length; i++) {
-    const line = contentLines[i];
+    // Iterate over the editor content lines
+    for (let i = 0; i < contentLines.length; i++) {
+      const line = contentLines[i];
 
-    // Check if the current line matches the first line of the serialized object
-    if (line.trim() === serializedLines[0].trim()) {
-      let isMatch = true;
+      // Check if the current line matches the first line of the serialized object
+      if (line.trim() === serializedLines[0].trim()) {
+        let isMatch = true;
 
-      // Check subsequent lines to ensure the entire object matches
-      for (let j = 0; j < serializedLines.length; j++) {
-        let editorLine = contentLines[i + j]?.trim();
-        const objectLine = serializedLines[j]?.trim();
+        // Check subsequent lines to ensure the entire object matches
+        for (let j = 0; j < serializedLines.length; j++) {
+          let editorLine = contentLines[i + j]?.trim();
+          const objectLine = serializedLines[j]?.trim();
 
-        if (editorLine === "},") {
-          editorLine = "}";
+          if (editorLine === "},") {
+            editorLine = "}";
+          }
+
+          if (editorLine !== objectLine) {
+            isMatch = false;
+            break;
+          }
+
+          // console.log(
+          //   "is match",
+          //   isMatch,
+          //   "Editor Line:",
+          //   editorLine,
+          //   "Object Line:",
+          //   objectLine,
+          // );
         }
 
-        if (editorLine !== objectLine) {
-          isMatch = false;
-          break;
+        // console.log("Is Match:", isMatch, i);
+        if (isMatch) {
+          startLine = i;
+          break; // Exit the loop once a match is found
         }
-
-        // console.log(
-        //   "is match",
-        //   isMatch,
-        //   "Editor Line:",
-        //   editorLine,
-        //   "Object Line:",
-        //   objectLine,
-        // );
-      }
-
-      // console.log("Is Match:", isMatch, i);
-      if (isMatch) {
-        startLine = i;
-        break; // Exit the loop once a match is found
       }
     }
-  }
 
-  if (startLine !== -1) {
-    const endLine = startLine + serializedLines.length - 1;
-    ranges.push({
-      startLine: startLine + 1,
-      endLine: endLine + 1,
-      error: `Error: Failed to apply VRL Function.\n${object.message}`,
-    }); // Monaco uses 1-based indexing
-  }
+    if (startLine !== -1) {
+      const endLine = startLine + serializedLines.length - 1;
+      ranges.push({
+        startLine: startLine + 1,
+        endLine: endLine + 1,
+        error: `Error: Failed to apply VRL Function.\n${object.message}`,
+      }); // Monaco uses 1-based indexing
+    }
 
-  return ranges;
+    return ranges;
+  } catch (e) {
+    console.log("Error in getLineRanges", e);
+  }
 }
 
 function highlightSpecificEvent() {
-  const errorEvents = JSON.parse(originalOutputEvents.value).filter(
-    (event: any) => event.message?.trim(),
-  );
-  const errorEventRanges: any[] = [];
+  try {
+    const errorEvents = JSON.parse(originalOutputEvents.value).filter(
+      (event: any) => event.message?.trim(),
+    );
+    const errorEventRanges: any[] = [];
 
-  errorEvents.forEach((event: any) => {
-    const ranges = getLineRanges(event);
-    if (ranges && ranges.length > 0) {
-      errorEventRanges.push(ranges[0]);
+    errorEvents.forEach((event: any) => {
+      const ranges = getLineRanges(event);
+      if (ranges && ranges.length > 0) {
+        errorEventRanges.push(ranges[0]);
+      }
+    });
+    if (errorEventRanges.length) {
+      outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
     }
-  });
-  if (errorEventRanges.length) {
-    outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+
+    if (outputEventsEditorRef.value)
+      outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
+  } catch (e) {
+    console.log("Error in highlightSpecificEvent", e);
   }
-  if (outputEventsEditorRef.value)
-    outputEventsEditorRef.value.addErrorDiagnostics(errorEventRanges);
 }
 
 defineExpose({

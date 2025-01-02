@@ -71,7 +71,7 @@
     "query": "Query",
     "output": "Output",
     "selectStream": "Select Stream",
-    "usavedTitle": "Unsaved Changes",
+    "unsavedTitle": "Unsaved Changes",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
     "cancelTitle": "Cancel Changes",
     "cancelMessage": "Are you sure you want to cancel the changes?"
