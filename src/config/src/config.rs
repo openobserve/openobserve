@@ -1554,6 +1554,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check http config
+    if let Err(e) = check_http_config(&mut cfg) {
+        panic!("common config error: {e}")
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1723,6 +1728,18 @@ fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             || cfg.grpc.tls_key_path.is_empty())
     {
         return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+    }
+    Ok(())
+}
+
+fn check_http_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.http.tls_enabled
+        && (cfg.http.tls_cert_path.is_empty() || cfg.http.tls_key_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "When ZO_HTTP_TLS_ENABLED=true, both ZO_HTTP_TLS_CERT_PATH \
+             and ZO_HTTP_TLS_KEY_PATH must be set."
+        ));
     }
     Ok(())
 }
