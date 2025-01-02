@@ -129,7 +129,7 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations", "serviceAccounts"];
+  const cloud = ["users", "organizations"];
 
   const rbac = ["groups", "roles"];
 
