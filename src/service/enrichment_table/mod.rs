@@ -291,13 +291,11 @@ pub async fn extract_multipart(
         let Some(content_disposition) = field.content_disposition() else {
             continue;
         };
-
         if content_disposition.get_filename().is_none() {
             continue;
         };
 
         let mut data = bytes::Bytes::new();
-
         while let Some(chunk) = field.next().await {
             let chunked_data = chunk.unwrap();
             // Reconstruct entire CSV data bytes here to prevent fragmentation of values.

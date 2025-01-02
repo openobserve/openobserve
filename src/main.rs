@@ -89,7 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::tls::{aws_client_tls_config, http_tls_config};
+use openobserve::service::tls::{awc_client_tls_config, http_tls_config};
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -554,7 +554,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .timeout(Duration::from_secs(cfg.route.timeout))
                 .disable_redirects();
             if cfg.http.tls_enabled {
-                let config = aws_client_tls_config().unwrap();
+                let config = awc_client_tls_config().unwrap();
                 client_builder =
                     client_builder.connector(awc::Connector::new().rustls_0_23(config));
             }
@@ -598,12 +598,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
-    let server = match cfg.http.tls_enabled {
-        true => {
-            let sc = http_tls_config()?;
-            server.bind_rustls_0_23(haddr, sc)?
-        }
-        false => server.bind(haddr)?,
+    let server = if cfg.http.tls_enabled {
+        let sc = http_tls_config()?;
+        server.bind_rustls_0_23(haddr, sc)?
+    } else {
+        server.bind(haddr)?
     };
 
     let server = server
@@ -692,13 +691,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
-
-    let server = match cfg.http.tls_enabled {
-        true => {
-            let sc = http_tls_config()?;
-            server.bind_rustls_0_23(haddr, sc)?
-        }
-        false => server.bind(haddr)?,
+    let server = if cfg.http.tls_enabled {
+        let sc = http_tls_config()?;
+        server.bind_rustls_0_23(haddr, sc)?
+    } else {
+        server.bind(haddr)?
     };
 
     let server = server
