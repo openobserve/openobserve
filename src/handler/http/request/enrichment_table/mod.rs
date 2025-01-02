@@ -15,6 +15,7 @@
 
 use std::io::Error;
 
+use actix_http::StatusCode;
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use config::SIZE_IN_MB;
@@ -22,7 +23,7 @@ use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::{extract_multipart, save_enrichment_data},
+    service::enrichment_table::{extract_and_save_data, save_enrichment_data},
 };
 
 /// CreateEnrichmentTable
@@ -81,8 +82,13 @@ pub async fn save_enrichment_table(
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,
                 };
-                let json_record = extract_multipart(payload).await?;
-                save_enrichment_data(&org_id, &table_name, json_record, append_data).await
+
+                extract_and_save_data(&org_id, &table_name, append_data, payload).await?;
+
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    StatusCode::OK.into(),
+                    "Saved enrichment table".to_string(),
+                )))
             } else {
                 Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",
