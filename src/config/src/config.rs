@@ -472,12 +472,6 @@ pub struct Http {
     #[env_config(name = "ZO_HTTP_TLS_MIN_VERSION", default = "", help = "Supported values: "1.2" or "1.3", default is all_version")]
     pub tls_min_version: String,
     #[env_config(
-        name = "ZO_HTTP_CHECK_CERTIFICATES_DISABLED",
-        default = "false",
-        help = "http check certificates disabled"
-    )]
-    pub tls_http_check_certificates_disabled: bool,
-    #[env_config(
         name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
         default = "native",
         help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"

@@ -61,22 +61,23 @@ pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
 
 pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
-    let mut cert_store = match cfg.http.tls_root_certificates.as_str() {
-        "webpki" => webpki_roots_cert_store(),
-        "native" => native_roots_cert_store()?,
-        _ => webpki_roots_cert_store(),
+    let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
+        native_roots_cert_store()?
+    } else {
+        // default use webpki, and add custom ca certificates
+        let mut cert_store = webpki_roots_cert_store();
+        let cert_file =
+            &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to open TLS certificate file {}: {}",
+                    &cfg.http.tls_cert_path,
+                    e
+                )
+            })?);
+        let cert_chain = certs(cert_file);
+        cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
+        cert_store
     };
-
-    let cert_file =
-        &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to open TLS certificate file {}: {}",
-                &cfg.http.tls_cert_path,
-                e
-            )
-        })?);
-    let cert_chain = certs(cert_file);
-    cert_store.add_parsable_certificates(cert_chain.try_collect::<_, Vec<_>, _>()?);
 
     let mut config = ClientConfig::builder()
         .with_root_certificates(cert_store)
@@ -84,11 +85,6 @@ pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
 
     let protos = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     config.alpn_protocols = protos;
-    if cfg.http.tls_http_check_certificates_disabled {
-        config
-            .dangerous()
-            .set_certificate_verifier(Arc::new(danger::NoCertificateVerification));
-    }
 
     Ok(Arc::new(config))
 }
