@@ -40,7 +40,6 @@
     </div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
-      :key="JSON.stringify(data) + index"
     >
       <div
         style="
@@ -111,10 +110,10 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     onBeforeMount(() => {
@@ -141,6 +140,7 @@ export default defineComponent({
     };
 
     const saveDrilldownData = () => {
+      console.log("saving drilldown data");
       showDrilldownPopUp.value = false;
       selectedDrilldownIndexToEdit.value = null;
       isDrilldownEditMode.value = false;

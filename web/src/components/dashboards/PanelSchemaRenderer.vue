@@ -340,6 +340,9 @@ export default defineComponent({
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
     watch(loading, (updatedLoadingValue) => {
       if (variablesAndPanelsDataLoadingState) {
+        console.log(
+          `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} is loading: ${updatedLoadingValue}`,
+        );
         // update the loading state of the current panel
         variablesAndPanelsDataLoadingState.panels = {
           ...variablesAndPanelsDataLoadingState?.panels,
@@ -350,6 +353,9 @@ export default defineComponent({
     //watch trace id and add in the searchRequestTraceIds
     watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
       if (variablesAndPanelsDataLoadingState) {
+        console.log(
+          `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} trace id is updated to: ${updatedSearchRequestTraceIds}`,
+        );
         variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
           ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
           [panelSchema?.value?.id]: updatedSearchRequestTraceIds,
@@ -375,6 +381,9 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
+        console.log(
+          `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} data is updated`,
+        );
         // emit vrl function field list
         if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
@@ -401,6 +410,9 @@ export default defineComponent({
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
+          console.log(
+            `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} trying to convert data`,
+          );
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -414,13 +426,23 @@ export default defineComponent({
               chartPanelStyle.value,
             );
 
+            console.log(
+              `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} successfully converted data`,
+            );
+
             errorDetail.value = "";
           } catch (error: any) {
-            console.error("error", error);
-            
+            console.error(
+              `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} error converting data`,
+              error,
+            );
+
             errorDetail.value = error.message;
           }
         } else {
+          console.log(
+            `[PanelSchemaRenderer] Panel id: ${panelSchema?.value?.id} error detail is set, will show default data`,
+          );
           // if no data is available, then show the default data
           // if there is an error config in the panel schema, then show the default data on error
           // if no default data on error is set, then show the custom error message
@@ -441,22 +463,34 @@ export default defineComponent({
     // when we get the new metadata from the apis, emit the metadata update
     watch(
       metadata,
-      () => {
+      (newVal, oldVal) => {
+        console.log(
+          `[PanelSchemaRenderer] metadata updated, new value: ${JSON.stringify(
+            newVal,
+          )}, old value: ${JSON.stringify(oldVal)}`,
+        );
         emit("metadata-update", metadata.value);
       },
       { deep: true },
     );
 
-    watch(lastTriggeredAt, () => {
+    watch(lastTriggeredAt, (newVal, oldVal) => {
+      console.log(
+        `[PanelSchemaRenderer] lastTriggeredAt updated, new value: ${newVal}, old value: ${oldVal}`,
+      );
       emit("last-triggered-at-update", lastTriggeredAt.value);
     });
 
-    watch(isCachedDataDifferWithCurrentTimeRange, () => {
+    watch(isCachedDataDifferWithCurrentTimeRange, (newVal, oldVal) => {
+      console.log(
+        `[PanelSchemaRenderer] isCachedDataDifferWithCurrentTimeRange updated, new value: ${newVal}, old value: ${oldVal}`,
+      );
       emit(
         "is-cached-data-differ-with-current-time-range-update",
         isCachedDataDifferWithCurrentTimeRange.value,
       );
     });
+
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
@@ -560,10 +594,13 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {      
+    watch(errorDetail, (newVal, oldVal) => {
+      console.log(
+        `[PanelSchemaRenderer] errorDetail updated, new value: ${newVal}, old value: ${oldVal}`,
+      );
       //check if there is an error message or not
-      if (!errorDetail.value) return;
-      emit("error", errorDetail);
+      if (!newVal) return;
+      emit("error", newVal);
     });
 
     const hideDrilldownPopUp = () => {
@@ -702,6 +739,7 @@ export default defineComponent({
     watch(
       () => resultMetaData.value,
       (newVal) => {
+        console.log("PanelSchemaRenderer watch resultMetaData triggered", newVal);
         emit("result-metadata-update", newVal);
       },
       { deep: true },

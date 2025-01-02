@@ -221,15 +221,15 @@ export default defineComponent({
         emit("blur");
       });
 
-      window.addEventListener("click", () => {
-        editorObj?.layout();
-      });
+      // window.addEventListener("click", () => {
+      //   editorObj?.layout();
+      // });
 
-      window.addEventListener("resize", async () => {
-        await nextTick();
-        editorObj?.layout();
-        // queryEditorRef.value.resetEditorLayout();
-      });
+      // window.addEventListener("resize", async () => {
+      //   await nextTick();
+      //   editorObj?.layout();
+      //   // queryEditorRef.value.resetEditorLayout();
+      // });
     };
 
     onMounted(async () => {

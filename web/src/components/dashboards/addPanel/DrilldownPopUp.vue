@@ -111,9 +111,12 @@
           </q-btn>
         </q-btn-group>
       </div>
-      <div v-if="drilldownData.data.logsMode === 'custom'" style="margin-top: 10px">
+      <div
+        v-if="drilldownData.data.logsMode === 'custom'"
+        style="margin-top: 10px"
+      >
         <label>Enter Custom Query:</label>
-        <query-editor
+        <!-- <query-editor
           data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
@@ -122,7 +125,7 @@
           :debounceTime="300"
           v-model:query="drilldownData.data.logsQuery"
           @update:query="updateQueryValue"
-        />
+        /> -->
       </div>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
@@ -362,7 +365,7 @@ import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/dashboards/QueryEditor.vue"),
 );
 
 export default defineComponent({
@@ -394,12 +397,12 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
-    
+
     const getDefaultDrilldownData = () => ({
       name: "",
       type: "byDashboard",
@@ -427,15 +430,16 @@ export default defineComponent({
             JSON.stringify(
               dashboardPanelData.data.config.drilldown[
                 props?.drilldownDataIndex
-              ]
-            )
+              ],
+            ),
           )
-        : getDefaultDrilldownData()
+        : getDefaultDrilldownData(),
     );
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
 
     onMounted(async () => {
+      console.log("DrilldownPopUp mounted");
       // if no folders in organization, get folders
       if (
         !store.state.organizationData.folders ||
@@ -453,32 +457,54 @@ export default defineComponent({
 
       // get variables list
       await getvariableNames();
+      console.log("DrilldownPopUp mounted complete");
     });
 
     // on folder change, reset dashboard and tab values
     watch(
       () => drilldownData.value.data.folder,
       async (newVal, oldVal) => {
+        console.log(
+          "watching drilldownData.data.folder changed",
+          newVal,
+          oldVal,
+        );
         await getDashboardList();
+        console.log(
+          "getDashboardList returned",
+          JSON.stringify(dashboardList.value),
+        );
         if (newVal !== oldVal) {
+          console.log(
+            "drilldownData.data.folder changed, updating drilldownData.data.dashboard and drilldownData.data.tab",
+          );
           // take first value from new options list
           drilldownData.value.data.dashboard =
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      }
+      },
     );
 
     // on dashboard change, reset tab value
     watch(
       () => drilldownData.value.data.dashboard,
       async (newVal, oldVal) => {
+        console.log(
+          "watching drilldownData.data.dashboard changed",
+          newVal,
+          oldVal,
+        );
         await getTabList();
+        console.log("getTabList returned", JSON.stringify(tabList.value));
         if (newVal !== oldVal) {
+          console.log(
+            "drilldownData.data.dashboard changed, updating drilldownData.data.tab",
+          );
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      }
+      },
     );
 
     const folderList = computed(() => {
@@ -501,7 +527,7 @@ export default defineComponent({
       // get folder data
       // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder
+        (folder: any) => folder.name === drilldownData.value.data.folder,
       );
 
       // if no folder with same forder name found, return
@@ -513,7 +539,7 @@ export default defineComponent({
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId
+        folderData?.folderId,
       );
 
       // make list of dashboards
@@ -528,9 +554,9 @@ export default defineComponent({
 
     const getTabList = async () => {
       // get folder data
-      // by using folder name, find folder data      
+      // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder
+        (folder: any) => folder.name === drilldownData.value.data.folder,
       );
 
       // if no folder with same forder name found, return
@@ -539,28 +565,32 @@ export default defineComponent({
         return;
       }
       // want dashboardId from dashboard name
-      // by using dashboard name, find dashboard data      
+      // by using dashboard name, find dashboard data
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId
+        folderData?.folderId,
       );
-      
+
       // get dashboardId from allDashboardList by dashboard name
       const dashboardId = allDashboardList?.find(
         (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard
+          dashboard.title === drilldownData.value.data.dashboard,
       )?.dashboardId;
-            
-      if (!dashboardId) {  
-        tabList.value = [];  
-        return;  
-      }  
+
+      if (!dashboardId) {
+        tabList.value = [];
+        return;
+      }
 
       // get dashboard data
       // by using dashboard name, find dashboard data
-      const dashboardData = await getDashboard(store, dashboardId, folderData?.folderId);
-      
+      const dashboardData = await getDashboard(
+        store,
+        dashboardId,
+        folderData?.folderId,
+      );
+
       // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
         tabList.value = [];
@@ -603,7 +633,7 @@ export default defineComponent({
       } else if (drilldownData.value.type == "logs") {
         if (drilldownData.value.data.logsMode === "custom") {
           return !drilldownData.value.data.logsQuery.trim();
-        } else if (drilldownData.value.data.logsMode === "auto") {          
+        } else if (drilldownData.value.data.logsMode === "auto") {
           return false;
         }
       } else {
@@ -619,12 +649,13 @@ export default defineComponent({
     });
 
     const saveDrilldown = () => {
+      console.log("saving drilldown");
       // if editmode then made changes
       // else add new drilldown
-      if (props?.isEditMode) {        
+      if (props?.isEditMode) {
         dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
           drilldownData.value;
-      } else {        
+      } else {
         dashboardPanelData.data.config.drilldown.push(drilldownData.value);
       }
       emit("close");
@@ -690,37 +721,41 @@ export default defineComponent({
 
     const variableNamesFn = ref([]);
 
-    const getvariableNames = async () => {      
+    const getvariableNames = async () => {
       if (
         drilldownData.value.data.folder &&
         drilldownData.value.data.dashboard
       ) {
         const folder = store.state.organizationData.folders.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder,
         );
 
         const allDashboardData = await getAllDashboardsByFolderId(
           store,
-          folder.folderId
+          folder.folderId,
         );
 
         const dashboardId = allDashboardData?.find(
-        (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard
-      )?.dashboardId;
-      
-      if (!dashboardId) {  
-        variableNamesFn.value = [];  
-        return;  
-      } 
-        const dashboardData = await getDashboard(store, dashboardId, folder?.folderId);
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard,
+        )?.dashboardId;
+
+        if (!dashboardId) {
+          variableNamesFn.value = [];
+          return;
+        }
+        const dashboardData = await getDashboard(
+          store,
+          dashboardId,
+          folder?.folderId,
+        );
 
         if (dashboardData) {
           const optionsList = dashboardData.variables.list.map(
             (variable: any) => ({
               label: variable.name,
               value: variable.name,
-            })
+            }),
           );
           variableNamesFn.value = optionsList;
         } else {
@@ -730,12 +765,31 @@ export default defineComponent({
     };
 
     watch(drilldownData.value, async (newData) => {
+      console.log("Drilldown data changed, new data is: ", newData);
       if (newData.data.folder && newData.data.dashboard) {
+        console.log("Getting variable names for folder: ", newData.data.folder);
+        console.log(
+          "Getting variable names for dashboard: ",
+          newData.data.dashboard,
+        );
         await getvariableNames();
       } else {
+        console.log(
+          "No folder and dashboard selected, clearing variable names list",
+        );
         variableNamesFn.value = [];
       }
     });
+
+    watch(
+      () => drilldownData.value.data.logsMode,
+      (newVal, oldVal) => {
+        if (newVal !== "custom") {
+          drilldownData.value.data.logsQuery = "";
+          console.log("logsMode changed to non-custom. logsQuery cleared.");
+        }
+      },
+    );
 
     const updateQueryValue = (value: string) => {
       drilldownData.value.data.logsQuery = value;

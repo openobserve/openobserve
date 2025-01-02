@@ -2577,12 +2577,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].config.limit,
     ],
     () => {
+      console.log("Fields updated");
       // only continue if current mode is auto query generation
       if (
         !dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
+        console.log("Generating query");
         makeAutoSQLQuery();
       }
     },
@@ -3314,24 +3316,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
+      console.log("Watcher triggered");
+      const currentQuery = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
       
       // Only continue if the current mode is "show custom query"
-      if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery &&
-        dashboardPanelData.data.queryType == "sql"
-      ) {
-        // Call the updateQueryValue function
-        if (parser) updateQueryValue();
+      if (currentQuery.customQuery && dashboardPanelData.data.queryType == "sql") {
+        console.log("Custom query mode and SQL type detected");
+        if (parser) {
+          console.log("Calling updateQueryValue function");
+          updateQueryValue();
+        }
       } else {
-        // auto query mode selected
-        // remove the custom fields from the list
+        console.log("Auto query mode detected");
         dashboardPanelData.meta.stream.customQueryFields = [];
+        console.log("Cleared custom query fields");
       }
-      // if (dashboardPanelData.data.queryType == "promql") {
-      //     updatePromQLQuery()
-      // }
     },
     { deep: true },
   );

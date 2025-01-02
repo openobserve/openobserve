@@ -344,14 +344,15 @@ export default defineComponent({
       );
     });
 
+    const handleResize = async () => {
+      await nextTick();
+      editorObj.layout();
+    };
+
     onMounted(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
-      window.addEventListener("resize", async () => {
-        await nextTick();
-        editorObj.layout();
-        // queryEditorRef.value.resetEditorLayout();
-      });
+      window.addEventListener("resize", handleResize);
     });
 
     onActivated(async () => {
@@ -361,6 +362,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       provider.value?.dispose();
+      window.removeEventListener("resize", handleResize);
     });
 
     onDeactivated(() => {
