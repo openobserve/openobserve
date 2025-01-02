@@ -199,6 +199,9 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
 
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_put(&key, entry).await?;
     Ok(())
 }
 
@@ -232,6 +235,8 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         log::error!("Error deleting org: {}", e);
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_delete(&format!("{}{}", ORG_KEY_PREFIX, org_id)).await?;
     Ok(())
 }
 
@@ -247,4 +252,42 @@ pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow
             org_type: org.org_type.to_string(),
         })
         .collect())
+}
+
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+
+    use crate::common::meta::organization::Organization;
+
+    pub async fn organization_put(
+        key: &str,
+        org: &Organization,
+    ) -> Result<(), infra::errors::Error> {
+        let value = config::utils::json::to_vec(org)?.into();
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::organization_put(
+                key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn organization_delete(key: &str) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::organization_delete(
+                key,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
 }

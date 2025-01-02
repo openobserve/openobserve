@@ -17,12 +17,16 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use config::meta::user::{User, UserRole};
+#[cfg(feature = "enterprise")]
+use infra::table::org_users::OrgUserPut;
 use infra::{
     db::{self, delete_from_db_coordinator, get_coordinator, put_into_db_coordinator},
     table::org_users::{self, OrgUserExpandedRecord, OrgUserRecord, UserOrgExpandedRecord},
 };
 
 use crate::common::infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN};
+
+pub const ORG_USERS_KEY_PREFIX: &str = "/org_users/";
 
 pub async fn add(
     org_id: &str,
@@ -32,13 +36,26 @@ pub async fn add(
     rum_token: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/org_users/single/{}/{}", org_id, user_email);
-    org_users::add(org_id, &user_email, role, token, rum_token)
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    org_users::add(org_id, &user_email, role.clone(), token, rum_token.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add user to org: {}", e))?;
 
     log::debug!("Put into db_coordinator: {user_email}");
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_add(
+        &key,
+        &OrgUserPut {
+            org_id: org_id.to_string(),
+            email: user_email.to_string(),
+            role,
+            token: token.to_string(),
+            rum_token,
+        },
+    )
+    .await?;
     Ok(())
 }
 
@@ -50,32 +67,51 @@ pub async fn update(
     rum_token: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/org_users/single/{}/{}", org_id, user_email);
-    org_users::update(org_id, &user_email, role, token, rum_token)
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
+    org_users::update(org_id, &user_email, role.clone(), token, rum_token.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update user role: {}", e))?;
 
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_update(
+        &key,
+        &OrgUserPut {
+            org_id: org_id.to_string(),
+            email: user_email.to_string(),
+            role,
+            token: token.to_string(),
+            rum_token,
+        },
+    )
+    .await?;
     Ok(())
 }
 
 pub async fn remove(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/org_users/single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
     org_users::remove(org_id, &user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {}", e))?;
     let _ = delete_from_db_coordinator(&key, false, true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_remove(&key).await?;
     Ok(())
 }
 
 pub async fn remove_by_user(email: &str) -> Result<(), anyhow::Error> {
     let email = email.to_lowercase();
-    let key = format!("/org_users/many/user/{}", email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}many/user/{}", email);
     org_users::remove_by_user(&email)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to remove user from org: {}", e))?;
     let _ = delete_from_db_coordinator(&key, false, true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_remove(&key).await?;
     Ok(())
 }
 
@@ -172,11 +208,14 @@ pub async fn update_rum_token(
     rum_token: &str,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/org_users/single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
     org_users::update_rum_token(org_id, &user_email, rum_token)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update rum token: {}", e))?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_update_rum_token(&key, rum_token).await?;
     Ok(())
 }
 
@@ -186,16 +225,19 @@ pub async fn update_token(
     token: &str,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/org_users/single/{}/{}", org_id, user_email);
+    let key = format!("{ORG_USERS_KEY_PREFIX}single/{}/{}", org_id, user_email);
     org_users::update_token(org_id, &user_email, token)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update token: {}", e))?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::org_user_update_token(&key, token).await?;
     Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/org_users/";
+    let key = ORG_USERS_KEY_PREFIX;
     let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -344,4 +386,93 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Organizations users Cached");
     Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use core::convert::Into;
+
+    use config::utils::json;
+    use infra::table::org_users::OrgUserPut;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+
+    pub async fn org_user_add(
+        key: &str,
+        org_user: &OrgUserPut,
+    ) -> Result<(), infra::errors::Error> {
+        let value = json::to_vec(org_user)?.into();
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_user_add(
+                key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn org_user_update(
+        key: &str,
+        org_user: &OrgUserPut,
+    ) -> Result<(), infra::errors::Error> {
+        let value = json::to_vec(org_user)?.into();
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_user_update(
+                key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn org_user_remove(key: &str) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_user_remove(
+                key,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn org_user_update_token(key: &str, token: &str) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_user_update_token(
+                key,
+                token.to_string().into(),
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn org_user_update_rum_token(
+        key: &str,
+        rum_token: &str,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_user_update_rum_token(
+                key,
+                rum_token.to_string().into(),
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
 }

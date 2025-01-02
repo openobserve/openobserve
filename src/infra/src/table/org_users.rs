@@ -26,6 +26,7 @@ use sea_orm::{
     entity::prelude::*, ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{
     entity::{
@@ -47,6 +48,15 @@ pub struct OrgUserRecord {
     pub token: String,
     pub rum_token: Option<String>,
     pub created_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OrgUserPut {
+    pub email: String,
+    pub org_id: String,
+    pub role: UserRole,
+    pub token: String,
+    pub rum_token: Option<String>,
 }
 
 impl OrgUserRecord {

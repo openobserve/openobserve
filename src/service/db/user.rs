@@ -19,6 +19,8 @@ use bytes::Bytes;
 use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "enterprise")]
 use infra::table::org_invites::InvitationRecord;
+#[cfg(feature = "enterprise")]
+use infra::table::users::UserUpdate;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     table::users,
@@ -32,6 +34,7 @@ use crate::{
     service::db,
 };
 
+pub const USER_RECORD_KEY: &str = "/user_record/";
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {
     let email = email.to_lowercase();
     users::get(&email)
@@ -141,7 +144,7 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 }
 
 pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
-    let key = format!("/user_record/{}", db_user.email);
+    let key = format!("{USER_RECORD_KEY}{}", db_user.email);
     let user = users::UserRecord::from(db_user);
     users::add(user.clone())
         .await
@@ -159,6 +162,10 @@ pub async fn add(db_user: &DBUser) -> Result<(), anyhow::Error> {
         )
         .await?;
     }
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::add_user_to_super_cluster(db_user).await?;
+
     Ok(())
 }
 
@@ -170,22 +177,40 @@ pub async fn update(
     password_ext: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let user_email = user_email.to_lowercase();
-    let key = format!("/user_record/{user_email}");
-    users::update(&user_email, first_name, last_name, password, password_ext)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
+    let key = format!("{USER_RECORD_KEY}{user_email}");
+    users::update(
+        &user_email,
+        first_name,
+        last_name,
+        password,
+        password_ext.clone(),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Error updating user: {e}"))?;
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::update_user_in_super_cluster(&UserUpdate {
+        email: user_email,
+        first_name: first_name.to_string(),
+        last_name: last_name.to_string(),
+        password: password.to_string(),
+        password_ext,
+    })
+    .await?;
     Ok(())
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let name = name.to_lowercase();
-    let key = format!("/user_record/{name}");
+    let key = format!("{USER_RECORD_KEY}{name}");
     // First delete all org_user entries for this user
     org_users::remove_by_user(&name).await?;
     match users::remove(&name).await {
         Ok(_) => {
             let _ = delete_from_db_coordinator(&key, false, true, None).await;
+            #[cfg(feature = "enterprise")]
+            super_cluster::delete_user_from_super_cluster(&name).await?;
             Ok(())
         }
         Err(e) => {
@@ -210,7 +235,7 @@ pub async fn list_users(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/user_record/";
+    let key = USER_RECORD_KEY;
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -293,7 +318,7 @@ pub async fn root_user_exists() -> bool {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let _key = "/user_record/";
+    let _key = USER_RECORD_KEY;
     users::clear()
         .await
         .map_err(|e| anyhow::anyhow!("Error clearing users: {e}"))?;
@@ -332,6 +357,64 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
             log::error!("Error getting user {email}: {}", e);
             None
         }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use config::{meta::user::DBUser, utils::json};
+    use infra::table::users::UserUpdate;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+
+    use super::USER_RECORD_KEY;
+
+    pub async fn add_user_to_super_cluster(user: &DBUser) -> Result<(), infra::errors::Error> {
+        let key = format!("{USER_RECORD_KEY}{}", user.email);
+        let value = json::to_vec(user)?;
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::user_add(
+                &key,
+                value.into(),
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn update_user_in_super_cluster(
+        user: &UserUpdate,
+    ) -> Result<(), infra::errors::Error> {
+        let key = format!("{USER_RECORD_KEY}{}", user.email);
+        let value = json::to_vec(user)?;
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::user_update(
+                &key,
+                value.into(),
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn delete_user_from_super_cluster(email: &str) -> Result<(), infra::errors::Error> {
+        let key = format!("{USER_RECORD_KEY}{}", email);
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::user_delete(
+                &key,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
     }
 }
 

@@ -64,6 +64,15 @@ pub struct UserRecord {
     pub updated_at: i64,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserUpdate {
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub password: String,
+    pub password_ext: Option<String>,
+}
+
 impl From<&DBUser> for UserRecord {
     fn from(user: &DBUser) -> Self {
         let is_root = user
