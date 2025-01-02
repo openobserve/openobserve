@@ -24,11 +24,11 @@ use config::{
 use hashbrown::HashMap;
 use infra::table::{
     self,
-    distinct_values::{self, DistinctFieldRecord, OriginType},
+    distinct_values::{DistinctFieldRecord, OriginType},
     folders::FolderType,
 };
 
-use super::{folders, stream::save_stream_settings};
+use super::{db::distinct_values, folders, stream::save_stream_settings};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
