@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ errorMessage.message }}
                       <div style="width: 300px">
                         <q-input
-                          v-model="userSelectedDashboardTitle"
+                          v-model="dashboardTitles[errorIndex]"
                           :label="'Dashboard Title'"
                           color="input-border"
                           bg-color="input-bg"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           tabindex="0"
                           @update:model-value="
                             updateDashboardTitle(
-                              userSelectedDashboardTitle,
+                              dashboardTitles[errorIndex],
                               errorMessage.dashboardIndex,
                             )
                           "
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ errorMessage.message }}
                       <div style="width: 300px">
                         <q-select
-                          v-model="userSelectedStreamType"
+                          v-model="streamTypes[errorIndex]"
                           :options="streamTypeOptions"
                           :label="'Stream Type'"
                           :popup-content-style="{
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :input-debounce="400"
                           @update:model-value="
                             updateStreamType(
-                              userSelectedStreamType,
+                              streamTypes[errorIndex],
                               errorMessage.dashboardIndex,
                               errorMessage.tabIndex,
                               errorMessage.panelIndex,
@@ -386,8 +386,8 @@ export default defineComponent({
     // holds the value of the loading for any of the import type
     const isLoading = ref(false);
     const queryEditorPlaceholderFlag = ref(true);
-    const userSelectedDashboardTitle = ref("");
-    const userSelectedStreamType = ref("");
+    const dashboardTitles = reactive({});
+    const streamTypes = reactive({});
     const streamTypeOptions = ["logs", "metrics", "traces"];
     // import type values
     const ImportType = {
@@ -808,11 +808,11 @@ export default defineComponent({
       queryEditorPlaceholderFlag,
       importDashboard,
       goToCommunityDashboards,
-      userSelectedDashboardTitle,
       updateDashboardTitle,
       updateStreamType,
       streamTypeOptions,
-      userSelectedStreamType,
+      dashboardTitles,
+      streamTypes,
     };
   },
   components: { SelectFolderDropdown, AppTabs, QueryEditor },
