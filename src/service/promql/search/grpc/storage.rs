@@ -168,17 +168,17 @@ pub(crate) async fn create_context(
 
     // search tantivy index
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema)?;
-    if !matchers.matchers.is_empty() && cfg.common.inverted_index_enabled {
+    if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
             filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(
-                        "[trace_id {trace_id}] filter file list by tantivy index error: {e}"
+                        "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
                     );
                     DataFusionError::Execution(e.to_string())
                 })?;
-        log::info!("[trace_id {trace_id}] filter file list by tantivy index took: {idx_took} ms",);
+        log::info!("[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms",);
     }
 
     let session = SearchSession {
