@@ -4951,8 +4951,13 @@ const useLogs = () => {
       response.content.results.result_cache_ratio;
 
     (async () => {
-      generateHistogramData();
-      refreshPagination(true); // check whats this
+      try {
+        generateHistogramData();
+        refreshPagination(true);
+      } catch (error) {
+        console.error("Error processing histogram data:", error);
+        searchObj.loadingHistogram = false;
+      }
     })();
 
     // queryReq.query.start_time =
