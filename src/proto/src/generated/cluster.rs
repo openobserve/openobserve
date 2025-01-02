@@ -413,6 +413,8 @@ pub struct MetricsQueryStmt {
     pub end: i64,
     #[prost(int64, tag = "4")]
     pub step: i64,
+    #[prost(bool, tag = "5")]
+    pub query_exemplars: bool,
 }
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -422,7 +424,7 @@ pub struct MetricsQueryResponse {
     pub job: ::core::option::Option<Job>,
     #[prost(int32, tag = "2")]
     pub took: i32,
-    /// vector, matrix, scalar
+    /// vector, matrix, scalar, exemplars
     #[prost(string, tag = "3")]
     pub result_type: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "4")]
@@ -444,8 +446,10 @@ pub struct Series {
     pub scalar: ::core::option::Option<f64>,
     #[prost(string, optional, tag = "5")]
     pub stringliteral: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "6")]
+    pub exemplars: ::core::option::Option<Exemplars>,
 }
-#[derive(serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Label {
@@ -454,7 +458,7 @@ pub struct Label {
     #[prost(string, tag = "2")]
     pub value: ::prost::alloc::string::String,
 }
-#[derive(serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Sample {
@@ -462,6 +466,24 @@ pub struct Sample {
     pub time: i64,
     #[prost(double, tag = "2")]
     pub value: f64,
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Exemplars {
+    #[prost(message, repeated, tag = "1")]
+    pub exemplars: ::prost::alloc::vec::Vec<Exemplar>,
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Exemplar {
+    #[prost(int64, tag = "1")]
+    pub time: i64,
+    #[prost(double, tag = "2")]
+    pub value: f64,
+    #[prost(message, repeated, tag = "3")]
+    pub labels: ::prost::alloc::vec::Vec<Label>,
 }
 /// Generated client implementations.
 pub mod metrics_client {
