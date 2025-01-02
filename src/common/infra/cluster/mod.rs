@@ -182,13 +182,12 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
-
+        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-
+        let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
