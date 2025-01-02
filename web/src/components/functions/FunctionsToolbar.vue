@@ -26,7 +26,7 @@
         <div class="tw-flex tw-items-center">
           <q-input
             data-test="add-function-name-input"
-            v-model="functionName"
+            v-model.trim="functionName"
             :label="t('function.name')"
             color="input-border"
             bg-color="input-bg"
