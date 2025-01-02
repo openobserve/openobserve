@@ -17,9 +17,8 @@ use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
     http::{header, Method},
-    web, Error,
+    web, Error, HttpRequest,
 };
-use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{get_config, utils::base64};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -111,8 +110,8 @@ pub async fn validator(
 /// ### Args:
 /// - token: The token to validate
 ///  
-pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
-    match users::get_user_by_token(org_id, token).await {
+pub async fn validate_token(token: &str, org_id: &str, trace_id: &str) -> Result<(), Error> {
+    match users::get_user_by_token(org_id, token, trace_id).await {
         Some(_user) => Ok(()),
         None => Err(ErrorForbidden("User associated with this token not found")),
     }
@@ -462,7 +461,7 @@ pub async fn validate_user_for_query_params(
 
 pub async fn validator_aws(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -507,7 +506,7 @@ pub async fn validator_aws(
 
 pub async fn validator_gcp(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -549,8 +548,17 @@ pub async fn validator_gcp(
 
 pub async fn validator_rum(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let start_time = std::time::Instant::now();
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
+
     let path = req
         .request()
         .path()
@@ -570,11 +578,17 @@ pub async fn validator_rum(
     let query =
         web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
             .unwrap();
-
+    log::info!("[{trace_id}] start to validate token");
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
-        Some(token) => match validate_token(token, org_id_end_point[0]).await {
-            Ok(_res) => Ok(req),
+        Some(token) => match validate_token(token, org_id_end_point[0], trace_id).await {
+            Ok(_res) => {
+                log::info!(
+                    "[{trace_id}] Time taken to validate token: {:?}",
+                    start_time.elapsed()
+                );
+                Ok(req)
+            }
             Err(err) => {
                 log::error!(
                     "validate_token: Token not found for org_id: {}",
@@ -598,6 +612,14 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+    let trace_id = req
+        .headers()
+        .get("request_id")
+        .unwrap_or(&t)
+        .to_str()
+        .unwrap();
+    log::info!("[{trace_id}] into oo_validator_internal {:?}", auth_info);
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,

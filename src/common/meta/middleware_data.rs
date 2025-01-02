@@ -18,6 +18,7 @@ use std::{collections::HashMap, net::IpAddr, sync::Arc};
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
+    http::header,
     web, Error as ActixErr, HttpMessage,
 };
 use actix_web_lab::middleware::Next;
@@ -83,7 +84,14 @@ impl RumExtraData {
         req: ServiceRequest,
         next: Next<impl MessageBody>,
     ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
-        let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
+        let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
+        let trace_id = req
+            .headers()
+            .get("request_id")
+            .unwrap_or(&t)
+            .to_str()
+            .unwrap();
+        log::info!("[{trace_id}] into RumExtraData::extractor");
         let mut data =
             web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         Self::filter_api_keys(&mut data);
@@ -99,10 +107,10 @@ impl RumExtraData {
 
         // Now extend the existing hashmap with tags.
         user_agent_hashmap.extend(tags);
-
+        log::info!("[{trace_id}] into user_agent_hashmap");
         {
             let headers = req.headers();
-            let conn_info = req.connection_info();
+            let conn_info = req.connection_info().clone();
             let ip_address = match headers.contains_key("X-Forwarded-For")
                 || headers.contains_key("Forwarded")
             {
@@ -111,14 +119,17 @@ impl RumExtraData {
             };
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
-
+            log::info!("[{trace_id}] into user_agent_hashmap ip done");
             let ip = match parse_ip_addr(ip_address) {
                 Ok((ip, _)) => ip,
                 // Default to ipv4 loopback address
                 Err(_) => IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             };
 
-            let geo_info = if let Some(client) = &(*maxminddb_client) {
+            let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
+            log::info!("[{trace_id}] into MAXMIND_DB_CLIENT read lock done");
+            let geo_info = if let Some(client) = maxminddb_client.as_ref() {
+                log::info!("[{trace_id}] into maxminddb_client get client ref");
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
                     let country = city_info
                         .country
@@ -128,7 +139,7 @@ impl RumExtraData {
                         .city
                         .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
                     let country_iso_code = city_info.country.and_then(|c| c.iso_code);
-
+                    log::info!("[{trace_id}] into GeoInfoData parse done");
                     GeoInfoData {
                         city,
                         country,
@@ -142,11 +153,12 @@ impl RumExtraData {
                 GeoInfoData::default()
             };
 
-            user_agent_hashmap.insert(
-                "geo_info".into(),
-                serde_json::to_value(geo_info).unwrap_or_default(),
-            );
+            let geo_info = serde_json::to_value(geo_info).unwrap_or_default();
+            drop(maxminddb_client);
+
+            user_agent_hashmap.insert("geo_info".into(), geo_info);
         }
+        log::info!("[{trace_id}] into RumExtraData::extractor geo_info parse done");
 
         // User-agent parsing
         {
@@ -164,11 +176,13 @@ impl RumExtraData {
                 serde_json::to_value(parsed_user_agent).unwrap_or_default(),
             );
         }
+        log::info!("[{trace_id}] into RumExtraData::extractor user_agent parse done");
 
         let rum_extracted_data = RumExtraData {
             data: user_agent_hashmap,
         };
         req.extensions_mut().insert(rum_extracted_data);
+        log::info!("[{trace_id}] into RumExtraData::extractor ready to call next middleware");
         next.call(req).await
     }
 }

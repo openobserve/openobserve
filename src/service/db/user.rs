@@ -183,6 +183,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // Invalidate the entire RUM-TOKEN-CACHE
                 for (_, user) in USERS.clone() {
                     if user.email.eq(item_key) {
+                        log::info!(
+                            "USERS_RUM_TOKEN start to remove {}/{}",
+                            user.org,
+                            user.rum_token.as_ref().unwrap()
+                        );
                         USERS_RUM_TOKEN.clone().remove(&format!(
                             "{}/{}",
                             user.org,
