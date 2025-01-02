@@ -93,6 +93,7 @@ impl RumExtraData {
             .unwrap();
         log::info!("[{trace_id}] into RumExtraData::extractor");
         let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
+        log::info!("[{trace_id}] into MAXMIND_DB_CLIENT read lock done");
         let mut data =
             web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         Self::filter_api_keys(&mut data);
@@ -108,7 +109,7 @@ impl RumExtraData {
 
         // Now extend the existing hashmap with tags.
         user_agent_hashmap.extend(tags);
-
+        log::info!("[{trace_id}] into user_agent_hashmap");
         {
             let headers = req.headers();
             let conn_info = req.connection_info();
@@ -120,7 +121,7 @@ impl RumExtraData {
             };
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
-
+            log::info!("[{trace_id}] into user_agent_hashmap ip done");
             let ip = match parse_ip_addr(ip_address) {
                 Ok((ip, _)) => ip,
                 // Default to ipv4 loopback address
@@ -128,6 +129,7 @@ impl RumExtraData {
             };
 
             let geo_info = if let Some(client) = &(*maxminddb_client) {
+                log::info!("[{trace_id}] into maxminddb_client get client ref");
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
                     let country = city_info
                         .country
@@ -137,7 +139,7 @@ impl RumExtraData {
                         .city
                         .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
                     let country_iso_code = city_info.country.and_then(|c| c.iso_code);
-
+                    log::info!("[{trace_id}] into GeoInfoData parse done");
                     GeoInfoData {
                         city,
                         country,
