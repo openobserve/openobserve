@@ -947,7 +947,7 @@ export default defineComponent({
             });
           });
       }
-      if (streamResponse.settings.extended_retention_days.length >= 0) {
+      if (Array.isArray(streamResponse.settings.extended_retention_days)) {
         redBtnRows.value = [];
         indexData.value.extended_retention_days = streamResponse.settings.extended_retention_days;
         streamResponse.settings.extended_retention_days.forEach((field, index) => {
