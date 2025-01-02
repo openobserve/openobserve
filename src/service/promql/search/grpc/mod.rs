@@ -20,13 +20,14 @@ use std::{
 };
 
 use async_trait::async_trait;
+use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 
 use crate::service::{
-    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
+    promql::{value, PromqlContext, TableProvider, DEFAULT_LOOKBACK},
     search,
 };
 
@@ -48,9 +49,7 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<
-        Vec<(SessionContext, Arc<Schema>, config::meta::search::ScanStats)>,
-    > {
+    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut resp = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
@@ -109,16 +108,21 @@ pub async fn search(
         config::get_config().limit.query_timeout
     };
 
-    let mut engine = Query::new(
+    let mut ctx = PromqlContext::new(
         org_id,
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
         },
+        query.query_exemplars,
         timeout,
     );
 
-    let (value, result_type, mut scan_stats) = engine.exec(eval_stmt).await?;
+    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+        ctx.query_exemplars(eval_stmt).await?
+    } else {
+        ctx.exec(eval_stmt).await?
+    };
     let result_type = match result_type {
         Some(v) => v,
         None => value.get_type().to_string(),
@@ -172,10 +176,15 @@ pub async fn search(
                     .iter()
                     .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
                     .collect::<Vec<_>>();
-                if !samples.is_empty() {
+                let exemplars = v.exemplars.as_ref().map(|v| {
+                    let exemplars = v.iter().map(|x| x.into()).collect::<Vec<_>>();
+                    cluster_rpc::Exemplars { exemplars }
+                });
+                if !samples.is_empty() || exemplars.is_some() {
                     resp.result.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                         samples,
+                        exemplars,
                         ..Default::default()
                     });
                 }

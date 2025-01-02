@@ -15,15 +15,16 @@
 
 use std::collections::HashSet;
 
-use config::get_config;
+use config::{
+    get_config,
+    meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
+};
 use datafusion::{
     arrow::datatypes::Schema,
     error::Result,
     prelude::{col, lit, DataFrame},
 };
 use promql_parser::label::{MatchOp, Matchers};
-
-use crate::common::meta::prom::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL};
 
 pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
     let cfg = get_config();
