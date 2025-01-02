@@ -247,6 +247,8 @@ pub async fn delete_by_name(
     name: &str,
 ) -> Result<(), infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    #[cfg(feature = "enterprise")]
     let Some(alert_id) =
         table::get_by_name(client, org_id, "default", stream_type, stream_name, name)
             .await?
@@ -257,6 +259,7 @@ pub async fn delete_by_name(
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     cluster::emit_delete_event(org_id, stream_type, stream_name, name).await?;
+
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name, alert_id).await?;
 
