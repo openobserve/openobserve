@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(feature = "enterprise")]
-use std::collections::HashSet;
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
@@ -25,9 +23,14 @@ use infra::errors;
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use promql_parser::parser;
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{metrics, promql, promql::MetricsQueryRequest},
+    service::{
+        metrics,
+        promql::{self, MetricsQueryRequest},
+    },
 };
 
 /// prometheus remote-write endpoint for metrics
