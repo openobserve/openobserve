@@ -275,7 +275,8 @@
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization",
     "roles": "Roles",
-    "groups": "Groups"
+    "groups": "Groups",
+    "status": "Status"
   },
   "serviceAccounts": {
     "header": "Service Accounts",
@@ -373,7 +374,8 @@
     "role": "Role",
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
-    "proceed_subscription": "Proceed to Subscription"
+    "proceed_subscription": "Proceed to Subscription",
+    "subscription_plan": "Subscription Plan"
   },
   "template": {
     "header": "Templates",

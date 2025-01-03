@@ -158,14 +158,18 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "owner",
-        field: "owner",
-        label: t("organization.owner"),
-        align: "left",
-        sortable: true,
-      },
     ]);
+
+    if (config.isCloud == "true") {
+      columns.value.push({
+        name: "plan",
+        field: "plan",
+        label: t("organization.subscription_plan"),
+        align: "center",
+        sortable: true,
+      });
+    }
+
     const perPageOptions = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -227,7 +231,7 @@ export default defineComponent({
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            owner: data.user_email,
+            plan: data.plan || "-",
           };
         });
 
