@@ -209,7 +209,7 @@ impl From<&OrgInviteStatus> for InviteStatus {
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInvite {
     pub org_id: String,
@@ -219,7 +219,7 @@ pub struct UserInvite {
     pub expires_at: i64,
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInviteList {
     pub data: Vec<UserInvite>,

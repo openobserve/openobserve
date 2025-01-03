@@ -17,6 +17,8 @@ use std::str::FromStr;
 
 #[cfg(feature = "enterprise")]
 use jsonwebtoken::TokenData;
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::openfga::authorizer::authz::get_user_creation_tuples;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::authorizer::authz::{
     get_user_creation_tuples, get_user_org_tuple, update_tuples,
@@ -77,7 +79,7 @@ pub async fn process_token(
         return;
     }
 
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(feature = "cloud"))]
     {
         use config::get_config;
         use o2_enterprise::enterprise::openfga::authorizer::authz::{
@@ -587,7 +589,7 @@ async fn check_and_add_to_org(user_email: &str, name: &str) {
                 for invite in invites {
                     let org_id = invite.org_id.clone();
                     let invite_token = invite.token.clone();
-                    if let Err(e) = accept_invitation(&org_id, user_email, &invite_token).await {
+                    if let Err(e) = accept_invitation(user_email, &invite_token).await {
                         log::error!(
                             "Error accepting invite for user: {} org: {} error: {}",
                             user_email,

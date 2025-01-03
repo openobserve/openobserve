@@ -36,14 +36,12 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 
 use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
-use crate::common::meta::organization::OrganizationInviteUserRecord;
-#[cfg(feature = "cloud")]
-use crate::common::meta::organization::OrganizationInvites;
+use crate::common::meta::organization::{OrganizationInviteUserRecord, OrganizationInvites};
 use crate::{
     common::{
         meta::organization::{
             AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-            PipelineSummary, RumIngestionToken, StreamSummary, CUSTOM, DEFAULT_ORG, USER_DEFAULT,
+            PipelineSummary, RumIngestionToken, StreamSummary, CUSTOM, DEFAULT_ORG,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -243,11 +241,9 @@ pub async fn create_org(
     org.name = org.name.trim().to_owned();
 
     org.identifier = ider::uuid();
-    let mut org_type = CUSTOM.to_owned();
+    let org_type = CUSTOM.to_owned();
     #[cfg(feature = "cloud")]
-    if org.org_type.eq(USER_DEFAULT) {
-        org_type = USER_DEFAULT.to_owned();
-    }
+    let org_type = org.org_type.clone();
     org.org_type = org_type;
     match db::organization::save_org(org).await {
         Ok(_) => {
@@ -400,10 +396,12 @@ pub async fn generate_invitation(
 
     use super::users::get_user;
 
+    let mut inviter_name = "".to_owned();
     let cfg = get_config();
     if !is_root_user(user_email) {
         match get_user(Some(org_id), user_email).await {
             Some(user) => {
+                inviter_name = format!("{} {}", user.first_name, user.last_name);
                 if !(user.role.eq(&UserRole::Admin) || user.role.eq(&UserRole::Root)) {
                     return Err(anyhow::anyhow!("Unauthorized access"));
                 }
@@ -411,7 +409,7 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
-    if get_org(org_id).await.is_some() {
+    if let Some(org) = get_org(org_id).await {
         let invite_token = config::ider::generate();
         let expires_at = Utc::now().timestamp_micros()
             + Duration::days(cfg.common.org_invite_expiry as i64)
@@ -432,15 +430,14 @@ pub async fn generate_invitation(
             // TODO: Use an env to decide whether to send email or not
             let mut email = Message::builder()
                 .from(cfg.smtp.smtp_from_email.parse()?)
-                .subject(get_invite_email_subject(org_id));
+                .subject(get_invite_email_subject(&org.name));
             for invite in invites.invites.iter() {
                 email = email.to(invite.parse()?);
             }
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            // TODO: Decide the endpoint to be used
-            let msg = get_invite_email_body(org_id, &invite_token);
+            let msg = get_invite_email_body(org_id, &org.name, &inviter_name, &invite_token);
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
@@ -460,43 +457,81 @@ pub async fn generate_invitation(
 }
 
 #[cfg(feature = "cloud")]
-pub async fn accept_invitation(
-    org_id: &str,
-    user_email: &str,
-    invite_token: &str,
-) -> Result<(), anyhow::Error> {
+pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(), anyhow::Error> {
     use std::str::FromStr;
 
-    if get_org(org_id).await.is_some() {
-        // TODO: if free org, check if the user is alredy part of a free org.
-        let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
+    let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
-        let now = chrono::Utc::now().timestamp_micros();
-        if invite.org_id.ne(org_id) || invite.expires_at < now {
-            return Err(anyhow::anyhow!("Invalid token"));
-        }
-
-        let invite_role = UserRole::from_str(&invite.role)
-            .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
-        org_users::add(
-            org_id,
-            user_email,
-            invite_role,
-            &generate_random_string(16),
-            Some(format!("rum{}", generate_random_string(16))),
-        )
-        .await
-        .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
-
-        if let Err(e) = org_invites::remove(&invite.token, user_email).await {
-            // No need to return http error, as the user
-            // has already been added to the org
-            log::error!("Error removing invite: {}", e);
-        }
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!("Organization doesn't exist"))
+    let now = chrono::Utc::now().timestamp_micros();
+    if !is_add_user_allowed_for_org(&invite.org_id, user_email).await {
+        return Err(anyhow::anyhow!(
+            "User is already part of a free organization"
+        ));
     }
+    if invite.expires_at < now {
+        return Err(anyhow::anyhow!("Invalid token"));
+    }
+    let org_id = invite.org_id.clone();
+
+    if get_org(&org_id).await.is_none() {
+        return Err(anyhow::anyhow!("Organization doesn't exist"));
+    }
+
+    let invite_role = UserRole::from_str(&invite.role)
+        .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
+    org_users::add(
+        &org_id,
+        user_email,
+        invite_role,
+        &generate_random_string(16),
+        Some(format!("rum{}", generate_random_string(16))),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
+
+    if let Err(e) = org_invites::remove(&invite.token, user_email).await {
+        // No need to return http error, as the user
+        // has already been added to the org
+        log::error!("Error removing invite: {}", e);
+    }
+    Ok(())
+}
+
+#[cfg(feature = "cloud")]
+pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool {
+    use o2_enterprise::enterprise::cloud::org_usage;
+
+    let org = org_usage::get(org_id).await;
+    let mut is_already_part_of_free_org = false;
+    let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
+    if member_orgs.is_empty() {
+        return true;
+    }
+    for member_org in member_orgs {
+        match org_usage::get(&member_org.identifier).await {
+            Ok(subscription) => {
+                if subscription.is_some() {
+                    let subscription = subscription.unwrap();
+                    if subscription.is_free_sub() {
+                        is_already_part_of_free_org = true;
+                        break;
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+    }
+
+    if org.is_ok() {
+        let org = org.unwrap();
+        if org.is_some() {
+            let org = org.unwrap();
+            if org.is_free_sub() && is_already_part_of_free_org {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {

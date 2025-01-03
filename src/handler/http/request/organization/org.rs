@@ -398,10 +398,7 @@ async fn rename_org(
     )
 )]
 #[get("/{org_id}/invites")]
-pub async fn get_org_invites(
-    user_email: UserEmail,
-    path: web::Path<String>,
-) -> Result<HttpResponse, Error> {
+pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org = path.into_inner();
 
     let result = organization::get_invitations_for_org(&org).await;
@@ -466,14 +463,14 @@ pub async fn generate_org_invite(
         (status = 200, description = "Success", content_type = "application/json", body = Organization),
     )
 )]
-#[put("/{org_id}/accept_invite/{invite_token}")]
+#[put("/{org_id}/member_subscription/{invite_token}")]
 async fn accept_org_invite(
     user_email: UserEmail,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
-    let (org, invite_token) = path.into_inner();
+    let (_org, invite_token) = path.into_inner();
 
-    let result = organization::accept_invitation(&org, &user_email.user_id, &invite_token).await;
+    let result = organization::accept_invitation(&user_email.user_id, &invite_token).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
