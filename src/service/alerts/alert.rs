@@ -547,6 +547,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     if let Some(id) = alert.id.map(|id| id.to_string()) {
         remove_ownership(org_id, "alerts", Authz::new(&id)).await;
     }
+    remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
     Ok(())
 }
 
