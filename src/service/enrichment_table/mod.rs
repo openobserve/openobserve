@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{self, BufRead, Error, Write},
-    sync::Arc,
-};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
@@ -58,6 +54,10 @@ use crate::{
 };
 
 pub mod geoip;
+
+// Constants for chunk size and record limits
+const MAX_CHUNK_SIZE: usize = 25 * 1024 * 1024; // 25 MB
+const MAX_RECORDS: usize = 8192; // Save every 8192 records
 
 pub async fn save_enrichment_data(
     org_id: &str,
@@ -335,12 +335,6 @@ pub async fn extract_multipart(
     Ok(records)
 }
 
-// Constants for chunk size and record limits
-const MAX_CHUNK_SIZE: usize = 25 * 1024 * 1024; // 25 MB
-const MAX_RECORDS: usize = 8192; // Save every 8192 records
-                                 // const MAX_CHUNK_SIZE: usize = 100;
-                                 // const MAX_RECORDS: usize = 100;
-
 pub async fn extract_and_save_data(
     org_id: &str,
     table_name: &str,
@@ -366,28 +360,28 @@ pub async fn extract_and_save_data(
 
     // Process each field in the multipart payload
     while let Ok(Some(mut field)) = payload.try_next().await {
-        log::info!("Processing a new field from multipart payload.");
-
         if let Some(filename) = field.content_disposition().get_filename() {
-            log::info!("Field has a filename: {:?}", filename);
+            log::info!(
+                "[ENRICHMENT_TABLE] Processing field: {}",
+                filename.to_string()
+            );
 
             // Process the field's data in chunks
             while let Some(chunk) = field.next().await {
                 let chunk = chunk.unwrap();
                 data_buffer.extend_from_slice(&chunk);
 
+                if headers.is_none() {
+                    let (head_record, remaining_data) = extract_headers_and_data(&data_buffer)?;
+                    if head_record.is_some() {
+                        headers = head_record;
+                    }
+                    data_buffer = remaining_data;
+                }
+
                 // If the data buffer exceeds MAX_CHUNK_SIZE, process it
                 if data_buffer.len() >= MAX_CHUNK_SIZE {
                     chunk_id += 1;
-                    log::info!("Processing chunk ID: {}", chunk_id);
-
-                    if headers.is_none() {
-                        let (hrd_record, remaining_data) = extract_headers_and_data(&data_buffer)?;
-                        if hrd_record.is_some() {
-                            headers = hrd_record;
-                        }
-                        data_buffer = remaining_data;
-                    }
 
                     let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
 
@@ -415,7 +409,6 @@ pub async fn extract_and_save_data(
     // Process any remaining data in the buffer
     if !data_buffer.is_empty() || !leftover.is_empty() {
         chunk_id += 1;
-        log::info!("Processing final chunk ID: {}", chunk_id);
 
         let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
         parse_and_buffer_records(
@@ -436,11 +429,6 @@ pub async fn extract_and_save_data(
     // Save any remaining records in the record buffer
     if !record_buffer.is_empty() {
         part_number += 1;
-        log::info!(
-            "Saving final records for chunk ID: {}, part number: {}",
-            chunk_id,
-            part_number
-        );
         save_records(
             record_buffer,
             semaphore.clone(),
@@ -454,13 +442,14 @@ pub async fn extract_and_save_data(
     }
 
     // Wait for all processing tasks to complete
-    log::info!("Waiting for all processing tasks to complete.");
     for task in processing_tasks {
-        task.await.unwrap();
+        if let Err(e) = task.await {
+            log::error!("[ENRICHMENT_TABLE] Error in processing task: {:?}", e);
+        }
     }
 
     log::info!(
-        "All records processed successfully for org_id: {}, table_name: {}",
+        "[ENRICHMENT_TABLE] All records processed successfully for org_id: {}, table_name: {}",
         org_id,
         table_name
     );
@@ -479,7 +468,6 @@ fn extract_headers_and_data(
         match result {
             Ok(record) => Some(record),
             Err(e) => {
-                log::error!("Error extracting headers: {}", e);
                 return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
             }
         }
@@ -497,21 +485,13 @@ fn extract_headers_and_data(
 fn process_chunk(
     data: &[u8],
     leftover: &mut String,
-    chunk_id: usize,
+    _chunk_id: usize,
 ) -> Result<Vec<u8>, std::io::Error> {
-    log::info!("Processing chunk ID: {}", chunk_id);
-
     // Combine leftover with the current chunk
     let mut combined_data = leftover.clone();
     if !data.is_empty() {
-        let data = std::str::from_utf8(data).map_err(|e| {
-            log::error!(
-                "Error converting data to UTF-8 in chunk ID {}: {}",
-                chunk_id,
-                e
-            );
-            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-        })?;
+        let data = std::str::from_utf8(data)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         combined_data.push_str(data);
     } else {
         // We can assume that this is the last chunk
@@ -540,21 +520,10 @@ fn process_chunk(
         leftover.clear();
     }
 
-    let pd = std::str::from_utf8(&processed_data).unwrap();
-    let x = format!(
-        "Chunk ID: {}; Processed data: {:?}, Leftover: {:#?}",
-        chunk_id, pd, leftover
-    );
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("records.log")
-        .unwrap();
-    writeln!(file, "{:?}", x).unwrap();
-
     Ok(processed_data)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn parse_and_buffer_records(
     data: &[u8],
     record_buffer: &mut Vec<json::Map<String, json::Value>>,
@@ -567,20 +536,6 @@ async fn parse_and_buffer_records(
     part_number: &mut usize,
     headers: Option<&csv::StringRecord>,
 ) -> Result<(), std::io::Error> {
-    log::info!("Parsing records from chunk ID: {}", chunk_id);
-
-    let d = std::str::from_utf8(data).unwrap();
-    let x = format!(
-        "Chunk ID: {}; Part ID: {}, data: {:?}",
-        chunk_id, part_number, d
-    );
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("data_to_parse_records.log")
-        .unwrap();
-    writeln!(file, "{:?}", x).unwrap();
-
     let headers = match headers {
         Some(h) => h.clone(),
         None => {
@@ -598,7 +553,6 @@ async fn parse_and_buffer_records(
 
     for record in rdr.records() {
         let record = record?;
-        dbg!(&record);
         let mut json_record = json::Map::new();
 
         for (header, field) in headers.iter().zip(record.iter()) {
@@ -607,25 +561,9 @@ async fn parse_and_buffer_records(
 
         record_buffer.push(json_record);
 
+        // Trigger save when the buffer reaches MAX_RECORDS
         if record_buffer.len() >= MAX_RECORDS {
             *part_number += 1;
-
-            let x = format!(
-                "Chunk ID: {}; Part ID: {}, Records: {:?}",
-                chunk_id, part_number, record_buffer
-            );
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("parse_records.log")
-                .unwrap();
-            writeln!(file, "{:?}", x).unwrap();
-
-            log::info!(
-                "Record buffer full for chunk ID: {}, part number: {}. Spawning save task.",
-                chunk_id,
-                *part_number
-            );
 
             let full_buffer = std::mem::take(record_buffer);
             let org_id = org_id.to_string();
@@ -656,6 +594,38 @@ async fn parse_and_buffer_records(
         }
     }
 
+    // Handle any remaining records in the buffer
+    if !record_buffer.is_empty() {
+        *part_number += 1;
+
+        let full_buffer = std::mem::take(record_buffer);
+        let org_id = org_id.to_string();
+        let table_name = table_name.to_string();
+        let semaphore_clone = semaphore.clone();
+        let current_part = *part_number;
+
+        processing_tasks.push(tokio::spawn(async move {
+            if let Err(e) = save_records(
+                full_buffer,
+                semaphore_clone,
+                &org_id,
+                &table_name,
+                append_data,
+                chunk_id,
+                current_part,
+            )
+            .await
+            {
+                log::error!(
+                    "Error saving remaining records for chunk ID {}, part number {}: {}",
+                    chunk_id,
+                    current_part,
+                    e
+                );
+            }
+        }));
+    }
+
     Ok(())
 }
 
@@ -669,27 +639,14 @@ async fn save_records(
     part_number: usize,
 ) -> Result<(), std::io::Error> {
     let _permit = semaphore.acquire().await.unwrap();
-    log::info!(
-        "Saving {} records for chunk ID: {}, part number: {}, org_id: {}, table_name: {}",
-        records.len(),
-        chunk_id,
-        part_number,
-        org_id,
-        table_name
-    );
-
-    match save_enrichment_data(&org_id, &table_name, records, append_data).await {
-        Ok(_) => log::info!(
-            "Successfully saved records for chunk ID: {}, part number: {}",
-            chunk_id,
-            part_number
-        ),
-        Err(e) => log::error!(
-            "Error saving records for chunk ID: {}, part number: {}: {}",
-            chunk_id,
-            part_number,
-            e
-        ),
+    if let Err(e) = save_enrichment_data(org_id, table_name, records, append_data).await {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "Error saving records for chunk ID {}, part number {}: {}",
+                chunk_id, part_number, e
+            ),
+        ));
     }
 
     Ok(())

@@ -23,7 +23,7 @@ use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::{extract_and_save_data, save_enrichment_data},
+    service::enrichment_table::extract_and_save_data,
 };
 
 /// CreateEnrichmentTable
