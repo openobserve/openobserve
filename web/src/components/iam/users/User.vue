@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="cursor: pointer !important"
           />
           <q-btn
-            v-if="props.row.enableEdit"
+            v-if="props.row.enableEdit && config.isCloud == 'false'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-table>
     <q-dialog
+      v-if="config.isCloud == 'false'"
       v-model="showUpdateUserDialog"
       position="right"
       full-height
@@ -153,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-user
+        v-if="config.isCloud == 'false'"
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
@@ -171,9 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true"
-unelevated no-caps
-class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -267,7 +267,16 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) await getRoles();
+      if (isEnterprise.value || config.isCloud == "true") await getRoles();
+
+      if (config.isCloud == "true") {
+        columns.value.push({
+          name: "status",
+          field: "status",
+          label: t("user.status"),
+          align: "left",
+        });
+      }
 
       if (
         (isEnterprise.value && isCurrentUserInternal.value) ||
@@ -380,6 +389,7 @@ export default defineComponent({
                 enableEdit: false,
                 enableChangeRole: false,
                 enableDelete: false,
+                status: data.status,
               };
             });
 
