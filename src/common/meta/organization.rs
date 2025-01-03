@@ -39,6 +39,18 @@ pub struct OrganizationInvites {
     pub role: UserRole,
 }
 
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteUserRecord {
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: String,
+    pub status: String,
+    pub expires_at: i64,
+    pub is_external: bool,
+}
+
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrgRoleMapping {
     pub org_id: String,

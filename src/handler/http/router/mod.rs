@@ -531,6 +531,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
 
     #[cfg(feature = "cloud")]
     let service = service
+        .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
         .service(organization::org::accept_org_invite);
 

@@ -386,6 +386,39 @@ async fn rename_org(
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
+    operation_id = "GetOrganizationMemberInvites",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = OrganizationInviteUserRecord),
+    )
+)]
+#[get("/{org_id}/invites")]
+pub async fn get_org_invites(
+    user_email: UserEmail,
+    path: web::Path<String>,
+) -> Result<HttpResponse, Error> {
+    let org = path.into_inner();
+
+    let result = organization::get_invitations_for_org(&org).await;
+    match result {
+        Ok(result) => Ok(HttpResponse::Ok().json(result)),
+        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            err.to_string(),
+        ))),
+    }
+}
+
+/// InviteOrganizationMembers
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
     operation_id = "InviteOrganizationMembers",
     security(
         ("Authorization"= [])
@@ -414,15 +447,6 @@ pub async fn generate_org_invite(
             err.to_string(),
         ))),
     }
-}
-
-#[cfg(not(feature = "cloud"))]
-#[post("/{org_id}/invites")]
-pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-        http::StatusCode::NOT_FOUND.into(),
-        "Feature not available".to_string(),
-    )))
 }
 
 /// AcceptOrganizationInvite
@@ -457,13 +481,4 @@ async fn accept_org_invite(
             err.to_string(),
         ))),
     }
-}
-
-#[cfg(not(feature = "cloud"))]
-#[put("/{org_id}/accept_invite/{invite_token}")]
-async fn accept_org_invite() -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-        http::StatusCode::NOT_FOUND.into(),
-        "Feature not available".to_string(),
-    )))
 }
