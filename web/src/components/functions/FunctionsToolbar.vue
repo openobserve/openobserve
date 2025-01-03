@@ -44,10 +44,11 @@
             no-error-icon
             tabindex="0"
             style="min-width: 300px"
+            @blur="onblurInput"
           />
           <q-icon
             :key="functionName"
-            v-if="isValidMethodName() !== true"
+            v-if="isValidMethodName() !== true && showInputError"
             :name="outlinedInfo"
             size="20px"
             class="q-ml-xs cursor-pointer"
@@ -146,6 +147,8 @@ const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
 const addFunctionForm = ref(null);
 
+const showInputError = ref(false);
+
 const isValidMethodName = () => {
   if (!functionName.value) return "Field is required!";
   const methodPattern = /^[A-Z_][A-Z0-9_]*$/i;
@@ -153,6 +156,10 @@ const isValidMethodName = () => {
     methodPattern.test(functionName.value) ||
     "Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores."
   );
+};
+
+const onblurInput = () => {
+  showInputError.value = true;
 };
 
 const functionName = computed({
