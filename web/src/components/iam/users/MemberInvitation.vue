@@ -101,7 +101,7 @@ export default defineComponent({
 
     const userEmail: any = ref("");
     const options = ref();
-    const selectedRole = ref("");
+    const selectedRole = ref("admin");
     const currentUserRole = ref(props.currentrole || "");
 
     onBeforeMount(async () => {
