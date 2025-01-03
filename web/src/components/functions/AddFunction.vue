@@ -41,11 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div class="tw-pr-2">
-            <q-form
-              id="addFunctionForm"
-              ref="addJSTransformForm"
-              @submit="onSubmit"
-            >
+            <q-form id="addFunctionForm" ref="addJSTransformForm">
               <div class="add-function-name-input q-pb-sm o2-input">
                 <FullViewContainer
                   name="function"
@@ -139,6 +135,7 @@ import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { onBeforeRouteLeave } from "vue-router";
 
 const defaultValue: any = () => {
   return {
@@ -222,6 +219,14 @@ export default defineComponent({
       },
     );
 
+    onMounted(() => {
+      window.addEventListener("beforeunload", beforeUnloadHandler);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+    });
+
     const beforeUnloadHandler = (e: any) => {
       //check is data updated or not
       if (isFunctionDataChanged.value) {
@@ -232,6 +237,36 @@ export default defineComponent({
       }
       return;
     };
+
+    let forceSkipBeforeUnloadListener = false;
+
+    onBeforeRouteLeave((to, from, next) => {
+      // check if it is a force navigation, then allow
+      if (forceSkipBeforeUnloadListener) {
+        next();
+        return;
+      }
+      // else continue to warn user
+      const actions = ["add", "update"];
+
+      if (
+        from.path === "/pipeline/functions" &&
+        actions.includes((from.query?.action as string) || "none") &&
+        isFunctionDataChanged.value
+      ) {
+        const confirmMessage = t("pipeline.unsavedMessage");
+        if (window.confirm(confirmMessage)) {
+          // User confirmed, allow navigation
+          next();
+        } else {
+          // User canceled, prevent navigation
+          next(false);
+        }
+      } else {
+        // No unsaved changes or not leaving the edit route, allow navigation
+        next();
+      }
+    });
 
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
@@ -285,53 +320,61 @@ end`;
             timeout: 0,
           });
 
-          if (!beingUpdated.value) {
-            formData.value.transType = parseInt(formData.value.transType);
-            //trans type is lua remove params from form
-            if (formData.value.transType == 1) {
-              formData.value.params = "";
+          try {
+            if (!beingUpdated.value) {
+              formData.value.transType = parseInt(formData.value.transType);
+              //trans type is lua remove params from form
+              if (formData.value.transType == 1) {
+                formData.value.params = "";
+              }
+
+              callTransform = jsTransformService.create(
+                store.state.selectedOrganization.identifier,
+                formData.value,
+              );
+            } else {
+              formData.value.transType = parseInt(formData.value.transType);
+              //trans type is lua remove params from form
+              if (formData.value.transType == 1) {
+                formData.value.params = "";
+              }
+
+              callTransform = jsTransformService.update(
+                store.state.selectedOrganization.identifier,
+                formData.value,
+              );
             }
 
-            callTransform = jsTransformService.create(
-              store.state.selectedOrganization.identifier,
-              formData.value,
-            );
-          } else {
-            formData.value.transType = parseInt(formData.value.transType);
-            //trans type is lua remove params from form
-            if (formData.value.transType == 1) {
-              formData.value.params = "";
-            }
+            forceSkipBeforeUnloadListener = true;
 
-            callTransform = jsTransformService.update(
-              store.state.selectedOrganization.identifier,
-              formData.value,
-            );
+            callTransform
+              .then((res: { data: any }) => {
+                const data = res.data;
+                const _formData: any = { ...formData.value };
+                formData.value = { ...defaultValue() };
+
+                emit("update:list", _formData);
+                addJSTransformForm?.value?.resetValidation();
+
+                loadingNotification();
+                $q.notify({
+                  type: "positive",
+                  message: res.data.message || "Function saved successfully",
+                });
+              })
+              .catch((err) => {
+                compilationErr.value = err?.response?.data["message"];
+                $q.notify({
+                  type: "negative",
+                  message:
+                    err.response?.data?.message ?? "Function creation failed",
+                });
+                loadingNotification();
+              });
+          } catch (error) {
+            console.error("Error while saving function:", error);
+            loadingNotification();
           }
-
-          callTransform
-            .then((res: { data: any }) => {
-              const data = res.data;
-              const _formData: any = { ...formData.value };
-              formData.value = { ...defaultValue() };
-
-              emit("update:list", _formData);
-              addJSTransformForm.value.resetValidation();
-              loadingNotification();
-              $q.notify({
-                type: "positive",
-                message: res.data.message || "Function saved successfully",
-              });
-            })
-            .catch((err) => {
-              compilationErr.value = err.response.data["message"];
-              $q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.message ?? "Function creation failed",
-              });
-              loadingNotification();
-            });
 
           segment.track("Button Click", {
             button: "Save Function",
