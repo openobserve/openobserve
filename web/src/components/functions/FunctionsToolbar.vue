@@ -95,7 +95,7 @@
         padding="sm md"
         type="submit"
         no-caps
-        @click="emit('save')"
+        @click="onSave"
       />
       <q-btn
         data-test="add-function-cancel-btn"
@@ -173,6 +173,11 @@ const handleFullScreen = () => {
 
 const redirectToFunctions = () => {
   emit("back");
+};
+
+const onSave = () => {
+  showInputError.value = true;
+  emit("save");
 };
 
 defineExpose({ addFunctionForm });

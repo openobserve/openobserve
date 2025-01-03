@@ -331,8 +331,6 @@ const saveFunction = () => {
       });
       return;
     }
-
-    addFunctionRef.value.onSubmit();
     return;
   }
 
