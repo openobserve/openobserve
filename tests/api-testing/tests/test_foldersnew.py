@@ -4,14 +4,14 @@ def retrieve_new_dashboard(session, base_url, org_id, folder_id):
     print(resp_get_dashboard.content)
     assert (
         resp_get_dashboard.status_code == 200
-    ), f"Retrieve this folder dashboard: Expected 200, but got {resp_get_dashboard.status_code} {resp_get_dashboard.content}"
+    ), f"Retrieve these dashboards: Expected 200, but got {resp_get_dashboard.status_code} {resp_get_dashboard.content}"
 
 def delete_new_dashboard(session, base_url, org_id, folder_id):
-    resp_delete_dashboards = session.delete(
+    resp_delete_dashboard = session.delete(
         f"{base_url}api/v2/{org_id}/folders/dashboards/{folder_id}")
     assert (
         resp_delete_dashboard.status_code == 200
-    ), f"Deleting this folder dashboards: Expected 200, but got {resp_delete_dashboard.status_code} {resp_delete_dashboard.content}"
+    ), f"Deleting these dashboards: Expected 200, but got {resp_delete_dashboard.status_code} {resp_delete_dashboard.content}"
 
 def test_new_all_dashboards(create_session, base_url):
     """Running an E2E test for all new dashboards."""
@@ -71,7 +71,7 @@ def test_new_create_dashboards_delete(create_session, base_url):
 
 def retrieve_new_alert(session, base_url, org_id, folder_id):
     resp_get_alert = session.get(
-        f"{base_url}api/v2/{org_id}/folders/dashboards/{folder_id}")
+        f"{base_url}api/v2/{org_id}/folders/alerts/{folder_id}")
     print(resp_get_alert.content)
     assert (
         resp_get_alert.status_code == 200
