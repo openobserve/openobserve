@@ -204,6 +204,7 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+    req.use_cache = Some(use_cache);
 
     // set search event type
     if req.search_type.is_none() {
@@ -265,7 +266,6 @@ pub async fn search(
         stream_type,
         Some(user_id),
         &req,
-        use_cache,
         range_error,
     )
     .instrument(http_span)
@@ -485,6 +485,7 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
+        use_cache: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -538,6 +539,7 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
+        use_cache: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
@@ -878,6 +880,7 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
+        use_cache: Some(use_cache),
     };
 
     // skip fields which aren't part of the schema
@@ -941,7 +944,6 @@ async fn values_v1(
             actual_stream_type,
             Some(user_id.to_string()),
             &req,
-            use_cache,
             "".to_string(),
         )
         .instrument(http_span)

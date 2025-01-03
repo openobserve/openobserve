@@ -935,6 +935,7 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
             search_event_context: None,
+            use_cache: None,
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
@@ -1010,6 +1011,7 @@ pub async fn around_multi(
             timeout,
             search_type: Some(search::SearchEventType::UI),
             search_event_context: None,
+            use_cache: None,
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)

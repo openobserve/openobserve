@@ -29,7 +29,7 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::{
             get_or_create_trace_id, get_search_event_context_from_request,
-            get_stream_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
@@ -69,6 +69,7 @@ pub async fn submit_job(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -77,6 +78,7 @@ pub async fn submit_job(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+    req.use_cache = Some(use_cache);
 
     // update timeout
     if req.timeout == 0 {
