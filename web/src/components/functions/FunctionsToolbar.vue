@@ -44,7 +44,8 @@
             no-error-icon
             tabindex="0"
             style="min-width: 300px"
-            @blur="onblurInput"
+            @update:model-value="onUpdate"
+            @blur="onUpdate"
           />
           <q-icon
             :key="functionName"
@@ -59,6 +60,7 @@
               self="center left"
               max-width="300px"
               :offset="[2, 0]"
+              class="tw-text-[12px]"
             >
               {{ isValidMethodName() }}
             </q-tooltip>
@@ -95,7 +97,7 @@
         padding="sm md"
         type="submit"
         no-caps
-        @click="emit('save')"
+        @click="onSave"
       />
       <q-btn
         data-test="add-function-cancel-btn"
@@ -158,7 +160,7 @@ const isValidMethodName = () => {
   );
 };
 
-const onblurInput = () => {
+const onUpdate = () => {
   showInputError.value = true;
 };
 
@@ -173,6 +175,11 @@ const handleFullScreen = () => {
 
 const redirectToFunctions = () => {
   emit("back");
+};
+
+const onSave = () => {
+  showInputError.value = true;
+  emit("save");
 };
 
 defineExpose({ addFunctionForm });
