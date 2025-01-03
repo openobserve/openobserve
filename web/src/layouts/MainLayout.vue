@@ -291,27 +291,6 @@ class="padding-none" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <div v-if="config.isCloud == 'true'">
-                <q-item
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  :to="{ path: '/settings' }"
-                >
-                  <q-item-section avatar>
-                    <q-avatar
-                      size="md"
-                      icon="settings"
-                      color="red"
-                      text-color="white"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ t("menu.settings") }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-              </div>
               <q-item clickable>
                 <q-item-section avatar>
                   <q-icon size="xs" name="language" class="padding-none" />

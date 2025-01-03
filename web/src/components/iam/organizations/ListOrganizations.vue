@@ -195,43 +195,18 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      // {
-      //   name: "owner",
-      //   field: "owner",
-      //   label: t("organization.owner"),
-      //   align: "left",
-      //   sortable: true,
-      // },
-      ...(config.isCloud == 'true' ? [
-        {
-          name: "plan_type",
-          field: "plan_type",
-          label: t("organization.subscription_type"),
-          align: "left",
-          sortable: true,
-        },
-        {
-          name: "status",
-          field: "status",
-          label: t("organization.status"),
-          align: "left",
-          sortable: true,
-        },
-        {
-          name: "created",
-          field: "created",
-          label: t("organization.created"),
-          align: "left",
-          sortable: true,
-        },
-      ] : []),
-      // {
-      //   name: "actions",
-      //   field: "actions",
-      //   label: t("organization.actions"),
-      //   align: "center",
-      // },
     ]);
+
+    if (config.isCloud == "true") {
+      columns.value.push({
+        name: "plan",
+        field: "plan",
+        label: t("organization.subscription_plan"),
+        align: "center",
+        sortable: true,
+      });
+    }
+
     const perPageOptions = [
       { label: "25", value: 25 },
       { label: "50", value: 50 },
@@ -341,7 +316,7 @@ export default defineComponent({
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            // owner: data.user_email,
+            plan: data.plan || "-",
           };
 
           // Additional fields and logic for cloud configuration

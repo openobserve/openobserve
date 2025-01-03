@@ -39,92 +39,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-th>
         </q-tr>
       </template>
-      <template v-slot:body="props">
-        <q-tr :props="props">
-          <q-td auto-width>
-            <q-btn
-              size="xs" 
-              flat 
-              round 
-              dense 
-              @click="toggleExpand(props.row)"
-              :icon="props.row.showGroups ? 'remove' : 'add'"
-            />
-          </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
-            <template v-if="col.name === 'role'">
-               <template v-if="props.row.role === 'root'">
-                {{ props.row.role }}
-              </template>
-              <template v-else>
-                <q-select
-                  dense
-                  borderless
-                  v-model="props.row.role"
-                  :options="options"
-                  emit-value
-                  map-options
-                  style="width: 70px"
-                  @update:model-value="updateUserRole(props.row)"
-                />
-              </template>
-            </template>
-            <template v-else-if="col.name === 'actions'">
-              <q-btn
-                v-if="props.row.enableDelete"
-                :icon="outlinedDelete"
-                :title="t('user.delete')"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="confirmDeleteAction(props)"
-                style="cursor: pointer !important"
-              />
-              <q-btn
-                v-if="props.row.enableEdit"
-                icon="edit"
-                :title="t('user.update')"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="addRoutePush(props);forceCloseRow(props.row)"
-                style="cursor: pointer !important"
-              />
-                <!-- v-if="props.row.role === 'root' && store.state.userInfo.email === props.row.email" -->
-              </template>
-            <template v-else>
-              {{ col.value }}
-            </template>
-          </q-td>
-        </q-tr>
-        <q-tr v-show="props.row.showGroups" :props="props">
-          <q-td colspan="100%">
-            <div class="flex">
-              <div class="q-px-lg" v-if="props.row.user_groups || props.row.user_roles">
-                <p class="q-mb-sm" v-if="props.row.user_groups">
-                  <strong>User Group: </strong> <span>{{ props.row.user_groups }}</span>
-                </p>
-                <p class="q-mb-sm" v-if="props.row.user_roles">
-                  <strong>Custom Roles: </strong> <span>{{ props.row.user_roles }}</span>
-                </p>
-              </div>
-              <div 
-                class="flex justify-center items-center q-px-lg" 
-                v-else
-                style="width: 100%; text-align: center;"
-              >
-                <p>No Data</p>
-              </div>
-            </div>
-          </q-td>
-
-        </q-tr>
+      <template #body-cell-actions="props">
+        <q-td :props="props" side>
+          <q-btn
+            v-if="props.row.enableDelete"
+            :icon="outlinedDelete"
+            :title="t('user.delete')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
+            style="cursor: pointer !important"
+          />
+          <q-btn
+            v-if="props.row.enableEdit && config.isCloud == 'false'"
+            icon="edit"
+            :title="t('user.update')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="addRoutePush(props)"
+            style="cursor: pointer !important"
+          />
+        </q-td>
       </template>
       <template #top="scope">
         <div
@@ -185,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-table>
     <q-dialog
+      v-if="config.isCloud == 'false'"
       v-model="showUpdateUserDialog"
       position="right"
       full-height
@@ -200,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-user
+        v-if="config.isCloud == 'false'"
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
@@ -219,9 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true"
-unelevated no-caps
-class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -315,10 +258,27 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) 
-      {
-        getCustomRoles();
-        await _getRoles();
+      if (isEnterprise.value || config.isCloud == "true") await getRoles();
+
+      if (config.isCloud == "true") {
+        columns.value.push({
+          name: "status",
+          field: "status",
+          label: t("user.status"),
+          align: "left",
+        });
+      }
+
+      if (
+        (isEnterprise.value && isCurrentUserInternal.value) ||
+        !isEnterprise.value
+      ) {
+        columns.value.push({
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        });
       }
 
       // if (
@@ -448,6 +408,7 @@ export default defineComponent({
                 enableEdit: false,
                 enableChangeRole: false,
                 enableDelete: false,
+                status: data.status,
               };
             });
 
