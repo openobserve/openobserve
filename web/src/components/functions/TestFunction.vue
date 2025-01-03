@@ -25,6 +25,7 @@
                 anchor="center right"
                 self="center left"
                 :offset="[10, 10]"
+                class="tw-text-[12px]"
               >
                 {{ sqlQueryErrorMsg }}
               </q-tooltip>
@@ -185,6 +186,7 @@
               anchor="center right"
               self="center left"
               :offset="[10, 10]"
+              class="tw-text-[12px]"
             >
               {{ eventsErrorMsg }}
             </q-tooltip>
@@ -234,6 +236,7 @@
               anchor="center right"
               self="center left"
               :offset="[10, 10]"
+              class="tw-text-[12px]"
             >
               {{ outputEventsErrorMsg }}
             </q-tooltip>
