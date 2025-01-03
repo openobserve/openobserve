@@ -2,6 +2,8 @@ import time
 import random
 import uuid
 import pytest
+import json
+
 
 def test_get_alertsnew(create_session, base_url):
     """Running an E2E test for getting all the new alerts list."""
@@ -127,7 +129,7 @@ def test_new_alert_create(create_session, base_url):
 
     payload_folder = {"description": "newfoldernvp", "name": folder_alert}
     resp_create_folder = session.post(
-        f"{url}api/{org_id}/folders", json=payload_folder)
+        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
     print(resp_create_folder.content)
 
@@ -136,14 +138,6 @@ def test_new_alert_create(create_session, base_url):
     assert (
         resp_create_folder.status_code == 200
     ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
-
-    payload_folder = {
-        "description": "folderupdated",
-        "folderId": folder_id,
-        "name": folder_alert,
-    }
-    folder_id = resp_create_folder.json()["folderId"]
-
 
     # createtemplate
     template_alert = f"newtemp_{random.randint(1000, 9999)}"  # Make the name unique
@@ -201,8 +195,9 @@ def test_new_alert_create(create_session, base_url):
     ), f"Destination {destination_alert} not found in the response"
 
     time.sleep(5)
+
     # ingest logs
-    stream_name = "newpy_tests"
+    stream_name = "default"
     payload_logs = [
         {
             "Athlete": "newtemp",
@@ -231,40 +226,58 @@ def test_new_alert_create(create_session, base_url):
         resp_create_logstream.status_code == 200
     ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
     
-    time.sleep(5)  # Or use a more robust approach like a retry loop
-
-    is_real_time = False
+    time.sleep(5)  
     payload_alert = {
-        "name": alert_name,
-        "stream_type": "logs",
-        "stream_name": "newpy_tests",
-        "is_real_time": is_real_time,
-        "query_condition": {
-            "conditions": [
-                {
-                    "column": "city",
-                    "operator": "=",
-                    "value": "200",
-                    "id": "ebab5c0f-e78b-46b4-900a-22eb8a1f662c",
-                }
-            ],
-            "sql": "",
-            "promql": None,
-            "type": "custom",
-            "aggregation": None,
-        },
-        "trigger_condition": {
-            "period": 10,
-            "operator": ">=",
-            "threshold": 3,
-            "silence": 10,
-        },
-        "destinations": [destination_alert], # Updated to a list
-        "context_attributes": {},
-        "enabled": True,
-        "description": "test",
-        "folderId": folder_id,
-    }
+    "name": alert_name,
+    "row_template": template_alert,
+    "stream_type": "logs",
+    "stream_name": "default",
+    "is_real_time": False,
+    "context_attributes": {},
+    # "function": "",
+    "query_condition": {
+        "conditions": [ {
+        "column": "log",
+        "operator": "=",
+        "value": "200",
+        "type": None,  # Set it to None or remove it
+        "id": "95eb852b-b93b-4cb6-ab17-b7608b4fc741"
+        } ],
+        "search_event_type": "ui",
+        "sql": "",
+        "promql": "",
+        "type": "custom",
+        "aggregation": None,  # Use an empty dictionary or provide a valid structure
+        "promql_condition": None,
+        "vrl_function": None,
+        "multi_time_range": []
+    },
+    "trigger_condition": {
+        "period": 10,
+        "operator": ">=",
+        "frequency": 1,
+        "cron": "",
+        "threshold": 3,
+        "silence": 10,
+        "frequency_type": "minutes",
+        "timezone": "UTC",
+        "tolerance_in_secs": 0
+    },
+    # "id": "95eb852b-b93b-4cb6-ab17-b7608b4fc741",
+    "org_id": "default",
+    "destinations": [destination_alert],
+    "context_attributes": {},
+    "enabled": True,
+    "description": "test",
+    # "lastTriggeredAt": 1735899669457,
+    # "createdAt": "2025-01-03T10:21:09.457Z",
+    # "updatedAt": "",
+    "owner": "root@example.com",
+    # "lastEditedBy": "root@example.com",
+    # "tz_offset": 0,
+    "folderId": folder_id
+ }
+
     # Create the alert after ensuring the destination exists
     resp_post_alertnew = session.post(
     f"{url}api/v2/{org_id}/alerts",
