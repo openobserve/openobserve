@@ -31,7 +31,7 @@ use config::{
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
     SIZE_IN_MB,
 };
-use futures::{StreamExt, TryStreamExt};
+use futures::{channel::mpsc, sink::SinkExt, StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
     schema::{
@@ -39,7 +39,7 @@ use infra::{
         STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
-use tokio::{sync::Semaphore, task::JoinHandle};
+use tokio::sync::Semaphore;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
@@ -350,8 +350,28 @@ pub async fn extract_and_save_data(
         append_data
     );
 
+    // Create a channel to send extracted records to the saving task
+    let (mut tx, mut rx) = mpsc::unbounded::<Vec<json::Map<String, json::Value>>>();
     let semaphore = Arc::new(Semaphore::new(1));
-    let mut processing_tasks: Vec<JoinHandle<()>> = Vec::new();
+
+    // Spawn a separate task to handle saving records
+    let org_id_clone = org_id.to_string();
+    let table_name_clone = table_name.to_string();
+    let saving_task = tokio::spawn(async move {
+        while let Some(records) = rx.next().await {
+            if let Err(e) = save_records(
+                records,
+                semaphore.clone(),
+                &org_id_clone,
+                &table_name_clone,
+                append_data,
+            )
+            .await
+            {
+                log::error!("Error saving records: {:?}", e);
+            }
+        }
+    });
 
     let mut data_buffer = Vec::new();
     let mut leftover = String::new();
@@ -392,11 +412,7 @@ pub async fn extract_and_save_data(
                 parse_and_buffer_records(
                     &processed_data,
                     &mut record_buffer,
-                    &mut processing_tasks,
-                    semaphore.clone(),
-                    org_id,
-                    table_name,
-                    append_data,
+                    &mut tx,
                     chunk_id,
                     &mut part_number,
                     headers.as_ref(),
@@ -416,11 +432,7 @@ pub async fn extract_and_save_data(
         parse_and_buffer_records(
             &processed_data,
             &mut record_buffer,
-            &mut processing_tasks,
-            semaphore.clone(),
-            org_id,
-            table_name,
-            append_data,
+            &mut tx,
             chunk_id,
             &mut part_number,
             headers.as_ref(),
@@ -431,23 +443,23 @@ pub async fn extract_and_save_data(
     // Save any remaining records in the record buffer
     if !record_buffer.is_empty() {
         part_number += 1;
-        save_records(
-            record_buffer,
-            semaphore.clone(),
-            org_id,
-            table_name,
-            append_data,
-            chunk_id,
-            part_number,
-        )
-        .await?;
+
+        // Send the buffer to the saving task
+        if let Err(e) = tx.send(record_buffer).await {
+            log::error!(
+                "Error sending remaining records for chunk ID {}, part_number: {}, to saving task: {}",
+                chunk_id,
+                part_number,
+                e
+            );
+        }
     }
 
-    // Wait for all processing tasks to complete
-    for task in processing_tasks {
-        if let Err(e) = task.await {
-            log::error!("[ENRICHMENT_TABLE] Error in processing task: {:?}", e);
-        }
+    drop(tx);
+
+    // Wait for the saving task to complete
+    if let Err(e) = saving_task.await {
+        log::error!("Error in saving task: {:?}", e);
     }
 
     log::info!(
@@ -529,11 +541,7 @@ fn process_chunk(
 async fn parse_and_buffer_records(
     data: &[u8],
     record_buffer: &mut Vec<json::Map<String, json::Value>>,
-    processing_tasks: &mut Vec<JoinHandle<()>>,
-    semaphore: Arc<Semaphore>,
-    org_id: &str,
-    table_name: &str,
-    append_data: bool,
+    tx: &mut mpsc::UnboundedSender<Vec<json::Map<String, json::Value>>>,
     chunk_id: usize,
     part_number: &mut usize,
     headers: Option<&csv::StringRecord>,
@@ -568,31 +576,15 @@ async fn parse_and_buffer_records(
             *part_number += 1;
 
             let full_buffer = std::mem::take(record_buffer);
-            let org_id = org_id.to_string();
-            let table_name = table_name.to_string();
-            let semaphore_clone = semaphore.clone();
-            let current_part = *part_number;
 
-            processing_tasks.push(tokio::spawn(async move {
-                if let Err(e) = save_records(
-                    full_buffer,
-                    semaphore_clone,
-                    &org_id,
-                    &table_name,
-                    append_data,
+            // Send the buffer to the saving task
+            if let Err(e) = tx.send(full_buffer).await {
+                log::error!(
+                    "Error sending records for chunk ID {} to saving task: {}",
                     chunk_id,
-                    current_part,
-                )
-                .await
-                {
-                    log::error!(
-                        "Error saving records for chunk ID {}, part number {}: {}",
-                        chunk_id,
-                        current_part,
-                        e
-                    );
-                }
-            }));
+                    e
+                );
+            }
         }
     }
 
@@ -601,31 +593,15 @@ async fn parse_and_buffer_records(
         *part_number += 1;
 
         let full_buffer = std::mem::take(record_buffer);
-        let org_id = org_id.to_string();
-        let table_name = table_name.to_string();
-        let semaphore_clone = semaphore.clone();
-        let current_part = *part_number;
 
-        processing_tasks.push(tokio::spawn(async move {
-            if let Err(e) = save_records(
-                full_buffer,
-                semaphore_clone,
-                &org_id,
-                &table_name,
-                append_data,
+        // Send the buffer to the saving task
+        if let Err(e) = tx.send(full_buffer).await {
+            log::error!(
+                "Error sending remaining records for chunk ID {} to saving task: {}",
                 chunk_id,
-                current_part,
-            )
-            .await
-            {
-                log::error!(
-                    "Error saving remaining records for chunk ID {}, part number {}: {}",
-                    chunk_id,
-                    current_part,
-                    e
-                );
-            }
-        }));
+                e
+            );
+        }
     }
 
     Ok(())
@@ -637,17 +613,12 @@ async fn save_records(
     org_id: &str,
     table_name: &str,
     append_data: bool,
-    chunk_id: usize,
-    part_number: usize,
 ) -> Result<(), std::io::Error> {
     let _permit = semaphore.acquire().await.unwrap();
     if let Err(e) = save_enrichment_data(org_id, table_name, records, append_data).await {
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!(
-                "Error saving records for chunk ID {}, part number {}: {}",
-                chunk_id, part_number, e
-            ),
+            format!("Error saving records: {:?}", e,),
         ));
     }
 
