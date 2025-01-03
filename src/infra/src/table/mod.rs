@@ -19,6 +19,7 @@ use sea_orm_migration::MigratorTrait;
 
 use crate::db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE};
 
+pub mod action_scripts;
 pub mod alerts;
 pub mod dashboards;
 pub mod distinct_values;
@@ -33,6 +34,7 @@ pub mod short_urls;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
+    action_scripts::init().await?;
     Ok(())
 }
 

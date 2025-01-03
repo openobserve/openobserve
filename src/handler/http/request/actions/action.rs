@@ -16,7 +16,8 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use config::meta::{actions::action::Action, alerts::destinations::Destination};
+use config::meta::actions::action::Action;
+use o2_enterprise::enterprise::actions::action::delete_action_by_id;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::action::save_and_run_action;
 
@@ -44,10 +45,36 @@ pub async fn save_action(
     path: web::Path<String>,
     action: web::Json<Action>,
 ) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    let _org_id = path.into_inner();
     let action = action.into_inner();
     match save_and_run_action(action).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Action saved")),
+        Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// Delete Action
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Actions",
+    operation_id = "DeleteAction",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = Template, description = "Template data", content_type ="application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+    )
+)]
+#[delete("/{org_id}/actions/{ksuid}")]
+pub async fn delete_action(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_org_id, ksuid) = path.into_inner();
+    match delete_action_by_id(&ksuid).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Action deleted")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -96,33 +123,20 @@ pub async fn save_action(
 // #[get("/{org_id}/actions")]
 // pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error> {
 //     let org_id = path.into_inner();
+
+// match list_actions(org_id).await {
+// Ok(actions) => {
+// let action = actions.into_iter().find(|a| a.id == action_id);
+// match action {
+// Some(action) => Ok(MetaHttpResponse::json(action)),
+// None => Ok(MetaHttpResponse::not_found("Action not found")),
+// }
+// }
+// Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+// }
 // }
 //
-// /// Delete Action
-// #[utoipa::path(
-//     context_path = "/api",
-//     tag = "Actions",
-//     operation_id = "CreateAction",
-//     security(
-//         ("Authorization"= [])
-//     ),
-//     params(
-//         ("org_id" = String, Path, description = "Organization name"),
-//     ),
-//     request_body(content = Template, description = "Template data", content_type =
-// "application/json"),     responses(
-//         (status = 200, description = "Success", content_type = "application/json", body =
-// HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
-// body = HttpResponse),     )
-// )]
-// #[delete("/{org_id}/actions")]
-// pub async fn delete_action(
-//     path: web::Path<String>,
-//     action: web::Json<Action>,
-// ) -> Result<HttpResponse, Error> {
-//     let org_id = path.into_inner();
-// }
-//
+
 // /// Get single Action
 // #[utoipa::path(
 //     context_path = "/api",
@@ -142,9 +156,13 @@ pub async fn save_action(
 // body = HttpResponse),     )
 // )]
 // #[get("/{org_id}/actions/{action_id}")]
-// pub async fn get_action(
-//     path: web::Path<String>,
+// pub async fn get_action_from_id(
+//     path: web::Path<(String, String)>,
 //     action: web::Json<Action>,
 // ) -> Result<HttpResponse, Error> {
-//     let org_id = path.into_inner();
+//     let (org_id, action_id) = path.into_inner();
+//     match get_action(org_id, action_id).await {
+//         Ok(action) => Ok(MetaHttpResponse::json(action)),
+//         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+//     }
 // }
