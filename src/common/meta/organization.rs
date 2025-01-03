@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::user::UserRole;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -22,8 +23,26 @@ pub const THRESHOLD: i64 = 9383939382;
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
+    #[serde(default)]
     pub identifier: String,
-    pub label: String,
+    pub name: String,
+    #[serde(default)]
+    pub org_type: String,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInvites {
+    #[serde(default)]
+    pub invites: Vec<String>, // user emails
+    pub role: UserRole,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgRoleMapping {
+    pub org_id: String,
+    pub org_name: String,
+    pub role: UserRole,
 }
 
 #[derive(Serialize, Clone, ToSchema)]

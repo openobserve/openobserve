@@ -30,59 +30,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #no-data>
         <NoData></NoData>
       </template>
-      <template #body-cell-role="props">
-        <q-td :props="props" v-if="props?.row?.enableChangeRole">
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            emit-value
-            map-options
-            style="width: 70px"
-            @update:model-value="updateUserRole(props.row)"
-          />
-        </q-td>
-        <q-td :props="props" v-else>
-          {{ props.row.role }}
-        </q-td>
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th auto-width />
+          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+
+            <span>{{ col.label }}</span>
+          </q-th>
+        </q-tr>
       </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.enableDelete"
-            :icon="outlinedDelete"
-            :title="t('user.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            style="cursor: pointer !important"
-          />
-          <q-btn
-            v-if="props.row.enableEdit"
-            icon="edit"
-            :title="t('user.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-          />
-        </q-td>
+      <template v-slot:body="props">
+        <q-tr :props="props">
+          <q-td auto-width>
+            <q-btn
+              size="xs" 
+              flat 
+              round 
+              dense 
+              @click="toggleExpand(props.row)"
+              :icon="props.row.showGroups ? 'remove' : 'add'"
+            />
+          </q-td>
+          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+            <template v-if="col.name === 'role'">
+               <template v-if="props.row.role === 'root'">
+                {{ props.row.role }}
+              </template>
+              <template v-else>
+                <q-select
+                  dense
+                  borderless
+                  v-model="props.row.role"
+                  :options="options"
+                  emit-value
+                  map-options
+                  style="width: 70px"
+                  @update:model-value="updateUserRole(props.row)"
+                />
+              </template>
+            </template>
+            <template v-else-if="col.name === 'actions'">
+              <q-btn
+                v-if="props.row.enableDelete"
+                :icon="outlinedDelete"
+                :title="t('user.delete')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="confirmDeleteAction(props)"
+                style="cursor: pointer !important"
+              />
+              <q-btn
+                v-if="props.row.enableEdit"
+                icon="edit"
+                :title="t('user.update')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="addRoutePush(props);forceCloseRow(props.row)"
+                style="cursor: pointer !important"
+              />
+                <!-- v-if="props.row.role === 'root' && store.state.userInfo.email === props.row.email" -->
+              </template>
+            <template v-else>
+              {{ col.value }}
+            </template>
+          </q-td>
+        </q-tr>
+        <q-tr v-show="props.row.showGroups" :props="props">
+          <q-td colspan="100%">
+            <div class="flex">
+              <div class="q-px-lg" v-if="props.row.user_groups || props.row.user_roles">
+                <p class="q-mb-sm" v-if="props.row.user_groups">
+                  <strong>User Group: </strong> <span>{{ props.row.user_groups }}</span>
+                </p>
+                <p class="q-mb-sm" v-if="props.row.user_roles">
+                  <strong>Custom Roles: </strong> <span>{{ props.row.user_roles }}</span>
+                </p>
+              </div>
+              <div 
+                class="flex justify-center items-center q-px-lg" 
+                v-else
+                style="width: 100%; text-align: center;"
+              >
+                <p>No Data</p>
+              </div>
+            </div>
+          </q-td>
+
+        </q-tr>
       </template>
       <template #top="scope">
         <div
           class="q-table__title full-width q-mb-md"
           data-test="user-title-text"
         >
-          {{ t("user.header") }}
+          {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
           <q-input
@@ -98,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
 
           <div class="col-6">
+              <!-- v-if="showAddUserBtn" -->
             <q-btn
-              v-if="showAddUserBtn"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"
@@ -114,14 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('user.header')"
+          :pageTitle="t('iam.basicUsers')"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
           position="top"
           @update:changeRecordPerPage="changePagination"
         />
       </template>
-
       <template #bottom="scope">
         <QTablePagination
           :scope="scope"
@@ -153,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
         :roles="options"
+        :customRoles="customRoles"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
@@ -253,24 +302,28 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) await getRoles();
-
-      if (
-        (isEnterprise.value && isCurrentUserInternal.value) ||
-        !isEnterprise.value
-      ) {
-        columns.value.push({
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        });
+      if (isEnterprise.value) 
+      {
+        getCustomRoles();
+        await _getRoles();
       }
+
+      // if (
+      //   (isEnterprise.value && isCurrentUserInternal.value) ||
+      //   !isEnterprise.value
+      // ) {
+      //   columns.value.push({
+      //     name: "actions",
+      //     field: "actions",
+      //     label: t("user.actions"),
+      //     align: "left",
+      //   });
+      // }
 
       updateUserActions();
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: any = ref<QTableProps["columns"]>([ 
       {
         name: "#",
         label: "#",
@@ -305,14 +358,21 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
+      {
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        }
     ]);
     const userEmail: any = ref("");
-    const options = ref([{ label: "Admin", value: "admin" }]);
-    const selectedRole = ref(options.value[0].value);
+    const options = ref([]);
+    const customRoles = ref([]);
+    const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
-
-    const getRoles = () => {
+    
+    const _getRoles = () => {
       return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)
@@ -321,6 +381,15 @@ export default defineComponent({
           })
           .finally(() => resolve(true));
       });
+    };
+    const getCustomRoles = async () => {
+      await getRoles(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          customRoles.value = res.data;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     };
 
     const getOrgMembers = () => {
@@ -392,17 +461,16 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
+      { label: "25", value: 25 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const maxRecordToReturn = ref<number>(500);
+    const selectedPerPage = ref<number>(25);
     const pagination: any = ref({
-      rowsPerPage: 20,
+      rowsPerPage: 25,
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -411,18 +479,18 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    const showAddUserBtn = computed(() => {
-      if (isEnterprise.value) {
-        return (
-          isCurrentUserInternal.value &&
-          (currentUserRole.value == "admin" || currentUserRole.value == "root")
-        );
-      } else {
-        return (
-          currentUserRole.value == "admin" || currentUserRole.value == "root"
-        );
-      }
-    });
+    // const showAddUserBtn = computed(() => {
+    //   if (isEnterprise.value) {
+    //     return (
+    //       isCurrentUserInternal.value &&
+    //       (currentUserRole.value == "admin" || currentUserRole.value == "root")
+    //     );
+    //   } else {
+    //     return (
+    //       currentUserRole.value == "admin" || currentUserRole.value == "root"
+    //     );
+    //   }
+    // });
 
     const currentUser = computed(() => store.state.userInfo.email);
 
@@ -434,22 +502,31 @@ export default defineComponent({
       });
     };
 
-    const shouldAllowEdit = (user: any) => {
-      if (isEnterprise.value) {
-        return (
-          isCurrentUserInternal.value &&
-          !user.isExternal &&
-          (currentUserRole.value == "root" ||
-            (currentUserRole.value == "admin" && user.role !== "root"))
-        );
-      } else {
-        return (
-          user.isLoggedinUser ||
-          currentUserRole.value == "root" ||
-          (currentUserRole.value == "admin" && user.role !== "root")
-        );
+    // const shouldAllowEdit = (user: any) => {
+    //   if (isEnterprise.value) {
+    //     return (
+    //       isCurrentUserInternal.value &&
+    //       !user.isExternal &&
+    //       (currentUserRole.value == "root" ||
+    //         (currentUserRole.value == "admin" && user.role !== "root"))
+    //     );
+    //   } else {
+    //     return (
+    //       user.isLoggedinUser ||
+    //       currentUserRole.value == "root" ||
+    //       (currentUserRole.value == "admin" && user.role !== "root")
+    //     );
+    //   }
+    // };
+    const shouldAllowEdit = (user:any) => {
+      // Allow editing for root users only if the current user is root
+      if (user.role === "root") {
+        return store.state.userInfo.email === user.email;
       }
+      // Allow editing for all other users
+      return true;
     };
+
 
     const shouldAllowChangeRole = (user: any) => {
       if (isEnterprise.value) {
@@ -546,7 +623,57 @@ export default defineComponent({
         });
       }
     };
-
+    const toggleExpand = (row:any) => {
+      if (!row.showGroups) {
+        row.showGroups = true;
+        fetchUserGroups(row.email);
+        fetchUserRoles(row.email);
+      } else {
+        row.showGroups = false;
+      }
+    };
+    const forceCloseRow = (row:any) => {
+      if (row.showGroups) {
+        row.showGroups = false;
+      }
+    };
+    const fetchUserGroups = (userEmail:any) =>  {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserGroups(orgId, userEmail)
+        .then((response) => {
+          // Update the user_groups property in the row object
+          const updatedUsers = usersState.users.map((user) => {
+            if (user.email === userEmail) {
+              return { 
+                ...user, 
+                user_groups: response.data.join(', ') 
+                // user_groups: response.data
+              };
+            }
+            return user;
+          });
+          usersState.users = updatedUsers; 
+        })
+    }
+    const fetchUserRoles = (userEmail:any) =>  {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserRoles(orgId, userEmail)
+        .then((response) => {
+          // Update the user_roles property in the row object
+          const updatedUsers = usersState.users.map((user) => {
+            if (user.email === userEmail) {
+              return { 
+                ...user, 
+                user_roles: response.data.join(', ') 
+                // user_roles: response.data 
+              };
+            }
+            return user;
+          });
+          usersState.users = updatedUsers; 
+        })
+    }
+    
     const updateMember = (data: any) => {
       if (data.data != undefined) {
         usersState.users.forEach((member: any, key: number) => {
@@ -568,48 +695,59 @@ export default defineComponent({
       });
     };
 
-    const addMember = (res: any, data: any, operationType: string) => {
+    const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200) {
-        $q.notify({
-          color: "positive",
-          message: "User added successfully.",
+        router.push({
+          name: "users",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
         });
-
+        await getOrgMembers();
+        updateUserActions();
         if (operationType == "created") {
-          if (
-            store.state.selectedOrganization.identifier == data.organization
-          ) {
-            const user = {
-              "#":
-                usersState.users.length + 1 <= 9
-                  ? `0${usersState.users.length + 1}`
-                  : usersState.users.length + 1,
-              email: data.email,
-              first_name: data.first_name,
-              last_name: data.last_name,
-              role: data.role,
-              isExternal: false,
-              enableEdit: false,
-              enableChangeRole: false,
-              enableDelete: false,
-            };
-
-            user["enableEdit"] = shouldAllowEdit(user);
-            user["enableChangeRole"] = shouldAllowChangeRole(user);
-            user["enableDelete"] = shouldAllowDelete(user);
-
-            usersState.users.push(user);
-          }
-        } else {
-          usersState.users.forEach((member: any, key: number) => {
-            if (member.email == data.email) {
-              usersState.users[key] = {
-                ...usersState.users[key],
-                ...data,
-              };
-            }
+          $q.notify({
+            color: "positive",
+            message: "User added successfully.",
           });
+          // if (
+          //   store.state.selectedOrganization.identifier == data.organization
+          // ) {
+          //   const user = {
+          //     "#":
+          //       usersState.users.length + 1 <= 9
+          //         ? `0${usersState.users.length + 1}`
+          //         : usersState.users.length + 1,
+          //     email: data.email,
+          //     first_name: data.first_name,
+          //     last_name: data.last_name,
+          //     role: data.role,
+          //     isExternal: false,
+          //     enableEdit: false,
+          //     enableChangeRole: false,
+          //     enableDelete: false,
+          //   };
+
+          //   user["enableEdit"] = shouldAllowEdit(user);
+          //   user["enableChangeRole"] = shouldAllowChangeRole(user);
+          //   user["enableDelete"] = shouldAllowDelete(user);
+
+          //   usersState.users.push(user);
+          // }
+        } else {
+          $q.notify({
+            color: "positive",
+            message: "User updated successfully.",
+          });
+          // usersState.users.forEach((member: any, key: number) => {
+          //   if (member.email == data.email) {
+          //     usersState.users[key] = {
+          //       ...usersState.users[key],
+          //       ...data,
+          //     };
+          //   }
+          // });
         }
       }
       router.replace({
@@ -727,6 +865,9 @@ export default defineComponent({
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),
+      fetchUserGroups,
+      toggleExpand,
+      forceCloseRow,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -745,13 +886,14 @@ export default defineComponent({
       userEmail,
       selectedRole,
       options,
+      customRoles,
       currentUserRole,
       updateUserRole,
       getImageURL,
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
-      showAddUserBtn,
+      // showAddUserBtn,
     };
   },
 });

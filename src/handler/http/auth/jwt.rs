@@ -20,18 +20,14 @@ use config::get_config;
 #[cfg(feature = "enterprise")]
 use jsonwebtoken::TokenData;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::{
-    authorizer::{
-        authz::{
-            get_org_creation_tuples, get_user_creation_tuples, get_user_org_tuple,
-            get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
-        },
-        roles::{
-            check_and_get_crole_tuple_for_new_user, get_roles_for_user,
-            get_user_crole_removal_tuples,
-        },
+use o2_enterprise::enterprise::openfga::authorizer::{
+    authz::{
+        get_user_creation_tuples, get_user_org_tuple, get_user_role_creation_tuple,
+        get_user_role_deletion_tuple, update_tuples,
     },
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+    roles::{
+        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
+    },
 };
 #[cfg(feature = "enterprise")]
 use once_cell::sync::Lazy;
@@ -40,9 +36,10 @@ use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
-        service::{db, users},
+        common::meta::user::{RoleOrg, TokenValidationResponse},
+        service::{db, organization, users},
     },
+    config::meta::user::{DBUser, UserOrg, UserRole},
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 #[cfg(feature = "enterprise")]
@@ -58,6 +55,8 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
+    use crate::common::meta::user::UserOrgRole;
+
     let o2cfg = get_o2_config();
     let dec_token = res.1.unwrap();
 
@@ -71,7 +70,6 @@ pub async fn process_token(
             }
         }
     };
-    log::debug!("Here is the groups array: {:#?}", groups);
 
     let user_email = res.0.user_email.to_owned();
 
@@ -91,7 +89,8 @@ pub async fn process_token(
         source_orgs.push(UserOrg {
             role,
             name: o2cfg.dex.default_org.clone(),
-            ..UserOrg::default()
+            token: Default::default(),
+            rum_token: Default::default(),
         });
     } else {
         for group in groups {
@@ -105,7 +104,8 @@ pub async fn process_token(
                 source_orgs.push(UserOrg {
                     role: role_org.role,
                     name: role_org.org,
-                    ..UserOrg::default()
+                    token: Default::default(),
+                    rum_token: Default::default(),
                 });
             }
         }
@@ -125,6 +125,7 @@ pub async fn process_token(
 
         if o2cfg.openfga.enabled {
             for (index, org) in source_orgs.iter().enumerate() {
+                // Assuming all the relevant tuples for this org exist
                 let mut tuples = vec![];
                 get_user_creation_tuples(
                     &org.name,
@@ -132,16 +133,10 @@ pub async fn process_token(
                     &org.role.to_string(),
                     &mut tuples,
                 );
-                get_org_creation_tuples(
-                    &org.name,
-                    &mut tuples,
-                    OFGA_MODELS
-                        .iter()
-                        .map(|(_, fga_entity)| fga_entity.key)
-                        .collect(),
-                    NON_OWNING_ORG.to_vec(),
-                )
-                .await;
+
+                // Create the org if it does not exist. `org.name` is the id of the org.
+                // Also it creates necessary ofga tuples for the newly created org
+                let _ = organization::check_and_create_org(&org.name).await;
 
                 if index == 0 {
                     // this is to allow user call organization api with org
@@ -162,7 +157,7 @@ pub async fn process_token(
             password_ext: Some("".to_owned()),
         };
 
-        match users::update_db_user(updated_db_user).await {
+        match users::create_new_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("User added to the database");
                 if o2cfg.openfga.enabled {
@@ -223,10 +218,15 @@ pub async fn process_token(
 
         // Add the user to the newly added organizations
         for org in orgs_added {
+            let _ = organization::check_and_create_org(&org.name).await;
+
             match users::add_user_to_org(
                 &org.name,
                 &user_email,
-                org.role.clone(),
+                UserOrgRole {
+                    base_role: org.role.clone(),
+                    custom_role: None,
+                },
                 &get_config().auth.root_user_email,
             )
             .await
@@ -277,7 +277,10 @@ pub async fn process_token(
                 false,
                 &get_config().auth.root_user_email,
                 crate::common::meta::user::UpdateUser {
-                    role: Some(org.role.clone()),
+                    role: Some(crate::common::meta::user::UserRoleRequest {
+                        role: org.role.to_string(),
+                        custom: None,
+                    }),
                     ..Default::default()
                 },
             )
@@ -333,7 +336,6 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut org = "";
     let mut role = "";
     let mut custom_role = None;
-    log::debug!("parse_dn dn is: {dn}");
 
     let o2cfg = get_o2_config();
     if o2cfg.openfga.map_group_to_role {
@@ -391,16 +393,7 @@ async fn map_group_to_custom_role(
         };
 
         if o2cfg.openfga.enabled {
-            get_org_creation_tuples(
-                &o2cfg.dex.default_org,
-                &mut tuples,
-                OFGA_MODELS
-                    .iter()
-                    .map(|(_, fga_entity)| fga_entity.key)
-                    .collect(),
-                NON_OWNING_ORG.to_vec(),
-            )
-            .await;
+            let _ = organization::check_and_create_org(&o2cfg.dex.default_org).await;
             tuples.push(get_user_org_tuple(&o2cfg.dex.default_org, user_email));
             // this check added to avoid service accounts from logging in
             if !role.eq(&UserRole::ServiceAccount) {
@@ -429,13 +422,14 @@ async fn map_group_to_custom_role(
             organizations: vec![UserOrg {
                 role,
                 name: o2cfg.dex.default_org.clone(),
-                ..UserOrg::default()
+                token: Default::default(),
+                rum_token: Default::default(),
             }],
             is_external: true,
             password_ext: Some("".to_owned()),
         };
 
-        match users::update_db_user(updated_db_user).await {
+        match users::create_new_user(updated_db_user).await {
             Ok(_) => {
                 log::info!("group_to_custom_role: User added to the database");
                 if o2cfg.openfga.enabled {
@@ -471,7 +465,6 @@ async fn map_group_to_custom_role(
         let mut remove_tuples = vec![];
         // user exists in the db with default org hence skip org creation tuples
         let existing_roles = get_roles_for_user(user_email).await;
-        log::debug!("user exists existing roles: {:#?}", existing_roles);
 
         // Find roles to delete: present in existing_role but not in custom_role
         for existing_role in &existing_roles {
