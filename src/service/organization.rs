@@ -36,7 +36,7 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 
 use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
-use crate::common::meta::organization::OrganizationInviteUserRecords;
+use crate::common::meta::organization::OrganizationInviteUserRecord;
 #[cfg(feature = "cloud")]
 use crate::common::meta::organization::OrganizationInvites;
 use crate::{
@@ -372,20 +372,20 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 #[cfg(feature = "cloud")]
 pub async fn get_invitations_for_org(
     org_id: &str,
-) -> Result<Vec<OrganizationInviteUserRecords>, anyhow::Error> {
+) -> Result<Vec<OrganizationInviteUserRecord>, anyhow::Error> {
+    use crate::common::meta::user::InviteStatus;
+
     let invites = org_invites::get_invite_list_for_org(org_id).await?;
     Ok(invites
         .into_iter()
-        .map(|invite| {
-            Ok(OrganizationInviteUserRecords {
-                email: invite.invitee_id,
-                first_name: "".to_owned(),
-                last_name: "".to_owned(),
-                status: invite.status.to_string(),
-                expires_at: invite.expires_at,
-                is_external: true,
-                role: invite.role,
-            })
+        .map(|invite| OrganizationInviteUserRecord {
+            email: invite.invitee_id,
+            first_name: "".to_owned(),
+            last_name: "".to_owned(),
+            status: InviteStatus::from(&invite.status),
+            expires_at: invite.expires_at,
+            is_external: true,
+            role: invite.role,
         })
         .collect())
 }

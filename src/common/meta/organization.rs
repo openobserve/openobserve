@@ -17,6 +17,9 @@ use config::meta::user::UserRole;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[cfg(feature = "cloud")]
+use super::user::InviteStatus;
+
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
 pub const USER_DEFAULT: &str = "user_default";
@@ -46,7 +49,7 @@ pub struct OrganizationInviteUserRecord {
     pub first_name: String,
     pub last_name: String,
     pub role: String,
-    pub status: String,
+    pub status: InviteStatus,
     pub expires_at: i64,
     pub is_external: bool,
 }
