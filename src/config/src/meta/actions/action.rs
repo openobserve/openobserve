@@ -15,8 +15,8 @@ pub enum ExecutionDetailsType {
     #[sea_orm(string_value = "once")]
     #[default]
     Once,
-    #[sea_orm(string_value = "report")]
-    Report,
+    #[sea_orm(string_value = "repeat")]
+    Repeat,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
