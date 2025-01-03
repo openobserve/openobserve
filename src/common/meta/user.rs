@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::user::{DBUser, User, UserOrg, UserRole};
-#[cfg(feature = "enterprise")]
-use infra::table::org_invites::OrgInviteStatus;
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::cloud::table::org_invites::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use strum::IntoEnumIterator;
@@ -149,6 +149,10 @@ pub fn get_default_user_role() -> UserRole {
 #[cfg(feature = "enterprise")]
 pub fn get_roles() -> Vec<UserRole> {
     let mut roles = vec![];
+    // TODO: Allow all roles in cloud as well
+    #[cfg(feature = "cloud")]
+    roles.push(UserRole::Admin);
+    #[cfg(not(feature = "cloud"))]
     for role in UserRole::iter() {
         roles.push(role);
     }
@@ -180,7 +184,7 @@ pub struct UserList {
     pub data: Vec<UserResponse>,
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub enum InviteStatus {
     #[serde(rename = "pending")]
@@ -193,7 +197,7 @@ pub enum InviteStatus {
     Expired,
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 impl From<&OrgInviteStatus> for InviteStatus {
     fn from(status: &OrgInviteStatus) -> Self {
         match status {

@@ -20,6 +20,7 @@ use std::{fmt::Display, str::FromStr};
 pub enum OrganizationType {
     Default,
     Custom,
+    UserDefault,
 }
 
 impl From<OrganizationType> for i16 {
@@ -27,6 +28,7 @@ impl From<OrganizationType> for i16 {
         match org {
             OrganizationType::Default => 0,
             OrganizationType::Custom => 1,
+            OrganizationType::UserDefault => 2,
         }
     }
 }
@@ -36,6 +38,7 @@ impl From<i16> for OrganizationType {
         match org {
             0 => OrganizationType::Default,
             1 => OrganizationType::Custom,
+            2 => OrganizationType::UserDefault,
             _ => OrganizationType::Custom,
         }
     }
@@ -48,6 +51,7 @@ impl FromStr for OrganizationType {
         match s {
             "default" => Ok(OrganizationType::Default),
             "custom" => Ok(OrganizationType::Custom),
+            "user_default" => Ok(OrganizationType::UserDefault),
             _ => Ok(OrganizationType::Custom),
         }
     }
@@ -58,6 +62,7 @@ impl Display for OrganizationType {
         match self {
             OrganizationType::Default => write!(f, "default"),
             OrganizationType::Custom => write!(f, "custom"),
+            OrganizationType::UserDefault => write!(f, "user_default"),
         }
     }
 }

@@ -19,6 +19,7 @@ use utoipa::ToSchema;
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
+pub const USER_DEFAULT: &str = "user_default";
 pub const THRESHOLD: i64 = 9383939382;
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]

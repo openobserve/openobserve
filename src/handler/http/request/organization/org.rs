@@ -397,7 +397,7 @@ async fn rename_org(
         (status = 200, description = "Success", content_type = "application/json", body = Organization),
     )
 )]
-#[put("/{org_id}/generate_invite")]
+#[post("/{org_id}/invites")]
 pub async fn generate_org_invite(
     user_email: UserEmail,
     path: web::Path<String>,
@@ -417,7 +417,7 @@ pub async fn generate_org_invite(
 }
 
 #[cfg(not(feature = "cloud"))]
-#[put("/{org_id}/generate_invite")]
+#[post("/{org_id}/invites")]
 pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
         http::StatusCode::NOT_FOUND.into(),

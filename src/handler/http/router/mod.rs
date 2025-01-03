@@ -529,6 +529,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::job::cancel_query)
         .service(search::job::query_status);
 
+    #[cfg(feature = "cloud")]
+    let service = service
+        .service(organization::org::generate_org_invite)
+        .service(organization::org::accept_org_invite);
+
     cfg.service(service);
 }
 

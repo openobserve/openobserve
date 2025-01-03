@@ -41,7 +41,7 @@ use crate::{
     common::{
         meta::organization::{
             AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-            PipelineSummary, RumIngestionToken, StreamSummary, CUSTOM, DEFAULT_ORG,
+            PipelineSummary, RumIngestionToken, StreamSummary, CUSTOM, DEFAULT_ORG, USER_DEFAULT,
         },
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
@@ -241,7 +241,12 @@ pub async fn create_org(
     org.name = org.name.trim().to_owned();
 
     org.identifier = ider::uuid();
-    org.org_type = CUSTOM.to_owned();
+    let mut org_type = CUSTOM.to_owned();
+    #[cfg(feature = "cloud")]
+    if org.org_type.eq(USER_DEFAULT) {
+        org_type = USER_DEFAULT.to_owned();
+    }
+    org.org_type = org_type;
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
@@ -440,6 +445,7 @@ pub async fn accept_invitation(
     use std::str::FromStr;
 
     if get_org(org_id).await.is_some() {
+        // TODO: if free org, check if the user is alredy part of a free org.
         let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
         let now = chrono::Utc::now().timestamp_micros();
