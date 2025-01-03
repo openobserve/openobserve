@@ -186,11 +186,10 @@ pub async fn list_pipeline_dependencies(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("name" = String, Path, description = "Function name"),
     ),
-    request_body(content = FunctionTest, description = "Function test data", content_type = "application/json"),
+    request_body(content = TestVRLRequest, description = "Test run function", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = FunctionTestResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
