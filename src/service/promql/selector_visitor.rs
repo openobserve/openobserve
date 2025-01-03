@@ -13,45 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use promql_parser::{parser::Expr, util::ExprVisitor};
 
-use promql_parser::{
-    parser::{Expr, VectorSelector},
-    util::ExprVisitor,
-};
-
-pub struct MetricNameVisitor {
-    pub(crate) name: HashSet<String>,
+pub struct MetricSelectorVisitor {
+    pub(crate) exprs: Vec<Expr>,
 }
 
-impl MetricNameVisitor {
+impl MetricSelectorVisitor {
     pub fn new() -> Self {
-        Self {
-            name: HashSet::new(),
-        }
+        Self { exprs: vec![] }
+    }
+
+    pub fn exprs_to_string(&self) -> String {
+        self.exprs
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>()
+            .join(",")
     }
 }
 
-impl Default for MetricNameVisitor {
+impl Default for MetricSelectorVisitor {
     fn default() -> Self {
         Self::new()
     }
 }
 
-fn get_name_from_expr(vector_selector: &VectorSelector) -> String {
-    vector_selector.name.as_ref().unwrap().to_string()
-}
-
-impl ExprVisitor for MetricNameVisitor {
+impl ExprVisitor for MetricSelectorVisitor {
     type Error = &'static str;
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
         match expr {
-            Expr::VectorSelector(vector_selector) => {
-                self.name.insert(get_name_from_expr(vector_selector));
+            Expr::VectorSelector(_) => {
+                self.exprs.push(expr.clone());
             }
-            Expr::MatrixSelector(matrix_selector) => {
-                self.name.insert(get_name_from_expr(&matrix_selector.vs));
+            Expr::MatrixSelector(_) => {
+                self.exprs.push(expr.clone());
             }
             _ => {}
         }
@@ -61,12 +58,13 @@ impl ExprVisitor for MetricNameVisitor {
 
 #[cfg(test)]
 mod tests {
+
     use promql_parser::parser;
 
     use super::*;
 
     #[test]
-    fn test_name_visitor() {
+    fn test_selector_visitor() {
         let promql = r#"sum by(k8s_node_name)(
                             rate(container_fs_reads_bytes_total{
                                 container!= "",
@@ -80,16 +78,23 @@ mod tests {
                             )"#;
 
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricNameVisitor::default();
+        let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
-        assert_eq!(visitor.name.len(), 2);
+        let expected = vec![
+            "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
+            "container_fs_writes_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
+        ];
+        assert_eq!(visitor.exprs_to_string(), expected.join(","));
 
         let promql = r#"http_requests_total{environment=~"staging|testing|development",method!="GET"} offset 5m"#;
 
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricNameVisitor::default();
+        let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-        assert_eq!(visitor.name.len(), 1);
+        let expected = vec![
+            "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
+        ];
+        assert_eq!(visitor.exprs_to_string(), expected.join(","));
     }
 }
