@@ -247,7 +247,7 @@ def test_new_alert_create(create_session, base_url):
         "sql": "",
         "promql": "",
         "type": "custom",
-        "aggregation": None,  # Use an empty dictionary or provide a valid structure
+        # "aggregation": None,  # Use an empty dictionary or provide a valid structure
         "promql_condition": None,
         "vrl_function": None,
         "multi_time_range": []
