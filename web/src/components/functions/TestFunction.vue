@@ -556,6 +556,42 @@ const isInputValid = () => {
     return false;
   }
 };
+
+const processTestResults = async (results: any) => {
+  expandState.value.query = false;
+  expandState.value.output = true;
+  originalOutputEvents.value = JSON.stringify(results?.data?.results);
+
+  const processedEvents =
+    results?.data?.results.map((event: any) => event.event || event.events) ||
+    [];
+
+  outputEvents.value = JSON.stringify(processedEvents);
+  await Promise.all([
+    eventsEditorRef.value?.formatDocument(),
+    outputEventsEditorRef.value?.formatDocument(),
+  ]);
+
+  await nextTick();
+  setTimeout(() => {
+    highlightSpecificEvent();
+  }, 1000);
+};
+
+const handleTestError = (err: any) => {
+  console.error("Error in testing function:", err);
+  const errMsg = err.response?.data?.message || "Error in testing function";
+  outputEventsErrorMsg.value = "Error while transforming results";
+
+  q.notify({
+    type: "negative",
+    message: errMsg,
+    timeout: 3000,
+  });
+
+  outputEvents.value = errMsg;
+};
+
 const testFunction = async () => {
   loading.value.output = true;
   eventsErrorMsg.value = "";
@@ -570,38 +606,11 @@ const testFunction = async () => {
   };
   jstransform
     .test(store.state.selectedOrganization.identifier, payload)
-    .then(async (res: any) => {
-      expandState.value.query = false;
-      expandState.value.output = true;
-      originalOutputEvents.value = JSON.stringify(res?.data?.results);
-      outputEvents.value = JSON.stringify(
-        JSON.parse(
-          JSON.stringify(
-            res?.data?.results.map(
-              (event: any) => event.event || event.events,
-            ) || [],
-          ),
-        ),
-      );
-      eventsEditorRef?.value?.formatDocument();
-      await outputEventsEditorRef?.value?.formatDocument();
-
-      setTimeout(() => {
-        highlightSpecificEvent();
-      }, 1000);
+    .then((res: any) => {
+      processTestResults(res);
     })
     .catch((err: any) => {
-      console.error("Error in testing function:", err);
-      const errMsg = err.response?.data?.message || "Error in testing function";
-      outputEventsErrorMsg.value = "Error while transforming results";
-
-      q.notify({
-        type: "negative",
-        message: errMsg,
-        timeout: 3000,
-      });
-
-      outputEvents.value = errMsg;
+      handleTestError(err);
     })
     .finally(() => {
       loading.value.output = false;
