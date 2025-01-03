@@ -44,7 +44,8 @@
             no-error-icon
             tabindex="0"
             style="min-width: 300px"
-            @blur="onblurInput"
+            @update:model-value="onUpdate"
+            @blur="onUpdate"
           />
           <q-icon
             :key="functionName"
@@ -59,6 +60,7 @@
               self="center left"
               max-width="300px"
               :offset="[2, 0]"
+              class="tw-text-[12px]"
             >
               {{ isValidMethodName() }}
             </q-tooltip>
@@ -158,7 +160,7 @@ const isValidMethodName = () => {
   );
 };
 
-const onblurInput = () => {
+const onUpdate = () => {
   showInputError.value = true;
 };
 
