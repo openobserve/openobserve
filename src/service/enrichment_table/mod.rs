@@ -336,10 +336,10 @@ pub async fn extract_multipart(
 }
 
 // Constants for chunk size and record limits
-// const MAX_CHUNK_SIZE: usize = 25 * 1024 * 1024; // 25 MB
-// const MAX_RECORDS: usize = 8192; // Save every 8192 records
-const MAX_CHUNK_SIZE: usize = 100;
-const MAX_RECORDS: usize = 100;
+const MAX_CHUNK_SIZE: usize = 25 * 1024 * 1024; // 25 MB
+const MAX_RECORDS: usize = 8192; // Save every 8192 records
+                                 // const MAX_CHUNK_SIZE: usize = 100;
+                                 // const MAX_RECORDS: usize = 100;
 
 pub async fn extract_and_save_data(
     org_id: &str,
@@ -357,65 +357,68 @@ pub async fn extract_and_save_data(
     let semaphore = Arc::new(Semaphore::new(1));
     let mut processing_tasks: Vec<JoinHandle<()>> = Vec::new();
 
-    let mut data_buffer = Vec::new(); // Buffer for accumulating data (up to MAX_CHUNK_SIZE)
-    let mut leftover = String::new(); // Buffer for incomplete rows
-    let mut record_buffer = Vec::new(); // Buffer for records
-    let mut chunk_id = 0; // Track the chunk ID for debugging
+    let mut data_buffer = Vec::new();
+    let mut leftover = String::new();
+    let mut record_buffer = Vec::new();
+    let mut chunk_id = 0;
+    let mut part_number = 0;
     let mut headers: Option<csv::StringRecord> = None;
 
     // Process each field in the multipart payload
     while let Ok(Some(mut field)) = payload.try_next().await {
         log::info!("Processing a new field from multipart payload.");
 
-        let content_disposition = field.content_disposition();
-        if content_disposition.get_filename().is_none() {
-            continue;
-        }
+        if let Some(filename) = field.content_disposition().get_filename() {
+            log::info!("Field has a filename: {:?}", filename);
 
-        log::info!(
-            "Field has a filename: {:?}",
-            content_disposition.get_filename()
-        );
+            // Process the field's data in chunks
+            while let Some(chunk) = field.next().await {
+                let chunk = chunk.unwrap();
+                data_buffer.extend_from_slice(&chunk);
 
-        // Process the field's data in chunks
-        while let Some(chunk) = field.next().await {
-            let chunk = chunk.unwrap();
-            data_buffer.extend_from_slice(&chunk);
+                // If the data buffer exceeds MAX_CHUNK_SIZE, process it
+                if data_buffer.len() >= MAX_CHUNK_SIZE {
+                    chunk_id += 1;
+                    log::info!("Processing chunk ID: {}", chunk_id);
 
-            // If the data buffer exceeds MAX_CHUNK_SIZE, process it
-            if data_buffer.len() >= MAX_CHUNK_SIZE {
-                chunk_id += 1; // Increment the chunk ID
-                log::info!("Processing chunk ID: {}", chunk_id);
+                    if headers.is_none() {
+                        let (hrd_record, remaining_data) = extract_headers_and_data(&data_buffer)?;
+                        if hrd_record.is_some() {
+                            headers = hrd_record;
+                        }
+                        data_buffer = remaining_data;
+                    }
 
-                let (processed_data, _) = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
+                    let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
 
-                // Parse and buffer records from the processed data
-                headers = parse_and_buffer_records(
-                    &processed_data,
-                    &mut record_buffer,
-                    &mut processing_tasks,
-                    semaphore.clone(),
-                    org_id,
-                    table_name,
-                    append_data,
-                    chunk_id,
-                    headers.as_ref(),
-                )
-                .await?;
+                    // Parse and buffer records from the processed data
+                    parse_and_buffer_records(
+                        &processed_data,
+                        &mut record_buffer,
+                        &mut processing_tasks,
+                        semaphore.clone(),
+                        org_id,
+                        table_name,
+                        append_data,
+                        chunk_id,
+                        &mut part_number,
+                        headers.as_ref(),
+                    )
+                    .await?;
 
-                // Clear the data buffer
-                data_buffer.clear();
+                    data_buffer.clear();
+                }
             }
         }
     }
 
     // Process any remaining data in the buffer
     if !data_buffer.is_empty() || !leftover.is_empty() {
-        chunk_id += 1; // Increment the chunk ID
+        chunk_id += 1;
         log::info!("Processing final chunk ID: {}", chunk_id);
 
-        let (processed_data, _) = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
-        headers = parse_and_buffer_records(
+        let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
+        parse_and_buffer_records(
             &processed_data,
             &mut record_buffer,
             &mut processing_tasks,
@@ -424,6 +427,7 @@ pub async fn extract_and_save_data(
             table_name,
             append_data,
             chunk_id,
+            &mut part_number,
             headers.as_ref(),
         )
         .await?;
@@ -431,7 +435,12 @@ pub async fn extract_and_save_data(
 
     // Save any remaining records in the record buffer
     if !record_buffer.is_empty() {
-        log::info!("Saving final records for chunk ID: {}", chunk_id);
+        part_number += 1;
+        log::info!(
+            "Saving final records for chunk ID: {}, part number: {}",
+            chunk_id,
+            part_number
+        );
         save_records(
             record_buffer,
             semaphore.clone(),
@@ -439,6 +448,7 @@ pub async fn extract_and_save_data(
             table_name,
             append_data,
             chunk_id,
+            part_number,
         )
         .await?;
     }
@@ -457,103 +467,83 @@ pub async fn extract_and_save_data(
     Ok(())
 }
 
-/// Process a chunk of data, ensuring no records are broken
+fn extract_headers_and_data(
+    data: &[u8],
+) -> Result<(Option<csv::StringRecord>, Vec<u8>), std::io::Error> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(data);
+
+    // Extract the first row as the header
+    let headers = if let Some(result) = rdr.records().next() {
+        match result {
+            Ok(record) => Some(record),
+            Err(e) => {
+                log::error!("Error extracting headers: {}", e);
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
+            }
+        }
+    } else {
+        None
+    };
+
+    // Get the remaining unprocessed data
+    let position = rdr.position().byte();
+    let remaining_data = data[position as usize..].to_vec();
+
+    Ok((headers, remaining_data))
+}
+
 fn process_chunk(
     data: &[u8],
     leftover: &mut String,
     chunk_id: usize,
-) -> Result<(Vec<u8>, Vec<u8>), std::io::Error> {
+) -> Result<Vec<u8>, std::io::Error> {
     log::info!("Processing chunk ID: {}", chunk_id);
 
-    // Combine leftover data from the previous chunk with the current chunk
+    // Combine leftover with the current chunk
     let mut combined_data = leftover.clone();
-    let data = std::str::from_utf8(data).map_err(|e| {
-        log::error!(
-            "Error converting data to UTF-8 in chunk ID {}: {}",
-            chunk_id,
-            e
-        );
-        std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-    })?;
-    combined_data.push_str(data);
+    if !data.is_empty() {
+        let data = std::str::from_utf8(data).map_err(|e| {
+            log::error!(
+                "Error converting data to UTF-8 in chunk ID {}: {}",
+                chunk_id,
+                e
+            );
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+        })?;
+        combined_data.push_str(data);
+    } else {
+        // We can assume that this is the last chunk
+        // Append a newline character if the data does not end with one
+        if !combined_data.ends_with('\n') && !combined_data.is_empty() {
+            combined_data.push('\n');
+        }
+    }
 
     let mut processed_data = Vec::new();
-    let mut new_leftover = String::new();
+    let mut is_incomplete = false;
 
     // Split the data into lines
     for line in combined_data.split_inclusive('\n') {
         if line.ends_with('\n') {
             processed_data.extend_from_slice(line.as_bytes());
         } else {
-            // If the line is incomplete, append it to the leftover buffer
-            new_leftover.push_str(line);
+            *leftover = combined_data[line.as_ptr() as usize - combined_data.as_ptr() as usize..]
+                .to_string();
+            is_incomplete = true;
             break;
         }
     }
 
-    // Update the leftover buffer for the next chunk
-    *leftover = new_leftover;
+    if !is_incomplete {
+        leftover.clear();
+    }
 
-    log::debug!("Chunk ID {} processed. Leftover: {:?}", chunk_id, leftover);
     let pd = std::str::from_utf8(&processed_data).unwrap();
-    let lo = leftover.clone();
     let x = format!(
         "Chunk ID: {}; Processed data: {:?}, Leftover: {:#?}",
-        chunk_id, pd, lo
-    );
-    // For each record batch just write the log into a file for debugging
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("records.log")
-        .unwrap();
-    writeln!(file, "{:?}", x).unwrap();
-
-    Ok((processed_data, Vec::new()))
-}
-
-/// Process a single chunk of data using a peekable iterator
-fn _process_chunk(
-    chunk: &[u8],
-    leftover: &mut Option<String>, // Buffer for leftover data
-    chunk_id: usize,
-) -> Result<Vec<u8>, std::io::Error> {
-    let mut results: Vec<u8> = Vec::new();
-
-    // Create a peekable iterator over the lines of the chunk
-    let mut lines = io::Cursor::new(chunk).lines().peekable();
-
-    // If there is leftover data from the previous chunk, combine it with the first line
-    if let Some(leftover_data) = leftover.take() {
-        if let Some(Ok(line)) = lines.next() {
-            let combined_line = if line.ends_with('\n') {
-                format!("{}{}", leftover_data, line)
-            } else {
-                format!("{}{}\n", leftover_data, line)
-            };
-            dbg!(&combined_line);
-            results.extend_from_slice(combined_line.as_bytes());
-        }
-    }
-
-    // Process each line in the current chunk
-    while let Some(Ok(line)) = lines.next() {
-        // Check if this is the last line and if it is incomplete
-        if lines.peek().is_none() && !line.ends_with('\n') {
-            // Save the incomplete line as leftover for the next chunk
-            *leftover = Some(line);
-            break;
-        }
-
-        // Otherwise, process the line
-        results.extend_from_slice(line.as_bytes());
-    }
-
-    // For each record batch just write the log into a file for debugging
-    let res = std::str::from_utf8(&results).unwrap();
-    let x = format!(
-        "Chunk ID: {}; Processed data: {:?}, leftover: {:?}",
-        chunk_id, res, leftover
+        chunk_id, pd, leftover
     );
     let mut file = std::fs::OpenOptions::new()
         .create(true)
@@ -562,10 +552,9 @@ fn _process_chunk(
         .unwrap();
     writeln!(file, "{:?}", x).unwrap();
 
-    Ok(results)
+    Ok(processed_data)
 }
 
-/// Parse CSV data and buffer records
 async fn parse_and_buffer_records(
     data: &[u8],
     record_buffer: &mut Vec<json::Map<String, json::Value>>,
@@ -575,30 +564,41 @@ async fn parse_and_buffer_records(
     table_name: &str,
     append_data: bool,
     chunk_id: usize,
+    part_number: &mut usize,
     headers: Option<&csv::StringRecord>,
-) -> Result<Option<csv::StringRecord>, std::io::Error> {
+) -> Result<(), std::io::Error> {
     log::info!("Parsing records from chunk ID: {}", chunk_id);
 
-    let mut rdr = csv::Reader::from_reader(data);
-    // Parse headers only if not already provided
-    let headers: csv::StringRecord = match headers {
+    let d = std::str::from_utf8(data).unwrap();
+    let x = format!(
+        "Chunk ID: {}; Part ID: {}, data: {:?}",
+        chunk_id, part_number, d
+    );
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("data_to_parse_records.log")
+        .unwrap();
+    writeln!(file, "{:?}", x).unwrap();
+
+    let headers = match headers {
         Some(h) => h.clone(),
-        None => rdr
-            .headers()?
-            .iter()
-            .map(|x| {
-                let mut x = x.trim().to_string();
-                format_key(&mut x);
-                x
-            })
-            .collect::<Vec<_>>()
-            .into(),
+        None => {
+            log::error!("Headers not found for chunk ID: {}", chunk_id);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Headers not found",
+            ));
+        }
     };
 
-    // ERROR: the error is some where in this block of code
-    // the json record for left over data is missing
-    for result in rdr.records() {
-        let record = result?;
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(data);
+
+    for record in rdr.records() {
+        let record = record?;
+        dbg!(&record);
         let mut json_record = json::Map::new();
 
         for (header, field) in headers.iter().zip(record.iter()) {
@@ -607,24 +607,32 @@ async fn parse_and_buffer_records(
 
         record_buffer.push(json_record);
 
-        // If the record buffer is full, save it
         if record_buffer.len() >= MAX_RECORDS {
-            let x = format!("Chunk ID: {}; Records: {:?}", chunk_id, record_buffer);
+            *part_number += 1;
+
+            let x = format!(
+                "Chunk ID: {}; Part ID: {}, Records: {:?}",
+                chunk_id, part_number, record_buffer
+            );
             let mut file = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open("parse_records.log")
                 .unwrap();
             writeln!(file, "{:?}", x).unwrap();
+
             log::info!(
-                "Record buffer full for chunk ID: {}. Spawning save task.",
-                chunk_id
+                "Record buffer full for chunk ID: {}, part number: {}. Spawning save task.",
+                chunk_id,
+                *part_number
             );
 
             let full_buffer = std::mem::take(record_buffer);
             let org_id = org_id.to_string();
             let table_name = table_name.to_string();
             let semaphore_clone = semaphore.clone();
+            let current_part = *part_number;
+
             processing_tasks.push(tokio::spawn(async move {
                 if let Err(e) = save_records(
                     full_buffer,
@@ -633,19 +641,24 @@ async fn parse_and_buffer_records(
                     &table_name,
                     append_data,
                     chunk_id,
+                    current_part,
                 )
                 .await
                 {
-                    log::error!("Error saving records for chunk ID {}: {}", chunk_id, e);
+                    log::error!(
+                        "Error saving records for chunk ID {}, part number {}: {}",
+                        chunk_id,
+                        current_part,
+                        e
+                    );
                 }
             }));
         }
     }
 
-    Ok(Some(headers))
+    Ok(())
 }
 
-/// Save a batch of records to the database
 async fn save_records(
     records: Vec<json::Map<String, json::Value>>,
     semaphore: Arc<Semaphore>,
@@ -653,23 +666,30 @@ async fn save_records(
     table_name: &str,
     append_data: bool,
     chunk_id: usize,
+    part_number: usize,
 ) -> Result<(), std::io::Error> {
     let _permit = semaphore.acquire().await.unwrap();
     log::info!(
-        "Saving {} records for chunk ID: {}, org_id: {}, table_name: {}",
+        "Saving {} records for chunk ID: {}, part number: {}, org_id: {}, table_name: {}",
         records.len(),
         chunk_id,
+        part_number,
         org_id,
         table_name
     );
 
-    let x = format!("Chunk ID: {}; Records: {:?}", chunk_id, records);
-    // For each record batch just write the log into a file for debugging
-
-    // Simulate saving records (replace this with your database logic)
     match save_enrichment_data(&org_id, &table_name, records, append_data).await {
-        Ok(_) => log::info!("Successfully saved records for chunk ID: {}", chunk_id),
-        Err(e) => log::error!("Error saving records for chunk ID {}: {}", chunk_id, e),
+        Ok(_) => log::info!(
+            "Successfully saved records for chunk ID: {}, part number: {}",
+            chunk_id,
+            part_number
+        ),
+        Err(e) => log::error!(
+            "Error saving records for chunk ID: {}, part number: {}: {}",
+            chunk_id,
+            part_number,
+            e
+        ),
     }
 
     Ok(())
