@@ -292,42 +292,44 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        let filename = content_disposition.get_filename();
+        let Some(content_disposition) = field.content_disposition() else {
+            continue;
+        };
+        if content_disposition.get_filename().is_none() {
+            continue;
+        };
+
         let mut data = bytes::Bytes::new();
+        while let Some(chunk) = field.next().await {
+            let chunked_data = chunk.unwrap();
+            // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+            data = bytes::Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        }
+        let mut rdr = csv::Reader::from_reader(data.as_ref());
+        let headers: csv::StringRecord = rdr
+            .headers()?
+            .iter()
+            .map(|x| {
+                let mut x = x.trim().to_string();
+                format_key(&mut x);
+                x
+            })
+            .collect::<Vec<_>>()
+            .into();
 
-        if filename.is_some() {
-            while let Some(chunk) = field.next().await {
-                let chunked_data = chunk.unwrap();
-                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-                data = bytes::Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        for result in rdr.records() {
+            // The iterator yields Result<StringRecord, Error>, so we check the
+            // error here.
+            let record = result?;
+            // Transform the record to a JSON value
+            let mut json_record = json::Map::new();
+
+            for (header, field) in headers.iter().zip(record.iter()) {
+                json_record.insert(header.into(), json::Value::String(field.into()));
             }
-            let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers: csv::StringRecord = rdr
-                .headers()?
-                .iter()
-                .map(|x| {
-                    let mut x = x.trim().to_string();
-                    format_key(&mut x);
-                    x
-                })
-                .collect::<Vec<_>>()
-                .into();
 
-            for result in rdr.records() {
-                // The iterator yields Result<StringRecord, Error>, so we check the
-                // error here.
-                let record = result?;
-                // Transform the record to a JSON value
-                let mut json_record = json::Map::new();
-
-                for (header, field) in headers.iter().zip(record.iter()) {
-                    json_record.insert(header.into(), json::Value::String(field.into()));
-                }
-
-                if !json_record.is_empty() {
-                    records.push(json_record);
-                }
+            if !json_record.is_empty() {
+                records.push(json_record);
             }
         }
     }
@@ -360,48 +362,48 @@ pub async fn extract_and_save_data(
 
     // Process each field in the multipart payload
     while let Ok(Some(mut field)) = payload.try_next().await {
-        if let Some(filename) = field.content_disposition().get_filename() {
-            log::info!(
-                "[ENRICHMENT_TABLE] Processing field: {}",
-                filename.to_string()
-            );
+        let Some(content_disposition) = field.content_disposition() else {
+            continue;
+        };
+        if content_disposition.get_filename().is_none() {
+            continue;
+        };
 
-            // Process the field's data in chunks
-            while let Some(chunk) = field.next().await {
-                let chunk = chunk.unwrap();
-                data_buffer.extend_from_slice(&chunk);
+        // Process the field's data in chunks
+        while let Some(chunk) = field.next().await {
+            let chunk = chunk.unwrap();
+            data_buffer.extend_from_slice(&chunk);
 
-                if headers.is_none() {
-                    let (head_record, remaining_data) = extract_headers_and_data(&data_buffer)?;
-                    if head_record.is_some() {
-                        headers = head_record;
-                    }
-                    data_buffer = remaining_data;
+            if headers.is_none() {
+                let (head_record, remaining_data) = extract_headers_and_data(&data_buffer)?;
+                if head_record.is_some() {
+                    headers = head_record;
                 }
+                data_buffer = remaining_data;
+            }
 
-                // If the data buffer exceeds MAX_CHUNK_SIZE, process it
-                if data_buffer.len() >= MAX_CHUNK_SIZE {
-                    chunk_id += 1;
+            // If the data buffer exceeds MAX_CHUNK_SIZE, process it
+            if data_buffer.len() >= MAX_CHUNK_SIZE {
+                chunk_id += 1;
 
-                    let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
+                let processed_data = process_chunk(&data_buffer, &mut leftover, chunk_id)?;
 
-                    // Parse and buffer records from the processed data
-                    parse_and_buffer_records(
-                        &processed_data,
-                        &mut record_buffer,
-                        &mut processing_tasks,
-                        semaphore.clone(),
-                        org_id,
-                        table_name,
-                        append_data,
-                        chunk_id,
-                        &mut part_number,
-                        headers.as_ref(),
-                    )
-                    .await?;
+                // Parse and buffer records from the processed data
+                parse_and_buffer_records(
+                    &processed_data,
+                    &mut record_buffer,
+                    &mut processing_tasks,
+                    semaphore.clone(),
+                    org_id,
+                    table_name,
+                    append_data,
+                    chunk_id,
+                    &mut part_number,
+                    headers.as_ref(),
+                )
+                .await?;
 
-                    data_buffer.clear();
-                }
+                data_buffer.clear();
             }
         }
     }
