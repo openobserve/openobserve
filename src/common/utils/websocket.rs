@@ -27,6 +27,8 @@ use sqlparser::{
     parser::Parser,
 };
 
+use crate::{common::utils::stream::get_max_query_range_if_sa, service::users};
+
 #[inline(always)]
 pub(crate) fn get_search_type_from_ws_req(
     search_event_type: &SearchEventType,
@@ -128,8 +130,11 @@ fn update_histogram_in_expr(expr: &mut Expr, histogram_interval: i64) {
 pub async fn get_max_query_range(
     stream_names: &[String],
     org_id: &str,
+    user_id: &str,
     stream_type: StreamType,
 ) -> i64 {
+    let user = users::get_user(Some(org_id), user_id).await;
+
     futures::future::join_all(
         stream_names
             .iter()
@@ -137,7 +142,15 @@ pub async fn get_max_query_range(
     )
     .await
     .into_iter()
-    .filter_map(|settings| settings.map(|s| s.max_query_range))
+    .filter_map(|settings| {
+        settings.map(|s| {
+            if let Some(user) = &user {
+                get_max_query_range_if_sa(s.max_query_range, user)
+            } else {
+                s.max_query_range
+            }
+        })
+    })
     .max()
     .unwrap_or(0)
 }

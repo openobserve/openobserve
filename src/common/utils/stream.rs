@@ -23,6 +23,11 @@ use config::{
     FILE_EXT_JSON,
 };
 
+use crate::{
+    common::meta::user::{User, UserRole},
+    service::users,
+};
+
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
     Err(Error::new(
@@ -108,6 +113,35 @@ pub async fn populate_file_meta(
     file_meta.max_ts = max_val;
     file_meta.records = total as i64;
     Ok(())
+}
+
+pub async fn get_settings_max_query_range(
+    stream_max_query_range: i64,
+    org_id: &str,
+    user_id: Option<&str>,
+) -> i64 {
+    if user_id.is_none() {
+        return stream_max_query_range;
+    }
+
+    if let Some(user) = users::get_user(Some(org_id), user_id.unwrap()).await {
+        return get_max_query_range_if_sa(stream_max_query_range, &user);
+    }
+
+    stream_max_query_range
+}
+
+pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i64 {
+    log::debug!("get_max_query_range_if_sa stream_max_query_range: {stream_max_query_range}, user_role: {:?}", user.role);
+    if user.role == UserRole::ServiceAccount {
+        let max_query_range_sa = get_config().limit.max_query_range_for_sa;
+        return if max_query_range_sa > 0 {
+            std::cmp::min(stream_max_query_range, max_query_range_sa)
+        } else {
+            stream_max_query_range
+        };
+    }
+    stream_max_query_range
 }
 
 #[cfg(test)]
