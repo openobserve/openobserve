@@ -409,6 +409,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::saved_view::delete_view)
         .service(functions::save_function)
         .service(functions::list_functions)
+        .service(functions::test_function)
         .service(functions::delete_function)
         .service(functions::update_function)
         .service(functions::list_pipeline_dependencies)
