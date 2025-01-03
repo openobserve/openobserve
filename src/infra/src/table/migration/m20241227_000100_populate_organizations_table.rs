@@ -40,7 +40,14 @@ impl MigrationTrait for Migration {
 
         while let Some(metas) = meta_pages.fetch_and_next().await? {
             let mut orgs = vec![];
+            log::debug!("Processing {} records", metas.len());
             for schema in metas {
+                log::debug!(
+                    "Processing record -> id: {}, key1: {}, key2: {}",
+                    schema.id,
+                    schema.key1,
+                    schema.key2
+                );
                 if org_set.contains(&schema.key1) {
                     continue;
                 }
@@ -51,6 +58,7 @@ impl MigrationTrait for Migration {
                     1
                 };
                 let now = chrono::Utc::now().timestamp_micros() as u64;
+                log::debug!("Creating organization: {}", org_id);
                 orgs.push(organizations::ActiveModel {
                     identifier: Set(org_id.clone()),
                     org_name: Set(org_id.clone()),
@@ -59,6 +67,9 @@ impl MigrationTrait for Migration {
                     updated_at: Set(now),
                 });
                 org_set.insert(org_id);
+            }
+            if orgs.is_empty() {
+                continue;
             }
             organizations::Entity::insert_many(orgs).exec(&txn).await?;
         }
