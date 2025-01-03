@@ -220,7 +220,7 @@ dependencies = [
  "tokio-rustls 0.26.1",
  "tokio-util",
  "tracing",
- "webpki-roots",
+ "webpki-roots 0.26.7",
 ]
 
 [[package]]
@@ -6013,6 +6013,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "svix-ksuid",
  "thiserror 1.0.69",
  "tokio",
  "tonic 0.12.3",
