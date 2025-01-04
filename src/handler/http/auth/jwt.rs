@@ -544,7 +544,7 @@ fn format_role_name(org: &str, role: String) -> String {
 }
 
 #[cfg(feature = "cloud")]
-async fn check_and_add_to_org(user_email: &str, name: &str) {
+pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     use config::ider;
     use o2_enterprise::enterprise::{
         cloud::org_invites::list_by_invitee, openfga::authorizer::authz::save_org_tuples,

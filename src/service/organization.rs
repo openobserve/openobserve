@@ -242,6 +242,13 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
+    #[cfg(feature = "cloud")]
+    if !is_add_user_allowed_for_org("", user_email).await {
+        return Err(anyhow::anyhow!(
+            "User can not be member of more than one free organization"
+        ));
+    }
+
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -529,7 +536,11 @@ pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool
             if org.is_free_sub() && is_already_part_of_free_org {
                 return false;
             }
+        } else if is_already_part_of_free_org {
+            return false;
         }
+    } else if is_already_part_of_free_org {
+        return false;
     }
     true
 }
