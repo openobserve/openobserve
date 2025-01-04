@@ -154,7 +154,6 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
-    const showAddOrganizationDialog = ref(false);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -391,7 +390,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      showAddOrganizationDialog,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
