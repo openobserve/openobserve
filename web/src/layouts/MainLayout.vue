@@ -826,9 +826,9 @@ export default defineComponent({
       // Convert the time difference from milliseconds to seconds
       const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
 
-      setTimeout(() => {
-        mainLayoutMixin.setup().getRefreshToken();
-      }, timeUntilNextAPICallInSeconds);
+      // setTimeout(() => {
+      //   mainLayoutMixin.setup().getRefreshToken();
+      // }, timeUntilNextAPICallInSeconds);
     };
 
     //get refresh token for cloud environment
