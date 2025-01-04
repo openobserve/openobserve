@@ -221,9 +221,9 @@ export default defineComponent({
         // }
 
         callOrganization
-          .then((res: { data: any }) => {
+          .then((res: any) => {
             const data = res.data;
-            if (res.status == 200) {
+            if (res?.status == 200) {
               this.organizationData = {
                 id: "",
                 name: "",
