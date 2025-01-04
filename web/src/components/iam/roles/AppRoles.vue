@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="sm lg"
         color="secondary"
         no-caps
+        icon="add"
         :label="t(`iam.addRole`)"
         @click="addRole"
       />
@@ -56,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="font-size: 14px; padding-bottom: 12px"
     >
       {{ rows.length }} {{ t("iam.roles") }}
+      <!-- Add QTablePagination here -->
     </div>
     <app-table
       data-test="iam-roles-table-section"
@@ -63,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rows="rows"
       :columns="columns"
       pagination
-      :rows-per-page="20"
+      :rows-per-page="25"
       :filter="{
         value: filterQuery,
         method: filterRoles,
@@ -173,10 +175,12 @@ onBeforeMount(() => {
 const filterQuery = ref("");
 
 const updateTable = () => {
+   let counter = 1;
   rows.value = cloneDeep(
     rolesState.roles.map((role: { role_name: string }, index) => ({
       ...role,
-      "#": index + 1,
+      // "#": index + 1,
+       "#": counter <= 9 ? `0${counter++}` : counter++,
     }))
   );
 };

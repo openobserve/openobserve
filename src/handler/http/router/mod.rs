@@ -341,6 +341,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
+        .service(users::list_invitations)
+        .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)
@@ -480,6 +482,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(logs::ingest::handle_gcp_request)
         .service(organization::org::create_org)
         .service(authz::fga::create_role)
+        .service(organization::org::rename_org)
         .service(authz::fga::get_roles)
         .service(authz::fga::update_role)
         .service(authz::fga::get_role_permissions)
@@ -489,6 +492,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(authz::fga::get_group_details)
         .service(authz::fga::get_resources)
         .service(authz::fga::get_users_with_role)
+        .service(authz::fga::get_roles_for_user)
+        .service(authz::fga::get_groups_for_user)
         .service(authz::fga::delete_role)
         .service(authz::fga::delete_group)
         .service(users::list_roles)
@@ -524,6 +529,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::job::cancel_multiple_query)
         .service(search::job::cancel_query)
         .service(search::job::query_status);
+
+    #[cfg(feature = "cloud")]
+    let service = service
+        .service(organization::org::get_org_invites)
+        .service(organization::org::generate_org_invite)
+        .service(organization::org::accept_org_invite);
 
     cfg.service(service);
 }
