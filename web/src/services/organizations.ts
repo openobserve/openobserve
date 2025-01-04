@@ -47,9 +47,9 @@ const organizations = {
   add_members: (data: any, orgIdentifier: string) => {
     return http().post(`api/${orgIdentifier}/invites`, data);
   },
-  process_subscription: (s: string, action: string) => {
+  process_subscription: (s: string, action: string, orgIdentifier: string) => {
     return http().put(
-      `api/organizations/member_subscription/${s}?action=${action}`, {}
+      `api/${orgIdentifier}/member_subscription/${s}?action=${action}`, {}
     );
   },
   get_associated_members: (orgIdentifier: string) => {

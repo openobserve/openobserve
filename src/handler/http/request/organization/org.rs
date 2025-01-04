@@ -485,7 +485,7 @@ async fn accept_org_invite(
 
     let result = organization::accept_invitation(&user_email.user_id, &invite_token).await;
     match result {
-        Ok(org) => Ok(HttpResponse::Ok().json(org)),
+        Ok(_) => Ok(MetaHttpResponse::ok("Invitation accepted successfully")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
             err.to_string(),

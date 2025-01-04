@@ -475,6 +475,8 @@ pub async fn generate_invitation(
 pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(), anyhow::Error> {
     use std::str::FromStr;
 
+    use crate::service::db::org_users::get_cached_user_org;
+
     let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
 
     let now = chrono::Utc::now().timestamp_micros();
@@ -492,6 +494,11 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         return Err(anyhow::anyhow!("Organization doesn't exist"));
     }
 
+    // Check if user is already part of the org
+    if get_cached_user_org(&org_id, user_email).is_some() {
+        return Ok(()); // User is already part of the org
+    }
+
     let invite_role = UserRole::from_str(&invite.role)
         .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
     org_users::add(
@@ -503,12 +510,6 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     )
     .await
     .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
-
-    if let Err(e) = org_invites::remove(&invite.token, user_email).await {
-        // No need to return http error, as the user
-        // has already been added to the org
-        log::error!("Error removing invite: {}", e);
-    }
     Ok(())
 }
 
