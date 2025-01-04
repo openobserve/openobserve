@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:header="props">
         <q-tr :props="props">
-          <q-th auto-width />
           <q-th v-for="col in props.cols"
 :key="col.name" :props="props">
             <span>{{ col.label }}</span>
@@ -261,26 +260,14 @@ export default defineComponent({
       await getOrgMembers();
       if (isEnterprise.value || config.isCloud == "true") await _getRoles();
 
-      if (config.isCloud == "true") {
-        columns.value.push({
-          name: "status",
-          field: "status",
-          label: t("user.status"),
-          align: "left",
-        });
-      }
-
-      if (
-        (isEnterprise.value && isCurrentUserInternal.value) ||
-        !isEnterprise.value
-      ) {
-        columns.value.push({
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        });
-      }
+      // if (config.isCloud == "true") {
+        // columns.value.push({
+        //   name: "status",
+        //   field: "status",
+        //   label: t("user.status"),
+        //   align: "left",
+        // });
+      // }
 
       // if (
       //   (isEnterprise.value && isCurrentUserInternal.value) ||
@@ -395,21 +382,21 @@ export default defineComponent({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data.role,
-                member_created: date.formatDate(
-                  parseInt(data.member_created),
-                  "YYYY-MM-DDTHH:mm:ssZ",
-                ),
-                member_updated: date.formatDate(
-                  parseInt(data.member_updated),
-                  "YYYY-MM-DDTHH:mm:ssZ",
-                ),
-                org_member_id: data.org_member_id,
-                isLoggedinUser: store.state.userInfo.email == data.email,
-                isExternal: !!data.is_external,
+                // member_created: date.formatDate(
+                //   parseInt(data.member_created),
+                //   "YYYY-MM-DDTHH:mm:ssZ",
+                // ),
+                // member_updated: date.formatDate(
+                //   parseInt(data.member_updated),
+                //   "YYYY-MM-DDTHH:mm:ssZ",
+                // ),
+                // org_member_id: data.org_member_id,
+                // isLoggedinUser: store.state.userInfo.email == data.email,
+                // isExternal: !!data.is_external,
                 enableEdit: false,
                 enableChangeRole: false,
                 enableDelete: false,
-                status: data.status,
+                // status: data.status,
               };
             });
 
