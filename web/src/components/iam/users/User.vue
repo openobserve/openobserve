@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
-
+          <q-th v-for="col in props.cols"
+:key="col.name" :props="props">
             <span>{{ col.label }}</span>
           </q-th>
         </q-tr>
@@ -164,7 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -258,7 +259,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value || config.isCloud == "true") await getRoles();
+      if (isEnterprise.value || config.isCloud == "true") await _getRoles();
 
       if (config.isCloud == "true") {
         columns.value.push({
@@ -296,7 +297,7 @@ export default defineComponent({
       updateUserActions();
     });
 
-    const columns: any = ref<QTableProps["columns"]>([ 
+    const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
         label: "#",
@@ -332,11 +333,11 @@ export default defineComponent({
         sortable: true,
       },
       {
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        }
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "left",
+      },
     ]);
     const userEmail: any = ref("");
     const options = ref([]);
@@ -344,7 +345,7 @@ export default defineComponent({
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
-    
+
     const _getRoles = () => {
       return new Promise((resolve) => {
         usersService
@@ -485,7 +486,7 @@ export default defineComponent({
     //     );
     //   }
     // };
-    const shouldAllowEdit = (user:any) => {
+    const shouldAllowEdit = (user: any) => {
       // Allow editing for root users only if the current user is root
       if (user.role === "root") {
         return store.state.userInfo.email === user.email;
@@ -493,7 +494,6 @@ export default defineComponent({
       // Allow editing for all other users
       return true;
     };
-
 
     const shouldAllowChangeRole = (user: any) => {
       if (isEnterprise.value) {
@@ -590,7 +590,7 @@ export default defineComponent({
         });
       }
     };
-    const toggleExpand = (row:any) => {
+    const toggleExpand = (row: any) => {
       if (!row.showGroups) {
         row.showGroups = true;
         fetchUserGroups(row.email);
@@ -599,48 +599,46 @@ export default defineComponent({
         row.showGroups = false;
       }
     };
-    const forceCloseRow = (row:any) => {
+    const forceCloseRow = (row: any) => {
       if (row.showGroups) {
         row.showGroups = false;
       }
     };
-    const fetchUserGroups = (userEmail:any) =>  {
+    const fetchUserGroups = (userEmail: any) => {
       const orgId = store.state.selectedOrganization.identifier;
-      usersService.getUserGroups(orgId, userEmail)
-        .then((response) => {
-          // Update the user_groups property in the row object
-          const updatedUsers = usersState.users.map((user) => {
-            if (user.email === userEmail) {
-              return { 
-                ...user, 
-                user_groups: response.data.join(', ') 
-                // user_groups: response.data
-              };
-            }
-            return user;
-          });
-          usersState.users = updatedUsers; 
-        })
-    }
-    const fetchUserRoles = (userEmail:any) =>  {
+      usersService.getUserGroups(orgId, userEmail).then((response) => {
+        // Update the user_groups property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_groups: response.data.join(", "),
+              // user_groups: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
+    };
+    const fetchUserRoles = (userEmail: any) => {
       const orgId = store.state.selectedOrganization.identifier;
-      usersService.getUserRoles(orgId, userEmail)
-        .then((response) => {
-          // Update the user_roles property in the row object
-          const updatedUsers = usersState.users.map((user) => {
-            if (user.email === userEmail) {
-              return { 
-                ...user, 
-                user_roles: response.data.join(', ') 
-                // user_roles: response.data 
-              };
-            }
-            return user;
-          });
-          usersState.users = updatedUsers; 
-        })
-    }
-    
+      usersService.getUserRoles(orgId, userEmail).then((response) => {
+        // Update the user_roles property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_roles: response.data.join(", "),
+              // user_roles: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
+    };
+
     const updateMember = (data: any) => {
       if (data.data != undefined) {
         usersState.users.forEach((member: any, key: number) => {

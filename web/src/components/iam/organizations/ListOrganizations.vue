@@ -101,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           position="bottom"
           @update:changeRecordPerPage="changePagination"
         />
-          <!-- :maxRecordToReturn="maxRecordToReturn" -->
-          <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
+        <!-- :maxRecordToReturn="maxRecordToReturn" -->
+        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
     <q-dialog
@@ -133,16 +133,13 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    JoinOrganization,
     QTablePagination,
     NoData,
-    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
@@ -156,7 +153,6 @@ export default defineComponent({
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
     const qTable: any = ref(null);
-    const showAddOrganizationDialog = ref(false);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -178,15 +174,6 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      ...(config.isCloud == 'true' ? [
-        {
-          name: "role",
-          field: "role",
-          label: t("organization.role"),
-          align: "left",
-          sortable: true,
-        },
-      ] : []),
       {
         name: "type",
         field: "type",
@@ -220,7 +207,7 @@ export default defineComponent({
       rowsPerPage: 25,
     });
     const isCloudOrEnterprise = () => {
-      return config.isCloud === 'true' || config.isEnterprise === 'true'
+      return config.isCloud === "true" || config.isEnterprise === "true";
     };
 
     watch(
@@ -229,17 +216,23 @@ export default defineComponent({
         if (action == "add" && isCloudOrEnterprise()) {
           showAddOrganizationDialog.value = true;
         }
-      }
+      },
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.query.action == "add" && isCloudOrEnterprise()) {
+      if (
+        router.currentRoute.value.query.action == "add" &&
+        isCloudOrEnterprise()
+      ) {
         showAddOrganizationDialog.value = true;
       }
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.query.action == "add" && isCloudOrEnterprise()) {
+      if (
+        router.currentRoute.value.query.action == "add" &&
+        isCloudOrEnterprise()
+      ) {
         showAddOrganizationDialog.value = true;
       }
 
@@ -273,29 +266,6 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    // const changeMaxRecordToReturn = (val: any) => {
-    //   maxRecordToReturn.value = val;
-    //   getOrganizations();
-    // };
-
-    const addOrganization = (evt) => {
-      router.push({
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-
-      if (evt) {
-        let button_txt = evt.target.innerText;
-        segment.track("Button Click", {
-          button: button_txt,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Organizations",
-        });
-      }
-    };
 
     const getOrganizations = () => {
       const dismiss = $q.notify({
@@ -319,9 +289,10 @@ export default defineComponent({
           };
 
           // Additional fields and logic for cloud configuration
-          if (config.isCloud === 'true') {
+          if (config.isCloud === "true") {
             const memberrole = data.OrganizationMemberObj.filter(
-              (v) => v.user_id === store.state.currentuser.id && v.role === "admin"
+              (v) =>
+                v.user_id === store.state.currentuser.id && v.role === "admin",
             );
 
             // If invited, pass props to inviteTeam function
@@ -418,7 +389,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      showAddOrganizationDialog,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
@@ -430,7 +400,6 @@ export default defineComponent({
         }
         return filtered;
       },
-      addOrganization,
       hideAddOrgDialog,
     };
   },
