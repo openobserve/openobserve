@@ -99,6 +99,8 @@ pub struct OrgDetails {
     pub org_type: String,
     #[serde(rename = "UserObj")]
     pub user_obj: OrgUser,
+    #[serde(default)]
+    pub plan: i32,
 }
 
 #[derive(Serialize, ToSchema)]

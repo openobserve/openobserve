@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
+use o2_enterprise::enterprise::cloud::org_usage;
 
 #[cfg(feature = "cloud")]
 use crate::common::meta::organization::OrganizationInvites;
@@ -89,6 +90,16 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     };
     for org in all_orgs {
         id += 1;
+        #[cfg(feature = "cloud")]
+        let org_subscription = {
+            if let Ok(Some(subscription)) = org_usage::get(org.identifier.as_str()).await {
+                subscription.subscription_type as i32
+            } else {
+                0
+            }
+        };
+        #[cfg(not(feature = "cloud"))]
+        let org_subscription = 0;
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
@@ -98,6 +109,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
             search_threshold: THRESHOLD,
             org_type: org.org_type,
             user_obj: user_detail.clone(),
+            plan: org_subscription,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
