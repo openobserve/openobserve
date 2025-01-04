@@ -555,12 +555,13 @@ async fn check_and_add_to_org(user_email: &str, name: &str) {
     let o2cfg = get_o2_config();
 
     let mut tuples_to_add = HashMap::new();
+    let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
     let db_user = db::user::get_user_by_email(&user_email).await;
     if db_user.is_none() {
         match create_new_user(DBUser {
             email: user_email.to_owned(),
-            first_name: name.to_owned(),
-            last_name: "".to_owned(),
+            first_name: first_name.to_owned(),
+            last_name: last_name.to_owned(),
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations: vec![], // No org
