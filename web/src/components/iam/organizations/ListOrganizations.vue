@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount } from "vue";
+import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -290,45 +290,45 @@ export default defineComponent({
           };
 
           // Additional fields and logic for cloud configuration
-          if (config.isCloud === "true") {
-            const memberrole = data.OrganizationMemberObj.filter(
-              (v) =>
-                v.user_id === store.state.currentuser.id && v.role === "admin",
-            );
+          // if (config.isCloud === "true") {
+          //   const memberrole = data.OrganizationMemberObj.filter(
+          //     (v) =>
+          //       v.user_id === store.state.currentuser.id && v.role === "admin",
+          //   );
 
-            // If invited, pass props to inviteTeam function
-            if (
-              router.currentRoute.value.query.action === "invite" &&
-              data.identifier === router.currentRoute.value.query.id
-            ) {
-              const props = {
-                row: {
-                  id: data.id,
-                  name: data.name,
-                  identifier: data.identifier,
-                  role: data.role,
-                  member_lists: [],
-                },
-              };
-              inviteTeam(props);
-            }
+          //   // If invited, pass props to inviteTeam function
+          //   // if (
+          //   //   router.currentRoute.value.query.action === "invite" &&
+          //   //   data.identifier === router.currentRoute.value.query.id
+          //   // ) {
+          //   //   const props = {
+          //   //     row: {
+          //   //       id: data.id,
+          //   //       name: data.name,
+          //   //       identifier: data.identifier,
+          //   //       role: data.role,
+          //   //       member_lists: [],
+          //   //     },
+          //   //   };
+          //   //   inviteTeam(props);
+          //   // }
 
-            const role = memberrole.length ? memberrole[0].role : "member";
+          //   const role = memberrole.length ? memberrole[0].role : "member";
 
-            // Extend common fields with cloud-specific data
-            return {
-              ...commonOrganization,
-              id: data.id,
-              created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
-              role: convertToTitleCase(role),
-              status: convertToTitleCase(data.status),
-              plan_type:
-                data.CustomerBillingObj.subscription_type === config.freePlan ||
-                data.CustomerBillingObj.subscription_type === ""
-                  ? "Developer"
-                  : "Pro",
-            };
-          }
+          //   // Extend common fields with cloud-specific data
+          //   return {
+          //     ...commonOrganization,
+          //     id: data.id,
+          //     created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
+          //     role: convertToTitleCase(role),
+          //     status: convertToTitleCase(data.status),
+          //     plan_type:
+          //       data.CustomerBillingObj.subscription_type === config.freePlan ||
+          //       data.CustomerBillingObj.subscription_type === ""
+          //         ? "Developer"
+          //         : "Pro",
+          //   };
+          // }
 
           // For open-source or enterprise, return only common fields
           return commonOrganization;
@@ -337,6 +337,8 @@ export default defineComponent({
         dismiss();
       });
     };
+
+    getOrganizations();
 
     const addOrganization = (evt) => {
       router.push({
@@ -365,6 +367,24 @@ export default defineComponent({
       });
     };
 
+    const inviteTeam = (props: any) => {
+      organization.value = {
+        id: props.row.id,
+        name: props.row.name,
+        role: props.row.role,
+        identifier: props.row.identifier,
+        member_lists: [],
+      };
+      showJoinOrganizationDialog.value = true;
+
+      segment.track("Button Click", {
+        button: "Invite Member",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Organizations",
+      });
+    };
+
     return {
       t,
       store,
@@ -382,14 +402,11 @@ export default defineComponent({
       addOrganization,
       getOrganizations,
       inviteTeam,
-      onAddTeam,
       pagination,
       resultTotal,
       perPageOptions,
       selectedPerPage,
       changePagination,
-      maxRecordToReturn,
-      changeMaxRecordToReturn,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];

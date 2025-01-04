@@ -38,7 +38,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
 
-    const componentName = ref("");
+    const componentName = ref("OrganizationsEnterprise");
 
     const loadComponent = ref(false);
 
