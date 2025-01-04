@@ -241,9 +241,7 @@ pub async fn get_job_result(
             model.error_message.unwrap()
         )))
     } else if model.status == 1 && model.partition_num != Some(1) {
-        let response = get_partition_result(&model)
-            .await
-            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        let response = get_partition_result(&model).await;
         Ok(response)
     } else if model.result_path.is_none() || model.cluster.is_none() {
         Ok(MetaHttpResponse::not_found(format!(
@@ -378,8 +376,12 @@ async fn cancel_job_inner(
     cancel_query_inner(org_id, &[&job.trace_id]).await
 }
 
-async fn get_partition_result(job: &JobModel) -> Result<HttpResponse, Error> {
-    let req: Request = json::from_str(&job.payload)?;
+async fn get_partition_result(job: &JobModel) -> HttpResponse {
+    let req: Result<Request, serde_json::Error> = json::from_str(&job.payload);
+    if let Err(e) = req {
+        return MetaHttpResponse::internal_error(e);
+    }
+    let req = req.unwrap();
     let limit = if req.query.size > 0 {
         req.query.size
     } else {
@@ -388,14 +390,14 @@ async fn get_partition_result(job: &JobModel) -> Result<HttpResponse, Error> {
     let offset = req.query.from;
     let partition_jobs = get_partition_jobs(&job.id).await;
     if let Err(e) = partition_jobs {
-        return Ok(MetaHttpResponse::internal_error(e));
+        return MetaHttpResponse::internal_error(e);
     }
     let partition_jobs = partition_jobs.unwrap();
     let response = merge_response(partition_jobs, limit, offset).await;
     if let Err(e) = response {
-        return Ok(MetaHttpResponse::internal_error(e));
+        return MetaHttpResponse::internal_error(e);
     }
-    Ok(HttpResponse::Ok().json(response.unwrap()))
+    HttpResponse::Ok().json(response.unwrap())
 }
 
 // check permissions
