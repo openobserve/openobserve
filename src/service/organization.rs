@@ -36,7 +36,9 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 
 use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
-use crate::common::meta::organization::{OrganizationInviteUserRecord, OrganizationInvites};
+use crate::common::meta::organization::{
+    OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
+};
 use crate::{
     common::{
         meta::organization::{
@@ -401,7 +403,7 @@ pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,
     invites: OrganizationInvites,
-) -> Result<String, anyhow::Error> {
+) -> Result<OrganizationInviteResponse, anyhow::Error> {
     use org_invites::{get_invite_email_body, get_invite_email_subject};
 
     use super::users::get_user;
@@ -460,7 +462,10 @@ pub async fn generate_invitation(
                 }
             }
         }
-        Ok(invite_token)
+        Ok(OrganizationInviteResponse {
+            data: Default::default(),
+            message: "Member invitation created successfully".to_owned(),
+        })
     } else {
         Err(anyhow::anyhow!("Organization doesn't exist"))
     }

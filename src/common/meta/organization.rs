@@ -44,6 +44,25 @@ pub struct OrganizationInvites {
 
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteResponse {
+    #[serde(default)]
+    pub data: OrganizationInviteResponseData, // user emails
+    pub message: String,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, Default, ToSchema, Clone, Debug)]
+pub struct OrganizationInviteResponseData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub valid_members: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub existing_members: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_email: Option<String>,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrganizationInviteUserRecord {
     pub email: String,
     pub first_name: String,
