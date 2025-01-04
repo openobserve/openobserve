@@ -279,14 +279,20 @@ export default defineComponent({
 
         resultTotal.value = res.data.data.length;
         let counter = 1;
+        const billingPlans = {
+          0: "Free Forever",
+          1: "Pay As You Go",
+          2: "Enterprise",
+        };
         organizations.value = res.data.data.map((data) => {
           // Common fields for all configurations
+
           const commonOrganization = {
             "#": counter <= 9 ? `0${counter++}` : counter++,
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            plan: data.plan || "-",
+            plan: billingPlans[data.plan] || "-",
           };
 
           // Additional fields and logic for cloud configuration
