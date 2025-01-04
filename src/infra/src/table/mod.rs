@@ -26,7 +26,6 @@ pub mod distinct_values;
 pub mod entity;
 pub mod folders;
 mod migration;
-pub mod org_invites;
 pub mod org_users;
 pub mod organizations;
 pub mod search_job;

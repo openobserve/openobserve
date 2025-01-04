@@ -15,7 +15,7 @@
 
 use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::table::org_invites::OrgInviteStatus;
+use o2_enterprise::enterprise::cloud::OrgInviteStatus;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use strum::IntoEnumIterator;

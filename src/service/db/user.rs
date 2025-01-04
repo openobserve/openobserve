@@ -24,9 +24,7 @@ use infra::{
     table::users,
 };
 #[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::org_invites;
-#[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::table::org_invites::InvitationRecord;
+use o2_enterprise::enterprise::cloud::{org_invites, InvitationRecord};
 
 use super::org_users::{self, get_cached_user_org};
 use crate::{

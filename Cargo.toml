@@ -224,7 +224,12 @@ report_server = { path = "src/report_server" }
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
-actix-tls = { version = "3.4", features = ["connect", "uri", "rustls-0_23-native-roots", "rustls-0_23-webpki-roots"] }
+actix-tls = { version = "3.4", features = [
+    "connect",
+    "uri",
+    "rustls-0_23-native-roots",
+    "rustls-0_23-webpki-roots",
+] }
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -299,7 +304,10 @@ reqwest = { version = "0.12", default-features = false, features = [
     "stream",
 ] }
 rustls-pemfile = "2"
-rustls = { version = "0.23.20", default-features = false, features = ["std", "tls12"]}
+rustls = { version = "0.23.20", default-features = false, features = [
+    "std",
+    "tls12",
+] }
 sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
