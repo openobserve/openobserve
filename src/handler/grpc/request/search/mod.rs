@@ -171,6 +171,7 @@ impl Search for Searcher {
         let ret = SearchService::search_partition(
             &req.trace_id,
             &req.org_id,
+            None,
             stream_type,
             &request,
             req.skip_max_query_range,
