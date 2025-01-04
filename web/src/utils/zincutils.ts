@@ -371,7 +371,7 @@ export const getPath = () => {
         ? window.location.pathname.slice(0, pos + 5)
         : "";
   const cloudPath = import.meta.env.BASE_URL;
-  return config.isCloud == "true" ? cloudPath : path;
+  return config.isCloud == "true" ? path : path;
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
