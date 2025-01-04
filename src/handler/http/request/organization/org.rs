@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
+#[cfg(feature = "cloud")]
 use o2_enterprise::enterprise::cloud::org_usage;
 
 #[cfg(feature = "cloud")]
