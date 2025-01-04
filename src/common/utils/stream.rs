@@ -144,6 +144,35 @@ pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i6
     stream_max_query_range
 }
 
+/// Get the maximum query range for a list of streams in hours
+pub async fn get_max_query_range(
+    stream_names: &[String],
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+) -> i64 {
+    let user = users::get_user(Some(org_id), user_id).await;
+
+    futures::future::join_all(
+        stream_names
+            .iter()
+            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type)),
+    )
+    .await
+    .into_iter()
+    .filter_map(|settings| {
+        settings.map(|s| {
+            if let Some(user) = &user {
+                get_max_query_range_if_sa(s.max_query_range, user)
+            } else {
+                s.max_query_range
+            }
+        })
+    })
+    .max()
+    .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

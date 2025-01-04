@@ -219,7 +219,7 @@ pub async fn get_latest_traces(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
-    let max_query_range = crate::common::utils::websocket::get_max_query_range(
+    let max_query_range = crate::common::utils::stream::get_max_query_range(
         &[stream_name.clone()],
         org_id.as_str(),
         &user_id,

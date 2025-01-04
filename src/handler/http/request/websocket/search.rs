@@ -34,9 +34,11 @@ use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::websocket::{
-            calc_queried_range, get_max_query_range, get_search_type_from_ws_req,
-            update_histogram_interval_in_query,
+        utils::{
+            stream::get_max_query_range,
+            websocket::{
+                calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
+            },
         },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},

@@ -17,7 +17,6 @@ use std::ops::ControlFlow;
 
 use config::meta::{
     search::{SearchEventContext, SearchEventType},
-    stream::StreamType,
     websocket::SearchResultType,
 };
 use infra::errors::Error;
@@ -26,8 +25,6 @@ use sqlparser::{
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
-
-use crate::{common::utils::stream::get_max_query_range_if_sa, service::users};
 
 #[inline(always)]
 pub(crate) fn get_search_type_from_ws_req(
@@ -124,35 +121,6 @@ fn update_histogram_in_expr(expr: &mut Expr, histogram_interval: i64) {
             }
         }
     }
-}
-
-/// Get the maximum query range for a list of streams in hours
-pub async fn get_max_query_range(
-    stream_names: &[String],
-    org_id: &str,
-    user_id: &str,
-    stream_type: StreamType,
-) -> i64 {
-    let user = users::get_user(Some(org_id), user_id).await;
-
-    futures::future::join_all(
-        stream_names
-            .iter()
-            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type)),
-    )
-    .await
-    .into_iter()
-    .filter_map(|settings| {
-        settings.map(|s| {
-            if let Some(user) = &user {
-                get_max_query_range_if_sa(s.max_query_range, user)
-            } else {
-                s.max_query_range
-            }
-        })
-    })
-    .max()
-    .unwrap_or(0)
 }
 
 /// Calculates the ratio of cache hits to search hits in the accumulated search results.
