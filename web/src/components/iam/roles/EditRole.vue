@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :removed-users="removedUsers"
         />
         <GroupServiceAccounts
+          v-if="config.isCloud == 'false'"
           data-test="edit-role-users-section"
           v-show="activeTab === 'serviceAccounts'"
           :groupUsers="roleUsers"
@@ -350,6 +351,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
+import config from "@/aws-exports";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
@@ -420,11 +422,14 @@ const tabs = [
     value: "users",
     label: "Users",
   },
-  {
+];
+
+if (config.isCloud == "false") {
+  tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
-  },
-];
+  });
+}
 
 const permissionDisplayOptions = [
   {
