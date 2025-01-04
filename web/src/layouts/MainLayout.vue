@@ -72,9 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="getImageURL('images/common/open_observe_logo.svg')"
             @click="goToHome"
           />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
-            >Beta</span
-          >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
