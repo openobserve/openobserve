@@ -223,13 +223,13 @@ export default defineComponent({
         callOrganization
           .then((res: { data: any }) => {
             const data = res.data;
-            if (res.data.data.status == "active") {
+            if (res.status == 200) {
               this.organizationData = {
                 id: "",
                 name: "",
               };
 
-              this.$emit("update:modelValue", data);
+              // this.$emit("update:modelValue", data);
               this.$emit("updated");
               this.addOrganizationForm.resetValidation();
               dismiss();
@@ -262,7 +262,7 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err.response.data["error"] || "Organization creation failed."
+                err?.response?.data["error"] || "Organization creation failed."
               ),
             });
             dismiss();
