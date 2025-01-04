@@ -21,7 +21,7 @@ import Usage from "@/enterprise/components/billings/usage.vue";
 const useEnvRoutes = () => {
   const parentRoutes: any = [];
 
-  const homeChildRoutes = [];
+  const homeChildRoutes: any = [];
 
 
   // {
