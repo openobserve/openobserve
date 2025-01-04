@@ -45,7 +45,7 @@ const organizations = {
     return http().post("/api/organizations", data);
   },
   add_members: (data: any, orgIdentifier: string) => {
-    return http().post(`api/${orgIdentifier}/organizations/members`, data);
+    return http().post(`api/${orgIdentifier}/invites`, data);
   },
   process_subscription: (s: string, action: string) => {
     return http().put(

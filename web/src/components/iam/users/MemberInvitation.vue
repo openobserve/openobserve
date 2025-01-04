@@ -128,7 +128,7 @@ export default defineComponent({
 
         organizationsService
           .add_members(
-            { member_lists: emailArray, role: selectedRole.value },
+            { invites: emailArray, role: selectedRole.value },
             store.state.selectedOrganization.identifier,
           )
           .then((res: { data: any }) => {

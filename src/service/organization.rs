@@ -180,6 +180,8 @@ async fn update_passcode_inner(
                 "Not allowed for external service accounts",
             ));
         }
+    } else {
+        local_org_id = DEFAULT_ORG;
     }
 
     // Update the org with the new token
