@@ -48,8 +48,8 @@ const organizations = {
     return http().post(`api/${orgIdentifier}/organizations/members`, data);
   },
   process_subscription: (s: string, action: string) => {
-    return http().get(
-      `api/organizations/member_subscription/${s}?action=${action}`
+    return http().put(
+      `api/organizations/member_subscription/${s}?action=${action}`, {}
     );
   },
   get_associated_members: (orgIdentifier: string) => {

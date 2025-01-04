@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
+    <q-card-section class="q-w-md">
       <q-form ref="addOrganizationForm" @submit="onSubmit">
         <q-input
           v-if="beingUpdated"
@@ -54,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-input
           v-model="organizationData.name"
-          :placeholder="t('organization.nameHolder')"
           :label="t('organization.name') + '*'"
           color="input-border"
           bg-color="input-bg"
@@ -68,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           maxlength="100"
         />
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex q-mt-lg">
           <q-btn
             v-close-popup="true"
             class="q-mb-md text-bold"
@@ -224,7 +223,7 @@ export default defineComponent({
         callOrganization
           .then((res: { data: any }) => {
             const data = res.data;
-            // if (res.data.data.status == "active") {
+            if (res.data.data.status == "active") {
               this.organizationData = {
                 id: "",
                 name: "",
@@ -234,11 +233,10 @@ export default defineComponent({
               this.$emit("updated");
               this.addOrganizationForm.resetValidation();
               dismiss();
-              // Handle sub during billing imprelementaion
-              // } else {
-              // this.proPlanRequired = true;
-              // this.proPlanMsg = res.data.message;
-              // this.newOrgIdentifier = res.data.identifier;
+            } else {
+              this.proPlanRequired = true;
+              this.proPlanMsg = res.data.message;
+              this.newOrgIdentifier = res.data.identifier;
               // this.store.state.dispatch("setSelectedOrganization", {
               //   identifier: data.identifier,
               //   name: data.name,
@@ -250,25 +248,23 @@ export default defineComponent({
               //   subscription_type: "Free-Plan-USD-Monthly",
               // });
               // window.location.href = `/organizations?org_identifier=${data.data.identifier}&action=subscribe`;
-              // this.router.push({
-              //   name: "organizations",
-              //   query: {
-              //     org_identifier: data.data.identifier,
-              //     action: "subscribe",
-              //     update_org: Date.now(),
-              //   },
-              // });
-            // }
-          })
-          .catch((err: any) => {
-            if(err.status !== 403){
-              this.$q.notify({
-                type: "negative",
-                message: JSON.stringify(
-                  err.response.data["error"] || "Organization creation failed."
-                ),
+              this.router.push({
+                name: "organizations",
+                query: {
+                  org_identifier: data.data.identifier,
+                  action: "subscribe",
+                  update_org: Date.now(),
+                },
               });
             }
+          })
+          .catch((err: any) => {
+            this.$q.notify({
+              type: "negative",
+              message: JSON.stringify(
+                err.response.data["error"] || "Organization creation failed."
+              ),
+            });
             dismiss();
           });
       });

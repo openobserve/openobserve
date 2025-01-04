@@ -33,98 +33,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
-
+          <q-th v-for="col in props.cols"
+:key="col.name" :props="props">
             <span>{{ col.label }}</span>
           </q-th>
         </q-tr>
       </template>
-      <template v-slot:body="props">
-        <q-tr :props="props">
-          <q-td auto-width>
-            <q-btn
-              size="xs" 
-              flat 
-              round 
-              dense 
-              @click="toggleExpand(props.row)"
-              :icon="props.row.showGroups ? 'remove' : 'add'"
-            />
-          </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
-            <template v-if="col.name === 'role'">
-               <template v-if="props.row.role === 'root'">
-                {{ props.row.role }}
-              </template>
-              <template v-else>
-                <q-select
-                  dense
-                  borderless
-                  v-model="props.row.role"
-                  :options="options"
-                  emit-value
-                  map-options
-                  style="width: 70px"
-                  @update:model-value="updateUserRole(props.row)"
-                />
-              </template>
-            </template>
-            <template v-else-if="col.name === 'actions'">
-              <q-btn
-                v-if="props.row.enableDelete"
-                :icon="outlinedDelete"
-                :title="t('user.delete')"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="confirmDeleteAction(props)"
-                style="cursor: pointer !important"
-              />
-              <q-btn
-                v-if="props.row.enableEdit"
-                icon="edit"
-                :title="t('user.update')"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click="addRoutePush(props);forceCloseRow(props.row)"
-                style="cursor: pointer !important"
-              />
-                <!-- v-if="props.row.role === 'root' && store.state.userInfo.email === props.row.email" -->
-              </template>
-            <template v-else>
-              {{ col.value }}
-            </template>
-          </q-td>
-        </q-tr>
-        <q-tr v-show="props.row.showGroups" :props="props">
-          <q-td colspan="100%">
-            <div class="flex">
-              <div class="q-px-lg" v-if="props.row.user_groups || props.row.user_roles">
-                <p class="q-mb-sm" v-if="props.row.user_groups">
-                  <strong>User Group: </strong> <span>{{ props.row.user_groups }}</span>
-                </p>
-                <p class="q-mb-sm" v-if="props.row.user_roles">
-                  <strong>Custom Roles: </strong> <span>{{ props.row.user_roles }}</span>
-                </p>
-              </div>
-              <div 
-                class="flex justify-center items-center q-px-lg" 
-                v-else
-                style="width: 100%; text-align: center;"
-              >
-                <p>No Data</p>
-              </div>
-            </div>
-          </q-td>
-
-        </q-tr>
+      <template #body-cell-actions="props">
+        <q-td :props="props" side>
+          <q-btn
+            v-if="props.row.enableDelete"
+            :icon="outlinedDelete"
+            :title="t('user.delete')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
+            style="cursor: pointer !important"
+          />
+          <q-btn
+            v-if="props.row.enableEdit && config.isCloud == 'false'"
+            icon="edit"
+            :title="t('user.update')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="addRoutePush(props)"
+            style="cursor: pointer !important"
+          />
+        </q-td>
       </template>
       <template #top="scope">
         <div
@@ -145,9 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-
-          <div class="col-6">
-              <!-- v-if="showAddUserBtn" -->
+          <div class="col-6" v-if="config.isCloud == 'true'">
+            <member-invitation
+              :key="currentUserRole"
+              v-model:currentrole="currentUserRole"
+            />
+          </div>
+          <div class="col-6" v-else>
             <q-btn
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
@@ -181,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-table>
     <q-dialog
+      v-if="config.isCloud == 'false'"
       v-model="showUpdateUserDialog"
       position="right"
       full-height
@@ -196,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-user
+        v-if="config.isCloud == 'false'"
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
@@ -215,7 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -248,6 +198,7 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
+import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import {
   getImageURL,
   verifyOrganizationStatus,
@@ -262,7 +213,13 @@ import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
-  components: { QTablePagination, UpdateUserRole, NoData, AddUser },
+  components: {
+    QTablePagination,
+    UpdateUserRole,
+    NoData,
+    AddUser,
+    MemberInvitation,
+  },
   emits: [
     "updated:fields",
     "deleted:fields",
@@ -302,10 +259,27 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) 
-      {
-        getCustomRoles();
-        await _getRoles();
+      if (isEnterprise.value || config.isCloud == "true") await _getRoles();
+
+      if (config.isCloud == "true") {
+        columns.value.push({
+          name: "status",
+          field: "status",
+          label: t("user.status"),
+          align: "left",
+        });
+      }
+
+      if (
+        (isEnterprise.value && isCurrentUserInternal.value) ||
+        !isEnterprise.value
+      ) {
+        columns.value.push({
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        });
       }
 
       // if (
@@ -323,7 +297,7 @@ export default defineComponent({
       updateUserActions();
     });
 
-    const columns: any = ref<QTableProps["columns"]>([ 
+    const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
         label: "#",
@@ -359,11 +333,11 @@ export default defineComponent({
         sortable: true,
       },
       {
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        }
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "left",
+      },
     ]);
     const userEmail: any = ref("");
     const options = ref([]);
@@ -371,7 +345,7 @@ export default defineComponent({
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
-    
+
     const _getRoles = () => {
       return new Promise((resolve) => {
         usersService
@@ -400,14 +374,7 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         usersService
-          .orgUsers(
-            0,
-            1000,
-            "email",
-            false,
-            "",
-            store.state.selectedOrganization.identifier
-          )
+          .orgUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
             resultTotal.value = res.data.data.length;
             let counter = 1;
@@ -430,11 +397,11 @@ export default defineComponent({
                 role: data.role,
                 member_created: date.formatDate(
                   parseInt(data.member_created),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 member_updated: date.formatDate(
                   parseInt(data.member_updated),
-                  "YYYY-MM-DDTHH:mm:ssZ"
+                  "YYYY-MM-DDTHH:mm:ssZ",
                 ),
                 org_member_id: data.org_member_id,
                 isLoggedinUser: store.state.userInfo.email == data.email,
@@ -442,6 +409,7 @@ export default defineComponent({
                 enableEdit: false,
                 enableChangeRole: false,
                 enableDelete: false,
+                status: data.status,
               };
             });
 
@@ -518,7 +486,7 @@ export default defineComponent({
     //     );
     //   }
     // };
-    const shouldAllowEdit = (user:any) => {
+    const shouldAllowEdit = (user: any) => {
       // Allow editing for root users only if the current user is root
       if (user.role === "root") {
         return store.state.userInfo.email === user.email;
@@ -526,7 +494,6 @@ export default defineComponent({
       // Allow editing for all other users
       return true;
     };
-
 
     const shouldAllowChangeRole = (user: any) => {
       if (isEnterprise.value) {
@@ -610,7 +577,7 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         addUser({}, false);
@@ -623,7 +590,7 @@ export default defineComponent({
         });
       }
     };
-    const toggleExpand = (row:any) => {
+    const toggleExpand = (row: any) => {
       if (!row.showGroups) {
         row.showGroups = true;
         fetchUserGroups(row.email);
@@ -632,48 +599,46 @@ export default defineComponent({
         row.showGroups = false;
       }
     };
-    const forceCloseRow = (row:any) => {
+    const forceCloseRow = (row: any) => {
       if (row.showGroups) {
         row.showGroups = false;
       }
     };
-    const fetchUserGroups = (userEmail:any) =>  {
+    const fetchUserGroups = (userEmail: any) => {
       const orgId = store.state.selectedOrganization.identifier;
-      usersService.getUserGroups(orgId, userEmail)
-        .then((response) => {
-          // Update the user_groups property in the row object
-          const updatedUsers = usersState.users.map((user) => {
-            if (user.email === userEmail) {
-              return { 
-                ...user, 
-                user_groups: response.data.join(', ') 
-                // user_groups: response.data
-              };
-            }
-            return user;
-          });
-          usersState.users = updatedUsers; 
-        })
-    }
-    const fetchUserRoles = (userEmail:any) =>  {
+      usersService.getUserGroups(orgId, userEmail).then((response) => {
+        // Update the user_groups property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_groups: response.data.join(", "),
+              // user_groups: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
+    };
+    const fetchUserRoles = (userEmail: any) => {
       const orgId = store.state.selectedOrganization.identifier;
-      usersService.getUserRoles(orgId, userEmail)
-        .then((response) => {
-          // Update the user_roles property in the row object
-          const updatedUsers = usersState.users.map((user) => {
-            if (user.email === userEmail) {
-              return { 
-                ...user, 
-                user_roles: response.data.join(', ') 
-                // user_roles: response.data 
-              };
-            }
-            return user;
-          });
-          usersState.users = updatedUsers; 
-        })
-    }
-    
+      usersService.getUserRoles(orgId, userEmail).then((response) => {
+        // Update the user_roles property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_roles: response.data.join(", "),
+              // user_roles: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
+    };
+
     const updateMember = (data: any) => {
       if (data.data != undefined) {
         usersState.users.forEach((member: any, key: number) => {
@@ -777,7 +742,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
               color: "negative",
               message: "Error while deleting user.",
@@ -801,7 +766,7 @@ export default defineComponent({
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {

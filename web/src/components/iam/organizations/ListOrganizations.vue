@@ -52,32 +52,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin-bottom: 2px; height: 44px"
         >
           <div class="q-table__title">{{ t("organization.header") }}</div>
-          <q-btn
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            icon="add"
-            dense
-            :label="t(`organization.add`)"
-            @click="addOrganization"
-            v-if="(config.isEnterprise == 'true' 
-              || config.isCloud == 'true' 
-            )"
-          />
         </div>
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-ml-none q-mb-xs"
-          style="width: 400px"
-          :placeholder="t('organization.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
+        <div class="full-width row q-mb-xs items-start">
+          <div class="col">
+            <q-input
+              v-model="filterQuery"
+              filled
+              dense
+              class="col-6 q-pr-sm"
+              style="width: 400px"
+              :placeholder="t('organization.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
+          <div class="col-3">
+            <q-btn
+              v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
+              class="q-ml-md q-mb-xs text-bold no-border float-right"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              icon="add"
+              dense
+              :label="t(`organization.add`)"
+              @click="addOrganization"
+            />
+          </div>
+        </div>
 
         <QTablePagination
           :scope="scope"
@@ -97,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           position="bottom"
           @update:changeRecordPerPage="changePagination"
         />
-          <!-- :maxRecordToReturn="maxRecordToReturn" -->
-          <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
+        <!-- :maxRecordToReturn="maxRecordToReturn" -->
+        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
     <q-dialog
@@ -110,60 +114,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-update-organization @updated="updateOrganizationList" />
     </q-dialog>
-
-    <q-dialog
-      v-model="showJoinOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideJoinOrgDialog"
-    >
-      <join-organization v-model="organization" @updated="joinOrganization" />
-    </q-dialog>
-    <q-dialog v-model="showOrgAPIKeyDialog">
-      <q-card>
-        <q-card-section>
-          <div class="text-h6">Organization API Key</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none" wrap>
-          <q-item>
-            <q-item-section
-              ><q-item-label lines="3" style="word-wrap: break-word">{{
-                organizationAPIKey
-              }}</q-item-label></q-item-section
-            >
-            <q-item-section side>
-              <q-btn
-                unelevated
-                round
-                flat
-                padding="sm"
-                size="sm"
-                icon="content_copy"
-                @click="copyAPIKey"
-                :title="t('organization.copyapikey')"
-              />
-            </q-item-section>
-          </q-item>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, onUpdated, watch, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
-import AddUpdateOrganization from "./AddUpdateOrganization.vue";
 import JoinOrganization from "./JoinOrganization.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
@@ -173,9 +138,9 @@ export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    JoinOrganization,
     QTablePagination,
     NoData,
+    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
@@ -210,15 +175,6 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      ...(config.isCloud == 'true' ? [
-        {
-          name: "role",
-          field: "role",
-          label: t("organization.role"),
-          align: "left",
-          sortable: true,
-        },
-      ] : []),
       {
         name: "type",
         field: "type",
@@ -226,43 +182,18 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      // {
-      //   name: "owner",
-      //   field: "owner",
-      //   label: t("organization.owner"),
-      //   align: "left",
-      //   sortable: true,
-      // },
-      ...(config.isCloud == 'true' ? [
-        {
-          name: "plan_type",
-          field: "plan_type",
-          label: t("organization.subscription_type"),
-          align: "left",
-          sortable: true,
-        },
-        {
-          name: "status",
-          field: "status",
-          label: t("organization.status"),
-          align: "left",
-          sortable: true,
-        },
-        {
-          name: "created",
-          field: "created",
-          label: t("organization.created"),
-          align: "left",
-          sortable: true,
-        },
-      ] : []),
-      // {
-      //   name: "actions",
-      //   field: "actions",
-      //   label: t("organization.actions"),
-      //   align: "center",
-      // },
     ]);
+
+    if (config.isCloud == "true") {
+      columns.value.push({
+        name: "plan",
+        field: "plan",
+        label: t("organization.subscription_plan"),
+        align: "center",
+        sortable: true,
+      });
+    }
+
     const perPageOptions = [
       { label: "25", value: 25 },
       { label: "50", value: 50 },
@@ -277,7 +208,7 @@ export default defineComponent({
       rowsPerPage: 25,
     });
     const isCloudOrEnterprise = () => {
-      return config.isCloud === 'true' || config.isEnterprise === 'true'
+      return config.isCloud === "true" || config.isEnterprise === "true";
     };
 
     watch(
@@ -286,17 +217,23 @@ export default defineComponent({
         if (action == "add" && isCloudOrEnterprise()) {
           showAddOrganizationDialog.value = true;
         }
-      }
+      },
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.query.action == "add" && isCloudOrEnterprise()) {
+      if (
+        router.currentRoute.value.query.action == "add" &&
+        isCloudOrEnterprise()
+      ) {
         showAddOrganizationDialog.value = true;
       }
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.query.action == "add" && isCloudOrEnterprise()) {
+      if (
+        router.currentRoute.value.query.action == "add" &&
+        isCloudOrEnterprise()
+      ) {
         showAddOrganizationDialog.value = true;
       }
 
@@ -310,33 +247,25 @@ export default defineComponent({
       }
     });
 
+    onMounted(() => {
+      if (router.currentRoute.value.query?.action == "add") {
+        showAddOrganizationDialog.value = true;
+      }
+    });
+
+    watch(
+      () => router.currentRoute.value.query?.action,
+      (value) => {
+        if (value == "add") {
+          showAddOrganizationDialog.value = true;
+        }
+      },
+    );
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
-    };
-    // const changeMaxRecordToReturn = (val: any) => {
-    //   maxRecordToReturn.value = val;
-    //   getOrganizations();
-    // };
-
-    const addOrganization = (evt) => {
-      router.push({
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-
-      if (evt) {
-        let button_txt = evt.target.innerText;
-        segment.track("Button Click", {
-          button: button_txt,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Organizations",
-        });
-      }
     };
 
     const getOrganizations = () => {
@@ -344,8 +273,8 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading organizations...",
       });
-      organizationsService.list(0, 100000, "name", false, "").then((res) => {
-        // Update store with the organizations for navbar consistency
+      organizationsService.list(0, 1000000, "name", false, "").then((res) => {
+        // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 
         resultTotal.value = res.data.data.length;
@@ -357,13 +286,14 @@ export default defineComponent({
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            // owner: data.user_email,
+            plan: data.plan || "-",
           };
 
           // Additional fields and logic for cloud configuration
-          if (config.isCloud === 'true') {
+          if (config.isCloud === "true") {
             const memberrole = data.OrganizationMemberObj.filter(
-              (v) => v.user_id === store.state.currentuser.id && v.role === "admin"
+              (v) =>
+                v.user_id === store.state.currentuser.id && v.role === "admin",
             );
 
             // If invited, pass props to inviteTeam function
@@ -408,51 +338,26 @@ export default defineComponent({
       });
     };
 
-
-    const onAddTeam = (props: any) => {
-      console.log(props);
-    };
-
-    const inviteTeam = (props: any) => {
-      organization.value = {
-        id: props.row.id,
-        name: props.row.name,
-        role: props.row.role,
-        identifier: props.row.identifier,
-        member_lists: [],
-      };
-      showJoinOrganizationDialog.value = true;
-
-      segment.track("Button Click", {
-        button: "Invite Member",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Organizations",
-      });
-    };
-
-    getOrganizations();
-
-    const redirectToInviteMember = (props) => {
+    const addOrganization = (evt) => {
       router.push({
-        name: "organizations",
         query: {
-          action: "invite",
-          id: props.row.identifier,
+          action: "add",
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+
+      if (evt) {
+        let button_txt = evt.target.innerText;
+        segment.track("Button Click", {
+          button: button_txt,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Organizations",
+        });
+      }
     };
 
     const hideAddOrgDialog = () => {
-      router.push({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    const hideJoinOrgDialog = () => {
       router.push({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
@@ -465,6 +370,7 @@ export default defineComponent({
       store,
       router,
       qTable,
+      config,
       loading: ref(false),
       organizations,
       organization,
@@ -482,8 +388,8 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       changePagination,
-      // maxRecordToReturn,
-      // changeMaxRecordToReturn,
+      maxRecordToReturn,
+      changeMaxRecordToReturn,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];
@@ -495,10 +401,7 @@ export default defineComponent({
         }
         return filtered;
       },
-      redirectToInviteMember,
       hideAddOrgDialog,
-      hideJoinOrgDialog,
-      config
     };
   },
   methods: {

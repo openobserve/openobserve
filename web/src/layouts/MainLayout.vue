@@ -291,27 +291,6 @@ class="padding-none" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <div v-if="config.isCloud == 'true'">
-                <q-item
-                  v-ripple="true"
-                  v-close-popup="true"
-                  clickable
-                  :to="{ path: '/settings' }"
-                >
-                  <q-item-section avatar>
-                    <q-avatar
-                      size="md"
-                      icon="settings"
-                      color="red"
-                      text-color="white"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ t("menu.settings") }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-                <q-separator />
-              </div>
               <q-item clickable>
                 <q-item-section avatar>
                   <q-icon size="xs" name="language" class="padding-none" />
@@ -457,7 +436,6 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
-  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
@@ -558,16 +536,11 @@ export default defineComponent({
       if (config.isEnterprise == "true") {
         invlidateLoginData();
       }
-
-      const logoutURL = getLogoutURL();
       this.store.dispatch("logout");
 
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
 
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
       this.$router.push("/logout");
     },
     goToHome() {
