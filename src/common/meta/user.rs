@@ -148,15 +148,10 @@ pub fn get_default_user_role() -> UserRole {
 
 #[cfg(feature = "enterprise")]
 pub fn get_roles() -> Vec<UserRole> {
-    let mut roles = vec![];
-    // TODO: Allow all roles in cloud as well
-    #[cfg(feature = "cloud")]
-    roles.push(UserRole::Admin);
-    #[cfg(not(feature = "cloud"))]
-    for role in UserRole::iter() {
-        roles.push(role);
+    match cfg!(feature = "cloud") {
+        true => vec![UserRole::Admin],
+        false => UserRole::iter().collect(),
     }
-    roles
 }
 
 #[cfg(not(feature = "enterprise"))]

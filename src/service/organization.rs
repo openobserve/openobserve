@@ -511,17 +511,14 @@ pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool
         return true;
     }
     for member_org in member_orgs {
-        match org_usage::get(&member_org.identifier).await {
-            Ok(subscription) => {
-                if subscription.is_some() {
-                    let subscription = subscription.unwrap();
-                    if subscription.is_free_sub() {
-                        is_already_part_of_free_org = true;
-                        break;
-                    }
+        if let Ok(subscription) = org_usage::get(&member_org.identifier).await {
+            if subscription.is_some() {
+                let subscription = subscription.unwrap();
+                if subscription.is_free_sub() {
+                    is_already_part_of_free_org = true;
+                    break;
                 }
             }
-            Err(_) => {}
         }
     }
 

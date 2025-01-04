@@ -74,7 +74,6 @@ pub async fn process_token(
     #[cfg(feature = "cloud")]
     {
         check_and_add_to_org(&user_email, &name).await;
-        return;
     }
 
     #[cfg(not(feature = "cloud"))]
@@ -556,7 +555,7 @@ async fn check_and_add_to_org(user_email: &str, name: &str) {
 
     let mut tuples_to_add = HashMap::new();
     let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
-    let db_user = db::user::get_user_by_email(&user_email).await;
+    let db_user = db::user::get_user_by_email(user_email).await;
     if db_user.is_none() {
         match create_new_user(DBUser {
             email: user_email.to_owned(),
@@ -571,7 +570,7 @@ async fn check_and_add_to_org(user_email: &str, name: &str) {
         .await
         {
             Ok(_) => {
-                let tuples = vec![get_user_org_tuple(&user_email, &user_email)];
+                let tuples = vec![get_user_org_tuple(user_email, user_email)];
                 tuples_to_add.insert(user_email.to_string(), tuples);
                 log::info!("User added to the database");
             }
