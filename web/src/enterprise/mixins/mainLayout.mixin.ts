@@ -28,11 +28,17 @@ const MainLayoutCloudMixin = {
         link: "/pipeline",
         name: "pipeline",
       });
-      linksList.value.splice(10, 0, {
-        title: t("menu.billings"),
-        icon: "payments",
-        link: "/billings",
-      });
+
+      if(!store.state.zoConfig?.custom_hide_menus
+          ?.split(",")
+          ?.includes("billings")
+      ) {
+        linksList.value.splice(10, 0, {
+          title: t("menu.billings"),
+          icon: "payments",
+          link: "/billings",
+        });
+      }
 
       return linksList.value;
     };

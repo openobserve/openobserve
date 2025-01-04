@@ -21,34 +21,33 @@ import Usage from "@/enterprise/components/billings/usage.vue";
 const useEnvRoutes = () => {
   const parentRoutes: any = [];
 
-  const homeChildRoutes: any = [];
-
-
-  // {
-  //   path: "billings",
-  //   name: "billings",
-  //   component: Billing,
-  //   meta: {
-  //     keepAlive: false,
-  //   },
-  //   children: [
-  //     {
-  //       path: "usage",
-  //       name: "usage",
-  //       component: Usage,
-  //     },
-  //     {
-  //       path: "plans",
-  //       name: "plans",
-  //       component: Plans,
-  //     },
-  //     {
-  //       path: "invoice_history",
-  //       name: "invoice_history",
-  //       component: InvoiceHistory,
-  //     },
-  //   ],
-  // },
+  const homeChildRoutes = [
+    {
+      path: "billings",
+      name: "billings",
+      component: Billing,
+      meta: {
+        keepAlive: false,
+      },
+      children: [
+        {
+          path: "usage",
+          name: "usage",
+          component: Usage,
+        },
+        {
+          path: "plans",
+          name: "plans",
+          component: Plans,
+        },
+        {
+          path: "invoice_history",
+          name: "invoice_history",
+          component: InvoiceHistory,
+        },
+      ],
+    },
+  ];
 
   return { parentRoutes, homeChildRoutes };
 };
