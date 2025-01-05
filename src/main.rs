@@ -599,7 +599,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .wrap(RequestTracing::new())
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        15,
+        1,
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
@@ -700,7 +700,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             ))
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        15,
+        1,
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
