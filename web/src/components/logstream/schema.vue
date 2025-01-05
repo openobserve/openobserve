@@ -1521,11 +1521,20 @@ export default defineComponent({
       const selectedFromDate = value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.from)
       const selectedToDate =value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.to)
       if (value.relativeTimePeriod == null) {
-        redDaysList.value.push({
-          start: convertDateToTimestamp(selectedFromDate,"00:00",'UTC').timestamp,
-          end: convertDateToTimestamp(selectedToDate,"00:00",'UTC').timestamp,
-        });
-        onSubmit();
+        try {
+            const startTimestamp = convertDateToTimestamp(selectedFromDate, "00:00", 'UTC').timestamp;
+            const endTimestamp = convertDateToTimestamp(selectedToDate, "00:00", 'UTC').timestamp;
+            
+            if (startTimestamp && endTimestamp) {
+              redDaysList.value.push({
+                start: startTimestamp,
+                end: endTimestamp,
+              });
+              onSubmit();
+            }
+          } catch (error) {
+            console.error('Error processing date selection:', error);
+          }
       }
     };
     const calculateDateRange = () => {
