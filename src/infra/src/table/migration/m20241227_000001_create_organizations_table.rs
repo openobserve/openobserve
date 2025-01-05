@@ -46,7 +46,7 @@ fn create_organizations_table_statement() -> TableCreateStatement {
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(Organizations::OrgName).string_len(100).not_null())
+        .col(ColumnDef::new(Organizations::OrgName).string_len(200).not_null())
         // Organizations type where...
         // - 0 is a default organization
         // - 1 is a custom organization
