@@ -100,7 +100,7 @@ export default defineComponent({
         })
         .catch((e) => {
           this.status = "error";
-          this.error = e.response.data.error.replaceAll("[BASE_URL]", baseURL);
+          this.error = e.response.data.message.replaceAll("[BASE_URL]", baseURL);
         });
     },
   },
