@@ -108,9 +108,8 @@ pub async fn search(
         let group = generate_search_group(start, end, step, group_interval);
         for (start, end) in group {
             let mut req = req.clone();
-            if end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3) {
-                req.need_wal = true;
-            }
+            req.need_wal =
+                end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
