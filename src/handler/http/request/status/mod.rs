@@ -117,6 +117,7 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     websocket_enabled: bool,
+    ingestion_url: String,
 }
 
 #[derive(Serialize)]
@@ -293,6 +294,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
+        ingestion_url: cfg.common.ingestion_url.to_string(),
     }))
 }
 
