@@ -16,7 +16,7 @@
 use std::io::{prelude::*, Error};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
-use actix_web::{http::header, post, web, HttpResponse};
+use actix_web::{post, web, HttpResponse};
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
@@ -110,17 +110,8 @@ pub async fn data(
     path: web::Path<String>,
     body: web::Bytes,
     rum_query_data: web::ReqData<RumExtraData>,
-    req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
-    let trace_id = req
-        .headers()
-        .get("request_id")
-        .unwrap_or(&t)
-        .to_str()
-        .unwrap();
     let org_id: String = path.into_inner();
-    ::log::info!("[{trace_id}] into post /v1/{org_id}/rum");
     let extend_json = &rum_query_data.data;
     Ok(
         match logs::ingest::ingest(
@@ -203,17 +194,8 @@ pub async fn sessionreplay(
     path: web::Path<String>,
     payload: MultipartForm<SegmentEvent>,
     rum_query_data: web::ReqData<RumExtraData>,
-    req: actix_web::HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let t = header::HeaderValue::from_str(config::ider::generate().as_str()).unwrap();
-    let trace_id = req
-        .headers()
-        .get("request_id")
-        .unwrap_or(&t)
-        .to_str()
-        .unwrap();
     let org_id = path.into_inner();
-    ::log::info!("[{trace_id}] into post /v1/{org_id}/replay");
     let mut segment_payload = String::new();
     if let Err(_e) =
         ZlibDecoder::new(&payload.segment.data[..]).read_to_string(&mut segment_payload)
@@ -231,7 +213,6 @@ pub async fn sessionreplay(
 
     let body = json::to_vec(&ingestion_payload).unwrap();
     let extend_json = &rum_query_data.data;
-    ::log::info!("[{trace_id}] start to ingest /v1/{org_id}/replay");
     Ok(
         match logs::ingest::ingest(
             0,
