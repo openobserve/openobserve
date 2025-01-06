@@ -28,7 +28,7 @@ use datafusion::{
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
@@ -79,6 +79,10 @@ pub(crate) async fn create_context(
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let index_fields = stream_settings
+        .index_fields
+        .iter()
+        .collect::<HashSet<&String>>();
 
     // rewrite partition filters
     let partition_keys: HashMap<&String, &StreamPartition> = stream_settings
@@ -167,7 +171,7 @@ pub(crate) async fn create_context(
     });
 
     // search tantivy index
-    let index_condition = convert_matchers_to_index_condition(&matchers, &schema)?;
+    let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
             filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
@@ -337,12 +341,14 @@ async fn cache_parquet_files(
 fn convert_matchers_to_index_condition(
     matchers: &Matchers,
     schema: &Arc<Schema>,
+    index_fields: &HashSet<&String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
     let cfg = get_config();
     for mat in matchers.matchers.iter() {
         if mat.name == cfg.common.column_timestamp
             || mat.name == VALUE_LABEL
+            || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()
         {
             continue;
