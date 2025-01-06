@@ -882,7 +882,7 @@ pub struct Common {
     pub result_cache_selection_strategy: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = "60",
+        default = 60,
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
@@ -892,6 +892,12 @@ pub struct Common {
     pub fake_es_version: String,
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub websocket_enabled: bool,
+    #[env_config(
+        name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
+        default = 300,
+        help = "allow minimum auto refresh interval in seconds"
+    )] // in seconds
+    pub min_auto_refresh_interval: u32,
 }
 
 #[derive(EnvConfig)]
@@ -970,6 +976,8 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_MAX_SEARCH_INTERVAL_PER_GROUP", default = 24)] // hours
+    pub metrics_max_search_interval_per_group: i64,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
@@ -1624,6 +1632,17 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.max_file_size_in_memory = 128 * 1024 * 1024; // 128MB
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
+    }
+
+    // check for metrics limit
+    if cfg.limit.metrics_max_search_interval_per_group == 0 {
+        cfg.limit.metrics_max_search_interval_per_group = 24;
+    }
+    if cfg.limit.metrics_max_series_per_query == 0 {
+        cfg.limit.metrics_max_series_per_query = 30000;
+    }
+    if cfg.limit.metrics_max_points_per_series == 0 {
+        cfg.limit.metrics_max_points_per_series = 30000;
     }
 
     // HACK instance_name
