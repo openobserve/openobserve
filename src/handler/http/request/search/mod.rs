@@ -45,6 +45,7 @@ use crate::{
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
             },
+            stream::get_settings_max_query_range,
         },
     },
     service::{
@@ -238,7 +239,9 @@ pub async fn search(
         if let Some(settings) =
             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
-            let max_query_range = settings.max_query_range;
+            let max_query_range =
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                    .await;
             if max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
@@ -1113,6 +1116,12 @@ pub async fn search_partition(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let org_id = org_id.into_inner();
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
@@ -1127,9 +1136,16 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req, false)
-        .instrument(http_span)
-        .await;
+    let search_res = SearchService::search_partition(
+        &trace_id,
+        &org_id,
+        Some(&user_id),
+        stream_type,
+        &req,
+        false,
+    )
+    .instrument(http_span)
+    .await;
 
     // do search
     match search_res {

@@ -1002,6 +1002,8 @@ pub struct Limit {
     pub request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
+    pub keep_alive_disabled: bool,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -1144,6 +1146,12 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_MAX_QUERY_RANGE_FOR_SA",
+        default = 0,
+        help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
+    )]
+    pub max_query_range_for_sa: i64,
 }
 
 #[derive(EnvConfig)]
