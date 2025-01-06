@@ -150,7 +150,7 @@ pub struct OrganizationSettingPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_websocket_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_auto_refresh_interval: Option<bool>,
+    pub min_auto_refresh_interval: Option<u32>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
