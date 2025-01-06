@@ -1162,6 +1162,12 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_MAX_QUERY_RANGE_FOR_SA",
+        default = 0,
+        help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
+    )]
+    pub max_query_range_for_sa: i64,
 }
 
 #[derive(EnvConfig)]

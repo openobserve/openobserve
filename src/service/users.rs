@@ -721,7 +721,6 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     // need to drop the reference to rum_tokens to avoid deadlock of dashmap
     drop(rum_tokens);
 
-    log::info!("get_user_by_token: User not found in cache, fetching from db");
     if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
         .await
         .ok()
