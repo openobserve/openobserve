@@ -23,7 +23,7 @@ use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::extract_and_save_data,
+    service::enrichment_table::store_multipart_to_disk,
 };
 
 /// CreateEnrichmentTable
@@ -83,12 +83,21 @@ pub async fn save_enrichment_table(
                     None => false,
                 };
 
-                extract_and_save_data(&org_id, &table_name, append_data, payload).await?;
-
-                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                    StatusCode::OK.into(),
-                    "Saved enrichment table".to_string(),
-                )))
+                match store_multipart_to_disk(&org_id, &table_name, append_data, payload).await {
+                    Ok(response) => Ok(response),
+                    Err(error) => {
+                        log::error!(
+                            "[ENRICHMENT_TABLE] Failed to save enrichment table: {}",
+                            error
+                        );
+                        Ok(
+                            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                format!("Failed to save enrichment table: {}", error),
+                            )),
+                        )
+                    }
+                }
             } else {
                 Ok(MetaHttpResponse::bad_request(
                     "Bad Request, content-type must be multipart/form-data",
