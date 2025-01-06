@@ -151,8 +151,10 @@ impl QueryConditionExt for QueryCondition {
                         promql::micros(promql::MINIMAL_INTERVAL),
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
+                    query_exemplars: false,
+                    no_cache: None,
                 };
-                let resp = match promql::search::search(org_id, &req, 0, "").await {
+                let resp = match promql::search::search(org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok((None, end_time));
@@ -366,6 +368,7 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
+                use_cache: None,
             };
             SearchService::search(&trace_id, org_id, stream_type, None, &req).await
         };

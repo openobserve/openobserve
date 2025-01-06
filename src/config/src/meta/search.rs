@@ -24,6 +24,9 @@ use crate::{
     utils::{base64, json},
 };
 
+pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
+    "Please be aware that the response is based on partial data";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
     Memory,
@@ -58,6 +61,9 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_cache: Option<bool>, // used for search job,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -208,6 +214,8 @@ pub struct Response {
     pub result_cache_ratio: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_by: Option<OrderBy>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -264,6 +272,7 @@ impl Response {
             new_end_time: None,
             result_cache_ratio: 0,
             work_group: None,
+            order_by: None,
         }
     }
 
@@ -342,6 +351,10 @@ impl Response {
 
     pub fn set_work_group(&mut self, val: Option<String>) {
         self.work_group = val;
+    }
+
+    pub fn set_order_by(&mut self, val: Option<OrderBy>) {
+        self.order_by = val;
     }
 }
 
@@ -476,6 +489,7 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
+            use_cache: None,
         };
         Ok(search_req)
     }
@@ -1006,6 +1020,7 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
+                use_cache: None,
             });
         }
         res

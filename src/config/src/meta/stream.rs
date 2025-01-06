@@ -83,7 +83,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
-            "enrichment_tables" => StreamType::EnrichmentTables,
+            "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
             "index" => StreamType::Index,
@@ -92,17 +92,9 @@ impl From<&str> for StreamType {
     }
 }
 
-impl From<StreamType> for cluster_rpc::StreamType {
-    fn from(value: StreamType) -> Self {
-        match value {
-            StreamType::Logs => cluster_rpc::StreamType::Logs,
-            StreamType::Metrics => cluster_rpc::StreamType::Metrics,
-            StreamType::Traces => cluster_rpc::StreamType::Traces,
-            StreamType::EnrichmentTables => cluster_rpc::StreamType::EnrichmentTables,
-            StreamType::Filelist => cluster_rpc::StreamType::Filelist,
-            StreamType::Metadata => cluster_rpc::StreamType::Metadata,
-            StreamType::Index => cluster_rpc::StreamType::Index,
-        }
+impl From<String> for StreamType {
+    fn from(s: String) -> Self {
+        StreamType::from(s.as_str())
     }
 }
 
@@ -650,7 +642,7 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub defined_schema_fields: Option<Vec<String>>,
     #[serde(default)]
-    pub max_query_range: i64,
+    pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]

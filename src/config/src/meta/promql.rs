@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::FxIndexMap;
 use hashbrown::HashMap;
 use proto::prometheus_rpc;
 use serde::{Deserialize, Serialize};
@@ -27,11 +26,12 @@ pub const VALUE_LABEL: &str = "value";
 pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
+pub const EXEMPLARS_LABEL: &str = "exemplars";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {
     #[serde(flatten)]
-    pub labels: &'a FxIndexMap<String, String>,
+    pub labels: &'a crate::FxIndexMap<String, String>,
     pub value: f64,
 }
 
@@ -133,6 +133,8 @@ pub struct RequestRangeQuery {
     pub step: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
+    /// Do not use cache.
+    pub no_cache: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,7 +147,7 @@ pub struct RequestMetadata {
 }
 
 // key - metric name
-pub(crate) type ResponseMetadata = HashMap<String, Vec<MetadataObject>>;
+pub type ResponseMetadata = HashMap<String, Vec<MetadataObject>>;
 
 #[derive(Debug, Serialize)]
 pub struct MetadataObject {

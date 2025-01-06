@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -21,6 +22,7 @@ use std::{
 use async_trait::async_trait;
 use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use promql_parser::label::Matchers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -33,14 +35,20 @@ mod functions;
 #[cfg(feature = "enterprise")]
 pub mod name_visitor;
 pub mod search;
+pub mod selector_visitor;
+mod utils;
 pub mod value;
 
 pub use engine::Engine;
-pub use exec::Query;
+pub use exec::PromqlContext;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
-pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s
-pub(crate) const MAX_DATA_POINTS: i64 = 256; // Width of panel
+pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
+pub(crate) const MAX_DATA_POINTS: i64 = 256; // Width of panel: window.innerWidth / 4
+pub(crate) const DEFAULT_MAX_POINTS_PER_SERIES: usize = 30000; // Maximum number of points per series
+const DEFAULT_MAX_SERIES_PER_QUERY: usize = 30000; // Maximum number of series in a single query
+const DEFAULT_STEP: Duration = Duration::from_secs(15); // default step in seconds
+const MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING: i64 = 10; // Adjust this value as needed
 
 #[async_trait]
 pub trait TableProvider: Sync + Send + 'static {
@@ -49,6 +57,8 @@ pub trait TableProvider: Sync + Send + 'static {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
+        machers: Matchers,
+        label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
@@ -59,6 +69,8 @@ pub struct MetricsQueryRequest {
     pub start: i64,
     pub end: i64,
     pub step: i64,
+    pub query_exemplars: bool,
+    pub no_cache: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,6 +93,18 @@ pub struct QueryResponse {
     pub status: Status,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<QueryResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExemplarsResponse {
+    pub status: Status,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<value::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,6 +170,61 @@ pub(crate) fn micros(t: Duration) -> i64 {
     t.as_micros()
         .try_into()
         .expect("BUG: time value is too large to fit in i64")
+}
+
+pub fn round_step(mut step: i64) -> i64 {
+    // align step to seconds
+    let second = micros(Duration::from_secs(1));
+    if step >= second {
+        step -= step % second;
+    }
+    if step == 0 {
+        micros(DEFAULT_STEP)
+    } else if step > (100 * second) {
+        step - (step % (10 * second))
+    } else if step > (10 * second) {
+        step - (step % (5 * second))
+    } else {
+        step
+    }
+}
+
+pub fn align_start_end(mut start: i64, mut end: i64, step: i64) -> (i64, i64) {
+    // Round start to the nearest smaller value divisible by step.
+    start -= start % step;
+    // Round end to the nearest bigger value divisible by step.
+    let adjust = end % step;
+    if adjust > 0 {
+        end += step - adjust
+    }
+    (start, end)
+}
+
+pub fn adjust_start_end(start: i64, end: i64, step: i64, disable_cache: bool) -> (i64, i64) {
+    if disable_cache {
+        // Do not adjust start and end values when cache is disabled.
+        return (start, end);
+    }
+
+    let points = (end - start) / step + 1;
+
+    if points < MIN_TIMESERIES_POINTS_FOR_TIME_ROUNDING {
+        // Too small number of points for rounding.
+        return (start, end);
+    }
+
+    // Round start and end to values divisible by step in order
+    // to enable response caching.
+    let (start, mut end) = align_start_end(start, end, step);
+
+    // Make sure that the new number of points is the same as the initial number of points.
+    let mut new_points = (end - start) / step + 1;
+    while new_points > points {
+        end -= step;
+        new_points -= 1;
+    }
+
+    (start, end)
 }
 
 #[cfg(test)]

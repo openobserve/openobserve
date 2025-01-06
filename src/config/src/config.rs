@@ -463,6 +463,20 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
+    pub tls_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_MIN_VERSION", default = "", help = "Supported values: "1.2" or "1.3", default is all_version")]
+    pub tls_min_version: String,
+    #[env_config(
+        name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        default = "webpki",
+        help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
+    )]
+    pub tls_root_certificates: String,
 }
 
 #[derive(EnvConfig)]
@@ -748,13 +762,13 @@ pub struct Common {
     pub inverted_index_old_format: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "parquet",
+        default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "",
+        default = "tantivy",
         help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,
@@ -868,7 +882,7 @@ pub struct Common {
     pub result_cache_selection_strategy: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = "60",
+        default = 60,
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
@@ -876,6 +890,14 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
+    #[env_config(
+        name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
+        default = 300,
+        help = "allow minimum auto refresh interval in seconds"
+    )] // in seconds
+    pub min_auto_refresh_interval: u32,
 }
 
 #[derive(EnvConfig)]
@@ -954,6 +976,10 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
+    pub metrics_max_series_per_query: usize,
+    #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
+    pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -982,6 +1008,8 @@ pub struct Limit {
     pub request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
+    pub keep_alive_disabled: bool,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -1124,6 +1152,12 @@ pub struct Limit {
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_MAX_QUERY_RANGE_FOR_SA",
+        default = 0,
+        help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
+    )]
+    pub max_query_range_for_sa: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1534,6 +1568,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check http config
+    if let Err(e) = check_http_config(&mut cfg) {
+        panic!("common config error: {e}")
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1703,6 +1742,18 @@ fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             || cfg.grpc.tls_key_path.is_empty())
     {
         return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+    }
+    Ok(())
+}
+
+fn check_http_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.http.tls_enabled
+        && (cfg.http.tls_cert_path.is_empty() || cfg.http.tls_key_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "When ZO_HTTP_TLS_ENABLED=true, both ZO_HTTP_TLS_CERT_PATH \
+             and ZO_HTTP_TLS_KEY_PATH must be set."
+        ));
     }
     Ok(())
 }

@@ -204,8 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete"
-color="grey" size="xs" />
+                            <q-icon name="delete" color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -303,7 +302,7 @@ color="grey" size="xs" />
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.toggleFunction"
-          :icon="'img:' + getImageURL('images/common/function.svg')"
+          :icon="functionToggleIcon"
           title="Toggle Function Editor"
           class="float-left"
           size="32px"
@@ -318,7 +317,7 @@ color="grey" size="xs" />
             auto-close
             size="12px"
             icon="save"
-            :icon-right="'img:' + getImageURL('images/common/function.svg')"
+            :icon-right="iconRight"
             :title="t('search.functionPlaceholder')"
             split
             class="no-outline saved-views-dropdown no-border btn-function"
@@ -385,8 +384,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -2716,6 +2714,26 @@ export default defineComponent({
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
+    const iconRight = computed(() => {
+      return (
+        "img:" +
+        getImageURL(
+          store.state.theme === "dark"
+            ? "images/common/function_dark.svg"
+            : "images/common/function.svg",
+        )
+      );
+    });
+    const functionToggleIcon = computed(() => {
+      return (
+        "img:" +
+        getImageURL(
+          searchObj.meta.toggleFunction
+            ? "images/common/function_dark.svg"
+            : "images/common/function.svg",
+        )
+      );
+    });
 
     // [END] cancel running queries
 
@@ -2805,6 +2823,8 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      iconRight,
+      functionToggleIcon,
     };
   },
   computed: {
