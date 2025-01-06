@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, get_config};
+use infra::table::enrichment_table_jobs;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
@@ -69,6 +70,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     tokio::task::spawn(async move { run_check_running_search_jobs().await });
     tokio::task::spawn(async move { run_delete_jobs().await });
+    tokio::task::spawn(async move { run_enrichment_table_delete_jobs().await });
 
     Ok(())
 }
@@ -185,6 +187,18 @@ async fn run_enrichment_table_jobs(id: i64) -> Result<(), anyhow::Error> {
                 id,
                 e
             );
+        }
+    }
+}
+
+async fn run_enrichment_table_delete_jobs() -> Result<(), anyhow::Error> {
+    let interval = get_config().limit.enrichment_table_job_delete_interval;
+    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        if let Err(e) = enrichment_table_jobs::delete_jobs().await {
+            log::error!("[ENRICHMENT_TABLE_JOB] run delete jobs error: {}", e);
         }
     }
 }

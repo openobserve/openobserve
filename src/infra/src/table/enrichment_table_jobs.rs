@@ -388,6 +388,19 @@ pub async fn set_job_failed(task_id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+pub async fn delete_jobs() -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::TaskStatus.eq(TaskStatus::Completed))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn is_empty() -> bool {
     len().await == 0
 }

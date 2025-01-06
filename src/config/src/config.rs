@@ -1156,6 +1156,8 @@ pub struct Limit {
         help = "Timeout for query"
     )]
     pub enrichment_table_job_timeout: i64,
+    #[env_config(name = "ZO_ENRICHMENT_TABLE_JOB_DELETE_INTERVAL", default = 600)] // seconds
+    pub enrichment_table_job_delete_interval: i64,
 }
 
 #[derive(EnvConfig)]
