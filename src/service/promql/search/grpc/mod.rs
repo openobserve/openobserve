@@ -104,7 +104,7 @@ pub async fn search(
     if start == end {
         results.push(search_inner(req).await?);
     } else {
-        let group_interval = (max_interval / step) * step;
+        let group_interval = max_interval - max_interval % step;
         let group = generate_search_group(start, end, step, group_interval);
         for (start, end) in group {
             let mut req = req.clone();
@@ -194,18 +194,14 @@ pub async fn search_inner(
     Ok((value, result_type, scan_stats))
 }
 
-// start: 0
-// end: 10
-// step: 2
-// group_interval: 4
-// group 1: 0-4 -> point 0, 2 ,4
-// group 2: 6-10 -> point 6, 8, 10
+/// generate search group
+/// if the last group is less than group_interval * 25%, it will be merged into the previous group
 fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -> Vec<(i64, i64)> {
     let mut resp = Vec::new();
     let mut start = start;
     while start < end {
         let next = start + group_interval;
-        if next > end {
+        if next >= end - group_interval / 4 {
             resp.push((start, end));
             break;
         }
@@ -280,5 +276,38 @@ fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
                 ..Default::default()
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_search_group() {
+        // test case 1: normal case
+        let resp = generate_search_group(0, 10, 2, 4);
+        let expected = vec![(0, 4), (6, 10)];
+        assert_eq!(resp, expected);
+
+        // test case 2: start == end
+        let resp = generate_search_group(0, 0, 2, 4);
+        let expected = vec![];
+        assert_eq!(resp, expected);
+
+        // test case 3: start > end
+        let resp = generate_search_group(10, 0, 2, 4);
+        let expected = vec![];
+        assert_eq!(resp, expected);
+
+        // test case 4, the last group is greater than group_interval * 25%
+        let resp = generate_search_group(0, 11, 2, 8);
+        let expected = vec![(0, 8), (10, 11)];
+        assert_eq!(resp, expected);
+
+        // test case 5, the last group is less than group_interval * 25%
+        let resp = generate_search_group(0, 10, 2, 8);
+        let expected = vec![(0, 10)];
+        assert_eq!(resp, expected);
     }
 }
