@@ -65,7 +65,7 @@ class="indexDetailsContainer" style="height: 100vh">
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs"> {{ indexData.name }}</span>
+                <span class="title q-pl-xs" > {{ indexData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -105,16 +105,22 @@ class="indexDetailsContainer" style="height: 100vh">
                 >
               </div>
               <div
-                class="stream-time-container"
+                class="stream-time-container flex justify-between tw-gap-5"
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
-                {{ t("logStream.time") }}
-                <span class="title q-pl-xs">
-                  {{ indexData.stats.doc_time_min }}
+              
+
+                <span class="q-px-xs">
+                      Start Time:
+                 <span class="title">{{ indexData.stats.doc_time_min }}</span>
                 </span>
-                <span>to</span>
-                <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                
+                <span class=" q-px-xs">
+                  End Time:
+                  <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                </span>
+
               </div>
             </div>
           </div>
@@ -978,11 +984,11 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
 
       indexData.value.defined_schema_fields =
