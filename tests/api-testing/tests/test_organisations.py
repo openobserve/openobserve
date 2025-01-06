@@ -2,7 +2,7 @@
 import random
 import string
 
-def generate_unique_alphanumeric(length=6):
+def generate_unique_alphanumeric(length=5):
     """Generate a unique alphanumeric string of a specified length."""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
