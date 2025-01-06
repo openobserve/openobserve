@@ -269,7 +269,11 @@ class="indexDetailsContainer" style="height: 100vh">
                   color="primary"
                   data-test="schema-add-fields-title"
                   @click="openDialog"
-                  class="font-weight-bold"
+                  class="q-my-sm text-bold no-border"
+                  padding="sm md"
+                  no-caps
+                  dense
+                  :disable="isDialogOpen"
                 >
                   Add Field(s)
                 </q-btn>
@@ -278,16 +282,15 @@ class="indexDetailsContainer" style="height: 100vh">
             <div class="q-mb-md" v-if="isDialogOpen">
               <q-card class="add-fields-card">
                 <!-- Header Section -->
-                <q-card-section>
+                <q-card-section class="q-pa-none" style="padding: 8px 16px 6px 16px">
                   <div class="tw-flex tw-justify-between tw-items-center">
                     <div class="text-h6">Add Field(s)</div>
                     <div>
                       <q-btn
                         data-test="add-stream-cancel-btn"
                         icon="close"
-                        class="q-my-sm text-bold q-mr-md"
+                        class=" text-bold q-mr-md"
                         text-color="light-text"
-                        padding="sm md"
                         no-caps
                         dense
                         flat
@@ -299,7 +302,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 <!-- Main Content (Scrollable if necessary) -->
                 <q-card-section
                   class="q-pa-none"
-                  style="flex: 1; overflow-y: auto"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px"
                 >
                   <StreamFieldsInputs
                     :fields="newSchemaFields"
