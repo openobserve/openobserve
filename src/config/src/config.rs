@@ -882,7 +882,7 @@ pub struct Common {
     pub result_cache_selection_strategy: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = "60",
+        default = 60,
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
@@ -892,6 +892,12 @@ pub struct Common {
     pub fake_es_version: String,
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub websocket_enabled: bool,
+    #[env_config(
+        name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
+        default = 300,
+        help = "allow minimum auto refresh interval in seconds"
+    )] // in seconds
+    pub min_auto_refresh_interval: u32,
 }
 
 #[derive(EnvConfig)]
