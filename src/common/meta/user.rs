@@ -146,17 +146,14 @@ pub fn get_default_user_role() -> UserRole {
     UserRole::Admin
 }
 
-#[cfg(feature = "enterprise")]
 pub fn get_roles() -> Vec<UserRole> {
-    match cfg!(feature = "cloud") {
-        true => vec![UserRole::Admin],
-        false => UserRole::iter().collect(),
+    if cfg!(feature = "cloud") {
+        vec![UserRole::Admin]
+    } else if cfg!(feature = "enterprise") {
+        UserRole::iter().collect()
+    } else {
+        vec![UserRole::Admin, UserRole::Root, UserRole::ServiceAccount]
     }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub fn get_roles() -> Vec<UserRole> {
-    vec![UserRole::Admin, UserRole::Root, UserRole::ServiceAccount]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

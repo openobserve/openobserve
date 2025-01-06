@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "cloud")]
-use chrono::{Duration, Utc};
-#[cfg(feature = "cloud")]
-use config::{get_config, SMTP_CLIENT};
 use config::{
     ider,
     meta::{
@@ -28,17 +24,18 @@ use config::{
     utils::rand::generate_random_string,
 };
 #[cfg(feature = "cloud")]
-use lettre::{message::SinglePart, AsyncTransport, Message};
-#[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::org_invites;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use {
+    crate::common::meta::organization::{
+        OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
+    },
+    chrono::{Duration, Utc},
+    config::{get_config, SMTP_CLIENT},
+    lettre::{message::SinglePart, AsyncTransport, Message},
+    o2_enterprise::enterprise::cloud::org_invites,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+};
 
 use super::{db::org_users, users::add_admin_to_org};
-#[cfg(feature = "cloud")]
-use crate::common::meta::organization::{
-    OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
-};
 use crate::{
     common::{
         meta::organization::{

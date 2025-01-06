@@ -17,5 +17,7 @@
 //! for HTTP responses and requests.
 
 pub mod alerts;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod dashboards;
 pub mod folders;

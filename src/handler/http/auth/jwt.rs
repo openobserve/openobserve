@@ -22,29 +22,26 @@ use o2_enterprise::enterprise::openfga::authorizer::authz::{
     get_user_creation_tuples, get_user_org_tuple, update_tuples,
 };
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use o2_enterprise::enterprise::openfga::authorizer::roles::{
-    check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
-};
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use once_cell::sync::Lazy;
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use regex::Regex;
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::{
         common::meta::user::RoleOrg,
         service::{organization, users},
     },
     config::meta::user::{UserOrg, UserRole},
+    o2_enterprise::enterprise::openfga::authorizer::roles::{
+        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
+    },
+    once_cell::sync::Lazy,
+    regex::Regex,
 };
 #[cfg(feature = "enterprise")]
 use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    serde_json::Value,
+    std::collections::HashMap,
 };
-#[cfg(feature = "enterprise")]
-use {serde_json::Value, std::collections::HashMap};
 
 #[cfg(feature = "cloud")]
 use crate::{
