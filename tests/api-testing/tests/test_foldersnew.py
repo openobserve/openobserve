@@ -101,7 +101,7 @@ def test_retrieve_dashboard_folders_400(create_session, base_url):
         f"{resp_create_new_dashboards_folders_blank.content}"
     )
 
-def test_retrieve_dashboard_folders_404(create_session, base_url):
+def test_retrieve_dashboard_folders_404_empty_org(create_session, base_url):
     org_id = "" # Empty org_id to test the case
     payload = {"description": "newfoldernvp", "name": ""}
     
@@ -225,7 +225,7 @@ def test_retrieve_alerts_folders_400(create_session, base_url):
         f"{resp_create_new_alerts_folders_blank.content}"
     )
 
-def test_retrieve_alerts_folders_400(create_session, base_url):
+def test_retrieve_alerts_folders_404_empty_org(create_session, base_url):
     org_id = "" # Empty org_id to test the case
     payload = {"description": "newfoldernvp", "name": ""}
     
@@ -244,10 +244,10 @@ def test_invalid_folder_id_retrieve_alerts(create_session, base_url):
     invalid_folder_id = "e56454545dfd@43232"  # Folder ID that doesn't exist
     
     resp_get_alerts_folders_invalid = create_session.get(
-        f"{base_url}api/v2/{org_id}/folders/dashboards/{invalid_folder_id}"
+        f"{base_url}api/v2/{org_id}/folders/alerts/{invalid_folder_id}"
     )
     assert resp_get_alerts_folders_invalid.status_code == 404, (
-        f"Expected 404 Not Found, but got {resp_get_alerts_folders.status_code} "
+        f"Expected 404 Not Found, but got {resp_get_alerts_folders_invalid.status_code} "
         f"{resp_get_alerts_folders_invalid.content}"
     )
 
