@@ -177,7 +177,16 @@ pub async fn validate_credentials(
     } else {
         match path.find('/') {
             Some(index) => {
-                let org_id = &path[0..index];
+                // hack for v2 api for alerts and folders
+                let org_id = if path_columns.len() > 2
+                    && path_columns[0].eq("v2")
+                    && (path_columns[2].eq("alerts") || path_columns[2].eq("folders"))
+                {
+                    path_columns[1]
+                } else {
+                    &path[0..index]
+                };
+
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
                 } else {
@@ -331,7 +340,15 @@ pub async fn validate_credentials_ext(
     } else {
         match path.find('/') {
             Some(index) => {
-                let org_id = &path[0..index];
+                // hack for v2 api for alerts and folders
+                let org_id = if path_columns.len() > 2
+                    && path_columns[0].eq("v2")
+                    && (path_columns[2].eq("alerts") || path_columns[2].eq("folders"))
+                {
+                    path_columns[1]
+                } else {
+                    &path[0..index]
+                };
                 if is_root_user(user_id) {
                     users::get_user(Some(DEFAULT_ORG), user_id).await
                 } else {
