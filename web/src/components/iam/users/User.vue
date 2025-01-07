@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="confirmDeleteAction(props)"
             style="cursor: pointer !important"
+            :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
             v-if="props.row.enableEdit && config.isCloud == 'false'"
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="addRoutePush(props)"
             style="cursor: pointer !important"
+             :data-test="`edit-basic-user-${props.row.email}`"
           />
         </q-td>
       </template>
@@ -104,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               :label="t(`user.add`)"
               @click="addRoutePush({})"
+              data-test="add-basic-user"
             />
           </div>
         </div>
@@ -164,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-card-actions class="confirmActions">
           <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+            no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn

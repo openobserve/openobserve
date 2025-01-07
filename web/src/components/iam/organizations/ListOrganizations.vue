@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               :label="t(`organization.add`)"
               @click="addOrganization"
+              data-test="Add Organization"
             />
           </div>
         </div>

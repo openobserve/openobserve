@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <q-btn
+            data-test="close-organizations-modal"
             v-close-popup="true"
             round
             flat
@@ -76,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             padding="sm md"
             no-caps
             @click="router.replace({ name: 'organizations' })"
+            data-test="cancel-organizations-modal"
           />
           <q-btn
             :disable="organizationData.name === '' && !proPlanRequired"

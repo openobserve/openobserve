@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-auto">
           <q-btn
+            data-test="close-user-button"
             v-close-popup="true"
             round
             flat
@@ -65,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 rules.email(val) || 'Please enter a valid email address',
             ]"
             maxlength="100"
+            data-test="user-email-field"
           />
 
           <div v-if="!beingUpdated && !existingUser">
@@ -85,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
+               data-test="user-password-field"
             >
               <template v-slot:append>
                 <q-icon
@@ -107,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             filled
             dense
+            data-test="user-first-name-field"
           />
 
           <q-input
@@ -120,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             filled
             dense
+            data-test="user-last-name-field"
           />
           <q-select
             v-if="(existingUser || beingUpdated) && (
@@ -139,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
+            data-test="user-role-field"
             />
           <q-select
               v-if="(existingUser || beingUpdated) && (
@@ -160,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               use-input
               @filter="filterFn"
+            data-test="user-custom-role-field"
               :disable="filterdOption.length === 0"
             />
           <div v-if="beingUpdated">
@@ -173,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
+              data-test="user-change-password-field"
             />
 
             <q-input
@@ -197,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
+            data-test="user-old-passoword-field"
             >
               <template v-slot:append>
                 <q-icon
@@ -225,6 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (val && val.length >= 8) ||
                   'Password must be at least 8 characters long',
               ]"
+              data-test="user-new-password-field"
             >
               <template v-slot:append>
                 <q-icon
@@ -284,6 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm md"
               no-caps
               @click="$emit('cancel:hideform')"
+              data-test="cancel-user-button"
             />
             <q-btn
               :label="t('user.save')"
@@ -292,6 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm xl"
               type="submit"
               no-caps
+              data-test="save-user-button"
             />
           </div>
         </q-form>
