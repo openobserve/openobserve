@@ -1827,7 +1827,7 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.data_tmp_dir.is_empty() {
         cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
     }
-    if cfg.common.data_tmp_dir.ends_with('/') {
+    if !cfg.common.data_tmp_dir.ends_with('/') {
         cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
