@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span class="text-subtitle2 text-bold q-mr-sm"  
                   :class="{
-                  highlighted: isHighlighted([index]),
+                  highlighted: isHighlighted(index),
                   'current-match': currentSelectedValue === index, // Current match class
               }">
                 {{ span.serviceName }}
@@ -238,30 +238,25 @@ export default defineComponent({
       if (currentIndex.value === -1 || searchResults.value.length === 0) {
         return null;
       }
-      return searchResults.value[currentIndex.value ?? 0][0];
+      return searchResults.value[currentIndex.value ?? 0];
     });
 
-    const findMatches = (spans:any, query:any, path = []) => {
-      const matches:any = [];
-      spans.forEach((span:any, index:any) => {
-        const currentPath = [...path, index];
-        // Iterate over each key-value pair in the span
-        Object.entries(span).forEach(([key, value]) => {
-          // Check if value is a string or number
-          if (typeof value === 'string') {
-            if (value.toLowerCase().includes(query.toLowerCase())) {
-              matches.push(currentPath);
+    const findMatches = (spanList:any, searchQuery:any) => {
+      const query = searchQuery.toLowerCase().trim();
+      return spanList
+        .map((span:any, index:any) => {
+          // Check if any span value matches the query
+          const matches = Object.values(span).some((value) => {
+            if (typeof value === "string" || typeof value === "number") {
+              return String(value).toLowerCase().includes(query);
             }
-          } else if (typeof value === 'number') {
-            if (value.toString().includes(query)) {
-              matches.push(currentPath);
-            }
-          }
-        });
-      });
-      return matches;
+            return false; // Skip non-string/non-number values
+          });
+          // Return the index if a match is found, otherwise return -1
+          return matches ? index : -1;
+        })
+        .filter((index:any) => index !== -1);
     };
-
     const updateSearch = () => {
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
@@ -273,10 +268,16 @@ export default defineComponent({
       }
     };
 
-    const isHighlighted = (path:any) => {
-      return searchResults.value.some((resultPath:any) =>
-        resultPath.join(',') === path.join(',')
-      );
+    const isHighlighted = (path: any) => {
+      // If the path is an array, join it and compare with resultPath joined
+      if (Array.isArray(path)) {
+        return searchResults.value.some((resultPath: any) =>
+          resultPath.join(',') === path.join(',')
+        );
+      }
+
+      // If path is a single value (index), compare it directly
+      return searchResults.value.includes(path);
     };
 
     const scrollToMatch = () => {
