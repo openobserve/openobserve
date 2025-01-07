@@ -337,29 +337,47 @@ pub async fn extract_multipart(
     Ok(records)
 }
 
-pub async fn store_multipart_to_disk(
+pub async fn add_task(
     org_id: &str,
     table_name: &str,
     append_data: bool,
-    mut payload: Multipart,
-) -> Result<HttpResponse, Error> {
-    // Create a task_id and store the task in the database
-    let key = format!("{}/{}/{}", org_id, table_name, append_data);
-    let task_id = ider::uuid();
+    file_link: Option<String>,
+) -> Result<(String, String), Error> {
+    let key = generte_file_key(org_id, table_name, append_data);
+    let task_id = generate_task_id();
     enrichment_table_jobs::add(
         &task_id,
         enrichment_table_jobs::TaskStatus::Pending,
-        Some(key),
-        None,
+        Some(key.clone()),
+        file_link,
     )
     .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    .map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] Failed to add task: {}", e);
+        Error::other("Failed to add task")
+    })?;
+    Ok((task_id, key))
+}
 
-    let tmp_dir = get_config().common.data_tmp_dir.clone();
-    let dir_path = format!("{}enrichment_table/{}/", tmp_dir, org_id);
-    tokio::fs::create_dir_all(dir_path.clone()).await?;
+pub async fn store_file_to_disk(key: &str, file_link: &str) -> Result<(), anyhow::Error> {
+    let (org_id, table_name, append_data) = parse_key(key);
 
-    let temp_file_path = format!("{}{}_{}.csv", dir_path, table_name, append_data);
+    let temp_file_path = prepare_file_path(&org_id, &table_name, append_data).await?;
+
+    let mut response = reqwest::get(file_link).await?;
+    write_to_file(&temp_file_path, &mut response).await?;
+
+    Ok(())
+}
+
+pub async fn store_multipart_to_disk(
+    key: &str,
+    mut payload: Multipart,
+) -> Result<(), anyhow::Error> {
+    let (org_id, table_name, append_data) = parse_key(key);
+
+    let temp_file_path = prepare_file_path(&org_id, &table_name, append_data).await?;
+
     let mut temp_file = tokio::fs::OpenOptions::new()
         .create(true)
         .write(true)
@@ -368,37 +386,28 @@ pub async fn store_multipart_to_disk(
         .await?;
 
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let Some(content_disposition) = field.content_disposition() else {
-            continue;
-        };
-        if content_disposition.get_filename().is_none() {
-            continue;
-        };
-
-        while let Some(chunk) = field.next().await {
-            let chunk = chunk.unwrap();
-            temp_file.write_all(&chunk).await?;
+        if let Some(content_disposition) = field.content_disposition() {
+            if content_disposition.get_filename().is_some() {
+                while let Some(chunk) = field.next().await {
+                    let chunk = chunk.unwrap();
+                    temp_file.write_all(&chunk).await?;
+                }
+            }
         }
     }
 
     temp_file.flush().await?;
     drop(temp_file);
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        StatusCode::OK.into(),
-        format!("Saved enrichment table to disk, task_id: {}", task_id),
-    )))
+    Ok(())
 }
 
-pub async fn remove_temp_file(
+async fn remove_temp_file(
     org_id: &str,
     table_name: &str,
     append_data: bool,
 ) -> Result<(), std::io::Error> {
-    let temp_file_path = format!(
-        "./data/openobserve/tmp/enrichment_table/{}/{}_{}.csv",
-        org_id, table_name, append_data
-    );
+    let temp_file_path = construct_file_path(org_id, table_name, append_data);
     tokio::fs::remove_file(&temp_file_path).await
 }
 
@@ -423,10 +432,7 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
 
     let mut record_buffer = Vec::new();
     let mut part_number = 0;
-    let file_path = format!(
-        "./data/openobserve/tmp/enrichment_table/{}/{}_{}.csv",
-        org_id, table_name, append_data
-    );
+    let file_path = construct_file_path(&org_id, &table_name, append_data);
     let file = File::open(file_path)?;
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(true)
@@ -491,6 +497,17 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
     Ok(())
 }
 
+#[inline]
+fn generate_task_id() -> String {
+    ider::uuid()
+}
+
+#[inline]
+fn generte_file_key(org_id: &str, table_name: &str, append_data: bool) -> String {
+    format!("{}/{}/{}", org_id, table_name, append_data)
+}
+
+#[inline]
 fn parse_key(key: &str) -> (String, String, bool) {
     let parts: Vec<&str> = key.split('/').collect();
     let org_id = parts[0].to_string();
@@ -498,4 +515,43 @@ fn parse_key(key: &str) -> (String, String, bool) {
     let append_data = parts[2].parse::<bool>().unwrap_or(false);
 
     (org_id, table_name, append_data)
+}
+
+#[inline]
+fn construct_file_path(org_id: &str, table_name: &str, append_data: bool) -> String {
+    let tmp_dir = get_config().common.data_tmp_dir.clone();
+    let dir_path = format!("{}enrichment_table/{}/", tmp_dir, org_id);
+    format!("{}{}_{}.csv", dir_path, table_name, append_data)
+}
+
+#[inline]
+async fn prepare_file_path(
+    org_id: &str,
+    table_name: &str,
+    append_data: bool,
+) -> Result<String, Error> {
+    let file_path = construct_file_path(org_id, table_name, append_data);
+
+    // Extract the directory from the file path
+    if let Some(dir_path) = std::path::Path::new(&file_path).parent() {
+        tokio::fs::create_dir_all(dir_path).await?;
+    }
+    Ok(file_path)
+}
+
+#[inline]
+async fn write_to_file(file_path: &str, response: &mut reqwest::Response) -> Result<(), Error> {
+    let mut temp_file = tokio::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(file_path)
+        .await?;
+
+    while let Ok(Some(chunk)) = response.chunk().await {
+        temp_file.write_all(&chunk).await?;
+    }
+
+    temp_file.flush().await?;
+    Ok(())
 }

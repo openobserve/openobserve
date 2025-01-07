@@ -20,10 +20,11 @@ use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use config::SIZE_IN_MB;
 use hashbrown::HashMap;
+use url::Url;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::store_multipart_to_disk,
+    common::meta::{enrichment_table::EnrichmentTableReq, http::HttpResponse as MetaHttpResponse},
+    service::enrichment_table::{add_task, store_file_to_disk, store_multipart_to_disk},
 };
 
 /// CreateEnrichmentTable
@@ -48,6 +49,7 @@ pub async fn save_enrichment_table(
     path: web::Path<(String, String)>,
     payload: Multipart,
     req: HttpRequest,
+    body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (org_id, table_name) = path.into_inner();
     let content_type = req.headers().get("content-type");
@@ -69,6 +71,11 @@ pub async fn save_enrichment_table(
             cfg.limit.enrichment_table_limit
         )));
     }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let append_data = match query.get("append") {
+        Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
+        None => false,
+    };
     match content_type {
         Some(content_type) => {
             if content_type
@@ -76,15 +83,56 @@ pub async fn save_enrichment_table(
                 .unwrap_or("")
                 .starts_with("multipart/form-data")
             {
-                let query =
-                    web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-                let append_data = match query.get("append") {
-                    Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
-                    None => false,
+                let (task_id, key) = add_task(&org_id, &table_name, append_data, None).await?;
+                match store_multipart_to_disk(&key, payload).await {
+                    Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                        StatusCode::OK.into(),
+                        format!("Saved enrichment table to disk, task_id: {}", task_id),
+                    ))),
+                    Err(error) => {
+                        log::error!(
+                            "[ENRICHMENT_TABLE] Failed to save enrichment table: {}",
+                            error
+                        );
+                        Ok(
+                            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                format!("Failed to save enrichment table: {}", error),
+                            )),
+                        )
+                    }
+                }
+            } else if content_type
+                .to_str()
+                .unwrap_or("")
+                .starts_with("application/json")
+            {
+                let req: EnrichmentTableReq = match serde_json::from_slice(&body) {
+                    Ok(req) => req,
+                    Err(_) => {
+                        return Ok(MetaHttpResponse::bad_request(
+                            "Bad Request, req body must be a valid JSON",
+                        ))
+                    }
+                };
+                let Some(ref file_link) = req.file_link else {
+                    return Ok(MetaHttpResponse::bad_request(
+                        "Bad Request, file_link missing",
+                    ));
                 };
 
-                match store_multipart_to_disk(&org_id, &table_name, append_data, payload).await {
-                    Ok(response) => Ok(response),
+                // Validate the file link
+                if Url::parse(file_link).is_err() {
+                    return Ok(MetaHttpResponse::bad_request("Invalid file link provided"));
+                }
+
+                let (task_id, key) =
+                    add_task(&org_id, &table_name, append_data, req.file_link.clone()).await?;
+                match store_file_to_disk(&key, file_link).await {
+                    Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                        StatusCode::OK.into(),
+                        format!("Saved enrichment table to disk, task_id: {}", task_id),
+                    ))),
                     Err(error) => {
                         log::error!(
                             "[ENRICHMENT_TABLE] Failed to save enrichment table: {}",

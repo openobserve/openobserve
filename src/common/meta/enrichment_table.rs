@@ -13,21 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod authz;
-pub mod enrichment_table;
-pub mod http;
-pub mod ingestion;
-pub mod maxmind;
-pub mod middleware_data;
-pub mod organization;
-pub mod pipelines;
-pub mod proxy;
-pub mod saved_view;
-pub mod search;
-pub mod service;
-pub mod service_account;
-pub mod stream;
-pub mod syslog;
-pub mod telemetry;
-pub mod traces;
-pub mod user;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EnrichmentTableReq {
+    pub file_link: Option<String>,
+}
