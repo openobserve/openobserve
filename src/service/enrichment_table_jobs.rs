@@ -40,7 +40,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         job.task_id
     );
 
-    let ttl = std::cmp::max(120, config::get_config().limit.enrichment_table_job_timeout) as u64;
+    let ttl = std::cmp::max(120, config::get_config().limit.enrichment_table_job_timeout / 4) as u64;
     let job_id = job.task_id.clone();
     let (_tx, mut rx) = mpsc::channel::<()>(1);
     tokio::task::spawn(async move {
@@ -76,6 +76,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             e
         );
         enrichment_table_jobs::set_job_failed(&job.task_id).await?;
+        return Ok(());
     };
 
     // update the task status to completed
