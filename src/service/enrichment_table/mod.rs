@@ -425,7 +425,6 @@ pub async fn remove_temp_file(
 }
 
 pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
-    return Err(anyhow::anyhow!("test"));
     let Some(ref key) = task.file_key else {
         let err = format!("[task_id: {}] File key not found", task.task_id);
         log::error!("{err}",);
