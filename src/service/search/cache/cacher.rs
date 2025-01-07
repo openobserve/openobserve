@@ -37,11 +37,14 @@ use crate::{
     },
 };
 
-//
+/// Invalidate cached response by stream min ts
+/// This is done to ensure that any stale data which is no longer retained in the stream is not
+/// returned as part of the cached response
+/// The cache will eventually remove the stale data as part of the cache eviction policy
 pub async fn invalidate_cached_response_by_stream_min_ts(
     file_path: &str,
-    responses: &mut [CachedQueryResponse],
-) -> Result<(), String> {
+    responses: &[CachedQueryResponse],
+) -> Result<Vec<CachedQueryResponse>, String> {
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
         return Err(format!(
@@ -51,14 +54,14 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     }
 
     let (org_id, stream_type_str, stream_name) = (components[0], components[1], components[2]);
-    let stream_type = StreamType::try_from(stream_type_str)
-        .map_err(|_| format!("Invalid stream type: {}", stream_type_str))?;
+    let stream_type = StreamType::from(stream_type_str);
 
     let stream_min_ts =
         infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type).doc_time_min;
 
-    let _ = responses
-        .iter_mut()
+    let filtered_responses = responses
+        .iter()
+        .cloned()
         .filter_map(|mut meta| {
             if meta.response_end_time >= stream_min_ts {
                 if meta.response_start_time < stream_min_ts {
@@ -71,7 +74,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
         })
         .collect();
 
-    Ok(())
+    Ok(filtered_responses)
 }
 
 #[tracing::instrument(
@@ -206,14 +209,16 @@ pub async fn check_cache(
         }
 
         // remove the cached response older than stream min ts
-        if let Err(e) =
-            invalidate_cached_response_by_stream_min_ts(file_path, &mut multi_resp.cached_response)
-                .await
+        match invalidate_cached_response_by_stream_min_ts(file_path, &multi_resp.cached_response)
+            .await
         {
-            log::error!(
+            Ok(responses) => {
+                multi_resp.cached_response = responses;
+            }
+            Err(e) => log::error!(
                 "Error invalidating cached response by stream min ts: {:?}",
                 e
-            );
+            ),
         }
 
         let total_hits = cached_responses
@@ -282,16 +287,20 @@ pub async fn check_cache(
         .await
         {
             Some(mut cached_resp) => {
-                if let Err(e) = invalidate_cached_response_by_stream_min_ts(
+                // remove the cached response older than stream min ts
+                match invalidate_cached_response_by_stream_min_ts(
                     file_path,
-                    &mut multi_resp.cached_response,
+                    &multi_resp.cached_response,
                 )
                 .await
                 {
-                    log::error!(
+                    Ok(responses) => {
+                        multi_resp.cached_response = responses;
+                    }
+                    Err(e) => log::error!(
                         "Error invalidating cached response by stream min ts: {:?}",
                         e
-                    );
+                    ),
                 }
 
                 let mut deltas = vec![];
