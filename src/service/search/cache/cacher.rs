@@ -37,6 +37,43 @@ use crate::{
     },
 };
 
+//
+pub async fn invalidate_cached_response_by_stream_min_ts(
+    file_path: &str,
+    responses: &mut [CachedQueryResponse],
+) -> Result<(), String> {
+    let components: Vec<&str> = file_path.split('/').collect();
+    if components.len() < 3 {
+        return Err(format!(
+            "File path does not contain sufficient components: {}",
+            file_path
+        ));
+    }
+
+    let (org_id, stream_type_str, stream_name) = (components[0], components[1], components[2]);
+    let stream_type = StreamType::try_from(stream_type_str)
+        .map_err(|_| format!("Invalid stream type: {}", stream_type_str))?;
+
+    let stream_min_ts =
+        infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type).doc_time_min;
+
+    let _ = responses
+        .iter_mut()
+        .filter_map(|mut meta| {
+            if meta.response_end_time >= stream_min_ts {
+                if meta.response_start_time < stream_min_ts {
+                    meta.response_start_time = stream_min_ts;
+                }
+                Some(meta) // Keep the entry after updating
+            } else {
+                None // Remove the entry
+            }
+        })
+        .collect();
+
+    Ok(())
+}
+
 #[tracing::instrument(
     name = "service:search:cache:cacher:check_cache",
     skip_all,
@@ -168,6 +205,17 @@ pub async fn check_cache(
             cached_responses.sort_by_key(|meta| meta.response_start_time);
         }
 
+        // remove the cached response older than stream min ts
+        if let Err(e) =
+            invalidate_cached_response_by_stream_min_ts(file_path, &mut multi_resp.cached_response)
+                .await
+        {
+            log::error!(
+                "Error invalidating cached response by stream min ts: {:?}",
+                e
+            );
+        }
+
         let total_hits = cached_responses
             .iter()
             .map(|v| v.cached_response.total)
@@ -234,6 +282,18 @@ pub async fn check_cache(
         .await
         {
             Some(mut cached_resp) => {
+                if let Err(e) = invalidate_cached_response_by_stream_min_ts(
+                    file_path,
+                    &mut multi_resp.cached_response,
+                )
+                .await
+                {
+                    log::error!(
+                        "Error invalidating cached response by stream min ts: {:?}",
+                        e
+                    );
+                }
+
                 let mut deltas = vec![];
                 calculate_deltas_v1(
                     &(ResultCacheMeta {
