@@ -18,6 +18,7 @@ use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, JsonValue,
     Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
+use serde::Serialize;
 
 use super::get_lock;
 use crate::{
@@ -36,6 +37,8 @@ pub struct Model {
     pub function: String, // The main action script
     #[sea_orm(column_type = "Json")]
     pub dependencies: String, // Dependencies or setup instructions
+    #[sea_orm(column_type = "String(StringLen::N(128))")]
+    pub org_id: String,
     #[sea_orm(column_type = "Json")]
     pub env: JsonValue, // Environment variables serialized as JSON
     #[sea_orm(column_type = "Json")]
@@ -62,25 +65,26 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug)]
+#[derive(FromQueryResult, Debug, Serialize)]
+pub struct ActionScriptDetails {
+    pub id: String,
+    pub name: String,
+    pub function: String,
+    pub dependencies: String,
+    pub env: JsonValue,
+    pub execution_details: ExecutionDetailsType,
+    pub cron_expr: Option<String>,
+}
+
+#[derive(FromQueryResult, Debug, Serialize)]
 pub struct ActionScriptInfo {
     pub id: String,
     pub name: String,
-}
-
-impl ActionScriptInfo {
-    // TODO add more parameters when the monitoring system is implemented
-    pub fn new(id: &str, name: &str) -> Self {
-        Self {
-            id: id.into(),
-            name: name.into(),
-        }
-    }
-}
-
-#[derive(FromQueryResult, Debug)]
-pub struct ActionScriptId {
-    pub id: String,
+    pub created_at: DateTimeUtc,         // Automatically set on insert
+    pub updated_at: Option<DateTimeUtc>, // Automatically updated
+    pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
+    pub last_failure_at: Option<DateTimeUtc>, // Automatically updated
+    pub failure_count: i32,              // Number of times the script has failed
 }
 
 pub async fn init() -> Result<(), errors::Error> {
@@ -130,10 +134,15 @@ pub async fn create_table() -> Result<(), errors::Error> {
 //     Ok(())
 // }
 
-pub async fn add(action: &Action, created_at: DateTimeUtc) -> Result<(), errors::Error> {
+pub async fn add(
+    action: &Action,
+    created_at: DateTimeUtc,
+    org_id: &str,
+) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(action.id.unwrap().to_string().to_lowercase()),
         name: Set(action.name.clone()),
+        org_id: Set(org_id.to_string()),
         function: Set(action.blob.clone()),
         env: Set(serde_json::json!(action.environment_variables.clone())),
         dependencies: Set(action.dependencies.join(",")),
@@ -164,33 +173,50 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(id: &str) -> Result<ActionScriptInfo, errors::Error> {
+pub async fn get(id: &str, org_id: &str) -> Result<ActionScriptDetails, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .select_only()
-        .column(Column::Id)
-        .column(Column::Name)
-        .filter(Column::Id.eq(id))
-        .into_model::<ActionScriptInfo>()
-        .one(client)
-        .await?
-        .ok_or_else(|| {
-            Error::DbError(DbError::SeaORMError("Action Script not found".to_string()))
-        })?;
+    dbg!(&id, &org_id);
+    let record = dbg!(
+        Entity::find()
+            .select_only()
+            .column(Column::Id)
+            .column(Column::Name)
+            .column(Column::Function)
+            .column(Column::Dependencies)
+            .column(Column::Env)
+            .column(Column::ExecutionDetails)
+            .column(Column::CronExpr)
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::Id.eq(id))
+            .into_model::<ActionScriptDetails>()
+            .one(client)
+            .await?
+    )
+    .ok_or_else(|| Error::DbError(DbError::SeaORMError("Action Script not found".to_string())))?;
 
     Ok(record)
 }
 
-pub async fn list(limit: Option<i64>) -> Result<Vec<ActionScriptInfo>, errors::Error> {
+pub async fn list(
+    org_id: &str,
+    limit: Option<i64>,
+) -> Result<Vec<ActionScriptInfo>, errors::Error> {
+    let limit = limit.unwrap_or(100);
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let mut res = Entity::find()
+    let res = Entity::find()
         .select_only()
         .column(Column::Id)
+        .column(Column::OrgId)
         .column(Column::Name)
+        .column(Column::CreatedAt)
+        .column(Column::UpdatedAt)
+        .column(Column::LastExecutedAt)
+        .column(Column::LastFailureAt)
+        .column(Column::FailureCount)
+        .filter(Column::OrgId.eq(org_id))
+        .limit(limit as u64)
         .order_by(Column::Id, Order::Desc);
-    if let Some(limit) = limit {
-        res = res.limit(limit as u64);
-    }
+
     let records = res.into_model::<ActionScriptInfo>().all(client).await?;
 
     Ok(records)

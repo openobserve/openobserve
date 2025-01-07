@@ -188,6 +188,7 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+zip = "2.2.2"
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
 
@@ -355,3 +356,4 @@ utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "3d16e345232bb3cb9b104ee6461e9dd0b4c361da" }
 vrl = { version = "0.19.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"
+zip = "2.2.2"
