@@ -360,11 +360,13 @@ pub async fn add_task(
 }
 
 pub async fn store_file_to_disk(key: &str, file_link: &str) -> Result<(), anyhow::Error> {
-    let (org_id, table_name, append_data) = parse_key(key);
+    let (org_id, table_name, append_data) = parse_key(key)?;
 
     let temp_file_path = prepare_file_path(&org_id, &table_name, append_data).await?;
 
-    let mut response = reqwest::get(file_link).await?;
+    let client = reqwest::Client::new();
+    let ttl = std::time::Duration::from_secs(get_config().limit.query_timeout);
+    let mut response = client.get(file_link).timeout(ttl).send().await?;
     write_to_file(&temp_file_path, &mut response).await?;
 
     Ok(())
@@ -374,7 +376,7 @@ pub async fn store_multipart_to_disk(
     key: &str,
     mut payload: Multipart,
 ) -> Result<(), anyhow::Error> {
-    let (org_id, table_name, append_data) = parse_key(key);
+    let (org_id, table_name, append_data) = parse_key(key)?;
 
     let temp_file_path = prepare_file_path(&org_id, &table_name, append_data).await?;
 
@@ -430,7 +432,7 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
         log::error!("{err}",);
         return Err(anyhow::anyhow!("{err}"));
     };
-    let (org_id, table_name, append_data) = parse_key(key);
+    let (org_id, table_name, append_data) = parse_key(key)?;
     log::info!(
         "[ENRICHMENT_TABLE] Starting to extract and save data for org_id: {}, table_name: {}, append_data: {}",
         org_id,
@@ -516,13 +518,18 @@ fn generte_file_key(org_id: &str, table_name: &str, append_data: bool) -> String
 }
 
 #[inline]
-pub fn parse_key(key: &str) -> (String, String, bool) {
+pub fn parse_key(key: &str) -> Result<(String, String, bool), anyhow::Error> {
     let parts: Vec<&str> = key.split('/').collect();
+    if parts.len() != 3 {
+        let err_msg = format!("[ENRICHMENT_TABLE] Invalid key format: {}", key);
+        log::info!("{err_msg}");
+        return Err(anyhow::anyhow!("{err_msg}"));
+    }
     let org_id = parts[0].to_string();
     let table_name = parts[1].to_string();
     let append_data = parts[2].parse::<bool>().unwrap_or(false);
 
-    (org_id, table_name, append_data)
+    Ok((org_id, table_name, append_data))
 }
 
 #[inline]
