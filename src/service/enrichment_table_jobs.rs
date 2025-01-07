@@ -83,6 +83,8 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             e
         );
         enrichment_table_jobs::set_job_failed(&job.task_id).await?;
+        let (org_id, table_name, append_data) = enrichment_table::parse_key(&job.file_key.unwrap());
+        enrichment_table::remove_temp_file(&org_id, &table_name, append_data).await?;
         return Ok(());
     };
 

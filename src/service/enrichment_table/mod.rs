@@ -402,16 +402,30 @@ pub async fn store_multipart_to_disk(
     Ok(())
 }
 
-async fn remove_temp_file(
+pub async fn remove_temp_file(
     org_id: &str,
     table_name: &str,
     append_data: bool,
 ) -> Result<(), std::io::Error> {
     let temp_file_path = construct_file_path(org_id, table_name, append_data);
-    tokio::fs::remove_file(&temp_file_path).await
+    match tokio::fs::remove_file(&temp_file_path).await {
+        Ok(_) => {
+            log::info!("Temporary file removed: {}", temp_file_path);
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            log::warn!("File not found, nothing to remove: {}", temp_file_path);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("Failed to remove file {}: {:?}", temp_file_path, e);
+            Err(e)
+        }
+    }
 }
 
 pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
+    return Err(anyhow::anyhow!("test"));
     let Some(ref key) = task.file_key else {
         let err = format!("[task_id: {}] File key not found", task.task_id);
         log::error!("{err}",);
@@ -503,7 +517,7 @@ fn generte_file_key(org_id: &str, table_name: &str, append_data: bool) -> String
 }
 
 #[inline]
-fn parse_key(key: &str) -> (String, String, bool) {
+pub fn parse_key(key: &str) -> (String, String, bool) {
     let parts: Vec<&str> = key.split('/').collect();
     let org_id = parts[0].to_string();
     let table_name = parts[1].to_string();
