@@ -90,14 +90,15 @@ pub async fn save_enrichment_table(
                         format!("Saved enrichment table to disk, task_id: {}", task_id),
                     ))),
                     Err(error) => {
-                        log::error!(
-                            "[ENRICHMENT_TABLE] Failed to save enrichment table: {}",
-                            error
+                        let err_msg = format!(
+                            "[task_id: {}] Failed to save enrichment table: {}",
+                            task_id, error
                         );
+                        log::error!("{}", err_msg);
                         Ok(
                             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                                 StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                format!("Failed to save enrichment table: {}", error),
+                                err_msg,
                             )),
                         )
                     }

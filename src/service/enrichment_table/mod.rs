@@ -411,16 +411,11 @@ async fn remove_temp_file(
     tokio::fs::remove_file(&temp_file_path).await
 }
 
-pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), std::io::Error> {
+pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
     let Some(ref key) = task.file_key else {
-        log::error!(
-            "[ENRICHMENT_TABLE] File key not found for task_id: {}",
-            task.task_id
-        );
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "File key not found",
-        ));
+        let err = format!("[task_id: {}] File key not found", task.task_id);
+        log::error!("{err}",);
+        return Err(anyhow::anyhow!("{err}"));
     };
     let (org_id, table_name, append_data) = parse_key(key);
     log::info!(

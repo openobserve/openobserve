@@ -27,7 +27,6 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i16", db_type = "Integer")]
-#[serde(rename_all = "camelCase")]
 pub enum TaskStatus {
     #[sea_orm(num_value = 0)]
     Pending,
@@ -37,8 +36,6 @@ pub enum TaskStatus {
     Completed,
     #[sea_orm(num_value = 3)]
     Failed,
-    #[sea_orm(num_value = 4)]
-    Cancelled,
 }
 
 impl From<TaskStatus> for i16 {
@@ -48,7 +45,18 @@ impl From<TaskStatus> for i16 {
             TaskStatus::InProgress => 1,
             TaskStatus::Completed => 2,
             TaskStatus::Failed => 3,
-            TaskStatus::Cancelled => 4,
+        }
+    }
+}
+
+impl From<i16> for TaskStatus {
+    fn from(value: i16) -> Self {
+        match value {
+            0 => TaskStatus::Pending,
+            1 => TaskStatus::InProgress,
+            2 => TaskStatus::Completed,
+            3 => TaskStatus::Failed,
+            _ => unimplemented!("TaskStatus enum value not found"),
         }
     }
 }
@@ -61,8 +69,8 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_type = "String(StringLen::N(32))")]
     pub task_id: String,
-    #[sea_orm(column_type = "Integer", default = "TaskStatus::Pending")]
-    pub task_status: TaskStatus,
+    #[sea_orm(column_type = "Integer", default = "0")]
+    pub task_status: i16,
     #[sea_orm(column_type = "Text", nullable)]
     pub file_key: Option<String>, // Optional field for file key on the local disk
     #[sea_orm(column_type = "Text", nullable)]
@@ -104,7 +112,7 @@ impl From<Model> for EnrichmentTableJobsRecord {
     fn from(value: Model) -> Self {
         Self {
             task_id: value.task_id,
-            task_status: value.task_status,
+            task_status: TaskStatus::from(value.task_status),
             file_key: value.file_key,
             file_link: value.file_link,
         }
@@ -177,7 +185,7 @@ pub async fn add(
 ) -> Result<(), errors::Error> {
     let record = ActiveModel {
         task_id: Set(task_id.to_string()),
-        task_status: Set(task_status),
+        task_status: Set(task_status.into()),
         file_key: Set(file_key),
         file_link: Set(file_link),
         created_ts: Set(chrono::Utc::now().timestamp()),
@@ -207,7 +215,7 @@ pub async fn put(
     let active: ActiveModel = match get_model(client, task_id).await? {
         Some(model) => {
             let mut active: ActiveModel = model.into();
-            active.task_status = Set(task_status);
+            active.task_status = Set(task_status.into());
             active.file_key = Set(file_key);
             active.file_link = Set(file_link);
             active
@@ -215,7 +223,7 @@ pub async fn put(
         None => ActiveModel {
             id: NotSet,
             task_id: Set(task_id.to_string()),
-            task_status: Set(task_status),
+            task_status: Set(task_status.into()),
             file_key: Set(file_key),
             file_link: Set(file_link),
             created_ts: Set(chrono::Utc::now().timestamp()),
@@ -330,7 +338,7 @@ pub async fn update_running_job(task_id: &str) -> Result<(), errors::Error> {
     let active: ActiveModel = match get_model(client, task_id).await? {
         Some(model) => {
             let mut active: ActiveModel = model.into();
-            active.task_status = Set(TaskStatus::InProgress);
+            active.task_status = Set(TaskStatus::InProgress.into());
             active
         }
         None => {
@@ -352,7 +360,7 @@ pub async fn set_job_finish(task_id: &str) -> Result<(), errors::Error> {
     let active: ActiveModel = match get_model(client, task_id).await? {
         Some(model) => {
             let mut active: ActiveModel = model.into();
-            active.task_status = Set(TaskStatus::Completed);
+            active.task_status = Set(TaskStatus::Completed.into());
             active
         }
         None => {
@@ -374,7 +382,7 @@ pub async fn set_job_failed(task_id: &str) -> Result<(), errors::Error> {
     let active: ActiveModel = match get_model(client, task_id).await? {
         Some(model) => {
             let mut active: ActiveModel = model.into();
-            active.task_status = Set(TaskStatus::Failed);
+            active.task_status = Set(TaskStatus::Failed.into());
             active
         }
         None => {
