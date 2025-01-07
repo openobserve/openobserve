@@ -1190,7 +1190,11 @@ export const convertSQLData = async (
         panelSchema.type == "h-stacked") &&
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
-      return yAxisKeys.length === 1 ? xAXisKey : `${xAXisKey} (${label})`;
+      return yAxisKeys.length === 1
+        ? xAXisKey
+          ? xAXisKey
+          : label
+        : `${xAXisKey} (${label})`;
     }
 
     return label;
@@ -1214,7 +1218,8 @@ export const convertSQLData = async (
 
           if (
             breakDownKeys.length &&
-            (panelSchema.type === "bar" || panelSchema.type === "h-bar")
+            (panelSchema.type === "bar" || panelSchema.type === "h-bar") &&
+            !panelSchema.config.trellis?.layout
           ) {
             const seriesData = getAxisDataFromKey(yAxis);
             return getSeriesObj(yAxisName, seriesData, seriesConfig);
@@ -2097,9 +2102,7 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis.forEach((it: any) => {
-        it.type = "time";
-      });
+      options.xAxis[0].type = "time";
 
       options.xAxis[0].data = [];
 
