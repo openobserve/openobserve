@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       class="flex"
     >
-      <div :style="{ width: leftWidth + 'px' }">
+      <div
+         class="border-right" :style="{ width: leftWidth + 'px' }"  >
         <div
           :style="{
             height: '100%',
@@ -98,7 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-red-6 q-mr-xs"
                 title="Error Span"
               />
-              <span class="text-subtitle2 text-bold q-mr-sm">
+              <span class="text-subtitle2 text-bold q-mr-sm"  
+                  :class="{
+                  highlighted: isHighlighted([index]),
+                  'current-match': currentSelectedValue === index, // Current match class
+              }">
                 {{ span.serviceName }}
               </span>
               <span
@@ -123,7 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></div>
         </div>
       </div>
-
       <span-block
         :span="span"
         :depth="depth"
@@ -151,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref } from "vue";
+import { defineComponent, onBeforeMount, onMounted, ref,watch ,defineExpose, computed} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -196,6 +200,14 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    searchQuery: {
+      type: String,
+      default: '',
+    },
+    spanList: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ["toggleCollapse", "selectSpan"],
   setup(props, { emit }) {
@@ -220,6 +232,88 @@ export default defineComponent({
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };
+    const searchResults = ref<any[]>([]);
+    const currentIndex = ref<number | null>(null);
+    const currentSelectedValue = computed(() => {
+      if (currentIndex.value === -1 || searchResults.value.length === 0) {
+        return null;
+      }
+      return searchResults.value[currentIndex.value ?? 0][0];
+    });
+
+    const findMatches = (spans:any, query:any, path = []) => {
+      const matches:any = [];
+      spans.forEach((span:any, index:any) => {
+        const currentPath = [...path, index];
+        // Iterate over each key-value pair in the span
+        Object.entries(span).forEach(([key, value]) => {
+          // Check if value is a string or number
+          if (typeof value === 'string') {
+            if (value.toLowerCase().includes(query.toLowerCase())) {
+              matches.push(currentPath);
+            }
+          } else if (typeof value === 'number') {
+            if (value.toString().includes(query)) {
+              matches.push(currentPath);
+            }
+          }
+        });
+      });
+      return matches;
+    };
+
+    const updateSearch = () => {
+      if (props.searchQuery?.trim()) {
+        searchResults.value = findMatches(props.spanList, props.searchQuery);
+        currentIndex.value = 0; // Reset to first match
+        scrollToMatch();
+      } else {
+        searchResults.value = [];
+        currentIndex.value = null;
+      }
+    };
+
+    const isHighlighted = (path:any) => {
+      return searchResults.value.some((resultPath:any) =>
+        resultPath.join(',') === path.join(',')
+      );
+    };
+
+    const scrollToMatch = () => {
+      if (searchResults.value.length > 0) {
+        const matchElement = document.querySelector(`.current-match`);
+        if (matchElement) {
+          matchElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        }
+      }
+    };
+
+    const nextMatch = () => {
+     if (currentIndex.value !== null && currentIndex.value < searchResults.value.length - 1) {
+        currentIndex.value++;
+        scrollToMatch();
+      }
+      
+    };
+
+    const prevMatch = () => {
+      if (currentIndex.value !== null && currentIndex.value > 0) {
+        currentIndex.value--;
+        scrollToMatch();
+      }
+    };
+    defineExpose({
+      nextMatch,
+      prevMatch
+    });
+
+    watch(() => props.searchQuery, (newValue) => {
+      // Call the event to notify the parent
+      updateSearch();
+    });
 
     return {
       toggleSpanCollapse,
@@ -229,6 +323,13 @@ export default defineComponent({
       viewSpanLogs,
       t,
       spanHoveredIndex,
+      searchResults,
+      currentIndex,
+      updateSearch,
+      nextMatch,
+      prevMatch,
+      isHighlighted,
+      currentSelectedValue
     };
   },
   components: { SpanBlock },
@@ -276,5 +377,17 @@ export default defineComponent({
     visibility: visible;
     width: auto;
   }
+}
+.border-right{
+  border-right: 1px solid rgb(236, 236, 236);
+}
+.highlighted {
+  background-color: yellow;
+  font-weight: bold;
+}
+.current-match {
+  background-color: yellow;
+  color: red;
+  font-weight: bold;
 }
 </style>
