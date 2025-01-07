@@ -40,6 +40,10 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         job.task_id
     );
 
+    // update the task status to processing
+    enrichment_table_jobs::update_running_job(&job.task_id).await?;
+
+    // similar to the compactor, we need to update the job status every 15 seconds
     let ttl = std::cmp::max(
         120,
         config::get_config().limit.enrichment_table_job_timeout / 4,
