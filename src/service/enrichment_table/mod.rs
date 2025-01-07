@@ -449,11 +449,6 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
         .from_reader(file);
     let headers = rdr.headers()?.clone();
 
-    // if append_data is false, then we need to delete the existing table
-    // and create a new one when processing part 1
-    // and the rest of the data will be appended to the new table
-    let tmp_append_data = append_data || part_number != 1;
-
     for record in rdr.records() {
         let record = record?;
         let mut json_record = json::Map::new();
@@ -467,6 +462,11 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
         // Send records in batches to the saving task
         if record_buffer.len() >= MAX_RECORDS {
             part_number += 1;
+
+            // if append_data is false, then we need to delete the existing table
+            // and create a new one when processing part 1
+            // and the rest of the data will be appended to the new table
+            let tmp_append_data = append_data || part_number != 1;
 
             let full_buffer = std::mem::take(&mut record_buffer);
 
@@ -484,6 +484,11 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
     // Send any remaining records in the buffer
     if !record_buffer.is_empty() {
         part_number += 1;
+
+        // if append_data is false, then we need to delete the existing table
+        // and create a new one when processing part 1
+        // and the rest of the data will be appended to the new table
+        let tmp_append_data = append_data || part_number != 1;
 
         let full_buffer = std::mem::take(&mut record_buffer);
 
