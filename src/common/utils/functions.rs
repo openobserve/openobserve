@@ -75,21 +75,14 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .common
         .enable_enterprise_mmdb
-        && crate::common::infra::config::GEOIP_ENT_TABLE
-            .read()
-            .is_some()
     {
-        tables.insert(
-            o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
-                .to_owned(),
-            Box::new(
-                crate::common::infra::config::GEOIP_ENT_TABLE
-                    .read()
-                    .as_ref()
-                    .unwrap()
-                    .clone(),
-            ),
-        );
+        let geoip_ent = crate::common::infra::config::GEOIP_ENT_TABLE.read();
+        if let Some(table) = geoip_ent.as_ref() {
+            tables.insert(
+                    o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
+                        .to_owned(),Box::new(table.clone())
+                );
+        }
     };
 
     registry.load(tables);
