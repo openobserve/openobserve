@@ -209,11 +209,9 @@ pub async fn check_cache(
         }
 
         // remove the cached response older than stream min ts
-        match invalidate_cached_response_by_stream_min_ts(file_path, &multi_resp.cached_response)
-            .await
-        {
+        match invalidate_cached_response_by_stream_min_ts(file_path, &cached_responses).await {
             Ok(responses) => {
-                multi_resp.cached_response = responses;
+                cached_responses = responses;
             }
             Err(e) => log::error!(
                 "Error invalidating cached response by stream min ts: {:?}",
@@ -288,14 +286,12 @@ pub async fn check_cache(
         {
             Some(mut cached_resp) => {
                 // remove the cached response older than stream min ts
-                match invalidate_cached_response_by_stream_min_ts(
-                    file_path,
-                    &multi_resp.cached_response,
-                )
-                .await
+                match invalidate_cached_response_by_stream_min_ts(file_path, &[cached_resp.clone()])
+                    .await
                 {
                     Ok(responses) => {
-                        multi_resp.cached_response = responses;
+                        // single cached query response is expected
+                        cached_resp = responses[0].clone();
                     }
                     Err(e) => log::error!(
                         "Error invalidating cached response by stream min ts: {:?}",
