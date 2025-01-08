@@ -38,7 +38,7 @@ use infra::{
         SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
         STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
-    table::enrichment_table_jobs::{self, EnrichmentTableJobsRecord},
+    table::enrichment_table_jobs::{self, EnrichmentTableJobsRecord, TaskStatus},
 };
 use tokio::io::AsyncWriteExt;
 
@@ -56,7 +56,7 @@ use crate::{
 
 pub mod geoip;
 
-// Constants for chunk size and record limits
+// Constants for record limits
 const MAX_RECORDS: usize = 8192; // Save every 8192 records
 
 pub async fn save_enrichment_data(
@@ -343,11 +343,11 @@ pub async fn add_task(
     append_data: bool,
     file_link: Option<String>,
 ) -> Result<(String, String), Error> {
-    let key = generte_file_key(org_id, table_name, append_data);
+    let key = generate_file_key(org_id, table_name, append_data);
     let task_id = generate_task_id();
     enrichment_table_jobs::add(
         &task_id,
-        enrichment_table_jobs::TaskStatus::Pending,
+        enrichment_table_jobs::TaskStatus::FileDownload,
         Some(key.clone()),
         file_link,
     )
@@ -357,6 +357,16 @@ pub async fn add_task(
         Error::other("Failed to add task")
     })?;
     Ok((task_id, key))
+}
+
+pub async fn task_ready(task_id: &str) -> Result<(), Error> {
+    enrichment_table_jobs::set_job_status(task_id, TaskStatus::Pending)
+        .await
+        .map_err(|e| {
+            log::error!("[ENRICHMENT_TABLE] Failed to update task status: {}", e);
+            Error::other("Failed to update task status")
+        })?;
+    Ok(())
 }
 
 pub async fn store_file_to_disk(key: &str, file_link: &str) -> Result<(), anyhow::Error> {
@@ -526,7 +536,7 @@ async fn do_save(
     let tmp_append_data = append_data || *part_number != 1;
 
     // Save the buffer
-    save_enrichment_data(&org_id, &table_name, buffer, tmp_append_data).await
+    save_enrichment_data(org_id, table_name, buffer, tmp_append_data).await
 }
 
 #[inline]
@@ -535,7 +545,7 @@ fn generate_task_id() -> String {
 }
 
 #[inline]
-fn generte_file_key(org_id: &str, table_name: &str, append_data: bool) -> String {
+fn generate_file_key(org_id: &str, table_name: &str, append_data: bool) -> String {
     format!("{}/{}/{}", org_id, table_name, append_data)
 }
 

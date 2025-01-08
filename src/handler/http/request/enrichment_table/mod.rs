@@ -24,7 +24,9 @@ use url::Url;
 
 use crate::{
     common::meta::{enrichment_table::EnrichmentTableReq, http::HttpResponse as MetaHttpResponse},
-    service::enrichment_table::{add_task, store_file_to_disk, store_multipart_to_disk},
+    service::enrichment_table::{
+        add_task, store_file_to_disk, store_multipart_to_disk, task_ready,
+    },
 };
 
 /// CreateEnrichmentTable
@@ -85,10 +87,13 @@ pub async fn save_enrichment_table(
             {
                 let (task_id, key) = add_task(&org_id, &table_name, append_data, None).await?;
                 match store_multipart_to_disk(&key, payload).await {
-                    Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                        StatusCode::OK.into(),
-                        format!("Saved enrichment table to disk, task_id: {}", task_id),
-                    ))),
+                    Ok(_) => {
+                        task_ready(&task_id).await?;
+                        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                            StatusCode::OK.into(),
+                            format!("Saved enrichment table to disk, task_id: {}", task_id),
+                        )))
+                    }
                     Err(error) => {
                         let err_msg = format!(
                             "[task_id: {}] Failed to save enrichment table: {}",

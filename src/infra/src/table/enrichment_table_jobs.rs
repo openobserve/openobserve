@@ -36,6 +36,8 @@ pub enum TaskStatus {
     Completed,
     #[sea_orm(num_value = 3)]
     Failed,
+    #[sea_orm(num_value = 4)]
+    FileDownload,
 }
 
 impl From<TaskStatus> for i16 {
@@ -45,6 +47,7 @@ impl From<TaskStatus> for i16 {
             TaskStatus::InProgress => 1,
             TaskStatus::Completed => 2,
             TaskStatus::Failed => 3,
+            TaskStatus::FileDownload => 4,
         }
     }
 }
@@ -56,6 +59,7 @@ impl From<i16> for TaskStatus {
             1 => TaskStatus::InProgress,
             2 => TaskStatus::Completed,
             3 => TaskStatus::Failed,
+            4 => TaskStatus::FileDownload,
             _ => unimplemented!("TaskStatus enum value not found"),
         }
     }
@@ -383,6 +387,28 @@ pub async fn set_job_failed(task_id: &str) -> Result<(), errors::Error> {
         Some(model) => {
             let mut active: ActiveModel = model.into();
             active.task_status = Set(TaskStatus::Failed.into());
+            active
+        }
+        None => {
+            return Err(Error::DbError(DbError::SeaORMError(
+                "Task not found".to_string(),
+            )))
+        }
+    };
+    active.save(client).await?;
+
+    Ok(())
+}
+
+pub async fn set_job_status(task_id: &str, task_status: TaskStatus) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let active: ActiveModel = match get_model(client, task_id).await? {
+        Some(model) => {
+            let mut active: ActiveModel = model.into();
+            active.task_status = Set(task_status.into());
             active
         }
         None => {
