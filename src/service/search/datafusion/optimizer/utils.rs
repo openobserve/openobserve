@@ -39,7 +39,6 @@ pub fn is_complex_query(plan: &LogicalPlan) -> bool {
             | LogicalPlan::Join(_)
             | LogicalPlan::Distinct(_)
             | LogicalPlan::RecursiveQuery(_)
-            | LogicalPlan::SubqueryAlias(_)
             | LogicalPlan::Subquery(_)
             | LogicalPlan::Window(_)
             | LogicalPlan::Union(_)
@@ -68,7 +67,7 @@ impl TreeNodeRewriter for AddSortAndLimit {
         let is_complex = node.exists(|plan| Ok(is_complex_query(plan)))?;
         let mut is_stop = true;
         let (mut transformed, schema) = match node {
-            LogicalPlan::Projection(_) => {
+            LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
             }
