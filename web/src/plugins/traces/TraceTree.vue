@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, onMounted, ref,watch ,defineExpose, computed} from "vue";
+import { defineComponent, onBeforeMount, nextTick, ref,watch ,defineExpose, computed} from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
@@ -261,7 +261,9 @@ export default defineComponent({
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
         currentIndex.value = 0; // Reset to first match
-        scrollToMatch();
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
       } else {
         searchResults.value = [];
         currentIndex.value = null;
@@ -295,14 +297,18 @@ export default defineComponent({
     const nextMatch = () => {
      if (currentIndex.value !== null && currentIndex.value < searchResults.value.length - 1) {
         currentIndex.value++;
-        scrollToMatch();
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
       }
     };
 
     const prevMatch = () => {
       if (currentIndex.value !== null && currentIndex.value > 0) {
         currentIndex.value--;
-        scrollToMatch();
+        nextTick(() => {
+          scrollToMatch(); // Wait for DOM updates before scrolling
+        });
       }
     };
     defineExpose({
