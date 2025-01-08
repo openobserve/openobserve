@@ -425,24 +425,20 @@ pub async fn create<C: TransactionTrait>(
     Ok(alert)
 }
 
-/// Moves the alert out of the specified source folder and into the specified
-/// destination folder.
+/// Moves the alerts into the specified destination folder.
 pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
-    alert_id: Ksuid,
-    src_folder_id: &str,
+    alert_ids: &[Ksuid],
     dst_folder_id: &str,
 ) -> Result<(), AlertError> {
-    let Some((folder, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
-        return Err(AlertError::AlertNotFound);
-    };
+    for alert_id in alert_ids {
+        let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, *alert_id).await? else {
+            return Err(AlertError::AlertNotFound);
+        };
 
-    if src_folder_id != folder.folder_id {
-        return Err(AlertError::MoveAlertNotInSourceFolder);
+        update(conn, org_id, Some(dst_folder_id), alert).await?;
     }
-
-    update(conn, org_id, Some(dst_folder_id), alert).await?;
     Ok(())
 }
 

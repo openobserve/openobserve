@@ -428,7 +428,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::list_alerts)
         .service(alerts::enable_alert)
         .service(alerts::trigger_alert)
-        .service(alerts::move_alert)
+        .service(alerts::move_alerts)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)

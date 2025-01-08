@@ -15,6 +15,7 @@
 
 use config::meta::alerts::alert as meta_alerts;
 use serde::Deserialize;
+use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use super::{Alert, StreamType};
@@ -33,6 +34,16 @@ pub struct CreateAlertRequestBody {
 /// HTTP request body for `UpdateAlert` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct UpdateAlertRequestBody(pub Alert);
+
+/// HTTP request body for `MoveAlerts` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct MoveAlertsRequestBody {
+    /// IDs of the alerts to move.
+    pub alert_ids: Vec<Ksuid>,
+
+    /// Indicates the folder to which alerts should be moved.
+    pub dst_folder_id: String,
+}
 
 /// HTTP URL query component that contains parameters for listing alerts.
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
@@ -81,7 +92,7 @@ pub struct EnableAlertQuery {
 #[into_params(style = Form, parameter_in = Query)]
 #[serde(rename_all = "snake_case")]
 pub struct MoveAlertQuery {
-    pub from: String,
+    pub id: Vec<Ksuid>,
     pub to: String,
 }
 

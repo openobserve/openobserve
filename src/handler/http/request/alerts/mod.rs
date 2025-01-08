@@ -23,7 +23,7 @@ use crate::{
     handler::http::models::alerts::{
         requests::{
             CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertQuery,
-            UpdateAlertRequestBody,
+            MoveAlertsRequestBody, UpdateAlertRequestBody,
         },
         responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
     },
@@ -316,35 +316,47 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     }
 }
 
-/// MoveAlert
+/// MoveAlerts
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "MoveAlert",
+    operation_id = "MoveAlerts",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("alert_id" = Ksuid, Path, description = "Alert ID"),
-        MoveAlertQuery,
     ),
+    request_body(content = MoveAlertsRequestBody, description = "Identifies alerts and the destination folder", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/move")]
-async fn move_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
-    let (org_id, alert_id) = path.into_inner();
-    let Ok(query) = web::Query::<MoveAlertQuery>::from_query(req.query_string()) else {
-        return MetaHttpResponse::bad_request("Error parsing query parameters");
-    };
-
+#[put("/v2/{org_id}/alerts/move")]
+async fn move_alerts(
+    path: web::Path<String>,
+    req_body: web::Json<MoveAlertsRequestBody>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match alert::move_to_folder(client, &org_id, alert_id, &query.to, &query.from).await {
-        Ok(_) => MetaHttpResponse::ok("Alert moved"),
+    match alert::move_to_folder(
+        client,
+        &org_id,
+        &req_body.alert_ids,
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        Ok(_) => {
+            let message = if req_body.alert_ids.len() == 1 {
+                "Alert moved"
+            } else {
+                "Alerts moved"
+            };
+            MetaHttpResponse::ok(message)
+        }
         Err(e) => e.into(),
     }
 }
