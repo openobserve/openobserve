@@ -67,15 +67,10 @@ async fn run_download_files() {
 
         if Lazy::get(&CLIENT_INITIALIZED).is_none() {
             update_global_maxmind_client(&fname).await;
-            log::info!("Maxmind client initialized");
-            Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
         } else {
             log::info!("New enterprise file found, updating client");
             update_global_maxmind_client(&fname).await;
         }
-
-        Lazy::force(&CLIENT_INITIALIZED);
-        return;
     }
 
     let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
@@ -152,7 +147,6 @@ pub async fn update_global_maxmind_client(fname: &str) {
                     ))
                     .unwrap(),
                 );
-                return;
             }
 
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
