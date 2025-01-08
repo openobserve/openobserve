@@ -70,15 +70,6 @@ pub async fn check_for_schema(
     }
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() {
-        return Ok((
-            SchemaEvolution {
-                is_schema_changed: false,
-                types_delta: None,
-            },
-            None,
-        ));
-    }
 
     // get infer schema
     let value_iter = record_vals.into_iter();
