@@ -65,12 +65,7 @@ async fn run_download_files() {
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
-        if Lazy::get(&CLIENT_INITIALIZED).is_none() {
-            update_global_maxmind_client(&fname).await;
-        } else {
-            log::info!("New enterprise file found, updating client");
-            update_global_maxmind_client(&fname).await;
-        }
+        update_global_maxmind_client(&fname).await;
     }
 
     let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
@@ -152,10 +147,10 @@ pub async fn update_global_maxmind_client(fname: &str) {
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
                 let mut geoip_city = GEOIP_CITY_TABLE.write();
                 *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
-            } else {
+            } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
                 let mut geoip_asn = GEOIP_ASN_TABLE.write();
                 *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
-            }
+            };
         }
         Err(e) => log::warn!(
             "Failed to create MaxmindClient with path: {}, {}",
