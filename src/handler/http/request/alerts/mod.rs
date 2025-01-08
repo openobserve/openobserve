@@ -22,8 +22,8 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::alerts::{
         requests::{
-            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertQuery,
-            MoveAlertsRequestBody, UpdateAlertRequestBody,
+            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertsRequestBody,
+            UpdateAlertRequestBody,
         },
         responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
     },
@@ -47,7 +47,6 @@ impl From<AlertError> for HttpResponse {
             AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound => MetaHttpResponse::not_found(value),
             AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
-            AlertError::MoveAlertNotInSourceFolder => MetaHttpResponse::conflict(value),
             AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),

@@ -87,15 +87,6 @@ pub struct EnableAlertQuery {
     pub value: bool,
 }
 
-/// HTTP URL query component that contains parameters for moving alerts.
-#[derive(Debug, Deserialize, utoipa::IntoParams)]
-#[into_params(style = Form, parameter_in = Query)]
-#[serde(rename_all = "snake_case")]
-pub struct MoveAlertQuery {
-    pub id: Vec<Ksuid>,
-    pub to: String,
-}
-
 impl From<CreateAlertRequestBody> for meta_alerts::Alert {
     fn from(value: CreateAlertRequestBody) -> Self {
         value.alert.into()

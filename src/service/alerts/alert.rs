@@ -95,11 +95,6 @@ pub enum AlertError {
 
     /// Error that occurs when trying to move an alert to a destination folder
     /// that cannot be found.
-    #[error("Error moving alert because the alert is no longer in the original folder")]
-    MoveAlertNotInSourceFolder,
-
-    /// Error that occurs when trying to move an alert to a destination folder
-    /// that cannot be found.
     #[error("Error moving alert to folder that cannot be found")]
     MoveDestinationFolderNotFound,
 
