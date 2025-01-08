@@ -630,6 +630,8 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
     pub feature_query_streaming_aggs: bool,
+    #[env_config(name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS", default = 0)]
+    pub feature_join_right_side_max_rows: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
