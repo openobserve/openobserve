@@ -282,13 +282,17 @@ fn generate_table_source_with_sorted_by_time(
         .as_any()
         .downcast_ref::<DefaultTableSource>()
         .unwrap();
-    let table_provider = source
+    if let Some(table_provider) = source
         .table_provider
         .as_any()
         .downcast_ref::<NewEmptyTable>()
-        .unwrap();
-    let mut new_table_provider = (*table_provider).clone();
-    new_table_provider.sorted_by_time = true;
-    let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
-    Arc::new(new_source)
+    {
+        let mut new_table_provider = (*table_provider).clone();
+        new_table_provider.sorted_by_time = true;
+        let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
+        Arc::new(new_source)
+    } else {
+        // for unit test
+        table_source
+    }
 }
