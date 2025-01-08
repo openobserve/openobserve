@@ -604,10 +604,6 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
-    pub widening_schema_evolution: bool,
-    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
-    pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -1206,6 +1202,8 @@ pub struct Compact {
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
+    pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
     pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files

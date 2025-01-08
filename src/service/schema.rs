@@ -70,7 +70,7 @@ pub async fn check_for_schema(
     }
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
+    if !schema.schema().fields().is_empty() {
         return Ok((
             SchemaEvolution {
                 is_schema_changed: false,
@@ -453,9 +453,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().to_owned());
-                    } else if infra::schema::is_widening_conversion(
+                    if infra::schema::is_widening_conversion(
                         existing_field.data_type(),
                         item_data_type,
                     ) {

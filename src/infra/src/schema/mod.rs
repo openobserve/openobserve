@@ -639,9 +639,7 @@ pub fn get_merge_schema_changes(
             Some(idx) => {
                 let existing_field = &merged_fields[*idx];
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().clone());
-                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                    if is_widening_conversion(existing_field.data_type(), item_data_type) {
                         is_schema_changed = true;
                         merged_fields[*idx] = item;
                         field_datatype_delta.push((**item).clone());
