@@ -14,14 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set};
+use serde::{Deserialize, Serialize};
 
 use super::{entity::cipher_keys::*, get_lock};
 use crate::{
-    db::{connect_to_orm, get_coordinator, ORM_CLIENT},
+    db::{connect_to_orm, ORM_CLIENT},
     errors,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryKind {
     CipherKey,
 }
@@ -52,6 +53,7 @@ pub struct ListFilter {
     pub kind: Option<EntryKind>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CipherEntry {
     pub org: String,
     pub created_at: i64,
@@ -76,8 +78,6 @@ impl TryInto<CipherEntry> for Model {
 }
 
 pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
-    let org = entry.org.clone();
-    let name = entry.name.clone();
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
@@ -94,26 +94,10 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
     Entity::insert(record).exec(client).await?;
     drop(_lock);
 
-    // specifically for cipher keys, we need to notify of this addition
-    if entry.kind == EntryKind::CipherKey {
-        // trigger watch event by putting value to cluster coordinator
-        let cluster_coordinator = get_coordinator().await;
-        cluster_coordinator
-            .put(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
-                bytes::Bytes::new(), // no actual data, the receiver can query the db
-                true,
-                None,
-            )
-            .await?;
-    }
-
     Ok(())
 }
 
 pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
-    let org = entry.org.clone();
-    let name = entry.name.clone();
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
@@ -129,20 +113,6 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update(record).exec(client).await?;
     drop(_lock);
-
-    // specifically for cipher keys, we need to notify of this addition
-    if entry.kind == EntryKind::CipherKey {
-        // trigger watch event by putting value to cluster coordinator
-        let cluster_coordinator = get_coordinator().await;
-        cluster_coordinator
-            .put(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
-                bytes::Bytes::new(), // no actual data, the receiver can query the db
-                true,
-                None,
-            )
-            .await?;
-    }
 
     Ok(())
 }
@@ -160,20 +130,6 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
         .await?;
 
     drop(_lock);
-
-    // specifically for cipher keys, we need to notify of this deletion
-    if kind == EntryKind::CipherKey {
-        // trigger watch event by putting value to cluster coordinator
-        let cluster_coordinator = get_coordinator().await;
-        cluster_coordinator
-            .delete(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
-                false,
-                true,
-                None,
-            )
-            .await?;
-    }
 
     Ok(())
 }

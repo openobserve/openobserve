@@ -74,7 +74,7 @@ pub async fn save(
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        match infra::table::cipher::add(CipherEntry {
+        match crate::service::db::keys::add(CipherEntry {
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),
@@ -245,7 +245,7 @@ pub async fn delete(
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
-        match infra::table::cipher::remove(
+        match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             &key_name,
@@ -315,7 +315,7 @@ pub async fn update(
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        match infra::table::cipher::update(CipherEntry {
+        match crate::service::db::keys::update(CipherEntry {
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),
