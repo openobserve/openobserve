@@ -23,10 +23,13 @@ use datafusion::{
         },
         DFSchema, Result,
     },
-    logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan},
+    datasource::DefaultTableSource,
+    logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource},
     prelude::Expr,
     scalar::ScalarValue,
 };
+
+use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -157,23 +160,26 @@ fn generate_sort_plan(
             .rewrite(&mut ChangeTableScanSchema::new())
             .data()
             .unwrap();
-        return (
+        (
             LogicalPlan::Sort(Sort {
                 expr: vec![timestamp],
                 input: Arc::new(input),
                 fetch: Some(limit),
             }),
             Some(schema),
-        );
+        )
+    } else {
+        let mut input = input.as_ref().clone();
+        input = input.rewrite(&mut SortByTime::new()).data().unwrap();
+        (
+            LogicalPlan::Sort(Sort {
+                expr: vec![timestamp],
+                input: Arc::new(input),
+                fetch: Some(limit),
+            }),
+            None,
+        )
     }
-    (
-        LogicalPlan::Sort(Sort {
-            expr: vec![timestamp],
-            input,
-            fetch: Some(limit),
-        }),
-        None,
-    )
 }
 
 fn generate_limit_and_sort_plan(
@@ -225,13 +231,16 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
                     schema.index_of(get_config().common.column_timestamp.as_str())?;
                 let mut projection = scan.projection.clone().unwrap();
                 projection.push(timestamp_idx);
-                let table_scan = TableScan::try_new(
+                let mut table_scan = TableScan::try_new(
                     scan.table_name,
                     scan.source,
                     Some(projection),
                     scan.filters,
                     scan.fetch,
                 )?;
+                // add sorted by time to the table source
+                let source = generate_table_source_with_sorted_by_time(table_scan.source);
+                table_scan.source = source;
                 Transformed::yes(LogicalPlan::TableScan(table_scan))
             }
             _ => Transformed::no(node),
@@ -239,4 +248,48 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
         transformed.tnr = TreeNodeRecursion::Stop;
         Ok(transformed)
     }
+}
+
+struct SortByTime {}
+
+impl SortByTime {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl TreeNodeRewriter for SortByTime {
+    type Node = LogicalPlan;
+
+    fn f_up(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
+        let mut transformed = match node {
+            LogicalPlan::TableScan(mut scan) => {
+                // add sorted by time to the table source
+                let source = generate_table_source_with_sorted_by_time(scan.source);
+                scan.source = source;
+                Transformed::yes(LogicalPlan::TableScan(scan))
+            }
+            _ => Transformed::no(node),
+        };
+        transformed.tnr = TreeNodeRecursion::Stop;
+        Ok(transformed)
+    }
+}
+
+fn generate_table_source_with_sorted_by_time(
+    table_source: Arc<dyn TableSource>,
+) -> Arc<dyn TableSource> {
+    let source: &DefaultTableSource = table_source
+        .as_any()
+        .downcast_ref::<DefaultTableSource>()
+        .unwrap();
+    let table_provider = source
+        .table_provider
+        .as_any()
+        .downcast_ref::<NewEmptyTable>()
+        .unwrap();
+    let mut new_table_provider = (*table_provider).clone();
+    new_table_provider.sorted_by_time = true;
+    let new_source = DefaultTableSource::new(Arc::new(new_table_provider));
+    Arc::new(new_source)
 }
