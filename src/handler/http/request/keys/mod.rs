@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use infra::table::cipher::CipherEntry;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::CipherData;
+use o2_enterprise::enterprise::cipher::{Cipher, CipherData};
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
@@ -67,12 +67,28 @@ pub async fn save(
             Some(id) => id,
         };
 
-        // TODO: validate cipher data by actually encrypting here
-
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
+
+        match cd.get_key().await {
+            // here we are just checking that the key can encrypt a string, i.e.
+            // it is set up correctly. We don't care what the actual entrypted string is.
+            Ok(mut k) => match k.encrypt("hello world") {
+                Ok(_) => {}
+                Err(e) => {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "error creating key from request : {e}"
+                    )))
+                }
+            },
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error creating key from request : {e}"
+                )))
+            }
+        }
 
         match crate::service::db::keys::add(CipherEntry {
             org: org_id.to_string(),
@@ -308,12 +324,28 @@ pub async fn update(
             Some(id) => id,
         };
 
-        // TODO: validate cipher data by actually encrypting here
-
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
+
+        match cd.get_key().await {
+            // here we are just checking that the key can encrypt a string, i.e.
+            // it is set up correctly. We don't care what the actual entrypted string is.
+            Ok(mut k) => match k.encrypt("hello world") {
+                Ok(_) => {}
+                Err(e) => {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "error creating key from request : {e}"
+                    )))
+                }
+            },
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error creating key from request : {e}"
+                )))
+            }
+        }
 
         match crate::service::db::keys::update(CipherEntry {
             org: org_id.to_string(),
