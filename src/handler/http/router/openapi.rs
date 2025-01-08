@@ -107,6 +107,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::list_alerts,
         request::alerts::enable_alert,
         request::alerts::trigger_alert,
+        request::alerts::move_alert,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,

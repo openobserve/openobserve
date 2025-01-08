@@ -22,7 +22,8 @@ use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::alerts::{
         requests::{
-            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, UpdateAlertRequestBody,
+            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, MoveAlertQuery,
+            UpdateAlertRequestBody,
         },
         responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
     },
@@ -46,6 +47,7 @@ impl From<AlertError> for HttpResponse {
             AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound => MetaHttpResponse::not_found(value),
             AlertError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found(value),
+            AlertError::MoveAlertNotInSourceFolder => MetaHttpResponse::conflict(value),
             AlertError::AlertNotFound => MetaHttpResponse::not_found(value),
             AlertError::AlertDestinationNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
@@ -310,6 +312,39 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Err(e) => e.into(),
+    }
+}
+
+/// MoveAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "MoveAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        MoveAlertQuery,
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/v2/{org_id}/alerts/{alert_id}/move")]
+async fn move_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+    let Ok(query) = web::Query::<MoveAlertQuery>::from_query(req.query_string()) else {
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
+    };
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::move_to_folder(client, &org_id, alert_id, &query.to, &query.from).await {
+        Ok(_) => MetaHttpResponse::ok("Alert moved"),
         Err(e) => e.into(),
     }
 }
