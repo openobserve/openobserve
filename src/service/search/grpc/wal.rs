@@ -261,7 +261,7 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
-            id: format!("{}-{}-wal-{ver}", query.trace_id, query.job_id),
+            id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
             work_group: query.work_group.clone(),
             target_partitions: cfg.limit.cpu_num,
