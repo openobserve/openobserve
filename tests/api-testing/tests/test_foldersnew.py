@@ -86,9 +86,8 @@ def test_retrieve_dashboard_folders_Unauthorized(session, base_url, org_id, fold
     )
     
 
-def test_retrieve_dashboard_folders_400(create_session, base_url):
-    org_id = "default"
-    folder_id = ""  # Empty folder_id to test the case
+def test_create_dashboard_folders_400_empty_name(create_session, base_url):
+    org_id = "default" # Empty org_id to test the case
     payload = {"description": "newfoldernvp", "name": ""}
     
     # Use create_session instead of session
@@ -97,13 +96,13 @@ def test_retrieve_dashboard_folders_400(create_session, base_url):
     )
     print(create_session.headers)
     assert resp_create_new_dashboards_folders_blank.status_code == 400, (
-        f"Expected 400, but got {resp_create_new_dashboards_folders_blank.status_code} "
+        f"Expected 400 , but got {resp_create_new_dashboards_folders_blank.status_code} "
         f"{resp_create_new_dashboards_folders_blank.content}"
     )
-
-def test_retrieve_dashboard_folders_404_empty_org(create_session, base_url):
+    
+def test_create_dashboard_folders_404_empty_org(create_session, base_url):
     org_id = "" # Empty org_id to test the case
-    payload = {"description": "newfoldernvp", "name": ""}
+    payload = {"description": "newfoldernvp", "name": "test"}
     
     # Use create_session instead of session
     resp_create_new_dashboards_folders_blank = create_session.post(
@@ -114,6 +113,8 @@ def test_retrieve_dashboard_folders_404_empty_org(create_session, base_url):
         f"Expected 404 , but got {resp_create_new_dashboards_folders_blank.status_code} "
         f"{resp_create_new_dashboards_folders_blank.content}"
     )
+
+
 
 def test_invalid_folder_id_retrieve_dashboard(create_session, base_url):
     org_id = "default"
@@ -210,9 +211,9 @@ def test_retrieve_alerts_folders_Unauthorized(session, base_url, org_id, folder_
         f"{resp_get_alerts_folders_Unauthorize.content}"
     )   
 
-def test_retrieve_alerts_folders_400(create_session, base_url):
-    org_id = "default"
-    folder_id = ""  # Empty folder_id to test the case
+
+def test_create_alerts_folders_400_empty_name(create_session, base_url):
+    org_id = "default" # Empty org_id to test the case
     payload = {"description": "newfoldernvp", "name": ""}
     
     # Use create_session instead of session
@@ -221,21 +222,7 @@ def test_retrieve_alerts_folders_400(create_session, base_url):
     )
     print(create_session.headers)
     assert resp_create_new_alerts_folders_blank.status_code == 400, (
-        f"Expected 400, but got {resp_create_new_alerts_folders_blank.status_code} "
-        f"{resp_create_new_alerts_folders_blank.content}"
-    )
-
-def test_retrieve_alerts_folders_404_empty_org(create_session, base_url):
-    org_id = "" # Empty org_id to test the case
-    payload = {"description": "newfoldernvp", "name": ""}
-    
-    # Use create_session instead of session
-    resp_create_new_alerts_folders_blank = create_session.post(
-        f"{base_url}api/v2/{org_id}/folders/alerts", json=payload
-    )
-    print(create_session.headers)
-    assert resp_create_new_alerts_folders_blank.status_code == 404, (
-        f"Expected 404 , but got {resp_create_new_alerts_folders_blank.status_code} "
+        f"Expected 400 , but got {resp_create_new_alerts_folders_blank.status_code} "
         f"{resp_create_new_alerts_folders_blank.content}"
     )
 
@@ -258,3 +245,17 @@ def delete_new_alerts_folders(session, base_url, org_id, folder_id):
     assert (
         resp_delete_alerts_folders.status_code == 200
     ), f"Deleting this folder alerts: Expected 200, but got {resp_delete_alerts_folders.status_code} {resp_delete_alerts_folders.content}"
+
+def test_create_alerts_folders_404_empty_org(create_session, base_url):
+    org_id = "" # Empty org_id to test the case
+    payload = {"description": "newfoldernvp", "name": "test"}
+    
+    # Use create_session instead of session
+    resp_create_new_alerts_folders_blank = create_session.post(
+        f"{base_url}api/v2/{org_id}/folders/alerts", json=payload
+    )
+    print(create_session.headers)
+    assert resp_create_new_alerts_folders_blank.status_code == 404, (
+        f"Expected 404 , but got {resp_create_new_alerts_folders_blank.status_code} "
+        f"{resp_create_new_alerts_folders_blank.content}"
+    )
