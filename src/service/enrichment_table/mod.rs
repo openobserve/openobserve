@@ -461,17 +461,17 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
 
         // Send records in batches to the saving task
         if record_buffer.len() >= MAX_RECORDS {
-            part_number += 1;
-
-            // if append_data is false, then we need to delete the existing table
-            // and create a new one when processing part 1
-            // and the rest of the data will be appended to the new table
-            let tmp_append_data = append_data || part_number != 1;
-
             let full_buffer = std::mem::take(&mut record_buffer);
 
             // Save the buffer
-            save_enrichment_data(&org_id, &table_name, full_buffer, tmp_append_data).await?;
+            do_save(
+                &mut part_number,
+                full_buffer,
+                &org_id,
+                &table_name,
+                append_data,
+            )
+            .await?;
             log::debug!(
                 "[ENRICHMENT_TABLE] Saved records for org_id: {}, table_name: {}, part_number: {}",
                 org_id,
@@ -483,17 +483,17 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
 
     // Send any remaining records in the buffer
     if !record_buffer.is_empty() {
-        part_number += 1;
-
-        // if append_data is false, then we need to delete the existing table
-        // and create a new one when processing part 1
-        // and the rest of the data will be appended to the new table
-        let tmp_append_data = append_data || part_number != 1;
-
         let full_buffer = std::mem::take(&mut record_buffer);
 
         // Save the buffer
-        save_enrichment_data(&org_id, &table_name, full_buffer, tmp_append_data).await?;
+        do_save(
+            &mut part_number,
+            full_buffer,
+            &org_id,
+            &table_name,
+            append_data,
+        )
+        .await?;
         log::debug!(
             "[ENRICHMENT_TABLE] Saved records for org_id: {}, table_name: {}, part_number: {}",
             org_id,
@@ -510,6 +510,23 @@ pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(
 
     remove_temp_file(&org_id, &table_name, append_data).await?;
     Ok(())
+}
+
+async fn do_save(
+    part_number: &mut i64,
+    buffer: Vec<json::Map<String, json::Value>>,
+    org_id: &str,
+    table_name: &str,
+    append_data: bool,
+) -> Result<HttpResponse, Error> {
+    *part_number += 1;
+    // if append_data is false, then we need to delete the existing table
+    // and create a new one when processing part 1
+    // and the rest of the data will be appended to the new table
+    let tmp_append_data = append_data || *part_number != 1;
+
+    // Save the buffer
+    save_enrichment_data(&org_id, &table_name, buffer, tmp_append_data).await
 }
 
 #[inline]
