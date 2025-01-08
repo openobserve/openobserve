@@ -149,20 +149,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
-          <div class="flex justify-center items-center">
+          <div class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300">
               <q-input
               v-model="searchQuery"
               placeholder="Search..."
               @update:model-value="handleSearchQueryChange" 
               dense
               borderless
-              outlined
               clearable
               debounce="500"
               class="q-mr-sm custom-height flex items-center"
             />
-             <q-btn  class="q-mr-sm download-logs-btn flex" flat round title="Previous" icon="keyboard_arrow_up" @click="prevMatch" dense  :size="`sm`" />
-             <q-btn  class="q-mr-sm download-logs-btn flex" flat round title= "Next" icon="keyboard_arrow_down" @click="nextMatch" dense   :size="`sm`"/>
+            <p class="tw-mr-1" v-if="searchResults"><small><span>{{currentIndex+1}}</span> of <span>{{searchResults}}</span></small></p>
+            <q-btn 
+              v-if="searchResults" 
+              :disable="currentIndex === 0" 
+              class="tw-mr-1 download-logs-btn flex" 
+              flat 
+              round
+              title="Previous"
+              icon="keyboard_arrow_up"
+              @click="prevMatch"
+              dense
+              :size="`sm`"
+              />
+            <q-btn 
+              v-if="searchResults"
+              :disable="currentIndex+1 === searchResults"
+              class="tw-mr-1 download-logs-btn flex"
+              flat round title= "Next" 
+              icon="keyboard_arrow_down" 
+              @click="nextMatch" 
+              dense
+              :size="`sm`"
+            />
             </div>
           <q-btn
             data-test="logs-search-bar-share-link-btn"
@@ -280,6 +300,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spanList="spanList"
                 @toggle-collapse="toggleSpanCollapse"
                 @select-span="updateSelectedSpan"
+                @update-current-index="handleIndexUpdate"
+                @search-result="handleSearchResult"
               />
             </div>
           </div>
@@ -448,6 +470,8 @@ export default defineComponent({
     );
 
     const showTraceDetails = ref(false);
+    const currentIndex = ref(0);
+    const searchResults = ref(0);
     const searchQuery = ref('');
 
     const handleSearchQueryChange = (value:any) => {
@@ -465,7 +489,12 @@ export default defineComponent({
         traceTreeRef.value.prevMatch();
       }
     };
-
+    const handleIndexUpdate = (newIndex:any) => {
+      currentIndex.value = newIndex; // Update the parent's state with the child's emitted value
+    };
+    const handleSearchResult = (newIndex:any) => {
+      searchResults.value = newIndex; // Update the parent's state with the child's emitted value
+    };
     // Watch for changes in searchQuery
     
 
@@ -1189,7 +1218,11 @@ export default defineComponent({
       handleSearchQueryChange,
       traceTreeRef,
       nextMatch,
-      prevMatch
+      prevMatch,
+      currentIndex,
+      handleIndexUpdate,
+      handleSearchResult,
+      searchResults
     };
   },
 });

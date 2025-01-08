@@ -209,7 +209,7 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["toggleCollapse", "selectSpan"],
+  emits: ["toggleCollapse", "selectSpan","update-current-index","search-result"],
   setup(props, { emit }) {
     const { searchObj, buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
@@ -297,7 +297,6 @@ export default defineComponent({
         currentIndex.value++;
         scrollToMatch();
       }
-      
     };
 
     const prevMatch = () => {
@@ -312,8 +311,13 @@ export default defineComponent({
     });
 
     watch(() => props.searchQuery, (newValue) => {
-      // Call the event to notify the parent
       updateSearch();
+    });
+    watch(currentIndex, (newValue) => {
+      emit('update-current-index', newValue);
+    });
+    watch(searchResults, (newValue) => {
+      emit('search-result', newValue.length);
     });
 
     return {
