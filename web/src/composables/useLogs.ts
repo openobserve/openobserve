@@ -1715,6 +1715,8 @@ const useLogs = () => {
                     searchObj.data.histogram.errorDetail =
                       "Search query was cancelled";
                   }
+
+                  showCancelSearchNotification();
                   break;
                 }
                 await getHistogramQueryData(searchObj.data.histogramQuery);
@@ -2062,12 +2064,12 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
-
       if (searchObj.data.isOperationCancelled) {
         notificationMsg.value = "Search operation is cancelled.";
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
+        showCancelSearchNotification();
         return;
       }
 
@@ -2384,6 +2386,8 @@ const useLogs = () => {
           searchObj.data.histogram.errorMsg = "Search query was cancelled";
           searchObj.data.histogram.errorDetail = "Search query was cancelled";
         }
+
+        showCancelSearchNotification();
         return;
       }
 
