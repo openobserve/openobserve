@@ -1377,9 +1377,9 @@ export const convertSQLData = async (
         updateTrellisConfig();
       } else if (breakDownKeys.length) {
         options.xAxis.forEach((it: any, index: number) => {
-          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 5;
+          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 20;
           it.axisLabel.margin =
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5;
+            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 25;
           it.axisTick.length =
             20 * (xAxisKeys.length + breakDownKeys.length - index);
         });
