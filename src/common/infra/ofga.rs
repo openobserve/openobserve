@@ -59,6 +59,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // sync with super cluster
     if get_o2_config().super_cluster.enabled {
         let meta_in_super = get_model().await?;
+        log::info!(
+            "[OFGA] meta_in_super: {:#?}, existing_model: {:#?}",
+            &meta_in_super,
+            &existing_meta,
+        );
         match (meta_in_super, &existing_meta) {
             (None, Some(existing_model)) => {
                 // set to super cluster
@@ -102,11 +107,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
-            log::info!("OFGA model already exists & no changes required");
+            log::info!("[OFGA] model already exists & no changes required");
             if !init_tuples.is_empty() {
                 match update_tuples(init_tuples, vec![]).await {
                     Ok(_) => {
-                        log::info!("Data migrated to openfga");
+                        log::info!("[OFGA] Data migrated to openfga");
                     }
                     Err(e) => {
                         log::error!(
@@ -139,7 +144,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
-            log::info!("[OFGA] OFGA set store_id: {}", store_id);
+            log::info!("[OFGA] set store_id: {}", store_id);
             if store_id.is_empty() {
                 log::error!("OFGA store id is empty");
             }
