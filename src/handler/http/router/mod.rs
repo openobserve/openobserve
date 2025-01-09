@@ -50,7 +50,7 @@ use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyUR
 pub mod openapi;
 pub mod ui;
 
-fn get_cors() -> Rc<Cors> {
+pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
         .allowed_headers(vec![

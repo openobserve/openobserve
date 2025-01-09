@@ -13,32 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod actions;
-pub mod alerts;
-pub mod authz;
-pub mod clusters;
-pub mod dashboards;
-pub mod enrichment_table;
-#[allow(deprecated)]
-pub mod folders;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod pipeline;
-pub mod promql;
-pub mod rum;
-pub mod search;
-pub mod service_accounts;
-pub mod short_url;
-pub mod status;
-pub mod stream;
-pub mod syslog;
-pub mod traces;
-pub mod users;
-pub mod websocket;
-pub mod script_server;
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+#[post("/v1/{org_id}/job")]
+pub async fn create_job(
+    path: web::Path<String>,
+ 
+) -> impl Responder {
+    let org_id  = path.into_inner();
+   
+    HttpResponse::Ok().json(org_id)
+     
+}

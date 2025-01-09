@@ -87,6 +87,9 @@ impl Node {
     pub fn is_alert_manager(&self) -> bool {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
+    pub fn is_script_server(&self) -> bool {
+        self.role.contains(&Role::ScriptServer) || self.role.contains(&Role::All)
+    }
 }
 
 impl Default for Node {
@@ -142,6 +145,7 @@ pub enum Role {
     Router,
     AlertManager,
     FlattenCompactor,
+    ScriptServer,
 }
 
 impl FromStr for Role {
@@ -156,6 +160,7 @@ impl FromStr for Role {
             "router" => Ok(Role::Router),
             "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
+            "script_server" | "scriptserver" => Ok(Role::ScriptServer),
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -171,6 +176,7 @@ impl std::fmt::Display for Role {
             Role::Router => write!(f, "router"),
             Role::AlertManager => write!(f, "alert_manager"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
+            Role::ScriptServer => write!(f, "script_server"),
         }
     }
 }
