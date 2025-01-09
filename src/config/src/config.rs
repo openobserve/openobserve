@@ -102,8 +102,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-// TODO: use it in the stream settings
-pub static SQL_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = get_config()
         .common
         .feature_secondary_index_extra_fields

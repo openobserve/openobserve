@@ -31,7 +31,9 @@ use datafusion::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+    },
 };
 use promql_parser::label::{MatchOp, Matchers};
 use tokio::sync::Semaphore;
@@ -76,13 +78,17 @@ pub(crate) async fn create_context(
             ));
         }
     };
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+
+    // get index fields
+    let stream_settings = unwrap_stream_settings(&schema);
+    let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+    // get partition time level
+    let stream_settings = stream_settings.unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let index_fields = stream_settings
-        .index_fields
-        .iter()
-        .collect::<HashSet<&String>>();
 
     // rewrite partition filters
     let partition_keys: HashMap<&String, &StreamPartition> = stream_settings
@@ -340,7 +346,7 @@ async fn cache_parquet_files(
 fn convert_matchers_to_index_condition(
     matchers: &Matchers,
     schema: &Arc<Schema>,
-    index_fields: &HashSet<&String>,
+    index_fields: &HashSet<String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
     let cfg = get_config();
