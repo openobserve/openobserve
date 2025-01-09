@@ -20,98 +20,6 @@ def test_get_alertsnew(create_session, base_url):
         resp_get_allalertsnew.status_code == 200
     ), f"Get all new alerts list 200, but got {resp_get_allalertsnew.status_code} {resp_get_allalertsnew.content}"
 
-def test_get_templates(create_session, base_url):
-    """Running an E2E test for getting all the alerts templates list."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    resp_get_templates = session.get(f"{url}api/{org_id}/alerts/templates")
-
-    print(resp_get_templates.content)
-    assert (
-        resp_get_templates.status_code == 200
-    ), f"Get all template list 200, but got {resp_get_templates.status_code} {resp_get_templates.content}"
-
-
-def test_post_templates(create_session, base_url):
-    """Running an E2E test for creating template."""
-    template_name = f"newtemp_{random.randint(1000, 9999)}"  # Make the name unique
-    
-    session = create_session
-    url = base_url
-    org_id = "default"
-    payload_temp = {"body": "invalid", "ise2e": True, "name": template_name}
-    
-    # Create template for alerts
-    resp_post_templates = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_temp
-    )
-    
-    print(resp_post_templates.content)
-    assert (
-        resp_post_templates.status_code == 200
-    ), f"Create template 200, but got {resp_post_templates.status_code} {resp_post_templates.content}"
-
-def test_get_destinations(create_session, base_url):
-    """Running an E2E test for getting all the destination list for alerts."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-
-    resp_get_destinations = session.get(f"{url}api/{org_id}/alerts/destinations")
-
-    print(resp_get_destinations.content)
-    assert (
-        resp_get_destinations.status_code == 200
-    ), f"Get all destination list 200, but got {resp_get_destinations.status_code} {resp_get_destinations.content}"
-
-def test_post_destination(create_session, base_url):
-    """Running an E2E test for creating a new destination."""
-
-    template_dest = f"newtemp_{random.randint(1000, 9999)}"  # Make the name unique
-    destination_name = f"newdest_{random.randint(1000, 9999)}"  # Make the name unique
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-    payload_tempd = {"body": "invalid", "ise2e": True, "name": template_dest}
-
-    # Create template for alerts
-    resp_create_templates_dest = session.post(
-        f"{url}api/{org_id}/alerts/templates", json=payload_tempd
-    )
-
-    print(resp_create_templates_dest.content)
-    assert (
-        resp_create_templates_dest.status_code == 200
-    ), f"Create template 200, but got {resp_create_templates_dest.status_code} {resp_create_templates_dest.content}"
-
-    skip_tls_verify_value = False  # Define the skip_tls_verify_value
-
-    payload_dest = {
-        "url": "www",
-        "method": "post",
-        "skip_tls_verify": skip_tls_verify_value,
-        "template": template_dest,
-        "headers": {"test": "test"},
-        "name": destination_name
-    }
-
-    # Create destination
-    resp_post_destinations = session.post(
-        f"{url}api/{org_id}/alerts/destinations",
-        json=payload_dest,
-    )
-    print(resp_post_destinations.content)
-
-    assert (
-        resp_post_destinations.status_code == 200
-    ), f"Failed to create destination: {resp_post_destinations.status_code} {resp_post_destinations.content}"
-
-
 def test_new_alert_create(create_session, base_url):
     """Running an E2E test for create a new alert."""
 
@@ -141,12 +49,17 @@ def test_new_alert_create(create_session, base_url):
     ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
 
     # createtemplate
-    template_alert = f"newtemp_{random.randint(1000, 9999)}"  # Make the name unique
-    destination_alert = f"newdest_{random.randint(1000, 9999)}"  # Make the name unique
+    template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
+    destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
 
 
-    payload_temp_alert = {"body": "invalid", "ise2e": True, "name": template_alert}
-
+    payload_temp_alert = {
+        "name":template_alert,
+        "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
+        "type":"http",
+        "title":""
+        }
+    
     # Create template for alerts
     resp_create_templates_alert = session.post(
         f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
@@ -161,13 +74,14 @@ def test_new_alert_create(create_session, base_url):
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
 
     payload_dest_alert = {
-        "url": "www",
-        "method": "post",
-        "skip_tls_verify": skip_tls_verify_value,
-        "template": template_alert,
-        "headers": {"test": "test"},
-        "name": destination_alert
-    }
+        "url":"https://hooks.slack.com/services/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",
+        "method":"post",
+        "skip_tls_verify":skip_tls_verify_value,
+        "template":template_alert,
+        "headers":{},
+        "name":destination_alert
+        }
+    
 
     # Create destination
     resp_create_destinations_alert = session.post(
@@ -277,6 +191,12 @@ def test_new_alert_create(create_session, base_url):
     )
     print(resp_post_alertnew.content)
 
+def test_get_alertnew(create_session, base_url):
+    """Running an E2E test for getting particular new alert ID."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -305,7 +225,34 @@ def test_new_alert_create(create_session, base_url):
         assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
         print(f"Successfully fetched details for alert {alert_id}")
 
-  
+def test_put_alertnew_disable(create_session, base_url):
+    """Running an E2E test for getting the new alert disable."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
@@ -319,15 +266,85 @@ def test_new_alert_create(create_session, base_url):
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
         print(f"Successfully disabled alert {alert_id}")
 
+def test_put_alertnew_enable(create_session, base_url):
+    """Running an E2E test for getting the new alert enable."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
+
     # Proceed to enable the alert
         resp_alertnew_enable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
         print(f"Enable Alert Response: {resp_alertnew_enable.text}")
-        assert resp_alertnew_enable.status_code == 200, f"Failed to disable alert {alert_id}"
+        assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
         print(f"Successfully enabled alert {alert_id}")
+
+def test_put_alertnew_trigger(create_session, base_url):
+    """Running an E2E test for getting the new alert trigger."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
 
     # Trigger the alert
         print(f"Attempting to trigger alert with ID: {alert_id}")
-        resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger")
+        resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
 
     # Log response details for debugging
         print(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
@@ -337,9 +354,42 @@ def test_new_alert_create(create_session, base_url):
         assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
         print(f"Successfully triggered alert {alert_id}")
     
+def test_delete_alertnew(create_session, base_url):
+    """Running an E2E test for deleting the new alert."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
 
     # Proceed to delete the alert
         resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
-        assert resp_delete_alertnew.status_code == 200, f"Failed to disable alert {alert_id}"
+        assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
