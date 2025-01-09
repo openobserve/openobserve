@@ -102,6 +102,26 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+// TODO: use it in the stream settings
+pub static SQL_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let mut fields = get_config()
+        .common
+        .feature_secondary_index_extra_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
+});
+
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = get_config()
         .common
@@ -499,6 +519,8 @@ pub struct Grpc {
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
     pub connect_timeout: u64,
+    #[env_config(name = "ZO_GRPC_CHANNEL_CACHE_DISABLED", default = false)]
+    pub channel_cache_disabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
     pub tls_enabled: bool,
     #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
@@ -582,14 +604,12 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
-    pub widening_schema_evolution: bool,
-    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
-    pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_INDEX_EXTRA_FIELDS", default = "")]
+    pub feature_secondary_index_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
@@ -1008,13 +1028,13 @@ pub struct Limit {
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
     pub keep_alive_disabled: bool,
-    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
@@ -1184,6 +1204,8 @@ pub struct Compact {
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
     pub old_data_max_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
+    pub old_data_min_hours: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
     pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
