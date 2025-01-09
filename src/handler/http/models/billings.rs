@@ -16,9 +16,15 @@
 //! These models define the schemas of HTTP request and response JSON bodies in
 //! billings API endpoints.
 
-use o2_enterprise::enterprise::cloud::org_usage::OrgUsageRecord;
+use o2_enterprise::enterprise::cloud::{billings::StripeInvoice, org_usage::OrgUsageRecord};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+/// HTTP request body for `ListInvoices` endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ListInvoicesResponseBody {
+    pub invoices: Vec<StripeInvoice>,
+}
 
 /// HTTP request body for `CreateQuotaThreshold` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]

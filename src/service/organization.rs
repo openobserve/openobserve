@@ -23,6 +23,8 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::{
@@ -32,7 +34,6 @@ use {
     config::{get_config, SMTP_CLIENT},
     lettre::{message::SinglePart, AsyncTransport, Message},
     o2_enterprise::enterprise::cloud::org_invites,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
 };
 
 use super::{db::org_users, users::add_admin_to_org};

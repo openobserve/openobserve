@@ -537,8 +537,9 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(organization::org::accept_org_invite)
         .service(billings::create_checkout_session)
         .service(billings::process_session_detail)
-        .service(billings::unsubscribe)
-        .service(billings::list_subscription);
+        .service(billings::list_subscription)
+        .service(billings::list_invoices)
+        .service(billings::unsubscribe);
 
     cfg.service(service);
 }
