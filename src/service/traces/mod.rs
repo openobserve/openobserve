@@ -86,7 +86,11 @@ pub async fn otlp_proto(
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[TRACES:OTLP] Invalid proto: {}", e);
+            log::error!(
+                "[TRACES:OTLP] Invalid proto: org_id: {}, error: {}",
+                org_id,
+                e
+            );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid proto: {}", e),
@@ -104,7 +108,8 @@ pub async fn otlp_proto(
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[TRACES:OTLP] Error while handling grpc trace request: {}",
+                "[TRACES:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
+                org_id,
                 e
             );
             Err(e)
@@ -276,21 +281,21 @@ pub async fn handle_otlp_request(
                 }
 
                 let mut events = vec![];
-                let mut event_att_map: HashMap<String, json::Value> = HashMap::new();
                 for event in span.events {
+                    let mut event_att_map: HashMap<String, json::Value> = HashMap::new();
                     for event_att in event.attributes {
                         event_att_map.insert(event_att.key, get_val(&event_att.value.as_ref()));
                     }
                     events.push(Event {
                         name: event.name,
                         _timestamp: event.time_unix_nano,
-                        attributes: event_att_map.clone(),
+                        attributes: event_att_map,
                     })
                 }
 
                 let mut links = vec![];
-                let mut link_att_map: HashMap<String, json::Value> = HashMap::new();
                 for link in span.links {
+                    let mut link_att_map: HashMap<String, json::Value> = HashMap::new();
                     for link_att in link.attributes {
                         link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
                     }
@@ -319,7 +324,7 @@ pub async fn handle_otlp_request(
                             trace_flags: Some(link.flags),
                             trace_state: Some(link.trace_state),
                         },
-                        attributes: link_att_map.clone(),
+                        attributes: link_att_map,
                         dropped_attributes_count: link.dropped_attributes_count,
                     })
                 }
