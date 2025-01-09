@@ -270,6 +270,12 @@ export default defineComponent({
         );
       }
 
+      if (props.language === "python") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/python/python.contribution.js"
+        );
+      }
+
       setupEditor();
     });
 

@@ -499,6 +499,7 @@ import {
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
+  outlinedCode,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -667,6 +668,12 @@ export default defineComponent({
         icon: outlinedReportProblem,
         link: "/alerts",
         name: "alertList",
+      },
+      {
+        title: t("menu.actions"),
+        icon: outlinedCode,
+        link: "/action-scripts",
+        name: "actionScripts",
       },
       {
         title: t("menu.ingestion"),

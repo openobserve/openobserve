@@ -44,6 +44,7 @@
     "echarts": "^5.5.1",
     "flag-icons": "^7.2.3",
     "js-cookie": "^3.0.5",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
     "luxon": "^3.4.4",

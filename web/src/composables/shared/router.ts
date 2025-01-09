@@ -63,6 +63,9 @@ const ApiDashboard = () =>
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
+const ActionScipts = () =>
+  import("@/components/actionScripts/ActionScipts.vue");
+
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
 import config from "@/aws-exports";
@@ -272,6 +275,14 @@ const useRoutes = () => {
       path: "alerts",
       name: "alertList",
       component: AlertList,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "action-scripts",
+      name: "actionScripts",
+      component: ActionScipts,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
