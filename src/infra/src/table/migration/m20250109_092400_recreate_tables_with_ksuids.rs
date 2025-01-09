@@ -1156,8 +1156,6 @@ impl
 
 #[cfg(test)]
 mod tests {
-    use collapse::*;
-
     use super::*;
 
     #[test]
