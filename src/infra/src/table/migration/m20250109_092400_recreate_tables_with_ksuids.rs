@@ -253,7 +253,7 @@ mod legacy_dashboards {
     /// Statement to drop the index on `folder_id` and `dashboard_id`.
     ///
     /// This should be ran BEFORE the legacy dashboards table is renamed from
-    /// `dashbboards` to `legacy_dashboards`.
+    /// `dashboards` to `legacy_dashboards`.
     pub fn drop_dashboards_folder_id_dashboard_id_idx_stmnt() -> IndexDropStatement {
         Index::drop()
             .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
@@ -273,7 +273,7 @@ mod legacy_dashboards {
     /// `legacy_dashboards` table.
     ///
     /// This should be ran AFTER the legacy dashboards table is renamed from
-    /// `dashbboards` to `legacy_dashboards`.
+    /// `dashboards` to `legacy_dashboards`.
     pub fn add_ksuid_column() -> TableAlterStatement {
         Table::alter()
             .table(Alias::new(NEW_TABLE_NAME))
@@ -285,7 +285,7 @@ mod legacy_dashboards {
     /// table.
     ///
     /// This should be ran AFTER the legacy dashboards table is renamed from
-    /// `dashbboards` to `legacy_dashboards`.
+    /// `dashboards` to `legacy_dashboards`.
     pub async fn populate_ksuid_column<C: ConnectionTrait>(
         conn: &C,
         page_size: u64,
@@ -308,7 +308,7 @@ mod legacy_dashboards {
     /// Statement to drop the legacy dashboards table.
     ///
     /// This should be ran AFTER the legacy dashboards table is renamed from
-    /// `dashbboards` to `legacy_dashboards`.
+    /// `dashboards` to `legacy_dashboards`.
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
     }
@@ -535,13 +535,13 @@ mod new_dashboards {
         while let Some(legacy_dashboards) = legacy_dashboard_pages.fetch_and_next().await? {
             let conversions_rslt: Result<Vec<_>, _> = legacy_dashboards
                 .into_iter()
-                .map(new_entities::dashbboards::Model::try_from)
+                .map(new_entities::dashboards::Model::try_from)
                 .collect();
             let active_models = conversions_rslt?
                 .into_iter()
                 .map(|m| m.into_active_model())
                 .collect_vec();
-            new_entities::dashbboards::Entity::insert_many(active_models)
+            new_entities::dashboards::Entity::insert_many(active_models)
                 .exec(conn)
                 .await?;
         }
@@ -1004,11 +1004,11 @@ mod new_entities {
         impl ActiveModelBehavior for ActiveModel {}
     }
 
-    pub mod dashbboards {
+    pub mod dashboards {
         use sea_orm::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-        #[sea_orm(table_name = "dashbboards")]
+        #[sea_orm(table_name = "dashboards")]
         pub struct Model {
             // The new KSUID primary key.
             #[sea_orm(primary_key, auto_increment = false)]
@@ -1119,7 +1119,7 @@ impl
     TryFrom<(
         legacy_entities::legacy_dashboards::Model,
         Option<legacy_entities::legacy_folders::Model>,
-    )> for new_entities::dashbboards::Model
+    )> for new_entities::dashboards::Model
 {
     type Error = DbErr;
 
@@ -1151,5 +1151,114 @@ impl
             created_at: value.0.created_at,
         };
         Ok(dashboard)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use collapse::*;
+
+    use super::*;
+
+    #[test]
+    fn postgres() {
+        legacy_folders::add_ksuid_column().to_string(PostgresQueryBuilder);
+        legacy_folders::drop_folders_org_idx_stmnt().to_string(PostgresQueryBuilder);
+        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
+        legacy_folders::drop_table().to_string(PostgresQueryBuilder);
+        legacy_folders::rename_to_legacy_folders().to_string(PostgresQueryBuilder);
+
+        legacy_dashboards::add_ksuid_column().to_string(PostgresQueryBuilder);
+        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(PostgresQueryBuilder);
+        legacy_dashboards::drop_table().to_string(PostgresQueryBuilder);
+        legacy_dashboards::rename_to_legacy_dashboards().to_string(PostgresQueryBuilder);
+
+        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
+        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(PostgresQueryBuilder);
+        legacy_alerts::drop_table().to_string(PostgresQueryBuilder);
+        legacy_alerts::rename_to_legacy_alerts().to_string(PostgresQueryBuilder);
+
+        new_folders::create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder);
+        new_folders::create_folders_org_type_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
+        new_folders::create_folders_table_statement().to_string(PostgresQueryBuilder);
+
+        new_dashboards::create_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(PostgresQueryBuilder);
+        new_dashboards::create_dashboards_table_statement().to_string(PostgresQueryBuilder);
+
+        new_alerts::create_alerts_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
+        new_alerts::create_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(PostgresQueryBuilder);
+        new_alerts::create_alerts_table_statement().to_string(PostgresQueryBuilder);
+    }
+
+    #[test]
+    fn mysql() {
+        legacy_folders::add_ksuid_column().to_string(MysqlQueryBuilder);
+        legacy_folders::drop_folders_org_idx_stmnt().to_string(MysqlQueryBuilder);
+        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
+        legacy_folders::drop_table().to_string(MysqlQueryBuilder);
+        legacy_folders::rename_to_legacy_folders().to_string(MysqlQueryBuilder);
+
+        legacy_dashboards::add_ksuid_column().to_string(MysqlQueryBuilder);
+        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(MysqlQueryBuilder);
+        legacy_dashboards::drop_table().to_string(MysqlQueryBuilder);
+        legacy_dashboards::rename_to_legacy_dashboards().to_string(MysqlQueryBuilder);
+
+        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
+        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(MysqlQueryBuilder);
+        legacy_alerts::drop_table().to_string(MysqlQueryBuilder);
+        legacy_alerts::rename_to_legacy_alerts().to_string(MysqlQueryBuilder);
+
+        new_folders::create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder);
+        new_folders::create_folders_org_type_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
+        new_folders::create_folders_table_statement().to_string(MysqlQueryBuilder);
+
+        new_dashboards::create_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(MysqlQueryBuilder);
+        new_dashboards::create_dashboards_table_statement().to_string(MysqlQueryBuilder);
+
+        new_alerts::create_alerts_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
+        new_alerts::create_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(MysqlQueryBuilder);
+        new_alerts::create_alerts_table_statement().to_string(MysqlQueryBuilder);
+    }
+
+    #[test]
+    fn sqlite() {
+        legacy_folders::add_ksuid_column().to_string(SqliteQueryBuilder);
+        legacy_folders::drop_folders_org_idx_stmnt().to_string(SqliteQueryBuilder);
+        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
+        legacy_folders::drop_table().to_string(SqliteQueryBuilder);
+        legacy_folders::rename_to_legacy_folders().to_string(SqliteQueryBuilder);
+
+        legacy_dashboards::add_ksuid_column().to_string(SqliteQueryBuilder);
+        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(SqliteQueryBuilder);
+        legacy_dashboards::drop_table().to_string(SqliteQueryBuilder);
+        legacy_dashboards::rename_to_legacy_dashboards().to_string(SqliteQueryBuilder);
+
+        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
+        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(SqliteQueryBuilder);
+        legacy_alerts::drop_table().to_string(SqliteQueryBuilder);
+        legacy_alerts::rename_to_legacy_alerts().to_string(SqliteQueryBuilder);
+
+        new_folders::create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder);
+        new_folders::create_folders_org_type_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
+        new_folders::create_folders_table_statement().to_string(SqliteQueryBuilder);
+
+        new_dashboards::create_dashboards_folder_id_dashboard_id_idx_stmnt()
+            .to_string(SqliteQueryBuilder);
+        new_dashboards::create_dashboards_table_statement().to_string(SqliteQueryBuilder);
+
+        new_alerts::create_alerts_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
+        new_alerts::create_alerts_org_stream_type_stream_name_name_idx_stmnt()
+            .to_string(SqliteQueryBuilder);
+        new_alerts::create_alerts_table_statement().to_string(SqliteQueryBuilder);
     }
 }
