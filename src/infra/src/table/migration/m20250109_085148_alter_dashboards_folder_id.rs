@@ -1,0 +1,207 @@
+// Copyright 2024 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Drops the folder's created_at column since Sea ORM maps this column's data
+//! type to different Rust types creating runtime errors when running on a
+//! non-PostgreSQL database.
+
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set, TransactionTrait,
+};
+use sea_orm_migration::prelude::*;
+
+const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk";
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        add_nullable_folder_uuid_column(manager).await?;
+        update_folder_uuid_column(manager).await?;
+        drop_foreign_key(manager).await?;
+        delete_folder_id_column(manager).await?;
+        rename_folder_uuid_column(manager).await?;
+        Ok(())
+    }
+
+    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
+        // Reversing this migration is not supported.
+        Ok(())
+    }
+}
+
+// Removes the old created_at column.
+async fn add_nullable_folder_uuid_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Dashboards::Table)
+                .add_column(
+                    ColumnDef::new(Dashboards::FolderUuid)
+                        .string_len(256)
+                        .default(Expr::value(""))
+                        .not_null(),
+                )
+                .to_owned(),
+        )
+        .await?;
+    Ok(())
+}
+
+// Removes the old created_at column.
+async fn update_folder_uuid_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let db = manager.get_connection();
+    let txn = db.begin().await?;
+    let mut dashboard_pages = dashboards::Entity::find().paginate(&txn, 100);
+    while let Some(dashboards) = dashboard_pages.fetch_and_next().await? {
+        for dashboard in dashboards.into_iter() {
+            let folder = folders::Entity::find()
+                .filter(folders::Column::Id.eq(dashboard.folder_id))
+                .one(db)
+                .await?
+                .unwrap();
+            let mut dashboard: dashboards::ActiveModel = dashboard.into();
+            dashboard.folder_uuid = Set(folder.folder_uuid);
+            dashboard.save(&txn).await?;
+        }
+    }
+
+    txn.commit().await?;
+    Ok(())
+    // let sql = r#"
+    //     UPDATE dashboards
+    //     SET folder_uuid = folders.folder_uuid
+    //     FROM folders
+    //     WHERE dashboards.folder_id = folders.id
+    // "#;
+
+    // db.execute_unprepared(sql).await?;
+
+    // query(query)
+    //     .execute(&db.pool())
+    //     .await?;
+    // manager
+    //     .
+    //     .alter_table(
+    //         Table::alter()
+    //             .table(Dashboards::Table)
+    //             .add_column(
+    //                 ColumnDef::new(Dashboards::FolderUuid)
+    //                     .string_len(100)
+    //                     .null(),
+    //             )
+    //             .to_owned(),
+    //     )
+    //     .await?;
+}
+
+async fn delete_folder_id_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Dashboards::Table)
+                .drop_column(Dashboards::FolderId)
+                .to_owned(),
+        )
+        .await?;
+    Ok(())
+}
+
+async fn rename_folder_uuid_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Dashboards::Table)
+                .rename_column(Dashboards::FolderUuid, Dashboards::FolderId)
+                .to_owned(),
+        )
+        .await?;
+    Ok(())
+}
+
+async fn drop_foreign_key(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .drop_foreign_key(
+            ForeignKey::drop()
+                .name(DASHBOARDS_FOLDERS_FK)
+                .table(Dashboards::Table)
+                .to_owned(),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Identifiers used in queries on the folders table.
+#[derive(DeriveIden)]
+enum Dashboards {
+    Table,
+    FolderUuid,
+    FolderId,
+}
+
+mod dashboards {
+    //! `SeaORM` Entity, @generated by sea-orm-codegen 1.1.0
+
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "dashboards")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub dashboard_id: String,
+        pub folder_id: i64,
+        pub owner: String,
+        pub role: Option<String>,
+        pub title: String,
+        #[sea_orm(column_type = "Text", nullable)]
+        pub description: Option<String>,
+        pub data: Json,
+        pub version: i32,
+        pub folder_uuid: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+mod folders {
+    //! `SeaORM` Entity, @generated by sea-orm-codegen 1.1.0
+
+    use sea_orm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[sea_orm(table_name = "folders")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i64,
+        pub org: String,
+        pub folder_id: String,
+        pub folder_uuid: String,
+        pub name: String,
+        #[sea_orm(column_type = "Text", nullable)]
+        pub description: Option<String>,
+        pub r#type: i16,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
