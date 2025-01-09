@@ -72,6 +72,11 @@ pub enum DashboardError {
     #[error("missing source or destination folder for dashboard move")]
     MoveMissingFolderParam,
 
+    /// Error that occurs when trying to move a dashboard but either the source
+    /// or destination folder is not specified.
+    #[error("error deleting the dashboard {0} from old folder {1} : {2}")]
+    MoveDashboardDeleteOld(String, String, String),
+
     /// Error that occurs when trying to move a dashboard to a destination
     /// folder that cannot be found.
     #[error("error moving dashboard to folder that cannot be found")]
@@ -422,7 +427,15 @@ pub async fn move_dashboard(
     put(org_id, dashboard_id, to_folder, dashboard, None).await?;
 
     // delete the dashboard from the source folder
-    let _ = table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id).await;
+    table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id)
+        .await
+        .map_err(|e| {
+            DashboardError::MoveDashboardDeleteOld(
+                dashboard_id.to_string(),
+                from_folder.to_string(),
+                e.to_string(),
+            )
+        })?;
 
     Ok(())
 }

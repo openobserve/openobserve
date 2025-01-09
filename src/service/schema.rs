@@ -70,15 +70,6 @@ pub async fn check_for_schema(
     }
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
-        return Ok((
-            SchemaEvolution {
-                is_schema_changed: false,
-                types_delta: None,
-            },
-            None,
-        ));
-    }
 
     // get infer schema
     let value_iter = record_vals.into_iter();
@@ -424,6 +415,10 @@ pub fn generate_schema_for_defined_schema_fields(
             new_fields.push(schema.schema().fields()[*f].clone());
         }
     }
+
+    // sort the fields by name to make sure the order is consistent
+    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
+
     SchemaCache::new(Schema::new_with_metadata(
         new_fields,
         schema.schema().metadata().clone(),
@@ -453,9 +448,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().to_owned());
-                    } else if infra::schema::is_widening_conversion(
+                    if infra::schema::is_widening_conversion(
                         existing_field.data_type(),
                         item_data_type,
                     ) {
