@@ -1076,20 +1076,13 @@ mod tests {
     #[test]
     fn postgres() {
         legacy_folders::add_ksuid_column().to_string(PostgresQueryBuilder);
-        legacy_folders::drop_folders_org_idx_stmnt().to_string(PostgresQueryBuilder);
-        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
         legacy_folders::drop_table().to_string(PostgresQueryBuilder);
         legacy_folders::rename_to_legacy_folders().to_string(PostgresQueryBuilder);
 
         legacy_dashboards::add_ksuid_column().to_string(PostgresQueryBuilder);
-        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
-            .to_string(PostgresQueryBuilder);
         legacy_dashboards::drop_table().to_string(PostgresQueryBuilder);
         legacy_dashboards::rename_to_legacy_dashboards().to_string(PostgresQueryBuilder);
 
-        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(PostgresQueryBuilder);
-        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
-            .to_string(PostgresQueryBuilder);
         legacy_alerts::drop_table().to_string(PostgresQueryBuilder);
         legacy_alerts::rename_to_legacy_alerts().to_string(PostgresQueryBuilder);
 
@@ -1110,20 +1103,13 @@ mod tests {
     #[test]
     fn mysql() {
         legacy_folders::add_ksuid_column().to_string(MysqlQueryBuilder);
-        legacy_folders::drop_folders_org_idx_stmnt().to_string(MysqlQueryBuilder);
-        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
         legacy_folders::drop_table().to_string(MysqlQueryBuilder);
         legacy_folders::rename_to_legacy_folders().to_string(MysqlQueryBuilder);
 
         legacy_dashboards::add_ksuid_column().to_string(MysqlQueryBuilder);
-        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
-            .to_string(MysqlQueryBuilder);
         legacy_dashboards::drop_table().to_string(MysqlQueryBuilder);
         legacy_dashboards::rename_to_legacy_dashboards().to_string(MysqlQueryBuilder);
 
-        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(MysqlQueryBuilder);
-        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
-            .to_string(MysqlQueryBuilder);
         legacy_alerts::drop_table().to_string(MysqlQueryBuilder);
         legacy_alerts::rename_to_legacy_alerts().to_string(MysqlQueryBuilder);
 
@@ -1144,20 +1130,13 @@ mod tests {
     #[test]
     fn sqlite() {
         legacy_folders::add_ksuid_column().to_string(SqliteQueryBuilder);
-        legacy_folders::drop_folders_org_idx_stmnt().to_string(SqliteQueryBuilder);
-        legacy_folders::drop_folders_org_type_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
         legacy_folders::drop_table().to_string(SqliteQueryBuilder);
         legacy_folders::rename_to_legacy_folders().to_string(SqliteQueryBuilder);
 
         legacy_dashboards::add_ksuid_column().to_string(SqliteQueryBuilder);
-        legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt()
-            .to_string(SqliteQueryBuilder);
         legacy_dashboards::drop_table().to_string(SqliteQueryBuilder);
         legacy_dashboards::rename_to_legacy_dashboards().to_string(SqliteQueryBuilder);
 
-        legacy_alerts::drop_alerts_folder_id_idx_stmnt().to_string(SqliteQueryBuilder);
-        legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt()
-            .to_string(SqliteQueryBuilder);
         legacy_alerts::drop_table().to_string(SqliteQueryBuilder);
         legacy_alerts::rename_to_legacy_alerts().to_string(SqliteQueryBuilder);
 
