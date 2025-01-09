@@ -111,7 +111,6 @@ pub async fn save_enrichment_table(
 
                 let (task_id, _) =
                     add_task(&org_id, &table_name, append_data, req.file_link.clone()).await?;
-                // TODO: Create an empty stream with the table namme
 
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     StatusCode::OK.into(),
@@ -119,12 +118,12 @@ pub async fn save_enrichment_table(
                 )))
             } else {
                 Ok(MetaHttpResponse::bad_request(
-                    "Bad Request, content-type must be multipart/form-data",
+                    "Bad Request, content-type must be multipart/form-data or application/json",
                 ))
             }
         }
         None => Ok(MetaHttpResponse::bad_request(
-            "Bad Request, content-type must be multipart/form-data",
+            "Bad Request, content-type must be multipart/form-data or application/json",
         )),
     }
 }
