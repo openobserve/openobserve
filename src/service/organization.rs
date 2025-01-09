@@ -30,7 +30,7 @@ use config::{
 #[cfg(feature = "cloud")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::org_invites;
+use o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
@@ -510,6 +510,12 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     )
     .await
     .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
+
+    if let Err(e) =
+        org_invites::update_invite_status(invite_token, user_email, OrgInviteStatus::Accepted).await
+    {
+        log::error!("Error updating the invite status in the db: {e}");
+    }
     Ok(())
 }
 

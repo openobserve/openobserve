@@ -84,7 +84,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "organizations" (
                 "identifier" varchar(256) NOT NULL PRIMARY KEY,
-                "org_name" varchar(100) NOT NULL,
+                "org_name" varchar(200) NOT NULL,
                 "org_type" smallint NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL
@@ -99,7 +99,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS `organizations` (
                 `identifier` varchar(256) NOT NULL PRIMARY KEY,
-                `org_name` varchar(100) NOT NULL,
+                `org_name` varchar(200) NOT NULL,
                 `org_type` smallint NOT NULL,
                 `created_at` bigint NOT NULL,
                 `updated_at` bigint NOT NULL
@@ -114,7 +114,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "organizations" (
                 "identifier" varchar(256) NOT NULL PRIMARY KEY,
-                "org_name" varchar(100) NOT NULL,
+                "org_name" varchar(200) NOT NULL,
                 "org_type" smallint NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL

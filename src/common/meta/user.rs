@@ -148,10 +148,7 @@ pub fn get_default_user_role() -> UserRole {
 
 #[cfg(feature = "enterprise")]
 pub fn get_roles() -> Vec<UserRole> {
-    match cfg!(feature = "cloud") {
-        true => vec![UserRole::Admin],
-        false => UserRole::iter().collect(),
-    }
+    UserRole::iter().collect()
 }
 
 #[cfg(not(feature = "enterprise"))]
