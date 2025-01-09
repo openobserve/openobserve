@@ -18,6 +18,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
     EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
+use svix_ksuid::KsuidLike;
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
@@ -107,7 +108,7 @@ pub async fn put(
             // active record so that Sea ORM will create a new DB record when the
             // active model is saved.
             None => ActiveModel {
-                id: NotSet,          // Set by DB.
+                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
                 name: NotSet,        // Can be updated so this is set below.
                 description: NotSet, // Can be updated so this is set below.
                 org: Set(org_id.to_owned()),

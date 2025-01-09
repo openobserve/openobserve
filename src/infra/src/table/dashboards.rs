@@ -27,6 +27,7 @@ use sea_orm::{
     TryIntoModel,
 };
 use serde_json::Value as JsonValue;
+use svix_ksuid::KsuidLike;
 
 use super::{
     distinct_values::{self, OriginType},
@@ -217,7 +218,7 @@ pub async fn put(
                 };
 
                 let dash_am = dashboards::ActiveModel {
-                    id: NotSet, // Set by DB.
+                    id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
                     dashboard_id: Set(dashboard_id.to_owned()),
                     folder_id: NotSet,   // Can be updated, so it is set below.
                     owner: NotSet,       // Can be updated, so it is set below.
