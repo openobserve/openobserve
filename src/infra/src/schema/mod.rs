@@ -22,6 +22,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
     RwAHashMap, RwHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use futures::{StreamExt, TryStreamExt};
@@ -293,6 +294,20 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
     }
 }
 
+pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    let default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.index_fields.clone();
+            fields.extend(default_fields);
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => default_fields,
+    }
+}
+
 pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = BLOOM_FILTER_DEFAULT_FIELDS.clone();
     match settings {
@@ -304,18 +319,6 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
             fields
         }
         None => default_fields,
-    }
-}
-
-pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
-    match settings {
-        Some(settings) => {
-            let mut fields = settings.index_fields.clone();
-            fields.sort();
-            fields.dedup();
-            fields
-        }
-        None => vec![],
     }
 }
 
