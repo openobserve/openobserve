@@ -141,11 +141,8 @@ async fn update_maxmind_client() {
     };
     match MaxmindClient::new_with_path(&city_fname) {
         Ok(maxminddb_client) => {
-            // Acquire the lock only when updating the shared state
-            {
-                let mut client = MAXMIND_DB_CLIENT.write().await;
-                *client = Some(maxminddb_client);
-            } // Lock is released here
+            let mut client = MAXMIND_DB_CLIENT.write().await;
+            *client = Some(maxminddb_client);
         }
         Err(e) => log::warn!(
             "Failed to update maxmind client with path: {}, {}",
