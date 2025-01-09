@@ -26,6 +26,7 @@ pub struct EnrichmentTableReq {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EnrichmentTableResp {
     pub task_id: String,
+    pub org_id: String,
     pub file_link: String,
     pub task_status: String,
     pub stream_name: String,
@@ -39,6 +40,7 @@ impl TryFrom<EnrichmentTableJobsRecord> for EnrichmentTableResp {
         let (_, stream_name, _) = parse_key(value.file_key.as_str())?;
         Ok(EnrichmentTableResp {
             task_id: value.task_id,
+            org_id: value.org_id,
             file_link: value.file_link,
             task_status: value.task_status.into(),
             stream_name,
