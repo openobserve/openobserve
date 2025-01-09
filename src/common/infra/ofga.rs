@@ -60,7 +60,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if get_o2_config().super_cluster.enabled {
         let meta_in_super = get_model().await?;
         log::info!(
-            "[OFGA] meta_in_super: {:#?}, existing_model: {:#?}",
+            "[OFGA] meta_in_super: {:?}, existing_model: {:?}",
             &meta_in_super,
             &existing_meta,
         );
@@ -82,6 +82,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             (Some(model), Some(existing_model)) => {
                 log::info!(
                     "[OFGA] meta_in_super is Some, existing_model is Some: comparing versions",
+                );
+                log::info!(
+                    "[OFGA] meta_in_super version: {}, existing_model version: {}",
+                    model.version,
+                    existing_model.version,
                 );
                 match model.version.cmp(&existing_model.version) {
                     Ordering::Less => {
@@ -244,7 +249,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if tuples.is_empty() {
                 log::info!("No orgs to update to the openfga");
             } else {
-                log::debug!("tuples not empty: {:#?}", tuples);
+                log::debug!("tuples not empty: {:?}", tuples);
                 match update_tuples(tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("Data migrated to openfga");
