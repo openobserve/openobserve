@@ -656,14 +656,12 @@ pub fn get_merge_schema_changes(
     if !is_schema_changed {
         (false, field_datatype_delta, vec![])
     } else {
-        (
-            true,
-            field_datatype_delta,
-            merged_fields
-                .into_iter()
-                .map(|f| f.as_ref().clone())
-                .collect::<Vec<_>>(),
-        )
+        let mut merged_fields = merged_fields
+            .into_iter()
+            .map(|f| f.as_ref().clone())
+            .collect::<Vec<_>>();
+        merged_fields.sort_by(|a, b| a.name().cmp(b.name()));
+        (true, field_datatype_delta, merged_fields)
     }
 }
 

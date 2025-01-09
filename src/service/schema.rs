@@ -415,6 +415,10 @@ pub fn generate_schema_for_defined_schema_fields(
             new_fields.push(schema.schema().fields()[*f].clone());
         }
     }
+
+    // sort the fields by name to make sure the order is consistent
+    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
+
     SchemaCache::new(Schema::new_with_metadata(
         new_fields,
         schema.schema().metadata().clone(),
