@@ -29,7 +29,7 @@ use crate::{
 #[sea_orm(rs_type = "i16", db_type = "Integer")]
 pub enum TaskStatus {
     #[sea_orm(num_value = 0)]
-    Pending,
+    Ready,
     #[sea_orm(num_value = 1)]
     InProgress,
     #[sea_orm(num_value = 2)]
@@ -37,17 +37,17 @@ pub enum TaskStatus {
     #[sea_orm(num_value = 3)]
     Failed,
     #[sea_orm(num_value = 4)]
-    FileDownload,
+    Added,
 }
 
 impl From<TaskStatus> for i16 {
     fn from(value: TaskStatus) -> Self {
         match value {
-            TaskStatus::Pending => 0,
+            TaskStatus::Ready => 0,
             TaskStatus::InProgress => 1,
             TaskStatus::Completed => 2,
             TaskStatus::Failed => 3,
-            TaskStatus::FileDownload => 4,
+            TaskStatus::Added => 4,
         }
     }
 }
@@ -55,11 +55,11 @@ impl From<TaskStatus> for i16 {
 impl From<i16> for TaskStatus {
     fn from(value: i16) -> Self {
         match value {
-            0 => TaskStatus::Pending,
+            0 => TaskStatus::Ready,
             1 => TaskStatus::InProgress,
             2 => TaskStatus::Completed,
             3 => TaskStatus::Failed,
-            4 => TaskStatus::FileDownload,
+            4 => TaskStatus::Added,
             _ => unimplemented!("TaskStatus enum value not found"),
         }
     }
@@ -105,7 +105,7 @@ impl EnrichmentTableJobsRecord {
     pub fn new(task_id: &str, file_key: Option<String>, file_link: Option<String>) -> Self {
         Self {
             task_id: task_id.to_string(),
-            task_status: TaskStatus::Pending,
+            task_status: TaskStatus::Ready,
             file_key,
             file_link,
         }
@@ -326,7 +326,7 @@ pub async fn get_pending_task() -> Option<EnrichmentTableJobsRecord> {
         .column(Column::TaskStatus)
         .column(Column::FileKey)
         .column(Column::FileLink)
-        .filter(Column::TaskStatus.eq(TaskStatus::Pending))
+        .filter(Column::TaskStatus.eq(TaskStatus::Ready))
         .order_by(Column::CreatedTs, Order::Asc)
         .into_model::<EnrichmentTableJobsRecord>()
         .one(client)

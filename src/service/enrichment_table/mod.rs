@@ -347,7 +347,7 @@ pub async fn add_task(
     let task_id = generate_task_id();
     enrichment_table_jobs::add(
         &task_id,
-        enrichment_table_jobs::TaskStatus::FileDownload,
+        enrichment_table_jobs::TaskStatus::Ready,
         Some(key.clone()),
         file_link,
     )
@@ -360,7 +360,7 @@ pub async fn add_task(
 }
 
 pub async fn task_ready(task_id: &str) -> Result<(), Error> {
-    enrichment_table_jobs::set_job_status(task_id, TaskStatus::Pending)
+    enrichment_table_jobs::set_job_status(task_id, TaskStatus::Ready)
         .await
         .map_err(|e| {
             log::error!("[ENRICHMENT_TABLE] Failed to update task status: {}", e);
@@ -437,6 +437,15 @@ pub async fn remove_temp_file(
 }
 
 pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
+    // Download the file from link and save it to disk
+    if let Some(ref file_link) = task.file_link {
+        store_file_to_disk(&task.file_key.clone().unwrap(), file_link).await?;
+    } else {
+        let err = format!("[task_id: {}] File link not found", task.task_id);
+        log::error!("{err}",);
+        return Err(anyhow::anyhow!("{err}"));
+    }
+
     let Some(ref key) = task.file_key else {
         let err = format!("[task_id: {}] File key not found", task.task_id);
         log::error!("{err}",);

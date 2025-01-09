@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, get_config};
-use infra::table::enrichment_table_jobs;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
@@ -65,12 +64,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     for i in 0..cfg.limit.search_job_workers {
         tokio::task::spawn(async move { run_search_jobs(i).await });
     }
-    for i in 0..cfg.limit.enrichment_table_job_workers {
-        tokio::task::spawn(async move { run_enrichment_table_jobs(i).await });
-    }
     tokio::task::spawn(async move { run_check_running_search_jobs().await });
     tokio::task::spawn(async move { run_delete_jobs().await });
-    tokio::task::spawn(async move { run_enrichment_table_delete_jobs().await });
 
     Ok(())
 }
@@ -173,32 +168,4 @@ async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
 #[cfg(not(feature = "enterprise"))]
 async fn run_delete_jobs() -> Result<(), anyhow::Error> {
     Ok(())
-}
-
-async fn run_enrichment_table_jobs(id: i64) -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.enrichment_table_job_scheduler_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = service::enrichment_table_jobs::run(id).await {
-            log::error!(
-                "[ENRICHMENT_TABLE_JOB: {}] run enrichment table job error: {}",
-                id,
-                e
-            );
-        }
-    }
-}
-
-async fn run_enrichment_table_delete_jobs() -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.enrichment_table_job_delete_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = enrichment_table_jobs::delete_jobs().await {
-            log::error!("[ENRICHMENT_TABLE_JOB] run delete jobs error: {}", e);
-        }
-    }
 }
