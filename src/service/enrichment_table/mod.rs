@@ -341,22 +341,57 @@ pub async fn add_task(
     org_id: &str,
     table_name: &str,
     append_data: bool,
-    file_link: Option<String>,
+    file_link: &str,
 ) -> Result<(String, String), Error> {
     let key = generate_file_key(org_id, table_name, append_data);
     let task_id = generate_task_id();
-    enrichment_table_jobs::add(
-        &task_id,
-        enrichment_table_jobs::TaskStatus::Ready,
-        Some(key.clone()),
-        file_link,
-    )
-    .await
-    .map_err(|e| {
+    let record = EnrichmentTableJobsRecord::new(&task_id, org_id, &key, &file_link);
+    enrichment_table_jobs::add(record).await.map_err(|e| {
         log::error!("[ENRICHMENT_TABLE] Failed to add task: {}", e);
         Error::other("Failed to add task")
     })?;
     Ok((task_id, key))
+}
+
+pub async fn list_jobs(org_id: &str) -> Result<HttpResponse, Error> {
+    let res = enrichment_table_jobs::list(org_id, None)
+        .await
+        .map_err(|e| {
+            log::error!("[ENRICHMENT_TABLE] Failed to list tasks: {}", e);
+            Error::other("Failed to list tasks")
+        })?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+pub async fn get_job_status(task_id: &str) -> Result<HttpResponse, Error> {
+    let res = enrichment_table_jobs::get(task_id).await.map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] Failed to get task status: {}", e);
+        Error::other("Failed to get task status")
+    })?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+pub async fn cancel_jobs(task_ids: Vec<String>) -> Result<HttpResponse, Error> {
+    for task_id in task_ids.iter() {
+        do_cancel(task_id).await?;
+    }
+    // TODO: stop background job
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        format!("Cancelled enrichment table jobs: {:?}", task_ids),
+    )))
+}
+
+pub async fn delete_job(task_id: &str) -> Result<HttpResponse, Error> {
+    do_cancel(task_id).await?;
+    // TODO: stop background job
+    // TODO: delete stream
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        StatusCode::OK.into(),
+        format!("Deleted enrichment table job, task_id: {}", task_id),
+    )))
 }
 
 pub async fn task_ready(task_id: &str) -> Result<(), Error> {
@@ -422,35 +457,36 @@ pub async fn remove_temp_file(
     let temp_file_path = construct_file_path(org_id, table_name, append_data);
     match tokio::fs::remove_file(&temp_file_path).await {
         Ok(_) => {
-            log::info!("Temporary file removed: {}", temp_file_path);
+            log::info!(
+                "[ENRICHMENT_TABLE] Temporary file removed: {}",
+                temp_file_path
+            );
             Ok(())
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            log::warn!("File not found, nothing to remove: {}", temp_file_path);
+            log::warn!(
+                "[ENRICHMENT_TABLE] File not found, nothing to remove: {}",
+                temp_file_path
+            );
             Ok(())
         }
         Err(e) => {
-            log::error!("Failed to remove file {}: {:?}", temp_file_path, e);
+            log::error!(
+                "[ENRICHMENT_TABLE] Failed to remove file {}: {:?}",
+                temp_file_path,
+                e
+            );
             Err(e)
         }
     }
 }
 
-pub async fn extract_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
+pub async fn download_and_save_data(task: &EnrichmentTableJobsRecord) -> Result<(), anyhow::Error> {
     // Download the file from link and save it to disk
-    if let Some(ref file_link) = task.file_link {
-        store_file_to_disk(&task.file_key.clone().unwrap(), file_link).await?;
-    } else {
-        let err = format!("[task_id: {}] File link not found", task.task_id);
-        log::error!("{err}",);
-        return Err(anyhow::anyhow!("{err}"));
-    }
+    let key = &task.file_key;
+    let file_link = &task.file_link;
+    store_file_to_disk(key, file_link).await?;
 
-    let Some(ref key) = task.file_key else {
-        let err = format!("[task_id: {}] File key not found", task.task_id);
-        log::error!("{err}",);
-        return Err(anyhow::anyhow!("{err}"));
-    };
     let (org_id, table_name, append_data) = parse_key(key)?;
     log::info!(
         "[ENRICHMENT_TABLE] Starting to extract and save data for org_id: {}, table_name: {}, append_data: {}",
@@ -609,5 +645,20 @@ async fn write_to_file(file_path: &str, response: &mut reqwest::Response) -> Res
     }
 
     temp_file.flush().await?;
+    Ok(())
+}
+
+async fn do_cancel(task_id: &str) -> Result<(), Error> {
+    let task = enrichment_table_jobs::get(task_id)
+        .await
+        .map_err(|_| Error::other("Failed to get task id"))?;
+
+    let (org_id, table_name, append_data) =
+        parse_key(&task.file_key).map_err(|_| Error::other("Failed to parse key"))?;
+    remove_temp_file(&org_id, &table_name, append_data).await?;
+
+    enrichment_table_jobs::set_job_status(task_id, TaskStatus::Cancelled)
+        .await
+        .map_err(|_| Error::other("Failed to cancel task"))?;
     Ok(())
 }

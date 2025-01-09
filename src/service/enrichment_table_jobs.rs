@@ -75,7 +75,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         }
     });
 
-    if let Err(e) = enrichment_table::extract_and_save_data(&job).await {
+    if let Err(e) = enrichment_table::download_and_save_data(&job).await {
         log::error!(
             "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table job failed: {}",
             id,
@@ -83,10 +83,8 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             e
         );
         enrichment_table_jobs::set_job_failed(&job.task_id).await?;
-        if let Some(key) = job.file_key {
-            let (org_id, table_name, append_data) = enrichment_table::parse_key(&key)?;
-            enrichment_table::remove_temp_file(&org_id, &table_name, append_data).await?;
-        }
+        let (org_id, table_name, append_data) = enrichment_table::parse_key(&job.file_key)?;
+        enrichment_table::remove_temp_file(&org_id, &table_name, append_data).await?;
         return Ok(());
     };
 

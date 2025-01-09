@@ -17,5 +17,5 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EnrichmentTableReq {
-    pub file_link: Option<String>,
+    pub file_link: String,
 }

@@ -27,6 +27,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i16", db_type = "Integer")]
+#[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
     #[sea_orm(num_value = 0)]
     Ready,
@@ -37,7 +38,7 @@ pub enum TaskStatus {
     #[sea_orm(num_value = 3)]
     Failed,
     #[sea_orm(num_value = 4)]
-    Added,
+    Cancelled,
 }
 
 impl From<TaskStatus> for i16 {
@@ -47,7 +48,7 @@ impl From<TaskStatus> for i16 {
             TaskStatus::InProgress => 1,
             TaskStatus::Completed => 2,
             TaskStatus::Failed => 3,
-            TaskStatus::Added => 4,
+            TaskStatus::Cancelled => 4,
         }
     }
 }
@@ -59,7 +60,7 @@ impl From<i16> for TaskStatus {
             1 => TaskStatus::InProgress,
             2 => TaskStatus::Completed,
             3 => TaskStatus::Failed,
-            4 => TaskStatus::Added,
+            4 => TaskStatus::Cancelled,
             _ => unimplemented!("TaskStatus enum value not found"),
         }
     }
@@ -73,12 +74,13 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_type = "String(StringLen::N(32))")]
     pub task_id: String,
+    pub org_id: String,
     #[sea_orm(column_type = "Integer", default = "0")]
     pub task_status: i16,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub file_key: Option<String>, // Optional field for file key on the local disk
-    #[sea_orm(column_type = "Text", nullable)]
-    pub file_link: Option<String>, // Optional field for HTTP link to the file
+    #[sea_orm(column_type = "Text")]
+    pub file_key: String,
+    #[sea_orm(column_type = "Text")]
+    pub file_link: String,
     pub created_ts: i64,
 }
 
@@ -93,21 +95,25 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(Debug, Clone, PartialEq, FromQueryResult)]
+#[derive(Debug, Clone, PartialEq, FromQueryResult, Serialize, Deserialize)]
 pub struct EnrichmentTableJobsRecord {
     pub task_id: String,
+    pub org_id: String,
     pub task_status: TaskStatus,
-    pub file_key: Option<String>,
-    pub file_link: Option<String>,
+    pub file_key: String,
+    pub file_link: String,
+    pub created_ts: i64,
 }
 
 impl EnrichmentTableJobsRecord {
-    pub fn new(task_id: &str, file_key: Option<String>, file_link: Option<String>) -> Self {
+    pub fn new(task_id: &str, org_id: &str, file_key: &str, file_link: &str) -> Self {
         Self {
             task_id: task_id.to_string(),
+            org_id: org_id.to_string(),
             task_status: TaskStatus::Ready,
-            file_key,
-            file_link,
+            file_key: file_key.to_string(),
+            file_link: file_link.to_string(),
+            created_ts: chrono::Utc::now().timestamp(),
         }
     }
 }
@@ -116,9 +122,11 @@ impl From<Model> for EnrichmentTableJobsRecord {
     fn from(value: Model) -> Self {
         Self {
             task_id: value.task_id,
+            org_id: value.org_id,
             task_status: TaskStatus::from(value.task_status),
             file_key: value.file_key,
             file_link: value.file_link,
+            created_ts: value.created_ts,
         }
     }
 }
@@ -159,8 +167,15 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
     let index2 = IndexStatement::new(
         "enrichment_table_jobs_task_status_created_ts_idx",
         "enrichment_table_jobs",
-        true,
+        false,
         &["task_status", "created_ts"],
+    );
+
+    let index3 = IndexStatement::new(
+        "enrichment_table_jobs_org_id_idx",
+        "enrichment_table_jobs",
+        false,
+        &["org_id"],
     );
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -168,31 +183,30 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
             mysql::create_index(index2).await?;
+            mysql::create_index(index3).await?;
         }
         DatabaseBackend::Postgres => {
             postgres::create_index(index1).await?;
             postgres::create_index(index2).await?;
+            postgres::create_index(index3).await?;
         }
         _ => {
             sqlite::create_index(index1).await?;
             sqlite::create_index(index2).await?;
+            sqlite::create_index(index3).await?;
         }
     }
     Ok(())
 }
 
-pub async fn add(
-    task_id: &str,
-    task_status: TaskStatus,
-    file_key: Option<String>,
-    file_link: Option<String>,
-) -> Result<(), errors::Error> {
+pub async fn add(record: EnrichmentTableJobsRecord) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        task_id: Set(task_id.to_string()),
-        task_status: Set(task_status.into()),
-        file_key: Set(file_key),
-        file_link: Set(file_link),
-        created_ts: Set(chrono::Utc::now().timestamp()),
+        task_id: Set(record.task_id.to_string()),
+        org_id: Set(record.org_id.to_string()),
+        task_status: Set(record.task_status.into()),
+        file_key: Set(record.file_key),
+        file_link: Set(record.file_link),
+        created_ts: Set(record.created_ts),
         ..Default::default()
     };
 
@@ -207,9 +221,10 @@ pub async fn add(
 
 pub async fn put(
     task_id: &str,
+    org_id: &str,
     task_status: TaskStatus,
-    file_key: Option<String>,
-    file_link: Option<String>,
+    file_key: String,
+    file_link: String,
 ) -> Result<EnrichmentTableJobsRecord, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -227,6 +242,7 @@ pub async fn put(
         None => ActiveModel {
             id: NotSet,
             task_id: Set(task_id.to_string()),
+            org_id: Set(org_id.to_string()),
             task_status: Set(task_status.into()),
             file_key: Set(file_key),
             file_link: Set(file_link),
@@ -255,11 +271,6 @@ pub async fn remove(task_id: &str) -> Result<(), errors::Error> {
 pub async fn get(task_id: &str) -> Result<EnrichmentTableJobsRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
-        .select_only()
-        .column(Column::TaskId)
-        .column(Column::TaskStatus)
-        .column(Column::FileKey)
-        .column(Column::FileLink)
         .filter(Column::TaskId.eq(task_id))
         .into_model::<EnrichmentTableJobsRecord>()
         .one(client)
@@ -273,14 +284,14 @@ pub async fn get(task_id: &str) -> Result<EnrichmentTableJobsRecord, errors::Err
     Ok(record)
 }
 
-pub async fn list(limit: Option<i64>) -> Result<Vec<EnrichmentTableJobsRecord>, errors::Error> {
+pub async fn list(
+    org_id: &str,
+    limit: Option<i64>,
+) -> Result<Vec<EnrichmentTableJobsRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut records = Entity::find()
-        .select_only()
-        .column(Column::TaskId)
-        .column(Column::TaskStatus)
-        .column(Column::FileKey)
-        .column(Column::FileLink)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::TaskStatus.ne(TaskStatus::Completed))
         .order_by(Column::CreatedTs, Order::Desc);
 
     if let Some(limit) = limit {
@@ -321,11 +332,6 @@ pub async fn clear() -> Result<(), errors::Error> {
 pub async fn get_pending_task() -> Option<EnrichmentTableJobsRecord> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::find()
-        .select_only()
-        .column(Column::TaskId)
-        .column(Column::TaskStatus)
-        .column(Column::FileKey)
-        .column(Column::FileLink)
         .filter(Column::TaskStatus.eq(TaskStatus::Ready))
         .order_by(Column::CreatedTs, Order::Asc)
         .into_model::<EnrichmentTableJobsRecord>()
