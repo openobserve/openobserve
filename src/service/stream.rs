@@ -650,11 +650,6 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    if !config::get_config().common.widening_schema_evolution {
-        return Err(anyhow::anyhow!(
-            "widening schema evolution is disabled, can't delete fields"
-        ));
-    }
     if fields.is_empty() {
         return Ok(());
     }
