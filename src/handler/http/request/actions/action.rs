@@ -203,7 +203,7 @@ pub async fn upload_zipped_action(
     }
 
     while let Ok(Some(mut field)) = payload.try_next().await {
-        match field.name() {
+        match field.name().unwrap_or("") {
             "file" => {
                 while let Some(chunk) = field.next().await {
                     match chunk {

@@ -2500,6 +2500,7 @@ dependencies = [
  "rand",
  "regex",
  "reqwest 0.12.9",
+ "sea-orm",
  "segment",
  "serde",
  "serde_json",
@@ -6637,6 +6638,8 @@ dependencies = [
  "ipnetwork 0.20.0",
  "itertools 0.13.0",
  "jsonwebtoken",
+ "k8s-openapi",
+ "kube",
  "lettre",
  "log",
  "maxminddb",
@@ -6695,6 +6698,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "vrl",
+ "zip 2.2.2",
  "zstd",
 ]
 
@@ -8636,9 +8640,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b24d72a69e89762982c29af249542b06c59fa131f87cc9d5b94be1f692b427a"
+checksum = "0dbcf83248860dc632c46c7e81a221e041b50d0006191756cb001d9e8afc60a9"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8681,9 +8685,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-macros"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0497f4fd82ecb2a222bea5319b9048f8ab58d4e734d095b062987acbcdeecdda"
+checksum = "49ce6f08134f3681b1ca92185b96fac898f26d9b4f5538d13f7032ef243d14b2"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2",
