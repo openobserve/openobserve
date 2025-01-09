@@ -171,29 +171,19 @@ pub async fn create_table_index() -> Result<(), errors::Error> {
         &["task_status", "created_ts"],
     );
 
-    let index3 = IndexStatement::new(
-        "enrichment_table_jobs_org_id_idx",
-        "enrichment_table_jobs",
-        false,
-        &["org_id"],
-    );
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match client.get_database_backend() {
         DatabaseBackend::MySql => {
             mysql::create_index(index1).await?;
             mysql::create_index(index2).await?;
-            mysql::create_index(index3).await?;
         }
         DatabaseBackend::Postgres => {
             postgres::create_index(index1).await?;
             postgres::create_index(index2).await?;
-            postgres::create_index(index3).await?;
         }
         _ => {
             sqlite::create_index(index1).await?;
             sqlite::create_index(index2).await?;
-            sqlite::create_index(index3).await?;
         }
     }
     Ok(())
