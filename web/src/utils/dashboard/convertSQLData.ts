@@ -591,7 +591,7 @@ export const convertSQLData = async (
       }
 
       if (!options.series?.length) {
-        throw new Error("No series data available");
+        return;
       }
 
       const yAxisNameGap = getYAxisNameGap();
@@ -2102,7 +2102,14 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis[0].type = "time";
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
 
       options.xAxis[0].data = [];
 
@@ -2254,7 +2261,16 @@ export const convertSQLData = async (
           ]);
         }
       });
-      options.xAxis[0].type = "time";
+
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
+
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
