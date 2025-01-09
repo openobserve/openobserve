@@ -35,8 +35,6 @@ pub struct Model {
     pub name: String, // Name with a max length of 32 characters
     #[sea_orm(column_type = "Text")]
     pub function: String, // The main action script
-    #[sea_orm(column_type = "Json")]
-    pub dependencies: String, // Dependencies or setup instructions
     #[sea_orm(column_type = "String(StringLen::N(128))")]
     pub org_id: String,
     #[sea_orm(column_type = "Json")]
@@ -70,7 +68,6 @@ pub struct ActionScriptDetails {
     pub id: String,
     pub name: String,
     pub function: String,
-    pub dependencies: String,
     pub env: JsonValue,
     pub execution_details: ExecutionDetailsType,
     pub cron_expr: Option<String>,
@@ -145,7 +142,6 @@ pub async fn add(
         org_id: Set(org_id.to_string()),
         function: Set(action.blob.clone()),
         env: Set(serde_json::json!(action.environment_variables.clone())),
-        dependencies: Set(action.dependencies.join(",")),
         execution_details: Set(action.execution_details.clone()),
         created_at: Set(created_at),
         ..Default::default()
@@ -182,7 +178,6 @@ pub async fn get(id: &str, org_id: &str) -> Result<ActionScriptDetails, errors::
             .column(Column::Id)
             .column(Column::Name)
             .column(Column::Function)
-            .column(Column::Dependencies)
             .column(Column::Env)
             .column(Column::ExecutionDetails)
             .column(Column::CronExpr)
@@ -259,32 +254,3 @@ pub async fn clear() -> Result<(), errors::Error> {
 pub async fn is_empty() -> bool {
     len().await == 0
 }
-
-// pub async fn get_expired(
-//     expired_before: i64,
-//     limit: Option<i64>,
-// ) -> Result<Vec<String>, errors::Error> {
-//     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-//     let mut res = Entity::find()
-//         .select_only()
-//         .column(Column::ShortId)
-//         .filter(Column::CreatedTs.lt(expired_before));
-//     if let Some(limit) = limit {
-//         res = res.limit(limit as u64);
-//     }
-//     let records = res.into_model::<ShortId>().all(client).await?;
-//     Ok(records.iter().map(|r| r.short_id.clone()).collect())
-// }
-//
-// pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
-//     // make sure only one client is writing to the database(only for sqlite)
-//     let _lock = get_lock().await;
-//
-//     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-//     Entity::delete_many()
-//         .filter(Column::ShortId.is_in(short_ids))
-//         .exec(client)
-//         .await?;
-//
-//     Ok(())
-// }

@@ -19,6 +19,16 @@ pub enum ExecutionDetailsType {
     Repeat,
 }
 
+impl From<&str> for ExecutionDetailsType {
+    fn from(s: &str) -> Self {
+        match s {
+            "once" => ExecutionDetailsType::Once,
+            "repeat" => ExecutionDetailsType::Repeat,
+            _ => ExecutionDetailsType::Once,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Action {
     #[serde(default)]
@@ -28,8 +38,6 @@ pub struct Action {
     pub blob: String,
     #[serde(default)]
     pub name: String,
-    #[serde(default)]
-    pub dependencies: Vec<String>,
     #[serde(default)]
     pub execution_details: ExecutionDetailsType,
     #[serde(default)]

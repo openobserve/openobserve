@@ -17,13 +17,12 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::actions::action::Action;
+use config::meta::actions::action::{Action, ExecutionDetailsType};
 use futures::{StreamExt, TryStreamExt};
-use infra::table::action_scripts::ActionScriptDetails;
-use o2_enterprise::enterprise::actions::action::read_action_from_zip;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::action::{
-    delete_action_by_id, get_action_details, get_actions, save_and_run_action,
+    delete_action_by_id, get_action_details, get_actions, populate_action_from_zip,
+    save_and_run_action,
 };
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -189,7 +188,8 @@ pub async fn upload_zipped_action(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let mut data = Vec::new();
+    let mut file_data = Vec::new();
+    let mut action = Action::default();
 
     // Validate Content-Type
     if let Some(content_type) = req.headers().get("Content-Type") {
@@ -202,32 +202,60 @@ pub async fn upload_zipped_action(
         }
     }
 
-    // Read multipart payload
     while let Ok(Some(mut field)) = payload.try_next().await {
-        if field.content_disposition().get_filename().is_some() {
-            // Ensure this is the correct field
-            while let Some(chunk) = field.next().await {
-                match chunk {
-                    Ok(bytes) => data.extend_from_slice(&bytes),
-                    Err(_) => {
-                        return Ok(HttpResponse::BadRequest().body("Failed to read uploaded file"));
+        match field.name() {
+            "file" => {
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => file_data.extend_from_slice(&bytes),
+                        Err(_) => return Ok(HttpResponse::BadRequest().body("Failed to read file")),
                     }
                 }
             }
+            "name" => {
+                let mut name = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    name.extend_from_slice(&chunk.unwrap());
+                }
+                action.name = String::from_utf8(name).unwrap();
+            }
+            "execution_details" => {
+                let mut details = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    details.extend_from_slice(&chunk.unwrap());
+                }
+                action.execution_details =
+                    ExecutionDetailsType::from(std::str::from_utf8(&*details).unwrap());
+            }
+            "cron_expr" => {
+                let mut cron = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    cron.extend_from_slice(&chunk.unwrap());
+                }
+                action.cron_expr = String::from_utf8(cron).unwrap();
+            }
+            "environment_variables" => {
+                let mut env_vars = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    env_vars.extend_from_slice(&chunk.unwrap());
+                }
+                action.environment_variables =
+                    serde_json::from_str(&String::from_utf8(env_vars).unwrap()).unwrap();
+            }
+            _ => {}
         }
     }
 
-    if data.is_empty() {
+    if file_data.is_empty() {
         return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
     }
 
     // Attempt to read the uploaded data as a ZIP file
-    match zip::read::ZipArchive::new(std::io::Cursor::new(data)) {
-        Ok(mut archive) => {
+    match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
+        Ok(archive) => {
             println!("Successfully read ZIP archive with {} files", archive.len());
-            // Further processing...
-            match read_action_from_zip(&org_id, archive).await {
-                Ok(action_id) => Ok(HttpResponse::Ok().json(action_id)),
+            match populate_action_from_zip(&org_id, archive, action).await {
+                Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
                 Err(e) => {
                     Ok(HttpResponse::BadRequest().body(format!("Failed to process action: {}", e)))
                 }
