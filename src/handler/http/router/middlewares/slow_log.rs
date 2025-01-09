@@ -73,6 +73,16 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
+        let remote_addr = match req.headers().contains_key("X-Forwarded-For")
+            || req.headers().contains_key("Forwarded")
+        {
+            true => req
+                .connection_info()
+                .realip_remote_addr()
+                .unwrap_or("-")
+                .to_string(),
+            false => req.connection_info().peer_addr().unwrap_or("-").to_string(),
+        };
         let path = req
             .uri()
             .path_and_query()
@@ -90,7 +100,8 @@ where
 
             if duration > threshold {
                 log::warn!(
-                    "Slow request detected - method: {}, path: {}, took: {:.6}",
+                    "Slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
+                    remote_addr,
                     method,
                     path,
                     duration.as_secs_f64()
