@@ -23,25 +23,23 @@
 //! the `folders` table.instead of using auto-incremented integers as primary keys
 //!
 //! The migration strategy to implement these changes follows these steps:
-//! 1. Drop all indices from the tables so that indices with the same names can be recreated later
-//!    on without causing problems due to conflicting names.
-//! 2. Rename the legacy `folders`, `dashboards`, and `alerts` tables to `legacy_folders`,
+//! 1. Rename the legacy `folders`, `dashboards`, and `alerts` tables to `legacy_folders`,
 //!    `legacy_dashboards`, and `legacy_alerts` so that later we can create new tables using these
 //!    original names.
-//! 3. Add a temporary `ksuid` column to the `legacy_folders` table and the `dashboards` table and
+//! 2. Add a temporary `ksuid` column to the `legacy_folders` table and the `dashboards` table and
 //!    populate the column. These KSUIDs will act as the primary keys for records that are copied to
 //!    new `folders` and `dashboards` tables.
-//! 4. Create new `folders`, `dashboards`, and `alerts` tables and their indices. These new tables
+//! 3. Create new `folders`, `dashboards`, and `alerts` tables and their indices. These new tables
 //!    should all use KSUIDs as their primary keys and foreign keys.
-//! 5. Select all records from the `legacy_folders` table. For each record create a new record in
+//! 4. Select all records from the `legacy_folders` table. For each record create a new record in
 //!    the `folders` table using `legacy_folders.ksuid` as `folders.id`.
-//! 6. Select all records from the `legacy_dashboards` table joined on the `legacy_folders` table.
+//! 5. Select all records from the `legacy_dashboards` table joined on the `legacy_folders` table.
 //!    For each result create a new record in the `dashboards` table using `legacy_dashboards.ksuid`
 //!    as `dashboards.id` and `legacy_folders.ksuid` as `dashboard.folder_id`.
-//! 7. Select all records from the `legacy_alerts` table joined on the `legacy_folders` table. For
+//! 6. Select all records from the `legacy_alerts` table joined on the `legacy_folders` table. For
 //!    each result create a new record in the `alerts` table using `legacy_alerts.ksuid` as
 //!    `alerts.id` and `legacy_folders.ksuid` as `alerts.folder_id`.
-//! 8. Delete the `legacy_folders`, `legacy_dashboards`, and `legacy_alerts` tables.
+//! 7. Delete the `legacy_folders`, `legacy_dashboards`, and `legacy_alerts` tables.
 
 use itertools::Itertools;
 use sea_orm::{
@@ -56,25 +54,6 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Drop all indices on the legacy tables so that we can recreate indices
-        // with the same names on the new tables without worrying about
-        // conflicting names.
-        manager
-            .drop_index(legacy_folders::drop_folders_org_idx_stmnt())
-            .await?;
-        manager
-            .drop_index(legacy_folders::drop_folders_org_type_folder_id_idx_stmnt())
-            .await?;
-        manager
-            .drop_index(legacy_dashboards::drop_dashboards_folder_id_dashboard_id_idx_stmnt())
-            .await?;
-        manager
-            .drop_index(legacy_alerts::drop_alerts_org_stream_type_stream_name_name_idx_stmnt())
-            .await?;
-        manager
-            .drop_index(legacy_alerts::drop_alerts_folder_id_idx_stmnt())
-            .await?;
-
         // Rename the legacy tables so that we can create new tables using the
         // original table names
         manager
@@ -163,31 +142,6 @@ mod legacy_folders {
     const OLD_TABLE_NAME: &str = "folders";
     const NEW_TABLE_NAME: &str = "legacy_folders";
 
-    const FOLDERS_ORG_IDX: &str = "folders_org_idx";
-    const FOLDERS_ORG_TYPE_FOLDER_ID_IDX: &str = "folders_org_type_folder_id_idx";
-
-    /// Statement to delete the index on org.
-    ///
-    /// This should be ran BEFORE the legacy folders table is renamed from
-    /// `folders` to `legacy_folders`.
-    pub fn drop_folders_org_idx_stmnt() -> IndexDropStatement {
-        Index::drop()
-            .name(FOLDERS_ORG_IDX)
-            .table(Alias::new(OLD_TABLE_NAME))
-            .to_owned()
-    }
-
-    /// Statement to delete the unique index on org, type, and folder_id.
-    ///
-    /// This should be ran BEFORE the legacy folders table is renamed from
-    /// `folders` to `legacy_folders`.
-    pub fn drop_folders_org_type_folder_id_idx_stmnt() -> IndexDropStatement {
-        Index::drop()
-            .name(FOLDERS_ORG_TYPE_FOLDER_ID_IDX)
-            .table(Alias::new(OLD_TABLE_NAME))
-            .to_owned()
-    }
-
     /// Statement to rename the legacy folders table from `folders` to
     /// `legacy_folders`.
     pub fn rename_to_legacy_folders() -> TableRenameStatement {
@@ -247,19 +201,6 @@ mod legacy_dashboards {
 
     const OLD_TABLE_NAME: &str = "dashboards";
     const NEW_TABLE_NAME: &str = "legacy_dashboards";
-
-    const DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX: &str = "dashboards_folder_id_dashboard_id_idx";
-
-    /// Statement to drop the index on `folder_id` and `dashboard_id`.
-    ///
-    /// This should be ran BEFORE the legacy dashboards table is renamed from
-    /// `dashboards` to `legacy_dashboards`.
-    pub fn drop_dashboards_folder_id_dashboard_id_idx_stmnt() -> IndexDropStatement {
-        Index::drop()
-            .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
-            .table(Alias::new(OLD_TABLE_NAME))
-            .to_owned()
-    }
 
     /// Statement to rename the legacy dashboards table from `dashboards` to
     /// `legacy_dashboards`.
@@ -321,32 +262,6 @@ mod legacy_alerts {
     const OLD_TABLE_NAME: &str = "alerts";
     const NEW_TABLE_NAME: &str = "legacy_alerts";
 
-    const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
-        "alerts_org_stream_type_stream_name_name_idx";
-    const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx";
-
-    /// Statement to drop the index on `org`, `stream_type`, `stream_name`, and `name`.
-    ///
-    /// This should be ran BEFORE the legacy alerts table is renamed from
-    /// `alerts` to `legacy_alerts`.
-    pub fn drop_alerts_org_stream_type_stream_name_name_idx_stmnt() -> IndexDropStatement {
-        Index::drop()
-            .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
-            .table(Alias::new(OLD_TABLE_NAME))
-            .to_owned()
-    }
-
-    /// Statement to drop the index on `folder_id`.
-    ///
-    /// This should be ran BEFORE the legacy alerts table is renamed from
-    /// `alerts` to `legacy_alerts`.
-    pub fn drop_alerts_folder_id_idx_stmnt() -> IndexDropStatement {
-        Index::drop()
-            .name(ALERTS_FOLDER_ID_IDX)
-            .table(Alias::new(OLD_TABLE_NAME))
-            .to_owned()
-    }
-
     /// Statement to rename the legacy alerts table from `alerts` to
     /// `legacy_alerts`.
     pub fn rename_to_legacy_alerts() -> TableRenameStatement {
@@ -367,8 +282,8 @@ mod legacy_alerts {
 mod new_folders {
     use super::*;
 
-    const FOLDERS_ORG_IDX: &str = "folders_org_idx";
-    const FOLDERS_ORG_TYPE_FOLDER_ID_IDX: &str = "folders_org_type_folder_id_idx";
+    const FOLDERS_ORG_IDX: &str = "folders_org_idx_2";
+    const FOLDERS_ORG_TYPE_FOLDER_ID_IDX: &str = "folders_org_type_folder_id_idx_2";
 
     /// Identifiers used in queries on the new folders table.
     #[derive(DeriveIden)]
@@ -456,8 +371,8 @@ mod new_folders {
 mod new_dashboards {
     use super::*;
 
-    const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk";
-    const DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX: &str = "dashboards_folder_id_dashboard_id_idx";
+    const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk_2";
+    const DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX: &str = "dashboards_folder_id_dashboard_id_idx_2";
 
     /// Identifiers used in queries on the new dashboards table.
     #[derive(DeriveIden)]
@@ -552,10 +467,10 @@ mod new_dashboards {
 mod new_alerts {
     use super::*;
 
-    const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk";
+    const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
     const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
-        "alerts_org_stream_type_stream_name_name_idx";
-    const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx";
+        "alerts_org_stream_type_stream_name_name_idx_2";
+    const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx_2";
 
     /// Identifiers used in queries on the alerts table.
     #[derive(DeriveIden)]
