@@ -234,7 +234,6 @@ def test_new_alert_create(create_session, base_url):
     "stream_name": "default",
     "is_real_time": False,
     "context_attributes": {},
-    # "function": "",
     "query_condition": {
         "conditions": [ {
         "column": "log",
@@ -247,7 +246,6 @@ def test_new_alert_create(create_session, base_url):
         "sql": "",
         "promql": "",
         "type": "custom",
-        # "aggregation": None,  # Use an empty dictionary or provide a valid structure
         "promql_condition": None,
         "vrl_function": None,
         "multi_time_range": []
@@ -263,31 +261,51 @@ def test_new_alert_create(create_session, base_url):
         "timezone": "UTC",
         "tolerance_in_secs": 0
     },
-    # "id": "95eb852b-b93b-4cb6-ab17-b7608b4fc741",
     "org_id": "default",
     "destinations": [destination_alert],
     "context_attributes": {},
     "enabled": True,
     "description": "test",
-    # "lastTriggeredAt": 1735899669457,
-    # "createdAt": "2025-01-03T10:21:09.457Z",
-    # "updatedAt": "",
     "owner": "root@example.com",
-    # "lastEditedBy": "root@example.com",
-    # "tz_offset": 0,
     "folderId": folder_id
  }
-
-    # Create the alert after ensuring the destination exists
     resp_post_alertnew = session.post(
     f"{url}api/v2/{org_id}/alerts",
     json=payload_alert,
     headers=headers,
     )
     print(resp_post_alertnew.content)
-
+    
+    # Ensure the response is successful and contains the expected data
     assert (
     resp_post_alertnew.status_code == 200
     ), f"Get all alerts list 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
-
     
+    # Extract the alert ID from the response message
+    response_json = resp_post_alertnew.json()
+    assert "message" in response_json, "Response should contain a message field"
+    assert response_json["message"] == "Alert saved", "Response message is incorrect"
+    # assert response_json["alert_id"] is not None, "Alert ID is missing in response"
+    # assert response_json["alert_id"] != "", "Alert ID is empty in response"
+    # assert response_json["alert_id"] == "alert_id", "Alert ID is incorrect in response"
+
+   
+   
+    # Extract the alert ID from the response message
+    message = response_json["message"]
+    alert_id_prefix = "alert_id: "
+    assert alert_id_prefix in message, "Alert ID not found in the message"
+    alert_id = message.split(alert_id_prefix)[-1].strip()
+    assert alert_id, "Extracted Alert ID is empty"
+
+    print(f"Alert ID: {alert_id}")
+
+    # alert_id = resp_post_alertnew.json()["alertId"]
+
+    resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+
+    print(resp_get_alertnew.content)
+    assert (
+        resp_get_alertnew.status_code == 200
+    ), f"Get all new alerts list 200, but got {resp_get_alertnew.status_code} {resp_get_alertnew.content}"
+
