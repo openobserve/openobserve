@@ -42,6 +42,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
     };
 
+    log::info("[OFGA] Initializing OFGA model");
+
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
     let mut need_migrate_index_streams = false;
@@ -60,28 +62,38 @@ pub async fn init() -> Result<(), anyhow::Error> {
         match (meta_in_super, &existing_meta) {
             (None, Some(existing_model)) => {
                 // set to super cluster
+                log::info("[OFGA] meta_in_super is None, existing_model is Some: setting existing model to super cluster");
                 set_model(Some(existing_model.clone())).await?;
             }
             (Some(model), None) => {
                 // set to local
+                log::info(
+                    "[OFGA] meta_in_super is Some, existing_model is None: setting it to local",
+                );
                 existing_meta = Some(model.clone());
                 migrate_native_objects = false;
                 db::ofga::set_ofga_model_to_db(model).await?;
             }
-            (Some(model), Some(existing_model)) => match model.version.cmp(&existing_model.version)
-            {
-                Ordering::Less => {
-                    // update version in super cluster
-                    set_model(Some(existing_model.clone())).await?;
+            (Some(model), Some(existing_model)) => {
+                log::info(
+                    "[OFGA] meta_in_super is Some, existing_model is Some: comparing versions",
+                );
+                match model.version.cmp(&existing_model.version) {
+                    Ordering::Less => {
+                        // update version in super cluster
+                        log::info!("[OFGA] setting existing_model to super cluster");
+                        set_model(Some(existing_model.clone())).await?;
+                    }
+                    Ordering::Greater => {
+                        // update version in local
+                        log::info!("[OFGA] setting meta_in_super to local");
+                        existing_meta = Some(model.clone());
+                        migrate_native_objects = false;
+                        db::ofga::set_ofga_model_to_db(model).await?;
+                    }
+                    Ordering::Equal => {}
                 }
-                Ordering::Greater => {
-                    // update version in local
-                    existing_meta = Some(model.clone());
-                    migrate_native_objects = false;
-                    db::ofga::set_ofga_model_to_db(model).await?;
-                }
-                Ordering::Equal => {}
-            },
+            }
             _ => {}
         }
     }
@@ -127,6 +139,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
+            log::info("[OFGA] OFGA set store_id: {}", store_id);
             if store_id.is_empty() {
                 log::error!("OFGA store id is empty");
             }
