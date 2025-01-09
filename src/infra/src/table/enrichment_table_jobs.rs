@@ -66,6 +66,18 @@ impl From<i16> for TaskStatus {
     }
 }
 
+impl From<TaskStatus> for String {
+    fn from(value: TaskStatus) -> Self {
+        match value {
+            TaskStatus::Ready => "ready".to_string(),
+            TaskStatus::InProgress => "inprogress".to_string(),
+            TaskStatus::Completed => "completed".to_string(),
+            TaskStatus::Failed => "failed".to_string(),
+            TaskStatus::Cancelled => "cancelled".to_string(),
+        }
+    }
+}
+
 // Define the table schema for enrichment_table_jobs
 #[derive(Debug, Clone, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "enrichment_table_jobs")]
@@ -95,7 +107,7 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(Debug, Clone, PartialEq, FromQueryResult, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, FromQueryResult)]
 pub struct EnrichmentTableJobsRecord {
     pub task_id: String,
     pub org_id: String,

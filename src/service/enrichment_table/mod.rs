@@ -43,7 +43,10 @@ use infra::{
 use tokio::io::AsyncWriteExt;
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::{
+        enrichment_table::EnrichmentTableResp, http::HttpResponse as MetaHttpResponse,
+        stream::SchemaRecords,
+    },
     service::{
         compact::retention,
         db::{self, enrichment_table},
@@ -360,6 +363,21 @@ pub async fn list_jobs(org_id: &str) -> Result<HttpResponse, Error> {
             log::error!("[ENRICHMENT_TABLE] Failed to list tasks: {}", e);
             Error::other("Failed to list tasks")
         })?;
+    let res: Vec<EnrichmentTableResp> = res
+        .into_iter()
+        .filter_map(|item| {
+            match EnrichmentTableResp::try_from(item) {
+                Ok(resp) => Some(resp), // Successfully converted item
+                Err(e) => {
+                    log::error!(
+                        "[ENRICHMENT_TABLE] Failed to convert task to response: {}",
+                        e
+                    );
+                    None
+                }
+            }
+        })
+        .collect();
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -368,6 +386,10 @@ pub async fn get_job_status(task_id: &str) -> Result<HttpResponse, Error> {
     let res = enrichment_table_jobs::get(task_id).await.map_err(|e| {
         log::error!("[ENRICHMENT_TABLE] Failed to get task status: {}", e);
         Error::other("Failed to get task status")
+    })?;
+    let res = EnrichmentTableResp::try_from(res).map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] Failed to convert task status: {}", e);
+        Error::other("Failed to convert task status")
     })?;
 
     Ok(HttpResponse::Ok().json(res))
