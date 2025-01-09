@@ -224,7 +224,9 @@ pub async fn get_job_result(
         .to_string();
 
     let from = req.from.unwrap_or(0);
-    let size = req.size.unwrap_or(100);
+    let size = req
+        .size
+        .unwrap_or(config::get_config().limit.query_default_limit);
 
     let org_id = path.0.clone();
     let job_id = path.1.clone();

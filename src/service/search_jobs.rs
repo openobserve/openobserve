@@ -438,7 +438,8 @@ pub async fn get_result(
 ) -> Result<Response, anyhow::Error> {
     if *cluster == config::get_cluster_name() {
         let buf = storage::get(path).await?;
-        let res: Response = json::from_slice::<Response>(&buf)?;
+        let mut res: Response = json::from_slice::<Response>(&buf)?;
+        res.pagination(from, size);
         return Ok(res);
     }
 
