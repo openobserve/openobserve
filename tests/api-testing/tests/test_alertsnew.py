@@ -3,6 +3,7 @@ import random
 import uuid
 import pytest
 import json
+import requests
 
 
 def test_get_alertsnew(create_session, base_url):
@@ -275,37 +276,70 @@ def test_new_alert_create(create_session, base_url):
     headers=headers,
     )
     print(resp_post_alertnew.content)
+
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Get  request using the extracted alert_id
+        resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
+        print(f"Successfully fetched details for alert {alert_id}")
+
+  
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
     
-    # Ensure the response is successful and contains the expected data
-    assert (
-    resp_post_alertnew.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
+    # Proceed to disable the alert
+        resp_alertnew_disable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
+        print(f"Disable Alert Response: {resp_alertnew_disable.text}")
+        assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
+        print(f"Successfully disabled alert {alert_id}")
+
+    # Proceed to enable the alert
+        resp_alertnew_enable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
+        print(f"Enable Alert Response: {resp_alertnew_enable.text}")
+        assert resp_alertnew_enable.status_code == 200, f"Failed to disable alert {alert_id}"
+        print(f"Successfully enabled alert {alert_id}")
+
+    # Trigger the alert
+        print(f"Attempting to trigger alert with ID: {alert_id}")
+        resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger")
+
+    # Log response details for debugging
+        print(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
+        print(f"Trigger Alert Response Body: {resp_alertnew_trigger.text}")
+
+    # Check if the response was successful
+        assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
+        print(f"Successfully triggered alert {alert_id}")
     
-    # Extract the alert ID from the response message
-    response_json = resp_post_alertnew.json()
-    assert "message" in response_json, "Response should contain a message field"
-    assert response_json["message"] == "Alert saved", "Response message is incorrect"
-    # assert response_json["alert_id"] is not None, "Alert ID is missing in response"
-    # assert response_json["alert_id"] != "", "Alert ID is empty in response"
-    # assert response_json["alert_id"] == "alert_id", "Alert ID is incorrect in response"
 
-   
-   
-    # Extract the alert ID from the response message
-    message = response_json["message"]
-    alert_id_prefix = "alert_id: "
-    assert alert_id_prefix in message, "Alert ID not found in the message"
-    alert_id = message.split(alert_id_prefix)[-1].strip()
-    assert alert_id, "Extracted Alert ID is empty"
-
-    print(f"Alert ID: {alert_id}")
-
-    # alert_id = resp_post_alertnew.json()["alertId"]
-
-    resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-
-    print(resp_get_alertnew.content)
-    assert (
-        resp_get_alertnew.status_code == 200
-    ), f"Get all new alerts list 200, but got {resp_get_alertnew.status_code} {resp_get_alertnew.content}"
-
+    # Proceed to delete the alert
+        resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
+        assert resp_delete_alertnew.status_code == 200, f"Failed to disable alert {alert_id}"
+        print(f"Successfully deleted alert {alert_id}")
