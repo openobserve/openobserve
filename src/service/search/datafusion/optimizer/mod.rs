@@ -35,6 +35,7 @@ use datafusion::optimizer::{
     unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
 };
 use infra::schema::get_stream_setting_fts_fields;
+use limit_join_right_side::LimitJoinRightSide;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
@@ -45,10 +46,13 @@ pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
 pub mod join_reorder;
+pub mod limit_join_right_side;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
+pub mod utils;
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+    let cfg = config::get_config();
     let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)
@@ -79,6 +83,12 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         // *********** custom rules ***********
         rules.push(Arc::new(RewriteMatch::new(fields)));
         // ************************************
+    }
+
+    if cfg.common.feature_join_right_side_max_rows > 0 {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
     }
 
     rules.push(Arc::new(EliminateNestedUnion::new()));

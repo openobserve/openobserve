@@ -410,7 +410,6 @@ onUnmounted(() => {
 let forceSkipBeforeUnloadListener = false;
 
 onBeforeRouteLeave((to, from, next) => {
-  console.log("beforeRouteLeave", pipelineObj.currentSelectedPipeline.nodes);
   // check if it is a force navigation, then allow
   if (forceSkipBeforeUnloadListener) {
     next();
