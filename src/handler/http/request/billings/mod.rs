@@ -25,7 +25,7 @@ use crate::{
         utils::{auth::UserEmail, redirect_response::RedirectResponseBuilder},
     },
     handler::http::models::billings::{
-        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
+        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody, ListSubscriptionResponseBody,
     },
     service::organization,
 };
@@ -116,7 +116,12 @@ pub async fn process_session_detail(
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
 
-    match o2_cloud_billings::process_checkout_session_details(&query.session_id, &query.plan).await
+    match o2_cloud_billings::process_checkout_session_details(
+        &org_id,
+        &query.session_id,
+        &query.plan,
+    )
+    .await
     {
         Err(e) => e.into_http_response(),
         Ok(()) => {
@@ -213,8 +218,13 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
     ),
 )]
 #[get("/{org_id}/billings/list_subscription")]
-pub async fn list_subscription(_path: web::Path<String>, _user_email: UserEmail) -> impl Responder {
-    HttpResponse::Ok().body("Unimplemented")
+pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -> impl Responder {
+    let org_id = path.into_inner();
+    let email = user_email.user_id.as_str();
+    match o2_cloud_billings::get_subscription(&org_id, email).await {
+        Ok(cb) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(cb)),
+        Err(e) => e.into_http_response(),
+    }
 }
 
 /// StripeWebhookEvent
@@ -277,7 +287,6 @@ impl IntoHttpResponse for o2_cloud_billings::BillingError {
             o2_cloud_billings::BillingError::SubscriptionNotFound => {
                 MetaHttpResponse::not_found(self.to_string())
             }
-            o2_cloud_billings::BillingError::StripeError(err) => MetaHttpResponse::bad_request(err),
             _ => MetaHttpResponse::bad_request(self.to_string()),
         }
     }
