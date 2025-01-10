@@ -155,6 +155,6 @@ pub async fn cancel(path: web::Path<String>, body: web::Bytes) -> Result<HttpRes
 
 #[delete("/{org_id}/enrichment_tables/jobs/{task_id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (org_id, table_name) = path.into_inner();
-    delete_job(&org_id, &table_name).await
+    let (_, task_id) = path.into_inner();
+    delete_job(&task_id).await
 }

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::table::enrichment_table_jobs;
-use tokio::sync::mpsc;
 
 use crate::service::enrichment_table;
 
@@ -41,22 +40,19 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     );
 
     // update the task status to processing
-    enrichment_table_jobs::update_running_job(&job.task_id).await?;
+    update_running_job(&job.task_id).await?;
 
     // similar to the compactor, we need to update the job status every 15 seconds
-    let ttl = std::cmp::max(
-        120,
-        config::get_config().limit.enrichment_table_job_timeout / 4,
-    ) as u64;
     let job_id = job.task_id.clone();
-    let (_tx, mut rx) = mpsc::channel::<()>(1);
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    let mut cancel_rx_clone = cancel_rx.clone();
     tokio::task::spawn(async move {
         loop {
             tokio::select! {
-                _ = tokio::time::sleep(std::time::Duration::from_secs(ttl)) => {}
-                _ = rx.recv() => {
+                _ = tokio::time::sleep(std::time::Duration::from_secs(15)) => {}
+                _ = cancel_rx_clone.changed() => {
                     log::debug!(
-                        "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table processed.",
+                        "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table received cancellation signal.",
                         id,
                         job_id
                     );
@@ -64,33 +60,53 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
                 }
             }
 
-            if let Err(e) = enrichment_table_jobs::update_running_job(&job_id).await {
+            if let Err(e) = update_running_job(&job_id).await {
                 log::error!(
                     "[ENRICHMENT_TABLE_JOBS : {}] task_id:{} update job status failed: {}",
                     id,
                     job_id,
                     e
                 );
+                let _ = cancel_tx.send(true);
+                return;
             }
         }
     });
 
-    if let Err(e) = enrichment_table::download_and_save_data(&job).await {
+    if let Err(e) = enrichment_table::download_and_save_data(&job, cancel_rx.clone()).await {
         log::error!(
             "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table job failed: {}",
             id,
             &job.task_id,
             e
         );
-        enrichment_table_jobs::set_job_failed(&job.task_id).await?;
+        let task_status = enrichment_table_jobs::get(&job.task_id).await?.task_status;
         let (org_id, table_name, append_data) = enrichment_table::parse_key(&job.file_key)?;
+        // If task is cancelled, remove the temp file and return
+        if task_status == enrichment_table_jobs::TaskStatus::Cancelled {
+            enrichment_table::remove_temp_file(&org_id, &table_name, append_data).await?;
+            return Ok(());
+        }
+
+        // update the task status to failed
+        enrichment_table_jobs::set_job_status(
+            &job.task_id,
+            enrichment_table_jobs::TaskStatus::Failed,
+        )
+        .await?;
+        // remove the temp file
         enrichment_table::remove_temp_file(&org_id, &table_name, append_data).await?;
+        // remove the table
         enrichment_table::delete_table(&org_id, &table_name).await?;
         return Ok(());
     };
 
     // update the task status to completed
-    enrichment_table_jobs::set_job_finish(&job.task_id).await?;
+    enrichment_table_jobs::set_job_status(
+        &job.task_id,
+        enrichment_table_jobs::TaskStatus::Completed,
+    )
+    .await?;
 
     log::info!(
         "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table job completed in {}ms",
@@ -98,6 +114,26 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         &job.task_id,
         start.elapsed().as_millis()
     );
+
+    Ok(())
+}
+
+pub async fn update_running_job(task_id: &str) -> Result<(), anyhow::Error> {
+    let job = enrichment_table_jobs::get(task_id).await?;
+
+    // ensure the status is not cancelled
+    if job.task_status == enrichment_table_jobs::TaskStatus::Cancelled
+        || job.task_status == enrichment_table_jobs::TaskStatus::Failed
+    {
+        Err(anyhow::anyhow!(
+            "Task {} is cancelled. Stopping the job",
+            task_id
+        ))?;
+    }
+
+    // update the task status to processing
+    enrichment_table_jobs::set_job_status(task_id, enrichment_table_jobs::TaskStatus::InProgress)
+        .await?;
 
     Ok(())
 }
