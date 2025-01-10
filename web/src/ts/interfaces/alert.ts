@@ -27,6 +27,7 @@ interface TimingFunction {
 
 // Alert payload which is sent to backend
 export interface Alert {
+  id?: string;
   name: string;
   stream_name: string;
   stream_type: string;

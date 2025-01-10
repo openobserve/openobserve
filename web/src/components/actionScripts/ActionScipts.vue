@@ -454,6 +454,7 @@ export default defineComponent({
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
+              id: data.id,
               name: data.name,
               alert_type: data.is_real_time ? "Real Time" : "Scheduled",
               stream_name: data.stream_name ? data.stream_name : "--",
@@ -478,7 +479,7 @@ export default defineComponent({
             showAddUpdateFn({ row: undefined });
           }
           if (router.currentRoute.value.query.action == "update") {
-            const alertName = router.currentRoute.value.query.name as string;
+            const alertName = router.currentRoute.value.query.id as string;
             showAddUpdateFn({
               row: getAlertByName(alertName),
             });
@@ -495,8 +496,8 @@ export default defineComponent({
           });
         });
     };
-    const getAlertByName = (name: string) => {
-      return alerts.value.find((alert) => alert.name === name);
+    const getAlertByName = (id: string) => {
+      return alerts.value.find((alert) => alert.id === id);
     };
     if (!alerts.value.length) {
       getAlerts();
@@ -707,7 +708,7 @@ export default defineComponent({
           name: "actionScripts",
           query: {
             action: "update",
-            name: props.row.name,
+            id: props.row.id,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
