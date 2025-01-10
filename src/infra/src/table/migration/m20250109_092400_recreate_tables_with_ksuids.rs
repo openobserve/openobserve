@@ -134,7 +134,7 @@ impl MigrationTrait for Migration {
 
 /// Data structures and migration statements for the legacy folders table.
 mod legacy_folders {
-    use sea_orm::{ActiveModelTrait, IntoActiveModel};
+    use sea_orm::{ActiveModelTrait, IntoActiveModel, QueryOrder};
     use svix_ksuid::KsuidLike;
 
     use super::*;
@@ -169,12 +169,15 @@ mod legacy_folders {
         conn: &C,
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
-        let mut pages = legacy_entities::legacy_folders::Entity::find().paginate(conn, page_size);
+        let mut pages = legacy_entities::legacy_folders::Entity::find()
+            .order_by_asc(legacy_entities::legacy_folders::Column::Id)
+            .paginate(conn, page_size);
 
         while let Some(folders) = pages.fetch_and_next().await? {
             for folder in folders {
                 let mut am = folder.into_active_model();
                 let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
+                println!("folder ksuid: {}", ksuid);
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
@@ -194,7 +197,7 @@ mod legacy_folders {
 
 /// Data structures and migration statements for the legacy dashboards table.
 mod legacy_dashboards {
-    use sea_orm::{ActiveModelTrait, IntoActiveModel};
+    use sea_orm::{ActiveModelTrait, IntoActiveModel, QueryOrder};
     use svix_ksuid::KsuidLike;
 
     use super::*;
@@ -231,8 +234,9 @@ mod legacy_dashboards {
         conn: &C,
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
-        let mut pages =
-            legacy_entities::legacy_dashboards::Entity::find().paginate(conn, page_size);
+        let mut pages = legacy_entities::legacy_dashboards::Entity::find()
+            .order_by_asc(legacy_entities::legacy_dashboards::Column::Id)
+            .paginate(conn, page_size);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
             for dashboard in dashboards {
@@ -261,7 +265,6 @@ mod legacy_alerts {
 
     const OLD_TABLE_NAME: &str = "alerts";
     const NEW_TABLE_NAME: &str = "legacy_alerts";
-
     /// Statement to rename the legacy alerts table from `alerts` to
     /// `legacy_alerts`.
     pub fn rename_to_legacy_alerts() -> TableRenameStatement {
@@ -465,8 +468,9 @@ mod new_dashboards {
 }
 
 mod new_alerts {
-    use super::*;
+    use sea_orm::QueryOrder;
 
+    use super::*;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
     const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
         "alerts_org_stream_type_stream_name_name_idx_2";
@@ -654,6 +658,7 @@ mod new_alerts {
     pub async fn populate<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
         let mut legacy_alerts_pages = legacy_entities::legacy_alerts::Entity::find()
             .find_also_related(legacy_entities::legacy_folders::Entity)
+            .order_by_asc(legacy_entities::legacy_alerts::Column::Id)
             .paginate(conn, 100);
         while let Some(legacy_alerts) = legacy_alerts_pages.fetch_and_next().await? {
             let conversions_rslt: Result<Vec<_>, _> = legacy_alerts
