@@ -310,7 +310,7 @@ pub async fn create<C: TransactionTrait>(
     Ok(alert)
 }
 
-/// Creates a new alert in the database. Returns the new alert.
+/// Updates an alert in the database. Returns the new alert.
 pub async fn update<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -319,7 +319,7 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
 ) -> Result<MetaAlert, errors::Error> {
     // Ensure that ID is provided.
     let Some(alert_id) = alert.id else {
-        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+        return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertMissingID).into());
     };
 
     let _lock = super::get_lock().await;
