@@ -74,7 +74,7 @@ def test_new_alert_create(create_session, base_url):
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
 
     payload_dest_alert = {
-        "url":"https://hooks.slack.com/services/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",
+        "url":"https://hooks.slack.com/services/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",
         "method":"post",
         "skip_tls_verify":skip_tls_verify_value,
         "template":template_alert,
@@ -359,42 +359,42 @@ def test_put_alertnew_trigger(create_session, base_url):
         assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
         print(f"Successfully triggered alert {alert_id}")
     
-# def test_delete_alertnew(create_session, base_url):
-#     """Running an E2E test for deleting the new alert."""
+def test_delete_alertnew(create_session, base_url):
+    """Running an E2E test for deleting the new alert."""
 
-#     session = create_session
-#     url = base_url
-#     org_id = "default"
+    session = create_session
+    url = base_url
+    org_id = "default"
 
-#     # Make the request to get the list of alerts
-#     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
 
-#     # Ensure the response is successful
-#     assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
 
-#     # Parse the response JSON
-#     response_json = resp_get_allalertsnew.json()
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
 
-#     # Check if "list" is in the response and proceed
-#     assert "list" in response_json, "Response does not contain 'list'"
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
 
-#     # Get the list of alerts from the response
-#     alerts = response_json["list"]
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
 
-#     # Now you can iterate over the alerts
-#     for alert in alerts:
-#         alert_id = alert.get("alert_id")
-#         assert alert_id, f"Alert ID is missing for alert: {alert}"
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-#         print(f"Extracted alert_id: {alert_id}")
+        print(f"Extracted alert_id: {alert_id}")
 
-#     # Validate the alert existence first
-#         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-#         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-#         print(f"Alert {alert_id} exists and is retrievable.")
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
 
-#     # Proceed to delete the alert
-#         resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-#         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
-#         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
-#         print(f"Successfully deleted alert {alert_id}")
+    # Proceed to delete the alert
+        resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
+        assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
+        print(f"Successfully deleted alert {alert_id}")
