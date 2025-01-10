@@ -184,6 +184,7 @@ use crate::{common::meta, handler::http::request};
             // Alerts
             crate::handler::http::models::alerts::requests::CreateAlertRequestBody,
             crate::handler::http::models::alerts::requests::UpdateAlertRequestBody,
+            crate::handler::http::models::alerts::requests::MoveAlertsRequestBody,
             crate::handler::http::models::alerts::responses::GetAlertResponseBody,
             crate::handler::http::models::alerts::responses::ListAlertsResponseBody,
             crate::handler::http::models::alerts::responses::ListAlertsResponseBodyItem,
