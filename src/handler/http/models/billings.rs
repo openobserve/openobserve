@@ -20,6 +20,14 @@ use o2_enterprise::enterprise::cloud::{billings::StripeInvoice, org_usage::OrgUs
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+// for search job pagination
+#[derive(Debug, Deserialize)]
+pub struct CheckoutSessionDetailRequestQuery {
+    pub session_id: String,
+    pub success: String,
+    pub plan: String,
+}
+
 /// HTTP request body for `ListInvoices` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct ListInvoicesResponseBody {

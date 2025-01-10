@@ -202,6 +202,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
+
+    #[cfg(feature = "cloud")]
+    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())

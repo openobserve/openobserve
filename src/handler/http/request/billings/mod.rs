@@ -15,13 +15,18 @@
 
 use std::collections::HashMap;
 
-use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
-use config::get_config;
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use config::{get_config, utils::json};
 use o2_enterprise::enterprise::cloud::billings as o2_cloud_billings;
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::billings::ListInvoicesResponseBody,
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::{auth::UserEmail, redirect_response::RedirectResponseBuilder},
+    },
+    handler::http::models::billings::{
+        CheckoutSessionDetailRequestQuery, ListInvoicesResponseBody,
+    },
     service::organization,
 };
 
@@ -52,7 +57,6 @@ pub async fn create_checkout_session(
     let email = user_email.user_id.as_str();
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-
     let Some(sub_type) = query.get("plan") else {
         return o2_cloud_billings::BillingError::SubTypeMissing.into_http_response();
     };
@@ -61,8 +65,6 @@ pub async fn create_checkout_session(
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
 
-    // TODO(taiming): confirm response type
-    // TODO(taiming): confirm base url vs web url
     match o2_cloud_billings::create_checkout_session(
         &get_config().common.base_uri,
         email,
@@ -72,8 +74,14 @@ pub async fn create_checkout_session(
     .await
     {
         Err(err) => err.into_http_response(),
-        Ok(None) => HttpResponse::Ok().body("Subscription updated successfully."),
-        Ok(Some(_url)) => HttpResponse::Ok().body("Checkout session created successfully."),
+        Ok(o2_cloud_billings::CheckoutResult::RedirectUrl(redirect_url)) => {
+            RedirectResponseBuilder::new(&redirect_url)
+                .build()
+                .redirect_http()
+        }
+        Ok(o2_cloud_billings::CheckoutResult::Session(checkout_session)) => {
+            MetaHttpResponse::json(checkout_session)
+        }
     }
 }
 
@@ -95,29 +103,27 @@ pub async fn create_checkout_session(
     ),
 )]
 #[get("/{org_id}/billings/checkout_session_detail")]
-pub async fn process_session_detail(path: web::Path<String>, req: HttpRequest) -> impl Responder {
+pub async fn process_session_detail(
+    path: web::Path<String>,
+    query: web::Query<CheckoutSessionDetailRequestQuery>,
+) -> impl Responder {
     let org_id = path.into_inner();
-
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let Some(session_id) = query.get("session_id") else {
-        return o2_cloud_billings::BillingError::SessionIdMissing.into_http_response();
-    };
-    if query.get("status").map_or(true, |s| !s.eq("success")) {
+    if query.success != "success" {
         return o2_cloud_billings::BillingError::InvalidStatus.into_http_response();
     }
-    let Some(sub_type) = query.get("plan") else {
-        return o2_cloud_billings::BillingError::SubTypeMissing.into_http_response();
-    };
 
     if organization::get_org(&org_id).await.is_none() {
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
 
-    match o2_cloud_billings::process_checkout_session_details(session_id, sub_type).await {
+    match o2_cloud_billings::process_checkout_session_details(&query.session_id, &query.plan).await
+    {
         Err(e) => e.into_http_response(),
         Ok(()) => {
             let redirect_url = format!("{}/billings/plans", &get_config().common.base_uri);
-            HttpResponse::Ok().body(redirect_url)
+            RedirectResponseBuilder::new(&redirect_url)
+                .build()
+                .redirect_http()
         }
     }
 }
@@ -209,6 +215,46 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
 #[get("/{org_id}/billings/list_subscription")]
 pub async fn list_subscription(_path: web::Path<String>, _user_email: UserEmail) -> impl Responder {
     HttpResponse::Ok().body("Unimplemented")
+}
+
+/// StripeWebhookEvent
+#[utoipa::path(
+    context_path = "/webhook",
+    tag = "Billings",
+    responses(
+        (status = 200, description="Status OK", content_type = "application/json", body = HttpResponse)
+    )
+)]
+#[post("/stripe")]
+pub async fn handle_stripe_event(
+    req: HttpRequest,
+    payload: web::Bytes, // Raw body bytes
+) -> impl Responder {
+    // Convert payload bytes to string
+    let payload_str = match String::from_utf8(payload.to_vec()) {
+        Ok(str) => str,
+        Err(_) => {
+            return o2_cloud_billings::BillingError::InvalidStripePayload.into_http_response()
+        }
+    };
+
+    // Get Stripe signature from headers
+    let signature = match req.headers().get("Stripe-Signature") {
+        Some(sig) => match sig.to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                return o2_cloud_billings::BillingError::InvalidStripeSig.into_http_response()
+            }
+        },
+        None => return o2_cloud_billings::BillingError::StripeSigMissing.into_http_response(),
+    };
+
+    match o2_cloud_billings::handle_strip_wb_event(signature, &payload_str).await {
+        Ok(()) => HttpResponse::Ok().json(json::json!({
+            "status": "success"
+        })),
+        Err(err) => err.into_http_response(),
+    }
 }
 
 // BillingsError extension
