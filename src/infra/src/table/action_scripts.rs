@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::actions::action::{Action, ExecutionDetailsType};
+use std::str::FromStr;
+
+use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, JsonValue,
-    Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, JsonValue, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
-use serde::Serialize;
 
 use super::get_lock;
 use crate::{
@@ -33,10 +34,12 @@ pub struct Model {
     pub id: String, // Primary key, unique identifier
     #[sea_orm(column_type = "String(StringLen::N(32))")]
     pub name: String, // Name with a max length of 32 characters
-    #[sea_orm(column_type = "Text")]
-    pub function: String, // The main action script
+    pub file_path: String, // Zip file for action script
+    pub file_name: String,
     #[sea_orm(column_type = "String(StringLen::N(128))")]
     pub org_id: String,
+    #[sea_orm(column_type = "String(StringLen::N(128))")]
+    pub created_by: String,
     #[sea_orm(column_type = "Json")]
     pub env: JsonValue, // Environment variables serialized as JSON
     #[sea_orm(column_type = "Json")]
@@ -45,13 +48,41 @@ pub struct Model {
     pub cron_expr: Option<String>,
     #[sea_orm(default_value = "CURRENT_TIMESTAMP")]
     pub created_at: DateTimeUtc, // Automatically set on insert
-    pub updated_at: Option<DateTimeUtc>, // Automatically updated
+    pub last_modified_at: DateTimeUtc,
     pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
-    pub last_failure_at: Option<DateTimeUtc>, // Automatically updated
     #[sea_orm(default_value = "0")]
     pub failure_count: i32, // Number of times the script has failed
+    #[sea_orm(column_type = "Text")]
+    pub description: String,
+    pub status: ActionStatus,
 }
 
+impl TryFrom<Model> for Action {
+    type Error = errors::Error;
+
+    fn try_from(model: Model) -> Result<Self, Self::Error> {
+        Ok(Action {
+            id: Some(
+                svix_ksuid::Ksuid::from_str(&model.id)
+                    .map_err(|e| Error::Message(e.to_string()))?,
+            ),
+            name: model.name,
+            org_id: model.org_id,
+            environment_variables: serde_json::from_value(model.env)?,
+            created_by: model.created_by,
+            execution_details: model.execution_details,
+            zip_file_path: Some(model.file_path),
+            created_at: model.created_at,
+            last_executed_at: model.last_executed_at,
+            failure_count: model.failure_count,
+            description: model.description,
+            cron_expr: model.cron_expr,
+            status: model.status,
+            zip_file_name: model.file_name,
+            last_modified_at: model.last_modified_at,
+        })
+    }
+}
 #[derive(Copy, Clone, Debug, EnumIter)]
 pub enum Relation {}
 
@@ -63,26 +94,25 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug, Serialize)]
-pub struct ActionScriptDetails {
-    pub id: String,
-    pub name: String,
-    pub function: String,
-    pub env: JsonValue,
-    pub execution_details: ExecutionDetailsType,
-    pub cron_expr: Option<String>,
-}
+// #[derive(FromQueryResult, Debug, Serialize)]
+// pub struct ActionScriptDetails {
+//     pub id: String,
+//     pub name: String,
+//     pub env: JsonValue,
+//     pub execution_details: ExecutionDetailsType,
+//     pub cron_expr: Option<String>,
+// }
 
-#[derive(FromQueryResult, Debug, Serialize)]
-pub struct ActionScriptInfo {
-    pub id: String,
-    pub name: String,
-    pub created_at: DateTimeUtc,         // Automatically set on insert
-    pub updated_at: Option<DateTimeUtc>, // Automatically updated
-    pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
-    pub last_failure_at: Option<DateTimeUtc>, // Automatically updated
-    pub failure_count: i32,              // Number of times the script has failed
-}
+// #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
+// pub struct ActionScriptInfo {
+//     pub id: String,
+//     pub name: String,
+//     pub running: bool,
+//     pub created_at: DateTimeUtc,         // Automatically set on insert
+//     pub updated_at: Option<DateTimeUtc>, // Automatically updated
+//     pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
+//     pub failure_count: i32,              // Number of times the script has failed
+// }
 
 pub async fn init() -> Result<(), errors::Error> {
     create_table().await?;
@@ -104,47 +134,26 @@ pub async fn create_table() -> Result<(), errors::Error> {
     Ok(())
 }
 
-// pub async fn create_table_index() -> Result<(), errors::Error> {
-//     let index1 = IndexStatement::new("action_scripts_short_id_idx", "short_urls", true,
-// &["short_id"]);     let index2 = IndexStatement::new(
-//         "short_urls_created_ts_idx",
-//         "short_urls",
-//         false,
-//         &["created_ts"],
-//     );
-//
-//     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-//     match client.get_database_backend() {
-//         DatabaseBackend::MySql => {
-//             mysql::create_index(index1).await?;
-//             mysql::create_index(index2).await?;
-//         }
-//         DatabaseBackend::Postgres => {
-//             postgres::create_index(index1).await?;
-//             postgres::create_index(index2).await?;
-//         }
-//         _ => {
-//             sqlite::create_index(index1).await?;
-//             sqlite::create_index(index2).await?;
-//         }
-//     }
-//     Ok(())
-// }
-
-pub async fn add(
-    action: &Action,
-    created_at: DateTimeUtc,
-    org_id: &str,
-) -> Result<(), errors::Error> {
+pub async fn add(action: &Action) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        id: Set(action.id.unwrap().to_string().to_lowercase()),
+        id: Set(action.id.unwrap().to_string()),
         name: Set(action.name.clone()),
-        org_id: Set(org_id.to_string()),
-        function: Set(action.blob.clone()),
+        org_id: Set(action.org_id.to_string()),
+        file_path: Set(action
+            .zip_file_path
+            .clone()
+            .ok_or(Error::Message(format!("file path not set")))?),
         env: Set(serde_json::json!(action.environment_variables.clone())),
         execution_details: Set(action.execution_details.clone()),
-        created_at: Set(created_at),
-        ..Default::default()
+        cron_expr: Set(action.cron_expr.clone()),
+        created_at: Set(action.created_at),
+        last_modified_at: Set(action.last_modified_at.clone()),
+        last_executed_at: Set(action.last_executed_at.clone()),
+        failure_count: Set(action.failure_count),
+        description: Set(action.description.clone()),
+        file_name: Set(action.zip_file_name.clone()),
+        created_by: Set(action.created_by.clone()),
+        status: Set(action.status.clone()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -156,12 +165,13 @@ pub async fn add(
     Ok(())
 }
 
-pub async fn remove(id: &str) -> Result<(), errors::Error> {
+pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many()
+    let _ = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
@@ -169,61 +179,72 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn get(id: &str, org_id: &str) -> Result<ActionScriptDetails, errors::Error> {
+pub async fn get(id: &str, org_id: &str) -> Result<Action, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     dbg!(&id, &org_id);
     let record = dbg!(
-        Entity::find()
-            .select_only()
-            .column(Column::Id)
-            .column(Column::Name)
-            .column(Column::Function)
-            .column(Column::Env)
-            .column(Column::ExecutionDetails)
-            .column(Column::CronExpr)
+        Entity::find_by_id(id)
             .filter(Column::OrgId.eq(org_id))
-            .filter(Column::Id.eq(id))
-            .into_model::<ActionScriptDetails>()
             .one(client)
             .await?
     )
     .ok_or_else(|| Error::DbError(DbError::SeaORMError("Action Script not found".to_string())))?;
 
-    Ok(record)
+    Ok(record.try_into()?)
 }
 
-pub async fn list(
-    org_id: &str,
-    limit: Option<i64>,
-) -> Result<Vec<ActionScriptInfo>, errors::Error> {
+pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, errors::Error> {
     let limit = limit.unwrap_or(100);
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
-        .select_only()
-        .column(Column::Id)
-        .column(Column::OrgId)
-        .column(Column::Name)
-        .column(Column::CreatedAt)
-        .column(Column::UpdatedAt)
-        .column(Column::LastExecutedAt)
-        .column(Column::LastFailureAt)
-        .column(Column::FailureCount)
         .filter(Column::OrgId.eq(org_id))
         .limit(limit as u64)
         .order_by(Column::Id, Order::Desc);
 
-    let records = res.into_model::<ActionScriptInfo>().all(client).await?;
+    let records = res
+        .all(client)
+        .await?
+        .into_iter()
+        .map(Action::try_from)
+        .collect::<Result<_, errors::Error>>()?;
 
     Ok(records)
 }
 
+pub async fn update(action: &Action) -> Result<(), errors::Error> {
+    let id = action.id.ok_or(Error::Message("id not set".to_string()))?;
+    let record = ActiveModel {
+        id: Set(id.to_string()),
+        name: Set(action.name.clone()),
+        org_id: Set(action.org_id.to_string()),
+        file_path: Set(action
+            .zip_file_path
+            .clone()
+            .ok_or(Error::Message(format!("file path not set")))?),
+        env: Set(serde_json::json!(action.environment_variables.clone())),
+        execution_details: Set(action.execution_details.clone()),
+        cron_expr: Set(action.cron_expr.clone()),
+        created_at: Set(action.created_at),
+        last_modified_at: Set(action.last_modified_at.clone()),
+        last_executed_at: Set(action.last_executed_at.clone()),
+        failure_count: Set(action.failure_count),
+        description: Set(action.description.clone()),
+        file_name: Set(action.zip_file_name.clone()),
+        created_by: Set(action.created_by.clone()),
+        status: Set(action.status.clone()),
+    };
+
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update(record).exec(client).await?;
+
+    Ok(())
+}
 pub async fn contains(id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find()
-        .filter(Column::Id.eq(id))
-        .into_model::<ActionScriptInfo>()
-        .one(client)
-        .await?;
+    let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
 
     Ok(record.is_some())
 }

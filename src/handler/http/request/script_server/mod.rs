@@ -14,10 +14,42 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use config::meta::actions::action::DeployActionRequest;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::acton_deployer::{
+    create_app, delete_app, get_app_status, list_apps,
+};
 
-#[post("/v1/{org_id}/job")]
-pub async fn create_job(path: web::Path<String>) -> impl Responder {
-    let org_id = path.into_inner();
+#[post("/v1/job")]
+pub async fn create_job(path: web::Path<String>, req: DeployActionRequest) -> impl Responder {
+    match create_app(req) {
+        Ok(created_at) => HttpResponse::Ok().json(serde_json::json!({"created_at":created_at})),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+    }
+}
 
-    HttpResponse::Ok().json(org_id)
+#[delete("/v1/job/{name}")]
+pub async fn delete_job(path: web::Path<String>) -> impl Responder {
+    let name = path.into();
+    match delete_app(&name) {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"deleted":name})),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+    }
+}
+
+#[get("/v1/job/{name}")]
+pub async fn get_app_details(path: web::Path<String>) -> impl Responder {
+    let name = path.into();
+    match get_app_status(&name) {
+        Ok(resp) => HttpResponse::Ok().json(resp),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+    }
+}
+
+#[get("/v1/job")]
+pub async fn list_deployed_apps(_path: web::Path<String>) -> impl Responder {
+    match list_apps() {
+        Ok(resp) => HttpResponse::Ok().json(resp),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+    }
 }
