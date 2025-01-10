@@ -49,10 +49,10 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(Annotations::StartTime)
-                .timestamp()
+                .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Annotations::EndTime).timestamp().null())
+        .col(ColumnDef::new(Annotations::EndTime).big_integer().null())
         .col(
             ColumnDef::new(Annotations::Tittle)
                 .string_len(256)

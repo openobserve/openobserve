@@ -9,8 +9,8 @@ pub struct Model {
     pub id: String,
     pub dashboard_id: String,
     pub org_id: String,
-    pub start_time: DateTime,
-    pub end_time: Option<DateTime>,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
     pub tittle: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub text: Option<String>,
