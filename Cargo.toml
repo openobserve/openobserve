@@ -22,7 +22,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["cloud"]
+default = ["enterprise"]
 enterprise = ["dep:o2_enterprise"]
 cloud = ["enterprise", "o2_enterprise/cloud"]
 mimalloc = ["dep:mimalloc"]
@@ -52,7 +52,7 @@ actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
-actix-web-opentelemetry = { version = "0.17", features = ["metrics"] }
+actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
     "support-rust-embed-for-web",
@@ -114,26 +114,10 @@ memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
 once_cell.workspace = true
-opentelemetry = "0.25"
-opentelemetry_sdk = { version = "0.25", features = [
-    "rt-tokio",
-    "trace",
-    "metrics",
-] }
-opentelemetry-otlp = { version = "0.25", features = [
-    "http-proto",
-    "serialize",
-    "serde",
-    "trace",
-    "reqwest-client",
-] }
-opentelemetry-proto = { version = "0.25", features = [
-    "gen-tonic",
-    "with-serde",
-    "logs",
-    "metrics",
-    "trace",
-] }
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.4"
@@ -347,11 +331,31 @@ tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.26"
+tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.0", features = [
     "env-filter",
     "json",
     "registry",
+] }
+opentelemetry = "0.26"
+opentelemetry_sdk = { version = "0.26", features = [
+    "rt-tokio",
+    "trace",
+    "metrics",
+] }
+opentelemetry-otlp = { version = "0.26", features = [
+    "http-proto",
+    "serialize",
+    "serde",
+    "trace",
+    "reqwest-client",
+] }
+opentelemetry-proto = { version = "0.26", features = [
+    "gen-tonic",
+    "with-serde",
+    "logs",
+    "metrics",
+    "trace",
 ] }
 url = "2.2"
 urlencoding = "2.1"
