@@ -32,17 +32,16 @@ use svix_ksuid::Ksuid;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
+/// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<Option<Alert>, infra::errors::Error> {
+) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
     // We cannot check the cache because the cache stores alerts by stream type
     // and stream name which are currently unknown.
-    let alert = table::get_by_id(conn, org_id, alert_id)
-        .await?
-        .map(|(_f, a)| a);
-    Ok(alert)
+    let folder_and_alert = table::get_by_id(conn, org_id, alert_id).await?;
+    Ok(folder_and_alert)
 }
 
 pub async fn get_by_name(
