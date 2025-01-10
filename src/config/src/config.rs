@@ -629,8 +629,8 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
     pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_SPLUNK_JOIN_ENABLED", default = false)]
-    pub feature_splunk_join_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
         default = 0,
@@ -1787,8 +1787,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // check for splunk join
-    if cfg.common.feature_splunk_join_enabled && cfg.common.feature_join_right_side_max_rows == 0 {
+    // check for join match one
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 

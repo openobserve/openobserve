@@ -276,7 +276,7 @@ pub async fn prepare_datafusion_context(
             .with_optimizer_rules(optimizer_rules)
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
     }
-    if cfg.common.feature_splunk_join_enabled {
+    if cfg.common.feature_join_match_one_enabled {
         builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
     }
     Ok(SessionContext::new_with_state(builder.build()))
