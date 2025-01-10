@@ -676,6 +676,14 @@ pub async fn download_and_save_data(
     );
 
     remove_temp_file(&org_id, &table_name, append_data).await?;
+
+    // update the task status to completed
+    enrichment_table_jobs::set_job_status(
+        &task.task_id,
+        enrichment_table_jobs::TaskStatus::Completed,
+    )
+    .await?;
+
     Ok(())
 }
 
