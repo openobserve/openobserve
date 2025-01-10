@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use aes_siv::{siv::Aes256Siv, KeyInit};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use config::get_config;
+use once_cell::sync::Lazy;
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +33,65 @@ pub enum EntryKind {
 
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
+static MASTER_KEY: Lazy<Algorithm> = Lazy::new(|| {
+    let config = get_config();
+    // we currently only support one algorithm, so directly get key
+    let key = match BASE64_STANDARD.decode(&config.encryption.master_key) {
+        Ok(v) => v,
+        Err(e) => {
+            log::debug!("potential error in configuring master encryption for cipher table: {e}");
+            log::info!("configuring cipher table master key as None");
+            return Algorithm::None;
+        }
+    };
+    match Aes256Siv::new_from_slice(&key) {
+        Ok(_) => Algorithm::Aes256Siv(key),
+        Err(e) => {
+            log::debug!("potential error in configuring master encryption for cipher table: {e}");
+            log::info!("configuring cipher table master key as None");
+            Algorithm::None
+        }
+    }
+});
+
+enum Algorithm {
+    Aes256Siv(Vec<u8>),
+    None,
+}
+
+impl Algorithm {
+    fn encrypt(&self, plaintext: &str) -> Result<String, errors::Error> {
+        match self {
+            Self::Aes256Siv(k) => {
+                let mut c = Aes256Siv::new_from_slice(&k).unwrap();
+                c.encrypt([&[]], plaintext.as_bytes())
+                    .map_err(|e| {
+                        errors::Error::Message(format!(
+                            "error encrypting data for cipher table {e}"
+                        ))
+                    })
+                    .map(|v| BASE64_STANDARD.encode(&v))
+            }
+            Self::None => Ok(plaintext.to_owned()),
+        }
+    }
+    fn decrypt(&self, encrypted: &str) -> Result<String, errors::Error> {
+        match self {
+            Self::Aes256Siv(k) => {
+                let mut c = Aes256Siv::new_from_slice(&k).unwrap();
+                let v = BASE64_STANDARD.decode(encrypted).unwrap();
+                c.decrypt([&[]], &v)
+                    .map_err(|e| {
+                        errors::Error::Message(format!(
+                            "error decrypting data for cipher table {e}"
+                        ))
+                    })
+                    .map(|v| String::from_utf8_lossy(&v).into_owned())
+            }
+            Self::None => Ok(encrypted.to_owned()),
+        }
+    }
+}
 
 impl ToString for EntryKind {
     fn to_string(&self) -> String {
@@ -78,13 +141,14 @@ impl TryInto<CipherEntry> for Model {
 }
 
 pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
+    let encrypted = MASTER_KEY.encrypt(&entry.data)?;
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
         created_at: Set(entry.created_at),
         name: Set(entry.name),
         kind: Set(entry.kind.to_string()),
-        data: Set(entry.data), // TODO encrypt data
+        data: Set(encrypted),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -98,13 +162,14 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
 }
 
 pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
+    let encrypted = MASTER_KEY.encrypt(&entry.data)?;
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
         created_at: Set(entry.created_at),
         name: Set(entry.name),
         kind: Set(entry.kind.to_string()),
-        data: Set(entry.data), // TODO encrypt data
+        data: Set(encrypted),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -140,8 +205,10 @@ pub async fn get_data(
     name: &str,
 ) -> Result<Option<String>, errors::Error> {
     let res = get(org, kind, name).await?;
-    // todo decrypt the data
-    Ok(res.map(|r| r.data))
+    match res {
+        Some(m) => MASTER_KEY.decrypt(&m.data).map(|v| Some(v)),
+        None => Ok(None),
+    }
 }
 
 async fn get(org: &str, kind: EntryKind, name: &str) -> Result<Option<Model>, errors::DbError> {
@@ -164,7 +231,21 @@ pub async fn list_all(limit: Option<i64>) -> Result<Vec<CipherEntry>, errors::Er
     }
     let records = res.into_model::<Model>().all(client).await?;
 
-    records.into_iter().map(|r| r.try_into()).collect()
+    let records: Vec<CipherEntry> = records
+        .into_iter()
+        .map(|r| <Model as TryInto<CipherEntry>>::try_into(r))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    records
+        .into_iter()
+        .map(|mut c: CipherEntry| match MASTER_KEY.decrypt(&c.data) {
+            Ok(d) => {
+                c.data = d;
+                Ok(c)
+            }
+            Err(e) => Err(e),
+        })
+        .collect()
 }
 
 pub async fn list_filtered(
@@ -184,7 +265,21 @@ pub async fn list_filtered(
     }
     let records = res.into_model::<Model>().all(client).await?;
 
-    records.into_iter().map(|r| r.try_into()).collect()
+    let records: Vec<CipherEntry> = records
+        .into_iter()
+        .map(|r| <Model as TryInto<CipherEntry>>::try_into(r))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    records
+        .into_iter()
+        .map(|mut c: CipherEntry| match MASTER_KEY.decrypt(&c.data) {
+            Ok(d) => {
+                c.data = d;
+                Ok(c)
+            }
+            Err(e) => Err(e),
+        })
+        .collect()
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
