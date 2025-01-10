@@ -29,6 +29,7 @@ pub mod organization;
 pub mod pipeline;
 pub mod promql;
 pub mod rum;
+pub mod script_server;
 pub mod search;
 pub mod service_accounts;
 pub mod short_url;
@@ -38,7 +39,6 @@ pub mod syslog;
 pub mod traces;
 pub mod users;
 pub mod websocket;
-pub mod script_server;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

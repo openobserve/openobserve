@@ -16,12 +16,8 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 
 #[post("/v1/{org_id}/job")]
-pub async fn create_job(
-    path: web::Path<String>,
- 
-) -> impl Responder {
-    let org_id  = path.into_inner();
-   
+pub async fn create_job(path: web::Path<String>) -> impl Responder {
+    let org_id = path.into_inner();
+
     HttpResponse::Ok().json(org_id)
-     
 }

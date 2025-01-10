@@ -472,6 +472,8 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(name = "ZO_SCRIPT_SERVER_TOKEN", default = "openobserve")]
+    pub script_server_token: String,
 }
 
 #[derive(EnvConfig)]

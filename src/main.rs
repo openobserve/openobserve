@@ -50,7 +50,10 @@ use openobserve::{
                 traces::TraceServer,
             },
         },
-        http::{request::script_server, router::*},
+        http::{
+            auth::script_server::validator as script_server_validator, request::script_server,
+            router::*,
+        },
     },
     job, router,
     service::{db, metadata, search::SEARCH_SERVER, self_reporting},
@@ -172,9 +175,9 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     // init script server
-     if config::cluster::LOCAL_NODE.is_script_server() {
+    if config::cluster::LOCAL_NODE.is_script_server() {
         return init_script_server().await;
-     }
+    }
 
     // init backend jobs
     let (job_init_tx, job_init_rx) = oneshot::channel();
@@ -896,8 +899,6 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
-
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // metrics
@@ -933,13 +934,9 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             local_id
         );
         let mut app = App::new().wrap(prometheus.clone());
-        let cors = get_cors();
-        app = app
-            .service(
-        web::scope(&cfg.common.base_uri)
-                .wrap(cors)
-                .service(script_server::create_job)
-            ); 
+
+        app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
+
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
@@ -974,12 +971,11 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     });
     server.await?;
 
-     log::info!("HTTP server stopped");
+    log::info!("HTTP server stopped");
 
     // flush usage report
     self_reporting::flush().await;
 
-  
     // stop telemetry
     if cfg.common.telemetry_enabled {
         meta::telemetry::Telemetry::new()
@@ -996,6 +992,16 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     Ok(())
+}
 
-
+pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
+    cfg.service(
+        web::scope("/api")
+            .wrap(cors)
+            .wrap(actix_web_httpauth::middleware::HttpAuthentication::with_fn(
+                script_server_validator,
+            ))
+            .service(script_server::create_job),
+    );
 }
