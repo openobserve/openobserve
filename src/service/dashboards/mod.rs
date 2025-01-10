@@ -34,6 +34,7 @@ use crate::common::{
     utils::auth::{remove_ownership, set_ownership},
 };
 pub mod reports;
+pub mod annotations;
 
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;

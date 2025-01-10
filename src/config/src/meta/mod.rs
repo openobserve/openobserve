@@ -31,3 +31,4 @@ pub mod short_url;
 pub mod sql;
 pub mod stream;
 pub mod websocket;
+pub mod annotations;
