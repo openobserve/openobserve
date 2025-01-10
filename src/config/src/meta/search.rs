@@ -292,7 +292,7 @@ impl Response {
             .take(size as usize)
             .cloned()
             .collect();
-        self.total = self.hits.len();
+        // self.total = self.hits.len();
     }
 
     pub fn add_hit(&mut self, hit: &json::Value) {
