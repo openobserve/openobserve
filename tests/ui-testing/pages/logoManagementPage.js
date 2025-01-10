@@ -53,19 +53,14 @@ export
     async updateCustomLogoText(text) {
         const isVisible = await this.editLogoTextButton.isVisible();
         if (isVisible) {
-        
-        
-        await this.page.locator('[data-test="settings_ent_logo_custom_text_edit_btn"]').click();
-        
-        }
-    
+    await this.page.locator('[data-test="settings_ent_logo_custom_text_edit_btn"]').click();
+          }
     await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible();
     await this.customLogoTextBox.click();
     await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible();
     await this.customLogoTextBox.fill(text);
     await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text_save_btn"]');
     await this.saveButton.click({ force: true });
-
 }
     async uploadLogo(filePath) {
         const isVisible = await this.deleteLogoButton.isVisible();
@@ -85,3 +80,4 @@ export
 
     }
 }
+
