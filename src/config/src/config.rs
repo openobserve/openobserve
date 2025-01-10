@@ -1676,6 +1676,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_max_points_per_series = 30000;
     }
 
+    // check search job retention
+    if cfg.limit.search_job_retention == 0 {
+        return Err(anyhow::anyhow!("search job retention is set to zero"));
+    }
+
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
         cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();

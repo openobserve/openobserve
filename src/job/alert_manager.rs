@@ -145,9 +145,6 @@ async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
     let time = get_config().limit.search_job_retention * 24 * 60 * 60;
-    if time == 0 {
-        return Err(anyhow::anyhow!("search job retention is set to zero"));
-    }
     let mut interval = time::interval(time::Duration::from_secs(
         get_config().limit.search_job_run_timeout as u64,
     ));
