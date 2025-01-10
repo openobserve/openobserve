@@ -1079,6 +1079,12 @@ pub struct Limit {
         help = "Timeout for query"
     )]
     pub search_job_timeout: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_RETENTION",
+        default = 30, // days
+        help = "Retention for search job"
+    )]
+    pub search_job_retention: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
