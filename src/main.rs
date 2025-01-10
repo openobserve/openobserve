@@ -594,7 +594,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
+                    .configure(get_proxy_routes)
+                    .configure(get_script_server_routes),
             )
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
@@ -697,7 +698,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
+                    .configure(get_proxy_routes)
+                    .configure(get_script_server_routes),
             )
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))

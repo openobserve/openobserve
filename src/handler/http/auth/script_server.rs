@@ -40,10 +40,7 @@ use crate::{
     service::{db, users},
 };
 
-pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
-pub const ACCESS_TOKEN: &str = "access_token";
-pub const REFRESH_TOKEN: &str = "refresh_token";
-pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+
 
 pub async fn validator(
     req: ServiceRequest,

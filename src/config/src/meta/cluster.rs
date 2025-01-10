@@ -88,7 +88,7 @@ impl Node {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
     pub fn is_script_server(&self) -> bool {
-        self.role.contains(&Role::ScriptServer) || self.role.contains(&Role::All)
+        self.role.contains(&Role::ScriptServer) 
     }
 }
 
