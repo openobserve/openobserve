@@ -101,13 +101,6 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         return Ok(());
     };
 
-    // update the task status to completed
-    enrichment_table_jobs::set_job_status(
-        &job.task_id,
-        enrichment_table_jobs::TaskStatus::Completed,
-    )
-    .await?;
-
     log::info!(
         "[ENRICHMENT_TABLE_JOBS: {}] task_id {} enrichment table job completed in {}ms",
         id,
