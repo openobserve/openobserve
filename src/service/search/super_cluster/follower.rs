@@ -63,6 +63,7 @@ use crate::service::search::{
 // 6. execute physical plan to get stream
 #[tracing::instrument(name = "service:search:grpc:flight:follower:search", skip_all)]
 pub async fn search(
+    trace_id: &str,
     flight_request: &FlightSearchRequest,
 ) -> Result<(
     SessionContext,
@@ -73,7 +74,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
-    let trace_id = req.trace_id.clone();
+    let trace_id = trace_id.to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx =

@@ -437,7 +437,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
 
     let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
     Ok(alert)
@@ -571,7 +571,7 @@ pub async fn delete_by_name(
     }
 }
 
-pub async fn enable_by_id<C: ConnectionTrait>(
+pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
@@ -580,9 +580,8 @@ pub async fn enable_by_id<C: ConnectionTrait>(
     let Some(mut alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
-    let stream_name = alert.stream_name.clone();
     alert.enabled = should_enable;
-    db::alerts::alert::set(org_id, alert.stream_type, &stream_name, alert, false).await?;
+    update(conn, org_id, None, alert).await?;
     Ok(())
 }
 
