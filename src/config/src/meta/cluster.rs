@@ -88,7 +88,13 @@ impl Node {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
     }
     pub fn is_script_server(&self) -> bool {
-        self.role.contains(&Role::ScriptServer) 
+        self.role.contains(&Role::ScriptServer) || self.role.contains(&Role::All)
+    }
+    pub fn is_standalone(&self) -> bool {
+        // standalone implies there is no external dependency required
+        // for this node. All role will always have DB dep.
+        // currently only script server has no external dep
+        !self.role.contains(&Role::All) && self.role.contains(&Role::ScriptServer)
     }
 }
 
