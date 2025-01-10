@@ -13,10 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
+use actix_web::{
+    body::MessageBody,
+    dev::{ServiceRequest, ServiceResponse},
+    http::{ConnectionType, StatusCode},
+};
+use actix_web_lab::middleware::Next;
 
-use crate::db::Db;
-
-pub async fn get_coordinator() -> &'static Box<dyn Db> {
-    super::db::get_coordinator().await
+pub async fn check_keep_alive(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let req_conn_type = req.head().connection_type();
+    let mut resp = next.call(req).await?;
+    if resp.status() >= StatusCode::BAD_REQUEST || req_conn_type == ConnectionType::Close {
+        resp.response_mut()
+            .head_mut()
+            .set_connection_type(ConnectionType::Close);
+    }
+    Ok(resp)
 }

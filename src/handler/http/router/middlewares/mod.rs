@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
+mod check_keep_alive;
+mod slow_log;
 
-use crate::db::Db;
-
-pub async fn get_coordinator() -> &'static Box<dyn Db> {
-    super::db::get_coordinator().await
-}
+pub use check_keep_alive::check_keep_alive;
+pub use slow_log::SlowLog;
