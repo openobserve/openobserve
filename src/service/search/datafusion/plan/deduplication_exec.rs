@@ -160,6 +160,7 @@ impl ExecutionPlan for DeduplicationExec {
     }
 }
 
+// TODO: rewrite this part use arrow kernel
 struct DeduplicationStream {
     stream: SendableRecordBatchStream,
     deduplication_columns: Vec<Column>,
@@ -167,8 +168,6 @@ struct DeduplicationStream {
     #[allow(unused)]
     batch_size: usize,
 }
-
-// int64, string, uint64, boolean, float64
 
 impl DeduplicationStream {
     pub fn new(stream: SendableRecordBatchStream, deduplication_columns: Vec<Column>) -> Self {
@@ -191,32 +190,19 @@ impl Stream for DeduplicationStream {
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
                 // deduplication the batch based on the deduplication_columns
-                let deduplication_columns_values = self
-                    .deduplication_columns
-                    .iter()
-                    .map(|column| {
-                        batch
-                            .column(column.index())
-                            .as_any()
-                            .downcast_ref::<StringArray>()
-                            .unwrap()
-                    })
-                    .collect_vec();
+                let deduplication_arrays =
+                    generate_deduplication_arrays(&self.deduplication_columns, &batch);
 
-                // generate the index for all no duplication rows
-                let mut indexes: Vec<u64> = vec![0];
-                let mut current_value = deduplication_columns_values
-                    .iter()
-                    .map(|column| column.value(0))
-                    .collect_vec();
+                let mut indexes = vec![];
+                if self.last_value.is_none() {
+                    self.last_value = Some(deduplication_arrays.get_value(0));
+                    indexes.push(0);
+                }
+
                 for i in 0..batch.num_rows() {
-                    let row_values = deduplication_columns_values
-                        .iter()
-                        .map(|column| column.value(i))
-                        .collect_vec();
-                    if current_value != row_values {
+                    if *self.last_value.as_ref().unwrap() != deduplication_arrays.get_value(i) {
                         indexes.push(i as u64);
-                        current_value = row_values;
+                        self.last_value = Some(deduplication_arrays.get_value(i));
                     }
                 }
 
@@ -246,14 +232,18 @@ impl RecordBatchStream for DeduplicationStream {
         Arc::clone(&self.stream.schema())
     }
 }
+#[derive(Debug, Clone)]
+struct DeduplicationArrays {
+    pub arrays: Vec<Array>,
+}
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-enum Value {
-    String(String),
-    Int64(i64),
-    UInt64(u64),
-    Boolean(bool),
-    Float64(f64),
+impl DeduplicationArrays {
+    pub fn get_value(&self, i: usize) -> Vec<Value> {
+        self.arrays
+            .iter()
+            .map(|array| array.get_value(i))
+            .collect_vec()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -265,11 +255,32 @@ enum Array {
     Float64(Float64Array),
 }
 
-fn generate_deduplication_array(
+impl Array {
+    pub fn get_value(&self, i: usize) -> Value {
+        match &self {
+            Array::String(array) => Value::String(array.value(i).to_string()),
+            Array::Int64(array) => Value::Int64(array.value(i)),
+            Array::UInt64(array) => Value::UInt64(array.value(i)),
+            Array::Boolean(array) => Value::Boolean(array.value(i)),
+            Array::Float64(array) => Value::Float64(array.value(i)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+enum Value {
+    String(String),
+    Int64(i64),
+    UInt64(u64),
+    Boolean(bool),
+    Float64(f64),
+}
+
+fn generate_deduplication_arrays(
     deduplication_columns: &[Column],
     batch: &RecordBatch,
-) -> Vec<Array> {
-    deduplication_columns
+) -> DeduplicationArrays {
+    let arrays = deduplication_columns
         .iter()
         .map(|column| {
             let array = batch.column(column.index());
@@ -308,5 +319,6 @@ fn generate_deduplication_array(
                 _ => panic!("Unsupported data type"),
             }
         })
-        .collect_vec()
+        .collect_vec();
+    DeduplicationArrays { arrays }
 }
