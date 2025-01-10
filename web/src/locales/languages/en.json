@@ -1037,6 +1037,7 @@
     "header": "Action Scripts",
     "add": "Create Action Script",
     "deleteTitle": "Delete",
-    "deleteText": "Are you sure you want to delete file ?"
+    "deleteText": "Are you sure you want to delete file ?",
+    "uploadCodeZip": "Upload Code Zip"
   }
 }

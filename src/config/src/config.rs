@@ -1697,6 +1697,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.tracing_enabled = false;
     }
 
+    if local_node_role.contains(&cluster::Role::ScriptServer) {
+        // script server does not have external dep, so can ignore their config check
+        return Ok(());
+    }
+
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 

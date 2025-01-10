@@ -175,7 +175,8 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     // init script server
-    if config::cluster::LOCAL_NODE.is_script_server() {
+    if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
+    {
         return init_script_server().await;
     }
 
@@ -773,8 +774,10 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if let Err(e) = cluster::set_offline(true).await {
-        log::error!("set offline failed: {}", e);
+    if !config::cluster::LOCAL_NODE.is_standalone() {
+        if let Err(e) = cluster::set_offline(true).await {
+            log::error!("set offline failed: {}", e);
+        }
     }
     log::info!("Node is offline");
 
