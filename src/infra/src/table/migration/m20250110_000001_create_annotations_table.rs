@@ -54,7 +54,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(ColumnDef::new(Annotations::EndTime).big_integer().null())
         .col(
-            ColumnDef::new(Annotations::Tittle)
+            ColumnDef::new(Annotations::Title)
                 .string_len(256)
                 .not_null(),
         )
@@ -87,7 +87,7 @@ enum Annotations {
     OrgId,
     StartTime,
     EndTime,
-    Tittle,
+    Title,
     Text,
     Tags,
     Panels,

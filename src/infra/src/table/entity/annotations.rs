@@ -11,7 +11,7 @@ pub struct Model {
     pub org_id: String,
     pub start_time: i64,
     pub end_time: Option<i64>,
-    pub tittle: String,
+    pub title: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub text: Option<String>,
     pub tags: String,
