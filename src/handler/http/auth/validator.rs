@@ -19,7 +19,7 @@ use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorNotFound, ErrorUnauthorized},
     http::{header, Method},
-    web, Error, HttpRequest,
+    web, Error,
 };
 use config::{
     get_config,
@@ -513,7 +513,7 @@ pub async fn validate_user_for_query_params(
 
 pub async fn validator_aws(
     req: ServiceRequest,
-    _: Option<HttpRequest>,
+    _thread_id: web::Data<usize>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -558,7 +558,7 @@ pub async fn validator_aws(
 
 pub async fn validator_gcp(
     req: ServiceRequest,
-    _: Option<HttpRequest>,
+    _thread_id: web::Data<usize>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -600,7 +600,7 @@ pub async fn validator_gcp(
 
 pub async fn validator_rum(
     req: ServiceRequest,
-    _: Option<HttpRequest>,
+    _thread_id: web::Data<usize>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = req
         .request()

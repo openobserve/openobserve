@@ -411,8 +411,9 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             *entry += 1;
             if *entry >= HEALTH_CHECK_FAILED_TIMES {
                 log::error!(
-                    "[CLUSTER] node {} health check failed 3 times, remove it",
-                    node.name
+                    "[CLUSTER] node {}[{}] health check failed 3 times, remove it",
+                    node.name,
+                    node.http_addr
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(
