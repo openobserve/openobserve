@@ -22,7 +22,9 @@ use datafusion::{
     },
     logical_expr::LogicalPlan,
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    prelude::Expr,
 };
+use itertools::Itertools;
 
 use super::utils::AddSortAndLimit;
 
@@ -57,12 +59,36 @@ impl OptimizerRule for LimitJoinRightSide {
     ) -> Result<Transformed<LogicalPlan>> {
         match plan {
             LogicalPlan::Join(mut join) => {
-                let plan = (*join.right)
-                    .clone()
-                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
-                    .data;
-                join.right = Arc::new(plan);
-                Ok(Transformed::yes(LogicalPlan::Join(join)))
+                let right_column = join
+                    .on
+                    .iter()
+                    .filter_map(|(_, r)| {
+                        if let Expr::Column(col) = r {
+                            Some(col.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect_vec();
+                if right_column.is_empty() {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                        .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
+                } else {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new_with_deduplication(
+                            self.limit,
+                            0,
+                            right_column,
+                        ))?
+                        .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
+                }
             }
             _ => Ok(Transformed::no(plan)),
         }
