@@ -107,6 +107,7 @@ use crate::{common::meta, handler::http::request};
         request::alerts::list_alerts,
         request::alerts::enable_alert,
         request::alerts::trigger_alert,
+        request::alerts::move_alerts,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,
@@ -183,6 +184,7 @@ use crate::{common::meta, handler::http::request};
             // Alerts
             crate::handler::http::models::alerts::requests::CreateAlertRequestBody,
             crate::handler::http::models::alerts::requests::UpdateAlertRequestBody,
+            crate::handler::http::models::alerts::requests::MoveAlertsRequestBody,
             crate::handler::http::models::alerts::responses::GetAlertResponseBody,
             crate::handler::http::models::alerts::responses::ListAlertsResponseBody,
             crate::handler::http::models::alerts::responses::ListAlertsResponseBodyItem,
