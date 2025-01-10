@@ -15,9 +15,10 @@
 
 use config::meta::folder::Folder;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
+use svix_ksuid::KsuidLike;
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
@@ -97,34 +98,36 @@ pub async fn put(
 ) -> Result<Folder, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let mut active: ActiveModel =
-        match get_model(client, org_id, &folder.folder_id, folder_type).await? {
-            // If a folder with the given folder_id already exists, get that folder
-            // model and use it as the active model so that Sea ORM will update the
-            // corresponding DB record when the active model is saved.
-            Some(model) => model.into(),
-            // In no folder with the given folder_id already exists, create a new
-            // active record so that Sea ORM will create a new DB record when the
-            // active model is saved.
-            None => ActiveModel {
-                id: NotSet,          // Set by DB.
-                name: NotSet,        // Can be updated so this is set below.
-                description: NotSet, // Can be updated so this is set below.
+    let model = match get_model(client, org_id, &folder.folder_id, folder_type).await? {
+        // If a folder with the given folder_id already exists, get that folder
+        // model and use it as the active model so that Sea ORM will update the
+        // corresponding DB record when the active model is saved.
+        Some(model) => {
+            let mut active = model.into_active_model();
+            active.name = Set(folder.name);
+            active.description = Set(Some(folder.description).filter(|d| !d.is_empty()));
+            let model: Model = active.update(client).await?.try_into_model()?;
+            model
+        }
+        // In no folder with the given folder_id already exists, create a new
+        // active record so that Sea ORM will create a new DB record when the
+        // active model is saved.
+        None => {
+            let active = ActiveModel {
+                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
                 org: Set(org_id.to_owned()),
                 // We should probably generate folder_id here for new folders,
                 // rather than depending on caller code to generate it.
                 folder_id: Set(folder.folder_id),
                 r#type: Set::<i16>(folder_type.into()),
-            },
-        };
+                name: Set(folder.name),
+                description: Set(Some(folder.description).filter(|d| !d.is_empty())),
+            };
+            let model: Model = active.insert(client).await?.try_into_model()?;
+            model
+        }
+    };
 
-    active.name = Set(folder.name);
-    active.description = Set(if folder.description.is_empty() {
-        None
-    } else {
-        Some(folder.description)
-    });
-    let model: Model = active.save(client).await?.try_into_model()?;
     Ok(model.into())
 }
 
