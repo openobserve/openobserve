@@ -118,6 +118,7 @@ struct ConfigResponse<'a> {
     usage_publish_interval: i64,
     websocket_enabled: bool,
     ingestion_url: String,
+    min_auto_refresh_interval: u32,
 }
 
 #[derive(Serialize)]
@@ -295,6 +296,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
         ingestion_url: cfg.common.ingestion_url.to_string(),
+        min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
     }))
 }
 
@@ -433,7 +435,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::AuthTokens;
+    use crate::common::meta::user::{AuthTokens, UserRole};
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -498,6 +500,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let id_token;
             match token_ver {
                 Ok(res) => {
+                    // check for service accounts , do not to allow login
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
+                        if db_user
+                            .organizations
+                            .iter()
+                            .any(|org| org.role.eq(&UserRole::ServiceAccount))
+                        {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Service accounts are not allowed to login".to_string()));
+                        }
+                    }
+
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
