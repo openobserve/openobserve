@@ -248,7 +248,7 @@ pub async fn put(
             task_status: Set(task_status.into()),
             file_key: Set(file_key),
             file_link: Set(file_link),
-            created_ts: Set(chrono::Utc::now().timestamp()),
+            created_ts: Set(chrono::Utc::now().timestamp_micros()),
         },
     };
 

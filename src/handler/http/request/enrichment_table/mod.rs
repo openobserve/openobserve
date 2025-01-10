@@ -24,8 +24,8 @@ use url::Url;
 use crate::{
     common::meta::{enrichment_table::EnrichmentTableReq, http::HttpResponse as MetaHttpResponse},
     service::enrichment_table::{
-        add_task, cancel_jobs, delete_job, extract_multipart, get_job_status, list_jobs,
-        save_enrichment_data,
+        add_task, cancel_jobs, create_empty_stream, delete_job, extract_multipart, get_job_status,
+        list_jobs, save_enrichment_data,
     },
 };
 
@@ -114,6 +114,7 @@ pub async fn save_enrichment_table(
 
                 let (task_id, _) =
                     add_task(&org_id, &table_name, append_data, &req.file_link).await?;
+                create_empty_stream(&org_id, &table_name).await?;
 
                 return Ok(HttpResponse::Created().json(serde_json::json!({ "task_id": task_id })));
             } else {
@@ -154,6 +155,6 @@ pub async fn cancel(path: web::Path<String>, body: web::Bytes) -> Result<HttpRes
 
 #[delete("/{org_id}/enrichment_tables/jobs/{task_id}")]
 pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_, table_name) = path.into_inner();
-    delete_job(&table_name).await
+    let (org_id, table_name) = path.into_inner();
+    delete_job(&org_id, &table_name).await
 }

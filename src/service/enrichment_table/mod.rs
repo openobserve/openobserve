@@ -406,10 +406,11 @@ pub async fn cancel_jobs(task_ids: Vec<String>) -> Result<HttpResponse, Error> {
     )))
 }
 
-pub async fn delete_job(task_id: &str) -> Result<HttpResponse, Error> {
+pub async fn delete_job(org_id: &str, task_id: &str) -> Result<HttpResponse, Error> {
     do_cancel(task_id).await?;
     // TODO: stop background job
     // TODO: delete stream
+    // delete_table(org_id, &table_name).await;
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
         format!("Deleted enrichment table job, task_id: {}", task_id),
@@ -682,5 +683,26 @@ async fn do_cancel(task_id: &str) -> Result<(), Error> {
     enrichment_table_jobs::set_job_status(task_id, TaskStatus::Cancelled)
         .await
         .map_err(|_| Error::other("Failed to cancel task"))?;
+    Ok(())
+}
+
+pub async fn create_empty_stream(org_id: &str, table_name: &str) -> Result<(), Error> {
+    // hack to create empty stream for enrichment table
+    infra::schema::update_setting(
+        org_id,
+        table_name,
+        StreamType::EnrichmentTables,
+        HashMap::new(),
+    )
+    .await
+    .map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] Failed to create empty stream: {}", e);
+        Error::other("Failed to create empty stream")
+    })?;
+    Ok(())
+}
+
+pub async fn delete_table(org_id: &str, table_name: &str) -> Result<(), Error> {
+    delete_enrichment_table(org_id, table_name, StreamType::EnrichmentTables).await;
     Ok(())
 }
