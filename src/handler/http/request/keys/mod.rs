@@ -67,6 +67,12 @@ pub async fn save(
             Some(id) => id,
         };
 
+        if req.name.contains(":") {
+            return Ok(MetaHttpResponse::bad_request(
+                "key name cannot have ':' in it",
+            ));
+        }
+
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -323,6 +329,12 @@ pub async fn update(
             None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
             Some(id) => id,
         };
+
+        if req.name.contains(":") {
+            return Ok(MetaHttpResponse::bad_request(
+                "key name cannot have ':' in it",
+            ));
+        }
 
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
