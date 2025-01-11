@@ -634,7 +634,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
         default = 0,
-        help = "Default to 50_000 when feature_splunk_join_enabled is true"
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
     )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
