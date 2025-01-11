@@ -36,11 +36,12 @@ use infra::db::{connect_to_orm, ORM_CLIENT};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
+/// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<Option<Alert>, infra::errors::Error> {
+) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
     new::get_by_id(conn, org_id, alert_id).await
 }
 
