@@ -116,8 +116,8 @@ pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error
     if let Ok(list) = get_actions(&org_id).await {
         if let Ok(list) = list
             .into_iter()
-            .map(GetActionDetailsResponse::try_from)
-            .collect::<Result<Vec<GetActionDetailsResponse>, _>>()
+            .map(GetActionInfoResponse::try_from)
+            .collect::<Result<Vec<GetActionInfoResponse>, _>>()
         {
             Ok(MetaHttpResponse::json(list))
         } else {

@@ -16,31 +16,9 @@
 use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
-    http::{header, Method},
-    web, Error, HttpRequest,
+    Error,
 };
-use config::{get_config, utils::base64};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-
-use crate::{
-    common::{
-        meta::{
-            ingestion::INGESTION_EP,
-            user::{
-                AuthTokensExt, DBUser, TokenValidationResponse, TokenValidationResponseBuilder,
-                UserRole,
-            },
-        },
-        utils::{
-            auth::{get_hash, is_root_user, AuthExtractor},
-            redirect_response::RedirectResponseBuilder,
-        },
-    },
-    service::{db, users},
-};
-
-
+use config::get_config;
 
 pub async fn validator(
     req: ServiceRequest,
@@ -53,8 +31,8 @@ pub async fn validator(
         None => return Err((ErrorUnauthorized("Unauthorized"), req)),
     };
     if auth.eq(&cfg.auth.script_server_token) {
-        return Ok(req);
+        Ok(req)
     } else {
-        return Err((ErrorForbidden("Unauthorized"), req));
+        Err((ErrorForbidden("Unauthorized"), req))
     }
 }

@@ -91,7 +91,6 @@ pub struct Action {
     pub last_modified_at: DateTime<Utc>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateActionDetailsRequest {
     pub name: Option<String>,
@@ -113,8 +112,8 @@ pub struct DeployActionRequest {
     pub cron_expr: Option<String>,
     #[serde(default)]
     pub environment_variables: HashMap<String, String>,
+    #[serde(default)]
     pub origin_cluster_id: String,
-    pub org_id: String,
 }
 
 /// Response from Action Deployer, to get the status of an action

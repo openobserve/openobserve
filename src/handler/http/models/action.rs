@@ -28,7 +28,7 @@ pub struct GetActionInfoResponse {
     pub last_run_at: DateTime<Utc>,
     pub created_by: String,
     pub description: String,
-    pub running: ActionStatus,
+    pub status: ActionStatus,
 }
 
 impl TryFrom<Action> for GetActionInfoResponse {
@@ -42,7 +42,7 @@ impl TryFrom<Action> for GetActionInfoResponse {
             last_run_at: value.last_executed_at.unwrap_or(value.created_at),
             created_by: value.created_by,
             description: value.description,
-            running: value.status,
+            status: value.status,
         })
     }
 }
