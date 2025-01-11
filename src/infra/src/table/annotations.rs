@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::annotations::Annotations;
+use chrono::Utc;
+use config::{ider, meta::annotations::AnnotationObj};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
 use super::{entity::annotations::*, get_lock};
@@ -22,35 +23,53 @@ use crate::{
     errors,
 };
 
-pub async fn add_many(annotations: Annotations) -> Result<(), errors::Error> {
+pub async fn add_many(org_id: &str, annotations: AnnotationObj) -> Result<(), errors::Error> {
     if annotations.annotations.is_empty() {
         return Ok(());
     }
     let dashboard_id = annotations.dashboard_id;
     let panels = annotations.panels;
 
+    let mut records: Vec<ActiveModel> = Vec::new();
     for annotation in annotations.annotations {
         let record = ActiveModel {
-            dashboard_id: Set(annotation.dashboard_id),
-            id: todo!(),
-            org_id: todo!(),
-            start_time: todo!(),
-            end_time: todo!(),
-            title: todo!(),
-            text: todo!(),
-            tags: todo!(),
-            panels: todo!(),
-            created_at: todo!(),
+            dashboard_id: Set(dashboard_id.clone()),
+            id: Set(ider::uuid()),
+            org_id: Set(org_id.to_string()),
+            start_time: Set(annotation.start_time),
+            end_time: Set(annotation.end_time),
+            title: Set(annotation.title),
+            text: Set(annotation.text),
+            tags: Set(annotation.tags),
+            panels: Set(panels.clone()),
+            created_at: Set(Utc::now().timestamp_micros()),
         };
+        records.push(record);
     }
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert_many()
+    Entity::insert_many(records)
         .exec(client)
         .await?;
 
     Ok(())
+}
+
+pub async fn get(org_id: &str, dashboard_id: &str) -> Result<Vec<Model>, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let annotations = Entity::find()
+        .filter(
+            Column::OrgId
+                .eq(org_id)
+                .and(Column::DashboardId.eq(dashboard_id)),
+        )
+        .all(client)
+        .await?;
+
+    Ok(annotations)
 }
