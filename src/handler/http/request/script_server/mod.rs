@@ -20,20 +20,20 @@ use o2_enterprise::enterprise::actions::acton_deployer::{
     create_app, delete_app, get_app_status, list_apps,
 };
 
-#[post("/v1/{org_id}/job")]
-pub async fn create_job(
-    path: web::Path<String>,
-    req: web::Json<DeployActionRequest>,
-) -> impl Responder {
+#[post("/{org_id}/v1/job")]
+pub async fn create_job(path: web::Path<String>, body: web::) -> impl Responder {
     let org_id = path.into_inner();
-    let req = req.into_inner();
+    let req: DeployActionRequest = match serde_json::from_slice(dbg!(&body)) {
+        Ok(req) => req,
+        Err(e) => return HttpResponse::BadRequest().json(e.to_string()),
+    };
     match create_app(&org_id, req).await {
         Ok(created_at) => HttpResponse::Ok().json(serde_json::json!({"created_at":created_at})),
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }
 
-#[delete("/v1/{org_id}/job/{name}")]
+#[delete("/{org_id}/v1/job/{name}")]
 pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
     let (_org_id, name) = path.into_inner();
     match delete_app(&name).await {
@@ -42,7 +42,7 @@ pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
     }
 }
 
-#[get("/v1/{org_id}/job/{name}")]
+#[get("/{org_id}/v1/job/{name}")]
 pub async fn get_app_details(path: web::Path<(String, String)>) -> impl Responder {
     let (_org_id, name) = path.into_inner();
     match get_app_status(&name).await {
@@ -51,7 +51,7 @@ pub async fn get_app_details(path: web::Path<(String, String)>) -> impl Responde
     }
 }
 
-#[get("/v1/{org_id}/job")]
+#[get("/{org_id}/v1/job")]
 pub async fn list_deployed_apps(path: web::Path<String>) -> impl Responder {
     let org_id = path.into_inner();
     match list_apps(&org_id).await {

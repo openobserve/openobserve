@@ -100,7 +100,7 @@ pub struct UpdateActionDetailsRequest {
 }
 
 /// Request send to Action Deployer, to deploy an action
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DeployActionRequest {
     #[serde(default)]
     pub job_name: String,
@@ -117,12 +117,13 @@ pub struct DeployActionRequest {
 }
 
 /// Response from Action Deployer, to get the status of an action
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ActionRunningStatusResponse {
     #[serde(default)]
     pub id: String,
     pub action_status: ActionStatus,
     pub created_at: DateTime<Utc>,
     pub last_executed_at: DateTime<Utc>,
+    // pub last_successful_at: DateTime<Utc>,
     pub failure_count: i32,
 }

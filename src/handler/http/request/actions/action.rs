@@ -17,13 +17,15 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use bytes::Bytes;
 use config::{
     get_config,
     meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest},
 };
 use futures::{StreamExt, TryStreamExt};
+use futures_util::stream::{self, Stream};
 use o2_enterprise::enterprise::actions::action_manager::{
-    delete_app_from_target_cluster, update_app_on_target_cluster,
+    delete_app_from_target_cluster, serve_file_from_s3, update_app_on_target_cluster,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::action_manager::{
@@ -58,6 +60,41 @@ pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpRespo
     let (org_id, ksuid) = path.into_inner();
     match delete_app_from_target_cluster(&org_id, ksuid).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Action deleted")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// Serve Action zip file
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Actions",
+    operation_id = "GetActionZip",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = Template, description = "Template data", content_type ="application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/actions/download/{ksuid}")]
+pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpResponse, Error> {
+    let (org_id, ksuid) = path.into_inner();
+    match serve_file_from_s3(&org_id, ksuid).await {
+        Ok((bytes, file_name)) => {
+            let resp = HttpResponse::Ok()
+                .insert_header((
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{}\"", file_name),
+                ))
+                .content_type("application/zip")
+                .streaming(stream::once(async { Ok::<Bytes, actix_web::Error>(bytes) }));
+            Ok(resp)
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -191,6 +228,8 @@ pub async fn upload_zipped_action(
     let org_id = path.into_inner();
     let mut file_data = Vec::new();
     let mut action = Action::default();
+
+    action.org_id = org_id.clone();
 
     // Validate Content-Type
     if let Some(content_type) = req.headers().get("Content-Type") {
