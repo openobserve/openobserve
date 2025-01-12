@@ -62,7 +62,10 @@ fn load_local_node_uuid() -> String {
 }
 
 fn load_local_node_role() -> Vec<Role> {
-    dbg!(get_config().common.node_role.clone())
+    get_config()
+        .common
+        .node_role
+        .clone()
         .split(',')
         .map(|s| s.parse().unwrap())
         .collect()

@@ -246,6 +246,25 @@ pub async fn upload_zipped_action(
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.name().unwrap_or("") {
+            "description" => {
+                let mut description = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => description.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(
+                                HttpResponse::BadRequest().body("Failed to read description field")
+                            )
+                        }
+                    }
+                }
+                if let Ok(description) = String::from_utf8(description) {
+                    action.description = Some(description);
+                } else {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Description field contains invalid UTF-8 data"));
+                }
+            }
             "file" => {
                 if let Some(name) = field.content_disposition() {
                     action.zip_file_name = name.to_string();

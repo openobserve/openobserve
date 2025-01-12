@@ -68,7 +68,7 @@ pub struct Action {
     #[serde(default)]
     pub org_id: String,
     #[serde(default)]
-    pub description: String,
+    pub description: Option<String>,
     #[serde(default)]
     pub zip_file_path: Option<String>,
     #[serde(default)]
@@ -94,10 +94,16 @@ pub struct Action {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateActionDetailsRequest {
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub environment_variables: Option<HashMap<String, String>>,
-    pub frequency: Option<ExecutionDetailsType>,
+    #[serde(default)]
+    pub execution_details: Option<ExecutionDetailsType>,
+    #[serde(default)]
     pub cron_expr: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// Request send to Action Deployer, to deploy an action

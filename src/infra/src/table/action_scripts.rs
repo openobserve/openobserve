@@ -52,7 +52,7 @@ pub struct Model {
     pub last_executed_at: Option<DateTimeUtc>,
     pub last_successful_at: Option<DateTimeUtc>,
     #[sea_orm(column_type = "Text")]
-    pub description: String,
+    pub description: Option<String>,
     pub status: ActionStatus,
 }
 
@@ -180,14 +180,13 @@ pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
 
 pub async fn get(id: &str, org_id: &str) -> Result<Action, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    dbg!(&id, &org_id);
-    let record = dbg!(
-        Entity::find_by_id(id)
-            .filter(Column::OrgId.eq(org_id))
-            .one(client)
-            .await?
-    )
-    .ok_or_else(|| Error::DbError(DbError::SeaORMError("Action Script not found".to_string())))?;
+    let record = Entity::find_by_id(id)
+        .filter(Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            Error::DbError(DbError::SeaORMError("Action Script not found".to_string()))
+        })?;
 
     Ok(record.try_into()?)
 }

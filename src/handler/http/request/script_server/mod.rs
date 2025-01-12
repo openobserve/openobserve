@@ -28,10 +28,7 @@ pub async fn create_job(
     let org_id = path.into_inner();
     log::info!("Creating job for org_id: {}", org_id);
     match create_app(&org_id, req.into_inner()).await {
-        Ok(created_at) => {
-            // let resp = dbg!(serde_json::json!({"created_at":created_at}));
-            HttpResponse::Ok().body(created_at.to_rfc3339())
-        }
+        Ok(created_at) => HttpResponse::Ok().body(created_at.to_rfc3339()),
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }

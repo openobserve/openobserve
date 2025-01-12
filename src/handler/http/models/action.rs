@@ -26,8 +26,8 @@ pub struct GetActionInfoResponse {
     pub name: String,
     pub created_at: DateTime<Utc>,
     pub last_run_at: DateTime<Utc>,
+    pub last_successful_at: Option<DateTime<Utc>>,
     pub created_by: String,
-    pub description: String,
     pub status: ActionStatus,
 }
 
@@ -40,8 +40,8 @@ impl TryFrom<Action> for GetActionInfoResponse {
             name: value.name,
             created_at: value.created_at,
             last_run_at: value.last_executed_at.unwrap_or(value.created_at),
+            last_successful_at: value.last_successful_at,
             created_by: value.created_by,
-            description: value.description,
             status: value.status,
         })
     }
@@ -56,10 +56,10 @@ pub struct GetActionDetailsResponse {
     pub id: String,
     pub name: String,
     pub environment_variables: HashMap<String, String>,
-    pub frequency: ExecutionDetailsType,
-    pub created_at: DateTime<Utc>,
-    pub cron_expr: String,
+    pub execution_details: ExecutionDetailsType,
+    pub cron_expr: Option<String>,
     pub zip_file_name: String,
+    pub description: Option<String>,
 }
 
 impl TryFrom<Action> for GetActionDetailsResponse {
@@ -70,10 +70,10 @@ impl TryFrom<Action> for GetActionDetailsResponse {
             id: value.id.ok_or(anyhow!("No Id for action"))?.to_string(),
             name: value.name,
             environment_variables: value.environment_variables,
-            frequency: value.execution_details,
-            created_at: value.created_at,
-            cron_expr: value.cron_expr.unwrap_or_else(|| "".to_string()),
+            execution_details: value.execution_details,
+            cron_expr: value.cron_expr,
             zip_file_name: value.zip_file_name,
+            description: value.description,
         })
     }
 }
