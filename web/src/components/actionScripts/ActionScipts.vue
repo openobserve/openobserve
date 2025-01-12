@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 42px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div v-if="!showAddAlertDialog" class="full-width action-scripts-table">
+    <div v-if="!showAddActionScriptDialog" class="full-width action-scripts-table">
       <q-table
         data-test="action-scripts-table"
         ref="qTable"
@@ -56,20 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <q-btn
-              v-else
-              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleAlertState(props.row)"
-            />
-            <q-btn
               :data-test="`alert-list-${props.row.name}-update-alert`"
               icon="edit"
               class="q-ml-xs"
@@ -80,18 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               :title="t('alerts.edit')"
               @click="showAddUpdateFn(props)"
-            ></q-btn>
-            <q-btn
-              icon="content_copy"
-              :title="t('alerts.clone')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="duplicateAlert(props.row)"
-              data-test="alert-clone"
             ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -323,7 +297,7 @@ export default defineComponent({
     const alertsRows: Ref<AlertListItem[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<Alert | {}> = ref({});
-    const showAddAlertDialog: any = ref(false);
+    const showAddActionScriptDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -368,37 +342,37 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "owner",
-        field: "owner",
-        label: t("alerts.owner"),
+        name: "created_by",
+        field: "created_by",
+        label: t("alerts.createdBy"),
         align: "center",
         sortable: true,
       },
       {
-        name: "conditions",
-        field: "conditions",
-        label: t("alerts.condition"),
-        align: "left",
-        sortable: false,
-      },
-      {
-        name: "description",
-        field: "description",
-        label: t("alerts.description"),
-        align: "center",
-        sortable: false,
-      },
-      {
-        name: "last_triggered_at",
-        field: "last_triggered_at",
-        label: t("alerts.lastTriggered"),
+        name: "created_at",
+        field: "created_at",
+        label: t("alerts.createdAt"),
         align: "left",
         sortable: true,
       },
       {
-        name: "last_satisfied_at",
-        field: "last_satisfied_at",
-        label: t("alerts.lastSatisfied"),
+        name: "last_run_at",
+        field: "last_run_at",
+        label: t("alerts.lastRunAt"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "last_successful_at",
+        field: "last_successful_at",
+        label: t("alerts.lastSuccessfulAt"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "status",
+        field: "status",
+        label: t("alerts.status"),
         align: "left",
         sortable: true,
       },
@@ -430,11 +404,13 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
+          resultTotal.value = 5;
           alerts.value = res.data.list.map((alert: any) => {
             return {
               ...alert,
               uuid: getUUID(),
             };
+            
           });
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
@@ -456,20 +432,15 @@ export default defineComponent({
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
               name: data.name,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
-              stream_name: data.stream_name ? data.stream_name : "--",
-              stream_type: data.stream_type,
-              enabled: data.enabled,
-              conditions: conditions,
-              description: data.description,
               uuid: data.uuid,
-              owner: data.owner,
-              last_triggered_at: convertUnixToQuasarFormat(
-                data.last_triggered_at,
+              created_by: data.created_by,
+              created_at: convertUnixToQuasarFormat(data.created_at),
+              last_run_at: convertUnixToQuasarFormat(data.last_run_at),
+              last_successful_at: convertUnixToQuasarFormat(
+                data.last_successful_at,
               ),
-              last_satisfied_at: convertUnixToQuasarFormat(
-                data.last_satisfied_at,
-              ),
+              status: data.status
+
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
@@ -510,7 +481,7 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
-        if (!action) showAddAlertDialog.value = false;
+        if (!action) showAddActionScriptDialog.value = false;
       },
     );
     const getDestinations = async () => {
@@ -578,7 +549,7 @@ export default defineComponent({
     }
 
     const addAlert = () => {
-      showAddAlertDialog.value = true;
+      showAddActionScriptDialog.value = true;
     };
 
     const duplicateAlert = (row: any) => {
@@ -728,7 +699,7 @@ export default defineComponent({
       hideForm();
     };
     const hideForm = () => {
-      showAddAlertDialog.value = false;
+      showAddActionScriptDialog.value = false;
       router.push({
         name: "actionScripts",
         query: {
@@ -902,7 +873,7 @@ export default defineComponent({
       duplicateAlert,
       changePagination,
       maxRecordToReturn,
-      showAddAlertDialog,
+      showAddActionScriptDialog,
       showForm,
       toBeCloneAlertName,
       toBeCloneUUID,
