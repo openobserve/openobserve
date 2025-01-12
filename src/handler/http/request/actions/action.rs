@@ -23,7 +23,7 @@ use config::{
     meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest},
 };
 use futures::{StreamExt, TryStreamExt};
-use futures_util::stream::{self, Stream};
+use futures_util::stream::{self};
 use o2_enterprise::enterprise::actions::action_manager::{
     delete_app_from_target_cluster, serve_file_from_s3, update_app_on_target_cluster,
 };

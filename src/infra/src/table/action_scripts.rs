@@ -49,9 +49,8 @@ pub struct Model {
     #[sea_orm(default_value = "CURRENT_TIMESTAMP")]
     pub created_at: DateTimeUtc, // Automatically set on insert
     pub last_modified_at: DateTimeUtc,
-    pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
-    #[sea_orm(default_value = "0")]
-    pub failure_count: i32, // Number of times the script has failed
+    pub last_executed_at: Option<DateTimeUtc>,
+    pub last_successful_at: Option<DateTimeUtc>,
     #[sea_orm(column_type = "Text")]
     pub description: String,
     pub status: ActionStatus,
@@ -74,12 +73,12 @@ impl TryFrom<Model> for Action {
             zip_file_path: Some(model.file_path),
             created_at: model.created_at,
             last_executed_at: model.last_executed_at,
-            failure_count: model.failure_count,
             description: model.description,
             cron_expr: model.cron_expr,
             status: model.status,
             zip_file_name: model.file_name,
             last_modified_at: model.last_modified_at,
+            last_successful_at: model.last_successful_at,
         })
     }
 }
@@ -149,7 +148,7 @@ pub async fn add(action: &Action) -> Result<(), errors::Error> {
         created_at: Set(action.created_at),
         last_modified_at: Set(action.last_modified_at.clone()),
         last_executed_at: Set(action.last_executed_at.clone()),
-        failure_count: Set(action.failure_count),
+        last_successful_at: Set(action.last_successful_at.clone()),
         description: Set(action.description.clone()),
         file_name: Set(action.zip_file_name.clone()),
         created_by: Set(action.created_by.clone()),
@@ -227,7 +226,7 @@ pub async fn update(action: &Action) -> Result<(), errors::Error> {
         created_at: Set(action.created_at),
         last_modified_at: Set(action.last_modified_at.clone()),
         last_executed_at: Set(action.last_executed_at.clone()),
-        failure_count: Set(action.failure_count),
+        last_successful_at: Set(action.last_successful_at.clone()),
         description: Set(action.description.clone()),
         file_name: Set(action.zip_file_name.clone()),
         created_by: Set(action.created_by.clone()),

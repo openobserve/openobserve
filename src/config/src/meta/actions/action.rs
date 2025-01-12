@@ -84,11 +84,12 @@ pub struct Action {
     pub status: ActionStatus,
     pub created_at: DateTime<Utc>,
     pub last_executed_at: Option<DateTime<Utc>>,
-    pub failure_count: i32,
     pub zip_file_name: String,
     // default to created_at
     #[serde(default)]
     pub last_modified_at: DateTime<Utc>,
+    #[serde(default)]
+    pub last_successful_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -113,7 +114,44 @@ pub struct DeployActionRequest {
     #[serde(default)]
     pub environment_variables: HashMap<String, String>,
     #[serde(default)]
-    pub origin_cluster_id: String,
+    pub origin_cluster_web_url: String,
+    #[serde(default)]
+    pub ksuid: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ActionType {
+    #[default]
+    Job,
+    CronJob,
+}
+
+impl ToString for ActionType {
+    fn to_string(&self) -> String {
+        match self {
+            ActionType::Job => "job".to_string(),
+            ActionType::CronJob => "cronjob".to_string(),
+        }
+    }
+}
+impl From<&str> for ActionType {
+    fn from(s: &str) -> Self {
+        match s {
+            "job" => ActionType::Job,
+            "cronjob" => ActionType::CronJob,
+            _ => ActionType::Job,
+        }
+    }
+}
+
+impl From<ExecutionDetailsType> for ActionType {
+    fn from(e: ExecutionDetailsType) -> Self {
+        match e {
+            ExecutionDetailsType::Once => ActionType::Job,
+            ExecutionDetailsType::Repeat => ActionType::CronJob,
+        }
+    }
 }
 
 /// Response from Action Deployer, to get the status of an action
@@ -123,7 +161,6 @@ pub struct ActionRunningStatusResponse {
     pub id: String,
     pub action_status: ActionStatus,
     pub created_at: DateTime<Utc>,
-    pub last_executed_at: DateTime<Utc>,
-    // pub last_successful_at: DateTime<Utc>,
-    pub failure_count: i32,
+    pub last_executed_at: Option<DateTime<Utc>>,
+    pub last_successful_at: Option<DateTime<Utc>>,
 }

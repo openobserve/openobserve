@@ -21,14 +21,17 @@ use o2_enterprise::enterprise::actions::acton_deployer::{
 };
 
 #[post("/{org_id}/v1/job")]
-pub async fn create_job(path: web::Path<String>, body: web::) -> impl Responder {
+pub async fn create_job(
+    path: web::Path<String>,
+    req: web::Json<DeployActionRequest>,
+) -> impl Responder {
     let org_id = path.into_inner();
-    let req: DeployActionRequest = match serde_json::from_slice(dbg!(&body)) {
-        Ok(req) => req,
-        Err(e) => return HttpResponse::BadRequest().json(e.to_string()),
-    };
-    match create_app(&org_id, req).await {
-        Ok(created_at) => HttpResponse::Ok().json(serde_json::json!({"created_at":created_at})),
+    log::info!("Creating job for org_id: {}", org_id);
+    match create_app(&org_id, req.into_inner()).await {
+        Ok(created_at) => {
+            // let resp = dbg!(serde_json::json!({"created_at":created_at}));
+            HttpResponse::Ok().body(created_at.to_rfc3339())
+        }
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }
@@ -37,7 +40,7 @@ pub async fn create_job(path: web::Path<String>, body: web::) -> impl Responder 
 pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
     let (_org_id, name) = path.into_inner();
     match delete_app(&name).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"deleted":name})),
+        Ok(_) => HttpResponse::Ok().json(""),
         Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }

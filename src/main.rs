@@ -922,6 +922,10 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
 
+    // following command will setup the namespace
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::actions::acton_deployer::init().await?;
+
     let server = HttpServer::new(move || {
         let cfg = get_config();
         let local_id = thread_id.load(Ordering::SeqCst) as usize;
@@ -1011,7 +1015,6 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::create_job)
             .service(script_server::delete_job)
             .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps)
-            .service(script_server::create_job_v2),
+            .service(script_server::list_deployed_apps),
     );
 }
