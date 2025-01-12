@@ -177,6 +177,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // init script server
     if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
     {
+        log::info!("Starting script server");
         return init_script_server().await;
     }
 
@@ -933,7 +934,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             "HTTP"
         };
         log::info!(
-            "Starting {} server at: {}, thread_id: {}",
+            "Starting Script Server {} server at: {}, thread_id: {}",
             scheme,
             haddr,
             local_id
@@ -1003,10 +1004,14 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
     cfg.service(
         web::scope("/api")
-            .wrap(cors)
             .wrap(actix_web_httpauth::middleware::HttpAuthentication::with_fn(
                 script_server_validator,
             ))
-            .service(script_server::create_job),
+            .wrap(cors)
+            .service(script_server::create_job)
+            .service(script_server::delete_job)
+            .service(script_server::get_app_details)
+            .service(script_server::list_deployed_apps)
+            .service(script_server::create_job_v2),
     );
 }

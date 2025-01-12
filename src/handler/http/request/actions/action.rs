@@ -17,45 +17,26 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::meta::actions::action::{Action, ExecutionDetailsType};
-use futures::{StreamExt, TryStreamExt};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::action::{
-    delete_action_by_id, get_action_details, get_actions, populate_action_from_zip,
-    save_and_run_action,
+use bytes::Bytes;
+use config::{
+    get_config,
+    meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest},
 };
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-/// Save Action
+use futures::{StreamExt, TryStreamExt};
+use futures_util::stream::{self, Stream};
+use o2_enterprise::enterprise::actions::action_manager::{
+    delete_app_from_target_cluster, serve_file_from_s3, update_app_on_target_cluster,
+};
 #[cfg(feature = "enterprise")]
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Actions",
-    operation_id = "Create Action",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[post("/{org_id}/actions")]
-pub async fn save_action(
-    path: web::Path<String>,
-    action: web::Json<Action>,
-) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
-    let action = action.into_inner();
-    match save_and_run_action(&*org_id, action).await {
-        Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
-}
+use o2_enterprise::enterprise::actions::action_manager::{
+    get_action_details, get_actions, register_app,
+};
+use svix_ksuid::Ksuid;
+
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
+};
 
 /// Delete Action
 #[utoipa::path(
@@ -75,10 +56,45 @@ pub async fn save_action(
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
-pub async fn delete_action(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
-    let (_org_id, ksuid) = path.into_inner();
-    match delete_action_by_id(&ksuid).await {
+pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpResponse, Error> {
+    let (org_id, ksuid) = path.into_inner();
+    match delete_app_from_target_cluster(&org_id, ksuid).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Action deleted")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// Serve Action zip file
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Actions",
+    operation_id = "GetActionZip",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = Template, description = "Template data", content_type ="application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body =HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json",body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/actions/download/{ksuid}")]
+pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpResponse, Error> {
+    let (org_id, ksuid) = path.into_inner();
+    match serve_file_from_s3(&org_id, ksuid).await {
+        Ok((bytes, file_name)) => {
+            let resp = HttpResponse::Ok()
+                .insert_header((
+                    "Content-Disposition",
+                    format!("attachment; filename=\"{}\"", file_name),
+                ))
+                .content_type("application/zip")
+                .streaming(stream::once(async { Ok::<Bytes, actix_web::Error>(bytes) }));
+            Ok(resp)
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -100,12 +116,17 @@ pub async fn delete_action(path: web::Path<(String, String)>) -> Result<HttpResp
 HttpResponse),         (status = 400, description = "Error",   content_type = "application/json",
 body = HttpResponse),     )
 )]
-#[put("/{org_id}/actions")]
+#[put("/{org_id}/actions/{action_id}")]
 pub async fn update_action(
-    path: web::Path<String>,
-    action: web::Json<Action>,
+    path: web::Path<(String, Ksuid)>,
+    req: web::Json<UpdateActionDetailsRequest>,
 ) -> Result<HttpResponse, Error> {
-    todo!();
+    let (org_id, ksuid) = path.into_inner();
+    let req = req.into_inner();
+    match update_app_on_target_cluster(&org_id, ksuid, req).await {
+        Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
 
 /// List Actions
@@ -129,10 +150,19 @@ body = HttpResponse),     )
 pub async fn list_actions(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
-    Ok(get_actions(&org_id).await.map_or_else(
-        |e| MetaHttpResponse::bad_request(e),
-        |actions| MetaHttpResponse::json(actions),
-    ))
+    if let Ok(list) = get_actions(&org_id).await {
+        if let Ok(list) = list
+            .into_iter()
+            .map(GetActionInfoResponse::try_from)
+            .collect::<Result<Vec<GetActionInfoResponse>, _>>()
+        {
+            Ok(MetaHttpResponse::json(list))
+        } else {
+            Ok(MetaHttpResponse::bad_request("Failed to transform actions"))
+        }
+    } else {
+        Ok(MetaHttpResponse::bad_request("Failed to fetch actions"))
+    }
 }
 
 /// Get single Action
@@ -157,7 +187,15 @@ body = HttpResponse),     )
 pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, action_id) = path.into_inner();
     match get_action_details(&org_id, &action_id).await {
-        Ok(action) => Ok(MetaHttpResponse::json(action)),
+        Ok(action) => {
+            if let Ok(resp) = GetActionDetailsResponse::try_from(action) {
+                return Ok(MetaHttpResponse::json(resp));
+            } else {
+                return Ok(MetaHttpResponse::bad_request(
+                    "Failed to fetch action details",
+                ));
+            }
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -191,6 +229,8 @@ pub async fn upload_zipped_action(
     let mut file_data = Vec::new();
     let mut action = Action::default();
 
+    action.org_id = org_id.clone();
+
     // Validate Content-Type
     if let Some(content_type) = req.headers().get("Content-Type") {
         if !content_type
@@ -202,45 +242,152 @@ pub async fn upload_zipped_action(
         }
     }
 
+    // mandatory fields needs to be tracked
+
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.name().unwrap_or("") {
             "file" => {
+                if let Some(name) = field.content_disposition() {
+                    action.zip_file_name = name.to_string();
+                }
+
                 while let Some(chunk) = field.next().await {
                     match chunk {
                         Ok(bytes) => file_data.extend_from_slice(&bytes),
                         Err(_) => return Ok(HttpResponse::BadRequest().body("Failed to read file")),
                     }
                 }
+                if file_data.is_empty() {
+                    return Ok(HttpResponse::BadRequest().body("File is missing or empty"));
+                }
+            }
+            "filename" => {
+                let mut filename = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => filename.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(
+                                HttpResponse::BadRequest().body("Failed to read filename field")
+                            )
+                        }
+                    }
+                }
+                if filename.is_empty() {
+                    return Ok(
+                        HttpResponse::BadRequest().body("Filename field is missing or empty")
+                    );
+                }
+                if let Ok(filename) = String::from_utf8(filename) {
+                    action.zip_file_name = filename;
+                } else {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Filename field contains invalid UTF-8 data"));
+                }
             }
             "name" => {
                 let mut name = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    name.extend_from_slice(&chunk.unwrap());
+                    match chunk {
+                        Ok(bytes) => name.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest().body("Failed to read name field"))
+                        }
+                    }
                 }
-                action.name = String::from_utf8(name).unwrap();
+                if name.is_empty() {
+                    return Ok(HttpResponse::BadRequest().body("Name field is missing or empty"));
+                }
+                if let Ok(name) = String::from_utf8(name) {
+                    action.name = name;
+                } else {
+                    return Ok(
+                        HttpResponse::BadRequest().body("Name field contains invalid UTF-8 data")
+                    );
+                }
             }
             "execution_details" => {
                 let mut details = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    details.extend_from_slice(&chunk.unwrap());
+                    match chunk {
+                        Ok(bytes) => details.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest()
+                                .body("Failed to read execution_details field"))
+                        }
+                    }
                 }
-                action.execution_details =
-                    ExecutionDetailsType::from(std::str::from_utf8(&*details).unwrap());
+                if details.is_empty() {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Execution details field is missing or empty"));
+                }
+                if let Ok(exec_details) = std::str::from_utf8(&details) {
+                    action.execution_details = ExecutionDetailsType::from(exec_details);
+                } else {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Execution details field contains invalid UTF-8 data"));
+                }
             }
             "cron_expr" => {
                 let mut cron = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    cron.extend_from_slice(&chunk.unwrap());
+                    match chunk {
+                        Ok(bytes) => cron.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(
+                                HttpResponse::BadRequest().body("Failed to read cron_expr field")
+                            )
+                        }
+                    }
                 }
-                action.cron_expr = String::from_utf8(cron).unwrap();
+                if let Ok(cron) = String::from_utf8(cron) {
+                    action.cron_expr = Some(cron);
+                } else {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Cron expression contains invalid UTF-8 data"));
+                }
             }
             "environment_variables" => {
                 let mut env_vars = Vec::new();
                 while let Some(chunk) = field.next().await {
-                    env_vars.extend_from_slice(&chunk.unwrap());
+                    match chunk {
+                        Ok(bytes) => env_vars.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest()
+                                .body("Failed to read environment_variables field"))
+                        }
+                    }
                 }
-                action.environment_variables =
-                    serde_json::from_str(&String::from_utf8(env_vars).unwrap()).unwrap();
+                if let Ok(env_vars) = String::from_utf8(env_vars) {
+                    if let Ok(env_vars) = serde_json::from_str(&env_vars) {
+                        action.environment_variables = env_vars;
+                    } else {
+                        return Ok(HttpResponse::BadRequest()
+                            .body("Invalid JSON in environment variables"));
+                    }
+                } else {
+                    return Ok(
+                        HttpResponse::BadRequest().body("Invalid JSON in environment variables")
+                    );
+                }
+            }
+            "owner" => {
+                let mut owner = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => owner.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest().body("Failed to read owner field"))
+                        }
+                    }
+                }
+                if let Ok(owner) = String::from_utf8(owner) {
+                    action.created_by = owner;
+                } else {
+                    return Ok(
+                        HttpResponse::BadRequest().body("Owner field contains invalid UTF-8 data")
+                    );
+                }
             }
             _ => {}
         }
@@ -250,11 +397,14 @@ pub async fn upload_zipped_action(
         return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
     }
 
+    let data_dir = get_config().common.data_dir.clone();
+    let file_path = format!("{}/actions/{}/{}.zip", data_dir, org_id, action.name);
+
     // Attempt to read the uploaded data as a ZIP file
     match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => {
             println!("Successfully read ZIP archive with {} files", archive.len());
-            match populate_action_from_zip(&org_id, archive, action).await {
+            match register_app(action, archive, &file_path).await {
                 Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
                 Err(e) => {
                     Ok(HttpResponse::BadRequest().body(format!("Failed to process action: {}", e)))
