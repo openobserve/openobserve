@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use arrow::record_batch::RecordBatch;
 use config::{
@@ -190,9 +193,24 @@ async fn get_wal_batches(
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
     }?;
 
-    let mut schema = Arc::new(Schema::empty());
-    if !batches.is_empty() {
-        schema = Arc::clone(&batches[0].schema());
+    if batches.is_empty() {
+        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
     }
-    Ok((stats, batches, schema))
+
+    // remove the metadata
+    let schema = Arc::new(
+        batches[0]
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::new()),
+    );
+    let mut new_batches = Vec::with_capacity(batches.len());
+    for batch in batches {
+        new_batches.push(RecordBatch::try_new(
+            schema.clone(),
+            batch.columns().to_vec(),
+        )?);
+    }
+    Ok((stats, new_batches, schema))
 }
