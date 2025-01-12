@@ -97,6 +97,7 @@ pub(crate) async fn create_context(
 
     let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
+    log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
     resp.push((ctx, schema, stats));
 
