@@ -15,11 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-report-section" class="full-width create-report-page">
+  <div
+    data-test="add-action-script-section"
+    class="full-width create-report-page"
+  >
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
         <div
-          data-test="add-report-back-btn"
+          data-test="add-action-script-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
             border: 1.5px solid;
@@ -33,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div
-          v-if="isEditingReport"
+          v-if="isEditingActionScript"
           class="text-h6"
-          data-test="add-report-title"
+          data-test="add-action-script-title"
         >
           {{ t("actions.update") }}
         </div>
-        <div v-else class="text-h6" data-test="add-report-title">
+        <div v-else class="text-h6" data-test="add-action-script-title">
           {{ t("actions.add") }}
         </div>
       </div>
@@ -49,11 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
         <q-form
           class="create-report-form"
-          ref="addReportFormRef"
+          ref="addActionScriptFormRef"
           @submit="onSubmit"
         >
           <div
-            data-test="add-report-name-input"
+            data-test="add-action-script-name-input"
             class="report-name-input o2-input q-px-sm"
             style="padding-top: 12px"
           >
@@ -67,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-              v-bind:readonly="isEditingReport"
-              v-bind:disable="isEditingReport"
+              v-bind:readonly="isEditingActionScript"
+              v-bind:disable="isEditingActionScript"
               :rules="[
                 (val: any) =>
                   !!val
@@ -85,8 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           </div>
           <div
-            data-test="add-report-description-input"
-            class="report-name-input o2-input q-px-sm"
+            data-test="add-action-script-description-input"
+            class="report-name-input o2-input q-px-sm q-pb-md"
           >
             <q-input
               v-model="formData.description"
@@ -112,41 +115,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             header-nav
           >
             <q-step
-              data-test="add-report-select-dashboard-step"
+              data-test="add-action-script-select-dashboard-step"
               :name="1"
               title="Upload Script Zip"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
+            <div class="flex items-center">
               <q-file
+                v-if="!isEditingActionScript || formData.fileNameToShow == ''"
+                ref="fileInput"
                 color="primary"
                 filled
                 v-model="formData.codeZip"
                 :label="t('actions.uploadCodeZip')"
                 bg-color="input-bg"
-                class="tw-w-[300px] q-py-md showLabelOnTop lookup-table-file-uploader"
+                class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
                 stack-label
                 outlined
                 dense
-                :rules="[(val: any) => !!val || 'CSV File is required!']"
+                accept=".zip"
+                :rules="[
+                  (val: any) => {
+                    if (!isEditingActionScript) {
+                      return !!val || 'CSV File is required!';
+                    }
+                    return true;
+                  }
+                ]"
+
               >
                 <template v-slot:prepend>
                   <q-icon name="attachment" />
                 </template>
+                <template v-slot:hint>
+                    Note: Only .zip files are accepted and it may contain
+                    various resources such as .py, .txt and main.py file etc.
+                  </template>
               </q-file>
+
+              <div v-else-if=" isEditingActionScript && formData.fileNameToShow != ''">
+                {{ formData.fileNameToShow }}
+                <q-btn
+                  data-test="edit-action-script-step1-continue-btn"
+                  @click="editFileToUpload"
+                  icon="edit"
+                  no-caps
+                />
+              </div>
+              <div v-if="isEditingActionScript && formData.fileNameToShow == ''" class="q-pt-md q-mt-xs q-pl-md"
+              >
+                <q-btn
+                  data-test="cancel-upload-new-btn-file"
+                  @click="cancelUploadingNewFile"
+                  color="red"
+                  label="Cancel"
+                  no-caps
+                />
+              </div>
+            </div>
+              
+              
               <q-stepper-navigation>
                 <q-btn
-                  data-test="add-report-step1-continue-btn"
+                  data-test="add-action-script-step1-continue-btn"
                   @click="step = 2"
                   color="secondary"
                   label="Continue"
                   no-caps
+                  class="q-mt-sm"
                 />
               </q-stepper-navigation>
             </q-step>
 
             <q-step
-              data-test="add-report-select-schedule-step"
+              data-test="add-action-script-select-schedule-step"
               :name="2"
               title="Schedule"
               icon="schedule"
@@ -169,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-for="visual in frequencyTabs" :key="visual.value">
                     <q-btn
-                      :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
+                      :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
                       :color="visual.value === frequency.type ? 'primary' : ''"
                       :flat="visual.value === frequency.type ? false : true"
                       dense
@@ -197,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="frequency.type === 'cron'">
                   <div class="flex items-center justify-start q-mt-md">
                     <div
-                      data-test="add-report-schedule-custom-interval-input"
+                      data-test="add-action-script-schedule-custom-interval-input"
                       class="o2-input q-mr-sm"
                       style="padding-top: 0; width: 320px"
                     >
@@ -249,9 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
-                    <div class="o2-input">
+                    <!-- <div class="o2-input">
                       <q-select
-                        data-test="add-report-schedule-start-timezone-select"
+                        data-test="add-action-script-schedule-start-timezone-select"
                         v-model="scheduling.timezone"
                         :options="filteredTimezone"
                         @blur="
@@ -276,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         style="width: 300px"
                       />
-                    </div>
+                    </div> -->
                   </div>
                 </template>
                 <!-- <template v-else>
@@ -291,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template v-for="visual in timeTabs" :key="visual.value">
                         <q-btn
-                          :data-test="`add-report-schedule-${visual.value}-btn`"
+                          :data-test="`add-action-script-schedule-${visual.value}-btn`"
                           :color="
                             visual.value === selectedTimeTab ? 'primary' : ''
                           "
@@ -332,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-start justify-start q-mt-md"
                   >
                     <div
-                      data-test="add-report-schedule-custom-interval-input"
+                      data-test="add-action-script-schedule-custom-interval-input"
                       class="o2-input q-mr-sm"
                       style="padding-top: 0; width: 160px"
                     >
@@ -353,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div
-                      data-test="add-report-schedule-custom-frequency-select"
+                      data-test="add-action-script-schedule-custom-frequency-select"
                       class="o2-input"
                       style="padding-top: 0; width: 160px"
                     >
@@ -377,12 +420,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    data-test="add-report-schedule-send-later-section"
+                    data-test="add-action-script-schedule-send-later-section"
                     v-if="selectedTimeTab === 'scheduleLater'"
                     class="flex items-center justify-start q-mt-md"
                   >
                     <div
-                      data-test="add-report-schedule-start-date-input"
+                      data-test="add-action-script-schedule-start-date-input"
                       class="o2-input q-mr-sm"
                     >
                       <q-input
@@ -429,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-input>
                     </div>
                     <div
-                      data-test="add-report-schedule-start-time-input"
+                      data-test="add-action-script-schedule-start-time-input"
                       class="o2-input q-mr-sm"
                     >
                       <q-input
@@ -470,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="o2-input">
                       <q-select
-                        data-test="add-report-schedule-start-timezone-select"
+                        data-test="add-action-script-schedule-start-timezone-select"
                         v-model="scheduling.timezone"
                         :options="filteredTimezone"
                         @blur="
@@ -501,17 +544,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <q-stepper-navigation>
+  
+                <div>
+
                 <q-btn
-                  data-test="add-report-step2-back-btn"
-                  flat
+                  data-test="add-action-script-step2-continue-btn"
+                  @click="step = 3"
+                  color="secondary"
+                  label="Continue"
+                  class="q-ml-sm"
+                  no-caps
+                />
+                <q-btn
+                  data-test="add-action-script-step2-back-btn"
                   @click="step = 1"
+                  flat
                   color="primary"
                   label="Back"
                   class="q-ml-sm"
                   no-caps
                 />
+                </div>
               </q-stepper-navigation>
             </q-step>
+            <q-step
+              data-test="add-action-script-select-schedule-step"
+              :name="3"
+              title="Environmental Variables"
+              icon="lock"
+              :done="step > 3"
+              class="q-mt-md"
+            >
+                <div
+                  v-for="(header, index) in environmentalVariables"
+                  :key="header.uuid"
+                  class="row q-col-gutter-sm q-pb-sm"
+                >
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-key-input`"
+                      v-model="header.key"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      :placeholder="'Key'"
+                      dense
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-value-input`"
+                      v-model="header.value"
+                      :placeholder="t('alert_destinations.api_header_value')"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      isUpdatingDestination
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="col-2 q-ml-none">
+                    <q-btn
+                      :data-test="`add-action-script-header-${header['key']}-delete-btn`"
+                      icon="delete"
+                      class="q-ml-xs iconHoverBtn"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alert_templates.delete')"
+                      @click="deleteApiHeader(header)"
+                    />
+                    <q-btn
+                      data-test="add-action-script-add-header-btn"
+                      v-if="index === environmentalVariables.length - 1"
+                      icon="add"
+                      class="q-ml-xs iconHoverBtn"
+                      padding="sm"
+                      unelevated
+                      size="sm"
+                      round
+                      flat
+                      :title="t('alert_templates.edit')"
+                      @click="addApiHeader()"
+                    />
+                  </div>
+                </div>
+              <q-stepper-navigation>
+                <q-btn
+                  data-test="add-action-script-step3-back-btn"
+                  flat
+                  @click="step = 2"
+                  color="primary"
+                  label="Back"
+                  class="q-ml-sm"
+                  no-caps
+                />
+            </q-stepper-navigation>
+            </q-step>
+            
           </q-stepper>
         </q-form>
       </div>
@@ -528,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <q-btn
-        data-test="add-report-cancel-btn"
+        data-test="add-action-script-cancel-btn"
         class="text-bold"
         :label="t('alerts.cancel')"
         text-color="light-text"
@@ -537,13 +675,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openCancelDialog"
       />
       <q-btn
-        data-test="add-report-save-btn"
+        data-test="add-action-script-save-btn"
         :label="t('alerts.save')"
         class="text-bold no-border q-ml-md"
         color="secondary"
         padding="sm xl"
         no-caps
-        @click="saveReport"
+        @click="saveActionScript"
       />
     </div>
   </div>
@@ -588,7 +726,7 @@ defineProps({
   },
 });
 
-const defaultReport = {
+const defaultActionScript = {
   codeZip: null,
   description: "",
   enabled: true,
@@ -600,6 +738,7 @@ const defaultReport = {
     type: "cron",
     cron: "",
   },
+  environment_variables: {},
   timezone: "UTC",
   timezoneOffset: 0,
   lastTriggeredAt: null,
@@ -607,6 +746,7 @@ const defaultReport = {
   updatedAt: "",
   owner: "",
   lastEditedBy: "",
+  fileNameToShow: "",
 };
 
 const { t } = useI18n();
@@ -616,13 +756,15 @@ const isCachedReport = ref(false);
 
 const showInfoTooltip = ref(false);
 
-const originalReportData: Ref<string> = ref("");
+const fileInput = ref(null);
 
-const addReportFormRef: Ref<any> = ref(null);
+const originalActionScriptData: Ref<string> = ref("");
+
+const addActionScriptFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
-const formData = ref(defaultReport);
+const formData = ref(defaultActionScript);
 
 const q = useQuasar();
 
@@ -673,10 +815,11 @@ const options: Ref<{ [key: string]: any[] }> = ref({});
 
 const emails = ref("");
 
-const isEditingReport = ref(false);
+const isEditingActionScript = ref(false);
 
-const isFetchingReport = ref(false);
+const isFetchingActionScript = ref(false);
 
+const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
 
 const frequency = ref({
@@ -689,35 +832,35 @@ const frequency = ref({
 });
 
 onBeforeMount(async () => {
-  isEditingReport.value = !!router.currentRoute.value.query?.id;
+  isEditingActionScript.value = !!router.currentRoute.value.query?.id;
 
-  if (isEditingReport.value) {
-    isEditingReport.value = true;
-    isFetchingReport.value = true;
+  if (isEditingActionScript.value) {
+    isEditingActionScript.value = true;
+    isFetchingActionScript.value = true;
 
     const actionId: string = (router.currentRoute.value.query?.id ||
       "") as string;
-
     actions
       .get_by_id(store.state.selectedOrganization.identifier, actionId)
       .then((res: any) => {
-        setupEditingReport(res.data);
-        originalReportData.value = JSON.stringify(formData.value);
+        setupEditingActionScript(res.data);
+
+        originalActionScriptData.value = JSON.stringify(formData.value);
       })
       .catch((err) => {
         if (err.response.status != 403) {
           q.notify({
             type: "negative",
-            message: err?.data?.message || "Error while fetching report!",
+            message: err?.data?.message || "Error while fetching Action Script!",
             timeout: 4000,
           });
         }
       })
       .finally(() => {
-        isFetchingReport.value = false;
+        isFetchingActionScript.value = false;
       });
   } else {
-    originalReportData.value = JSON.stringify(formData.value);
+    originalActionScriptData.value = JSON.stringify(formData.value);
   }
 });
 
@@ -766,7 +909,7 @@ const browserTime =
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
-const saveReport = async () => {
+const saveActionScript = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
   if (frequency.value.type === "cron") {
     const now = new Date();
@@ -798,50 +941,69 @@ const saveReport = async () => {
     scheduling.value.timezone,
   );
 
-  console.log("formData.value", formData.value);
-
   const form = new FormData();
   form.append("file", formData.value.codeZip || "");
+  if (
+    formData.value.codeZip &&
+    (formData.value.codeZip as File).name.length > 0
+  ) {
+    form.append("filename", (formData.value.codeZip as File).name || "");
+  }
   form.append("name", formData.value.name);
   form.append("desription", formData.value.description);
-  form.append("frequency", frequency.value.type);
+  form.append("execution_details", frequency.value.type);
   form.append("ordId", store.state.selectedOrganization.identifier);
   if (frequency.value.type === "cron")
     form.append("cron_expr", frequency.value.cron.toString().trim() + " *");
-  form.append("timezone", scheduling.value.timezone);
+  if (environmentalVariables.value.length > 0) {
+    const enviroment_variables = environmentalVariables.value.reduce(
+      (acc: any, curr: any) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      },
+      {},
+    );
+    form.append("environment_variables", JSON.stringify(enviroment_variables));
+  }
+  
+  // form.append("timezone", scheduling.value.timezone);
   form.append("owner", store.state.userInfo.email);
   form.append("lastEditedBy", store.state.userInfo.email);
-  form.append("timezoneOffset", convertedDateTime.offset.toString());
-
+  // form.append("timezoneOffset", convertedDateTime.offset.toString());
   // Check if all report input fields are valid
   try {
-    validateReportData();
+    validateActionScriptData();
     await nextTick();
     await nextTick();
-    const isValidForm = await addReportFormRef.value.validate();
+    const isValidForm = await addActionScriptFormRef.value.validate();
     if (!isValidForm) return;
   } catch (err) {
     console.log(err);
   }
 
-  const updateAction = isEditingReport.value ? actions.update : actions.create;
+  const updateAction =
+    isEditingActionScript.value && !formData.value.codeZip
+      ? actions.update
+      : actions.create;
 
   const dismiss = q.notify({
     spinner: true,
     message: "Please wait...",
     timeout: 2000,
   });
+  const actionId: string = (router.currentRoute.value.query?.id ||
+    "") as string;
 
-  updateAction(store.state.selectedOrganization.identifier, form)
+  updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
       q.notify({
         type: "positive",
         message: `Report ${
-          isEditingReport.value ? "updated" : "saved"
+          isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
         timeout: 3000,
       });
-      goToReports();
+      goToActionScripts();
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -850,8 +1012,8 @@ const saveReport = async () => {
           message:
             error?.response?.data?.message ||
             `Error while ${
-              isEditingReport.value ? "updating" : "saving"
-            } report.`,
+              isEditingActionScript.value ? "updating" : "saving"
+            } Action Script.`,
           timeout: 4000,
         });
       }
@@ -861,7 +1023,11 @@ const saveReport = async () => {
     });
 };
 
-const validateReportData = async () => {
+const validateActionScriptData = async () => {
+  if (!formData.value.codeZip && !isEditingActionScript.value) {
+    step.value = 1;
+    return;
+  }
   if (formData.value.frequency.type === "cron") {
     try {
       cronParser.parseExpression(frequency.value.cron);
@@ -884,29 +1050,20 @@ const validateReportData = async () => {
   }
 };
 
-const goToReports = () => {
+const goToActionScripts = () => {
   router.replace({
-    name: "reports",
+    name: "actionScripts",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };
 
-const setupEditingReport = async (report: any) => {
+const setupEditingActionScript = async (report: any) => {
   formData.value = {
     ...report,
-    dashboards: [
-      {
-        folder: "",
-        dashboard: "",
-        tabs: "" as string | string[],
-        variables: report.dashboards[0].variables,
-        timerange: report.dashboards[0].timerange,
-      },
-    ],
   };
-
+  formData.value.fileNameToShow = report.zip_file_name;
   // set date, time and timezone in scheduling
   const date = new Date(report.start / 1000);
 
@@ -930,19 +1087,13 @@ const setupEditingReport = async (report: any) => {
   // set selectedTimeTab to scheduleLater
   selectedTimeTab.value = "scheduleLater";
 
-  emails.value = report.destinations
-    .map((destination: { email: string }) => destination.email)
-    .join(";");
-
-  if (!report.destinations.length) isCachedReport.value = true;
-
   // set frequency
-  if (report.frequency.type === "cron") {
+  if (report.frequency.type == "cron") {
     frequency.value.type = report.frequency.type;
     frequency.value.cron =
-      report.frequency.cron.split(" ").length === 7
-        ? report.frequency.cron.split(" ").slice(0, 6).join(" ")
-        : report.frequency.cron;
+      report.cron_expr.split(" ").length === 7
+        ? report.cron_expr.split(" ").slice(0, 6).join(" ")
+        : report.cron_expr;
   } else if (report.frequency.interval > 1) {
     frequency.value.type = "custom";
     frequency.value.custom.period = report.frequency.type;
@@ -950,17 +1101,51 @@ const setupEditingReport = async (report: any) => {
   } else {
     frequency.value.type = report.frequency.type;
   }
+  if (Object.keys(formData.value.environment_variables).length) {
+    environmentalVariables.value = [];
+    Object.entries(formData.value.environment_variables).forEach(
+      ([key, value]: [string, any]) => {
+        addApiHeader(key, value);
+      },
+    );
+  }
 };
 
 const openCancelDialog = () => {
-  if (originalReportData.value === JSON.stringify(formData.value)) {
-    goToReports();
+  if (originalActionScriptData.value === JSON.stringify(formData.value)) {
+    goToActionScripts();
     return;
   }
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel report changes?";
-  dialog.value.okCallback = goToReports;
+  dialog.value.message = "Are you sure you want to cancel Action Script changes?";
+  dialog.value.okCallback = goToActionScripts;
+};
+const editFileToUpload = () => {
+  formData.value.fileNameToShow = ""
+
+}
+const cancelUploadingNewFile = () => {
+  formData.value.fileNameToShow = JSON.parse(
+    originalActionScriptData.value,
+  ).zip_file_name;
+}
+const addApiHeader = (key: string = "", value: string = "") => {
+  environmentalVariables.value.push({ key: key, value: value, uuid: getUUID() });
+};
+const deleteApiHeader = (header: any) => {
+  environmentalVariables.value = environmentalVariables.value.filter(
+    (_header) => _header.uuid !== header.uuid
+  );
+  if (
+    (formData.value.environment_variables as { [key: string]: any })[header.key]
+  ) {
+    delete (formData.value.environment_variables as { [key: string]: any })[
+      header.key
+    ];
+  }
+
+  if (!environmentalVariables.value.length) addApiHeader();
 };
 </script>
 

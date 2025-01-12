@@ -16,29 +16,31 @@
 import http from "./http";
 
 const actions = {
-  create: (org_identifier: string, data: any) => {
-    return http().post(`/api/${org_identifier}/alerts/destinations`, data);
+  create: (org_identifier: string, action_id: string = "", data: any) => {
+    return http().post(`/api/${org_identifier}/actions/upload`, data);
   },
-  update: (org_identifier: string, data: any) => {
-    return http().put(`/api/${org_identifier}/alerts/destinations}`, data);
+  update: (org_identifier: string, action_id: string, data: any) => {
+    return http().put(`/api/${org_identifier}/actions/${action_id}}`, data);
   },
-  list: ({ org_identifier, page_num, page_size, desc, sort_by }: any) => {
+  list: ( 
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    org_identifier: string,
+  ) => {
     return http().get(
-      `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`,
+      `/api/${org_identifier}/actions/?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`,
     );
   },
-  get_by_id: (org_identifier: string, action_id: string) => {
+  get_by_id: (org_identifier: string, ksuid: string) => {
     return http().get(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        action_id,
-      )}`,
+      `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`,
     );
   },
   delete: (org_identifier: string, action_id: string) => {
     return http().delete(
-      `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(
-        action_id,
-      )}`,
+      `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
     );
   },
 };

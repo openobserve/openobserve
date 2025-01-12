@@ -52,7 +52,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import JSZip from "jszip";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import axios from "axios";
