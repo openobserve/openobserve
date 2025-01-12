@@ -22,7 +22,13 @@ const actions = {
   update: (org_identifier: string, action_id: string, data: any) => {
     return http().put(`/api/${org_identifier}/actions/${action_id}}`, data);
   },
-  list: ({ org_identifier, page_num, page_size, desc, sort_by }: any) => {
+  list: ( 
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    org_identifier: string,
+  ) => {
     return http().get(
       `/api/${org_identifier}/actions/?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`,
     );

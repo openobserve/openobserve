@@ -23,11 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 42px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div v-if="!showAddActionScriptDialog" class="full-width action-scripts-table">
+    <div
+      v-if="!showAddActionScriptDialog"
+      class="full-width action-scripts-table"
+    >
       <q-table
         data-test="action-scripts-table"
         ref="qTable"
-        :rows="alertsRows"
+        :rows="actionsScriptRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
@@ -271,8 +274,11 @@ import {
   outlinedPause,
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
+import actions from "@/services/action_scripts";
+
 // import alertList from "./alerts";
 
+// TODO code clean up needs to be done 
 export default defineComponent({
   name: "AlertList",
   components: {
@@ -294,7 +300,7 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
-    const alertsRows: Ref<AlertListItem[]> = ref([]);
+    const actionsScriptRows: Ref<AlertListItem[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddActionScriptDialog: any = ref(false);
@@ -387,24 +393,22 @@ export default defineComponent({
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
-    const getAlerts = () => {
+    const getActionScripts = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading alerts...",
       });
-      alertsService
+      actions
         .list(
           1,
           1000,
           "name",
           false,
-          "",
           store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          resultTotal.value = 5;
           alerts.value = res.data.list.map((alert: any) => {
             return {
               ...alert,
@@ -412,22 +416,7 @@ export default defineComponent({
             };
             
           });
-          alertsRows.value = alerts.value.map((data: any) => {
-            let conditions = "--";
-            if (data.query_condition.conditions?.length) {
-              conditions = data.query_condition.conditions
-                .map((condition: any) => {
-                  return `${condition.column} ${condition.operator} ${condition.value}`;
-                })
-                .join(" AND ");
-            } else if (data.query_condition.sql) {
-              conditions = data.query_condition.sql;
-            } else if (data.query_condition.promql) {
-              conditions = data.query_condition.promql;
-            }
-            if (conditions.length > 50) {
-              conditions = conditions.substring(0, 32) + "...";
-            }
+          actionsScriptRows.value = alerts.value.map((data: any) => {
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
@@ -443,7 +432,7 @@ export default defineComponent({
 
             };
           });
-          alertsRows.value.forEach((alert: AlertListItem) => {
+          actionsScriptRows.value.forEach((alert: AlertListItem) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
@@ -462,7 +451,7 @@ export default defineComponent({
           dismiss();
           $q.notify({
             type: "negative",
-            message: "Error while pulling alerts.",
+            message: "Error while pulling action scripts.",
             timeout: 2000,
           });
         });
@@ -471,52 +460,52 @@ export default defineComponent({
       return alerts.value.find((alert) => alert.id === id);
     };
     if (!alerts.value.length) {
-      getAlerts();
+      getActionScripts();
     }
     onBeforeMount(async () => {
-      await getTemplates();
-      getDestinations();
+      // await getTemplates();
+      // getDestinations();
     });
-    onActivated(() => getDestinations());
+    // onActivated(() => getDestinations());
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showAddActionScriptDialog.value = false;
       },
     );
-    const getDestinations = async () => {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => {
-          destinations.value = res.data;
-        })
-        .catch(() =>
-          $q.notify({
-            type: "negative",
-            message: "Error while fetching destinations.",
-            timeout: 3000,
-          }),
-        );
-    };
+    // const getDestinations = async () => {
+    //   destinationService
+    //     .list({
+    //       org_identifier: store.state.selectedOrganization.identifier,
+    //     })
+    //     .then((res) => {
+    //       destinations.value = res.data;
+    //     })
+    //     .catch(() =>
+    //       $q.notify({
+    //         type: "negative",
+    //         message: "Error while fetching destinations.",
+    //         timeout: 3000,
+    //       }),
+    //     );
+    // };
 
-    const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => {
-          templates.value = res.data;
-        })
-        .catch(() =>
-          $q.notify({
-            type: "negative",
-            message: "Error while fetching templates.",
-            timeout: 3000,
-          }),
-        );
-    };
+    // const getTemplates = () => {
+    //   templateService
+    //     .list({
+    //       org_identifier: store.state.selectedOrganization.identifier,
+    //     })
+    //     .then((res) => {
+    //       templates.value = res.data;
+    //     })
+    //     .catch(() =>
+    //       $q.notify({
+    //         type: "negative",
+    //         message: "Error while fetching templates.",
+    //         timeout: 3000,
+    //       }),
+    //     );
+    // };
     const perPageOptions: any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
@@ -618,7 +607,7 @@ export default defineComponent({
                 timeout: 2000,
               });
               showForm.value = false;
-              getAlerts();
+              getActionScripts();
             } else {
               $q.notify({
                 type: "negative",
@@ -695,7 +684,7 @@ export default defineComponent({
       }
     };
     const refreshList = () => {
-      getAlerts();
+      getActionScripts();
       hideForm();
     };
     const hideForm = () => {
@@ -722,7 +711,7 @@ export default defineComponent({
               message: res.data.message,
               timeout: 2000,
             });
-            getAlerts();
+            getActionScripts();
           } else {
             $q.notify({
               type: "negative",
@@ -808,29 +797,29 @@ export default defineComponent({
       streamNames.value = filterColumns(indexOptions.value, val, update);
     };
 
-    const toggleAlertState = (row: any) => {
-      alertStateLoadingMap.value[row.uuid] = true;
-      const alert: Alert = alerts.value.find(
-        (alert) => alert.uuid === row.uuid,
-      ) as Alert;
-      alertsService
-        .toggleState(
-          store.state.selectedOrganization.identifier,
-          alert.stream_name,
-          alert.name,
-          !alert?.enabled,
-          alert.stream_type,
-        )
-        .then(() => {
-          alert.enabled = !alert.enabled;
-          alertsRows.value.forEach((alert) => {
-            alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
-          });
-        })
-        .finally(() => {
-          alertStateLoadingMap.value[row.uuid] = false;
-        });
-    };
+    // const toggleAlertState = (row: any) => {
+    //   alertStateLoadingMap.value[row.uuid] = true;
+    //   const alert: Alert = alerts.value.find(
+    //     (alert) => alert.uuid === row.uuid,
+    //   ) as Alert;
+    //   alertsService
+    //     .toggleState(
+    //       store.state.selectedOrganization.identifier,
+    //       alert.stream_name,
+    //       alert.name,
+    //       !alert?.enabled,
+    //       alert.stream_type,
+    //     )
+    //     .then(() => {
+    //       alert.enabled = !alert.enabled;
+    //       actionsScriptRows.value.forEach((alert) => {
+    //         alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
+    //       });
+    //     })
+    //     .finally(() => {
+    //       alertStateLoadingMap.value[row.uuid] = false;
+    //     });
+    // };
 
     const routeTo = (name: string) => {
       router.push({
@@ -842,9 +831,9 @@ export default defineComponent({
       });
     };
 
-    const refreshDestination = async () => {
-      await getDestinations();
-    };
+    // const refreshDestination = async () => {
+    //   await getDestinations();
+    // };
 
     return {
       t,
@@ -859,7 +848,7 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      getAlerts,
+      getActionScripts,
       pagination,
       resultTotal,
       refreshList,
@@ -927,12 +916,10 @@ export default defineComponent({
       splitterModel,
       outlinedPause,
       outlinedPlayArrow,
-      alertsRows,
-      toggleAlertState,
+      actionsScriptRows,
       alertStateLoadingMap,
       templates,
       routeTo,
-      refreshDestination,
     };
   },
 });

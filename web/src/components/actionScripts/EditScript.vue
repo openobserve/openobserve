@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
-                    <div class="o2-input">
+                    <!-- <div class="o2-input">
                       <q-select
                         data-test="add-action-script-schedule-start-timezone-select"
                         v-model="scheduling.timezone"
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         style="width: 300px"
                       />
-                    </div>
+                    </div> -->
                   </div>
                 </template>
                 <!-- <template v-else>
@@ -961,10 +961,10 @@ const saveActionScript = async () => {
     form.append("environment_variables", JSON.stringify(enviroment_variables));
   }
   
-  form.append("timezone", scheduling.value.timezone);
+  // form.append("timezone", scheduling.value.timezone);
   form.append("owner", store.state.userInfo.email);
   form.append("lastEditedBy", store.state.userInfo.email);
-  form.append("timezoneOffset", convertedDateTime.offset.toString());
+  // form.append("timezoneOffset", convertedDateTime.offset.toString());
   // Check if all report input fields are valid
   try {
     validateActionScriptData();
