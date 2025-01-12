@@ -276,6 +276,18 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import actions from "@/services/action_scripts";
 
+interface ActionScriptList {
+  "#": string | number; // If this represents a serial number or row index
+  id: any; // The unique identifier, specify the type (e.g., string, number) if known
+  name: any; // Name of the action script
+  uuid: any; // Unique UUID for the action script
+  created_by: any; // The user who created the script
+  created_at: string; // Creation timestamp, in ISO format or a specific format
+  last_run_at: string; // Timestamp of the last run, in ISO format or a specific format
+  last_successful_at: string; // Timestamp of the last successful run
+  status: any; // Current status of the action script
+}
+
 // import alertList from "./alerts";
 
 // TODO code clean up needs to be done 
@@ -300,7 +312,7 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
-    const actionsScriptRows: Ref<AlertListItem[]> = ref([]);
+    const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddActionScriptDialog: any = ref(false);
@@ -414,7 +426,6 @@ export default defineComponent({
               ...alert,
               uuid: getUUID(),
             };
-            
           });
           actionsScriptRows.value = alerts.value.map((data: any) => {
             return {
@@ -432,7 +443,7 @@ export default defineComponent({
 
             };
           });
-          actionsScriptRows.value.forEach((alert: AlertListItem) => {
+          actionsScriptRows.value.forEach((alert: ActionScriptList) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
@@ -454,6 +465,7 @@ export default defineComponent({
             message: "Error while pulling action scripts.",
             timeout: 2000,
           });
+          
         });
     };
     const getAlertByName = (id: string) => {

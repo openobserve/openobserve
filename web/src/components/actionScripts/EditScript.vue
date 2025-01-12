@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 accept=".zip"
                 :rules="[
-                  (val) => {
+                  (val: any) => {
                     if (!isEditingActionScript) {
                       return !!val || 'CSV File is required!';
                     }
@@ -943,8 +943,12 @@ const saveActionScript = async () => {
 
   const form = new FormData();
   form.append("file", formData.value.codeZip || "");
-  if (formData.value.codeZip && formData.value.codeZip.name.length > 0)
-    form.append("filename", formData.value.codeZip.name || "");
+  if (
+    formData.value.codeZip &&
+    (formData.value.codeZip as File).name.length > 0
+  ) {
+    form.append("filename", (formData.value.codeZip as File).name || "");
+  }
   form.append("name", formData.value.name);
   form.append("desription", formData.value.description);
   form.append("execution_details", frequency.value.type);
@@ -952,7 +956,8 @@ const saveActionScript = async () => {
   if (frequency.value.type === "cron")
     form.append("cron_expr", frequency.value.cron.toString().trim() + " *");
   if (environmentalVariables.value.length > 0) {
-    const enviroment_variables = environmentalVariables.value.reduce((acc, curr) => {
+    const enviroment_variables = environmentalVariables.value.reduce(
+      (acc: any, curr: any) => {
         acc[curr.key] = curr.value;
         return acc;
       },
@@ -1097,12 +1102,13 @@ const setupEditingActionScript = async (report: any) => {
     frequency.value.type = report.frequency.type;
   }
   if (Object.keys(formData.value.environment_variables).length) {
-      environmentalVariables.value = [];
+    environmentalVariables.value = [];
     Object.entries(formData.value.environment_variables).forEach(
-      ([key, value]) => {
+      ([key, value]: [string, any]) => {
         addApiHeader(key, value);
-      });
-    }
+      },
+    );
+  }
 };
 
 const openCancelDialog = () => {
@@ -1131,8 +1137,14 @@ const deleteApiHeader = (header: any) => {
   environmentalVariables.value = environmentalVariables.value.filter(
     (_header) => _header.uuid !== header.uuid
   );
-  if (formData.value.environment_variables[header.key])
-    delete formData.value.environment_variables[header.key];
+  if (
+    (formData.value.environment_variables as { [key: string]: any })[header.key]
+  ) {
+    delete (formData.value.environment_variables as { [key: string]: any })[
+      header.key
+    ];
+  }
+
   if (!environmentalVariables.value.length) addApiHeader();
 };
 </script>
