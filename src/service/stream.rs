@@ -394,18 +394,17 @@ pub async fn update_stream_settings(
                     .bloom_filter_fields
                     .extend(new_settings.bloom_filter_fields.add);
             }
-
             if !new_settings.bloom_filter_fields.remove.is_empty() {
                 settings
                     .bloom_filter_fields
                     .retain(|field| !new_settings.bloom_filter_fields.remove.contains(field));
             }
 
+            // check for index fields
             if !new_settings.index_fields.add.is_empty() {
                 settings.index_fields.extend(new_settings.index_fields.add);
                 settings.index_updated_at = now_micros();
             }
-
             if !new_settings.index_fields.remove.is_empty() {
                 settings
                     .index_fields

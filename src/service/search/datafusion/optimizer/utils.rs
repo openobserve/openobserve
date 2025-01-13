@@ -21,15 +21,19 @@ use datafusion::{
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
         },
-        DFSchema, Result,
+        Column, DFSchema, Result,
     },
     datasource::DefaultTableSource,
-    logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource},
+    logical_expr::{
+        col, Extension, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource,
+    },
     prelude::Expr,
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::table_provider::empty_table::NewEmptyTable;
+use crate::service::search::datafusion::{
+    plan::deduplication::DeduplicationLogicalNode, table_provider::empty_table::NewEmptyTable,
+};
 
 // check if the plan is a complex query that we can't add sort _timestamp
 pub fn is_complex_query(plan: &LogicalPlan) -> bool {
@@ -42,17 +46,35 @@ pub fn is_complex_query(plan: &LogicalPlan) -> bool {
             | LogicalPlan::Subquery(_)
             | LogicalPlan::Window(_)
             | LogicalPlan::Union(_)
+            | LogicalPlan::Extension(_)
     )
 }
 
 pub struct AddSortAndLimit {
     pub limit: usize,
     pub offset: usize,
+    pub deduplication_columns: Vec<Column>,
 }
 
 impl AddSortAndLimit {
     pub fn new(limit: usize, offset: usize) -> Self {
-        Self { limit, offset }
+        Self {
+            limit,
+            offset,
+            deduplication_columns: vec![],
+        }
+    }
+
+    pub fn new_with_deduplication(
+        limit: usize,
+        offset: usize,
+        deduplication_columns: Vec<Column>,
+    ) -> Self {
+        Self {
+            limit,
+            offset,
+            deduplication_columns,
+        }
     }
 }
 
@@ -60,7 +82,11 @@ impl TreeNodeRewriter for AddSortAndLimit {
     type Node = LogicalPlan;
 
     fn f_down(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
+        let cfg = config::get_config();
         if self.limit == 0 {
+            return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
+        }
+        if is_contain_deduplication_plan(&node) {
             return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
         }
 
@@ -118,6 +144,47 @@ impl TreeNodeRewriter for AddSortAndLimit {
         if is_stop {
             transformed.tnr = TreeNodeRecursion::Stop;
         }
+
+        // support deduplication on join key
+        // sort -> deduplication
+        // only add when is_stop == true
+        if !self.deduplication_columns.is_empty() && is_stop {
+            let mut sort_columns = Vec::with_capacity(self.deduplication_columns.len() + 1);
+            let schema = transformed.data.schema().clone();
+
+            for column in self.deduplication_columns.iter() {
+                sort_columns.push(SortExpr {
+                    expr: col(column.name()),
+                    asc: false,
+                    nulls_first: false,
+                });
+            }
+
+            if schema
+                .field_with_name(None, cfg.common.column_timestamp.as_str())
+                .is_ok()
+            {
+                sort_columns.push(SortExpr {
+                    expr: col(cfg.common.column_timestamp.clone()),
+                    asc: false,
+                    nulls_first: false,
+                });
+            }
+
+            let sort = LogicalPlan::Sort(Sort {
+                expr: sort_columns,
+                input: Arc::new(transformed.data),
+                fetch: None,
+            });
+            let dedup = LogicalPlan::Extension(Extension {
+                node: Arc::new(DeduplicationLogicalNode::new(
+                    sort,
+                    self.deduplication_columns.clone(),
+                )),
+            });
+            transformed.data = dedup;
+        }
+
         if let Some(schema) = schema {
             let plan = transformed.data;
             let proj = LogicalPlan::Projection(Projection::new_from_schema(Arc::new(plan), schema));
@@ -295,4 +362,9 @@ fn generate_table_source_with_sorted_by_time(
         // for unit test
         table_source
     }
+}
+
+fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
+    plan.exists(|plan| Ok(matches!(plan, LogicalPlan::Extension(_))))
+        .unwrap()
 }
