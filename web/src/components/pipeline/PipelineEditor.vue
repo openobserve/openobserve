@@ -154,6 +154,7 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
+  watch,
   ref,
   type Ref,
 } from "vue";
@@ -401,11 +402,21 @@ onBeforeMount(() => {
 
 onMounted(() => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  const { path, query } = router.currentRoute.value; 
+    if (path.includes("edit") && !query.id) {
+      router.push({
+        name:"pipelines",
+        query:{
+          org_identifier: store.state.selectedOrganization.identifier
+        }
+      })
+    }
 });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
 });
+
 
 let forceSkipBeforeUnloadListener = false;
 
