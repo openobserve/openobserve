@@ -390,7 +390,7 @@ const dialog = ref({
 
 onBeforeMount(() => {
   const route = router.currentRoute.value;
-  if (route.name == "pipelineEditor") {
+  if (route.name == "pipelineEditor" && route.query.id) {
     getPipeline();
     pipelineObj.isEditPipeline = true;
   } else {
