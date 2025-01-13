@@ -161,6 +161,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="editFileToUpload"
                   icon="edit"
                   no-caps
+                  dense
+                  flat
+                  size="14px"
                 />
               </div>
               <div v-if="isEditingActionScript && formData.fileNameToShow == ''" class="q-pt-md q-mt-xs q-pl-md"
@@ -292,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
-                    <div class="o2-input">
+                    <!-- <div class="o2-input">
                       <q-select
                         data-test="add-action-script-schedule-start-timezone-select"
                         v-model="scheduling.timezone"
@@ -319,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         style="width: 300px"
                       />
-                    </div>
+                    </div> -->
                   </div>
                 </template>
                 <!-- <template v-else>
@@ -575,6 +578,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :done="step > 3"
               class="q-mt-md"
             >
+            <div
+                  v-for="(header, index) in mandatoryKeys"
+                  :key="header.uuid"
+                  class="row q-col-gutter-sm o2-input"
+                >
+                  <div class="col-5 q-ml-none">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-key-input`"
+                      v-model="header.key"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      :placeholder="'Key'"
+                      dense
+                      tabindex="0"
+                      :readonly="true"
+
+                    />
+                  </div>
+                  <div class="col-5 q-ml-none q-mb-sm">
+                    <q-input
+                      :data-test="`add-action-script-header-${header['key']}-value-input`"
+                      v-model="header.value"
+                      :placeholder="t('alert_destinations.api_header_value')"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      isUpdatingDestination
+                      tabindex="0"
+                        :rules="[isRequiredValue]"
+                    />
+                  </div>
+                  <div class="col-2 q-ml-none">
+                  <div class="" v-if="header.key == 'ORIGIN_CLUSTER_TOKEN'">
+                      <q-icon
+                        :name="outlinedInfo"
+                        size="17px"
+                        class="q-ml-xs cursor-pointer"
+                        :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-5'
+                          : 'text-grey-7'
+                        "
+                      >
+                        <q-tooltip
+                          anchor="center right"
+                          self="center left"
+                          max-width="300px"
+                        >
+                          <span style="font-size: 14px"
+                            >
+                            ORIGIN_CLUSTER_TOKEN Is Required
+                            </span
+                          >
+                        </q-tooltip>
+                      </q-icon>
+                      </div>
+                      <div class="" v-else>
+                      <q-icon
+                        :name="outlinedInfo"
+                        size="17px"
+                        class="q-ml-xs cursor-pointer"
+                        :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-5'
+                          : 'text-grey-7'
+                        "
+                      >
+                        <q-tooltip
+                          anchor="center right"
+                          self="center left"
+                          max-width="300px"
+                        >
+                          <span style="font-size: 14px"
+                            >
+                            ORIGIN_CLUSTER_URL Is Required
+                            </span
+                          >
+                        </q-tooltip>
+                      </q-icon>
+                      </div>
+                  </div>
+                </div>
                 <div
                   v-for="(header, index) in environmentalVariables"
                   :key="header.uuid"
@@ -592,11 +683,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="'Key'"
                       dense
                       tabindex="0"
-                      :rules="[isRequiredKey]"
 
                     />
                   </div>
-                  <div class="col-5 q-ml-none">
+                  <div class="col-5 q-ml-none q-mb-sm">
                     <q-input
                       :data-test="`add-action-script-header-${header['key']}-value-input`"
                       v-model="header.value"
@@ -609,7 +699,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       isUpdatingDestination
                       tabindex="0"
-                      :rules="[isRequiredValue]"
                     />
                   </div>
                   <div class="col-2 q-ml-none">
@@ -753,6 +842,7 @@ const defaultActionScript = {
   owner: "",
   lastEditedBy: "",
   fileNameToShow: "",
+  id: ""
 };
 
 const { t } = useI18n();
@@ -802,6 +892,18 @@ const frequencyTabs = [
     value: "Once",
   },
 ];
+
+const mandatoryKeys = ref([
+{
+    key: "ORIGIN_CLUSTER_TOKEN",
+    value: "",
+},
+{
+    key: "ORIGIN_CLUSTER_URL",
+    value: "",
+}
+]);
+
 
 const selectedTimeTab = ref("scheduleNow");
 
@@ -898,29 +1000,29 @@ timezoneOptions.unshift(browserTime);
 
 const saveActionScript = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  if (frequency.value.type === "Repeat") {
-    const now = new Date();
+  // if (frequency.value.type === "Repeat") {
+  //   const now = new Date();
 
-    // Get the day, month, and year from the date object
-    const day = String(now.getDate()).padStart(2, "0");
-    const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-    const year = now.getFullYear();
+  //   // Get the day, month, and year from the date object
+  //   const day = String(now.getDate()).padStart(2, "0");
+  //   const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+  //   const year = now.getFullYear();
 
-    // Combine them in the DD-MM-YYYY format
-    scheduling.value.date = `${day}-${month}-${year}`;
+  //   // Combine them in the DD-MM-YYYY format
+  //   scheduling.value.date = `${day}-${month}-${year}`;
 
-    // Get the hours and minutes, ensuring they are formatted with two digits
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
+  //   // Get the hours and minutes, ensuring they are formatted with two digits
+  //   const hours = String(now.getHours()).padStart(2, "0");
+  //   const minutes = String(now.getMinutes()).padStart(2, "0");
 
-    // Combine them in the HH:MM format
-    scheduling.value.time = `${hours}:${minutes}`;
-  }
+  //   // Combine them in the HH:MM format
+  //   scheduling.value.time = `${hours}:${minutes}`;
+  // }
 
-  // If the user has selected to schedule now, we set the timezone to the current timezone
-  if (formData.value.execution_details === "Once") {
-    scheduling.value.timezone = timezone.value;
-  }
+  // // If the user has selected to schedule now, we set the timezone to the current timezone
+  // if (formData.value.execution_details === "Once") {
+  //   scheduling.value.timezone = timezone.value;
+  // }
   let form;
 
 // Determine if FormData is needed
@@ -935,38 +1037,69 @@ const saveActionScript = async () => {
       name: formData.value.name,
       description: formData.value.description,
       execution_details: frequency.value.type,
-      ordId: store.state.selectedOrganization.identifier,
-      owner: store.state.userInfo.email,
   };
-  const convertedDateTime = convertDateToTimestamp(
-    scheduling.value.date,
-    scheduling.value.time,
-    scheduling.value.timezone,
-  );
+  // const convertedDateTime = convertDateToTimestamp(
+  //   scheduling.value.date,
+  //   scheduling.value.time,
+  //   scheduling.value.timezone,
+  // );
 
   // Add cron expression if needed
   if (frequency.value.type === "Repeat") {
     commonFields.cron_expr = frequency.value.cron.toString().trim() + " *";
-    commonFields.timezoneOffset = convertedDateTime.offset.toString();
-    commonFields.timezone = scheduling.value.timezone;
+    // commonFields.timezoneOffset = convertedDateTime.offset.toString();
+    // commonFields.timezone = scheduling.value.timezone;
   }
 
-  if (frequency.value.type == "Once") {
-    commonFields.timezone = null;
-    commonFields.timezoneOffset = null;
+  if (useFormData) {
+    commonFields.owner = store.state.userInfo.email;
   }
+  // if (frequency.value.type == "Once") {
+  //   commonFields.timezone = null;
+  //   commonFields.timezoneOffset = null;
+  // }
 
-// Add environment variables if present
-if (environmentalVariables.value.length > 0) {
-  const environment_variables = environmentalVariables.value.reduce(
-    (acc: any, curr: any) => {
-      acc[curr.key] = curr.value;
-      return acc;
-    },
-    {}
-  );
-  commonFields.environment_variables = environment_variables;
-}
+    // Add environment variables if present
+    if (environmentalVariables.value.length > 0) {
+      // Convert environmentalVariables to an object, ignoring conflicts with mandatory keys
+      const environment_variables = environmentalVariables.value.reduce(
+        (acc: any, curr: any) => {
+          // Check if the key exists in mandatoryKeys
+          const isMandatoryKey = mandatoryKeys.value.some(
+            (mandatory) => mandatory.key === curr.key
+          );
+
+          if (!isMandatoryKey) {
+            // Add the key only if it is not a mandatory key
+            acc[curr.key] = curr.value;
+          }
+
+          return acc;
+        },
+        {}
+      );
+
+      // Add mandatory fields to ensure they're present
+      mandatoryKeys.value.forEach((mandatory) => {
+        if (!environment_variables[mandatory.key]) {
+          environment_variables[mandatory.key] = mandatory.value || ""; // Add missing mandatory fields
+        }
+      });
+
+      // Assign to commonFields
+      commonFields.environment_variables = environment_variables;
+    } else {
+      // If environmentalVariables is empty, initialize with mandatory fields
+      commonFields.environment_variables = mandatoryKeys.value.reduce(
+        (acc: any, curr: any) => {
+          acc[curr.key] = curr.value || ""; // Use default value if none exists
+          return acc;
+        },
+        {}
+      );
+    }
+
+
 
 // Populate form (either FormData or plain object)
   Object.entries(commonFields).forEach(([key, value]) => {
@@ -982,8 +1115,12 @@ if (environmentalVariables.value.length > 0) {
 
 // Add file fields if using FormData
   if (useFormData && formData.value.codeZip) {
-      form.append("file", formData.value.codeZip || "");
-      form.append("filename", (formData.value.codeZip as File).name || "");
+    form.append("file", formData.value.codeZip || "");
+    form.append("filename", (formData.value.codeZip as File).name || "");
+  }
+
+  if (isEditingActionScript.value && formData.value.codeZip) {
+    form.append("id", formData.value.id);
   }
 
 
@@ -1025,6 +1162,7 @@ if (environmentalVariables.value.length > 0) {
       
     })
     .catch((error) => {
+      step.value = 3;
       if (error.response.status != 403) {
         q.notify({
           type: "negative",
@@ -1047,14 +1185,11 @@ const validateActionScriptData = async () => {
     step.value = 1;
     return;
   }
-  if (
-    environmentalVariables.value[0].key == "" &&
-    environmentalVariables.value[0].value == "" &&
-    environmentalVariables.value.length == 1
-  ) {
+  if(mandatoryKeys.value[0].value == "" || mandatoryKeys.value[1].value == ""){
     step.value = 3;
     return;
   }
+ 
   if (formData.value.execution_details === "Repeat") {
     try {
       cronParser.parseExpression(frequency.value.cron);
@@ -1071,10 +1206,10 @@ const validateActionScriptData = async () => {
     return;
   }
 
-  if (!formData.value.timezone) {
-    step.value = 2;
-    return;
-  }
+  // if (!formData.value.timezone) {
+  //   step.value = 2;
+  //   return;
+  // }
 };
 
 const goToActionScripts = () => {
@@ -1091,6 +1226,8 @@ const setupEditingActionScript = async (report: any) => {
     ...report,
   };
   formData.value.fileNameToShow = report.zip_file_name;
+  mandatoryKeys.value = [];
+
   // set date, time and timezone in scheduling
   // const date = new Date(report.start / 1000);
 
@@ -1128,7 +1265,12 @@ const setupEditingActionScript = async (report: any) => {
     environmentalVariables.value = [];
     Object.entries(formData.value.environment_variables).forEach(
       ([key, value]: [string, any]) => {
-        addApiHeader(key, value);
+        if (key != "ORIGIN_CLUSTER_TOKEN" && key != "ORIGIN_CLUSTER_URL"){
+          addApiHeader(key, value);
+        }
+        else{
+          mandatoryKeys.value.push({key:key, value:value,uuid: getUUID()})
+        }
       },
     );
   }

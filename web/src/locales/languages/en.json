@@ -1044,6 +1044,7 @@
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
     "uploadCodeZip": "Upload Code Zip",
-    "update":"Update Action Script"
+    "update":"Update Action Script",
+    "type":"Execution Type"
   }
 }

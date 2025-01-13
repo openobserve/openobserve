@@ -375,6 +375,13 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "execution_details_type",
+        field: "execution_details_type",
+        label: t("actions.type"),
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "last_run_at",
         field: "last_run_at",
         label: t("alerts.lastRunAt"),
@@ -429,6 +436,8 @@ export default defineComponent({
             };
           });
           actionsScriptRows.value = alerts.value.map((data: any) => {
+            if (data.execution_details_type == "Repeat")
+              data.execution_details_type = "Cron Job";
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
@@ -438,7 +447,8 @@ export default defineComponent({
               created_at: data.created_at,
               last_run_at: data.last_run_at,
               last_successful_at: data.last_successful_at,
-              status: data.status
+              status: data.status,
+              execution_details_type: data.execution_details_type,
 
             };
           });
