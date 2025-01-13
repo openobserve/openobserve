@@ -296,11 +296,14 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("GET") {
                 method = "LIST".to_string();
             }
+            let key = if path_columns[1].eq("invites") {
+                "users"
+            } else {
+                path_columns[1]
+            };
             format!(
                 "{}:{}",
-                OFGA_MODELS
-                    .get(path_columns[1])
-                    .map_or(path_columns[1], |model| model.key),
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 path_columns[0]
             )
         } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {

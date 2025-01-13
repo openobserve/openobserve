@@ -230,6 +230,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    // Migrate ofga for cloud
+    #[cfg(feature = "cloud")]
+    o2_enterprise::enterprise::cloud::ofga_migrate()
+        .await
+        .expect("cloud ofga migrations failed");
+
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 

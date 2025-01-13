@@ -33,7 +33,7 @@ use {
     chrono::{Duration, Utc},
     config::{get_config, SMTP_CLIENT},
     lettre::{message::SinglePart, AsyncTransport, Message},
-    o2_enterprise::enterprise::cloud::org_invites,
+    o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus},
 };
 
 use super::{db::org_users, users::add_admin_to_org};
@@ -508,6 +508,12 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     )
     .await
     .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
+
+    if let Err(e) =
+        org_invites::update_invite_status(invite_token, user_email, OrgInviteStatus::Accepted).await
+    {
+        log::error!("Error updating the invite status in the db: {e}");
+    }
     Ok(())
 }
 
