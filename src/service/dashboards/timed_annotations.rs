@@ -24,6 +24,7 @@ pub async fn create_timed_annotations(
     let dashboard_id = req.dashboard_id.clone();
     let res =
         table::timed_annotations::add_many(&dashboard_id, org_id, req.timed_annotations).await?;
+    // TODO: send WATCH for super cluster
     Ok(res)
 }
 
@@ -36,6 +37,7 @@ pub async fn get_timed_annotations(
 ) -> Result<Vec<TimedAnnotation>, anyhow::Error> {
     let annotations =
         table::timed_annotations::get(dashboard_id, panels, start_time, end_time).await?;
+    // TODO: send WATCH for super cluster
     Ok(annotations)
 }
 
@@ -45,5 +47,6 @@ pub async fn delete_timed_annotations(req: TimedAnnotationDelete) -> Result<(), 
         return Err(anyhow::anyhow!("annotation_ids cannot be empty"));
     }
     table::timed_annotations::delete_many(&req.dashboard_id, &req.annotation_ids).await?;
+    // TODO: send WATCH for super cluster
     Ok(())
 }
