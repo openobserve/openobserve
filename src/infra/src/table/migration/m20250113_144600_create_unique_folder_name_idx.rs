@@ -40,7 +40,7 @@ impl MigrationTrait for Migration {
         txn.commit().await?;
 
         manager
-            .create_index(create_new_folders_org_type_folder_id_idx_stmnt())
+            .create_index(create_new_folders_org_type_name_idx_stmnt())
             .await?;
 
         Ok(())
@@ -127,7 +127,7 @@ impl FolderCount {
 }
 
 /// Statement to create the new unique index on org, type, and name.
-fn create_new_folders_org_type_folder_id_idx_stmnt() -> IndexCreateStatement {
+fn create_new_folders_org_type_name_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(FOLDERS_ORG_TYPE_NAME_IDX)
