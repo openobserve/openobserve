@@ -85,12 +85,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         // ************************************
     }
 
-    if cfg.common.feature_join_right_side_max_rows > 0 {
-        rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.common.feature_join_right_side_max_rows,
-        )));
-    }
-
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(UnwrapCastInComparison::new()));
@@ -124,6 +118,15 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(RewriteCipherCall::new()));
     #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherKey::new(&sql.org_id)));
+
+    // should after ExtractEquijoinPredicate, because LimitJoinRightSide will
+    // require the join's on columns
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
+    }
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after
