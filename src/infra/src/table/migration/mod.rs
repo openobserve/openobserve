@@ -55,6 +55,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085111_search_jobs::Migration),
             Box::new(m20241222_085135_search_job_partitions::Migration),
             Box::new(m20241222_085148_search_job_results::Migration),
+            Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
             Box::new(m20250110_000001_create_timed_annotations_table::Migration),
             Box::new(m20250110_000001_create_annotation_panels_table::Migration),
         ]
