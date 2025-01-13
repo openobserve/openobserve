@@ -17,12 +17,9 @@
 
 use std::sync::Arc;
 
-use config::{
-    meta::{
-        pipeline::{components::PipelineSource, Pipeline},
-        stream::StreamParams,
-    },
-    utils::json,
+use config::meta::{
+    pipeline::{components::PipelineSource, Pipeline},
+    stream::StreamParams,
 };
 use infra::{
     cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -235,7 +232,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 .enabled
             {
                 let key = format!("{PIPELINES_WATCH_PREFIX}{}", &pipeline.id);
-                match json::to_vec(pipeline) {
+                match config::utils::json::to_vec(pipeline) {
                     Err(e) => {
                         log::error!(
                             "[Pipeline] error serializing pipeline for super_cluster event: {}",
