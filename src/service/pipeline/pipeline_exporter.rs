@@ -24,7 +24,7 @@ use tokio::sync::mpsc::Receiver;
 use crate::service::pipeline::{
     pipeline_entry::PipelineEntry,
     pipeline_http_exporter_client::PipelineHttpExporterClient,
-    pipeline_offset_manager::PIPELINE_OFFSET_MANAGER,
+    pipeline_offset_manager::{init_pipeline_offset_manager, PIPELINE_OFFSET_MANAGER},
     pipeline_watcher::{WatcherEvent, FILE_WATCHER_NOTIFY},
 };
 
@@ -63,43 +63,45 @@ impl PipelineExporterClientBuilder {
 }
 
 pub struct PipelineExporter {
-    rx: Receiver<PipelineEntry>,
+    pipeline_exporter_rx: Receiver<PipelineEntry>,
     router: Box<dyn PipelineRouter>,
     stop_rx: Receiver<()>,
 }
 
 impl PipelineExporter {
     fn new(
-        rx: Receiver<PipelineEntry>,
+        pipeline_exporter_rx: Receiver<PipelineEntry>,
         router: Box<dyn PipelineRouter>,
         stop_rx: Receiver<()>,
     ) -> Self {
         Self {
-            rx,
+            pipeline_exporter_rx,
             router,
             stop_rx,
         }
     }
 
-    pub fn init(rx: Receiver<PipelineEntry>, stop_rx: Receiver<()>) -> Result<Self> {
+    pub fn init(pipeline_exporter_rx: Receiver<PipelineEntry>, stop_rx: Receiver<()>) -> Result<Self> {
         let client = PipelineExporterClientBuilder::build()?;
-        Ok(Self::new(rx, client, stop_rx))
+        Ok(Self::new(pipeline_exporter_rx, client, stop_rx))
     }
 
     pub async fn export(&mut self) -> Result<()> {
         loop {
-            tokio::select! {
-                _ = self.stop_rx.recv() => {
-                    log::info!("Received stop signal, stopping pipeline exporter");
-                    return Ok(());
-                }
-                entry = self.rx.recv() => {
-                    if let Some(entry) = entry {
-                        self.export_entry(entry).await?;
-                    } else {
-                        log::info!("PipelineEntry channel is closed, stopping pipeline exporter");
-                        return Ok(());
+            if let Ok(_) = self.stop_rx.try_recv() {
+                log::info!("Received stop signal, stopping pipeline exporter");
+                return Ok(());
+            }
+            //
+            match self.pipeline_exporter_rx.recv().await {
+                Some(entry) => {
+                    if let Err(e) = self.export_entry(entry).await {
+                        log::error!("Failed to export pipeline entry: {:?}", e);
                     }
+                }
+                None => {
+                    log::info!("PipelineEntry channel is closed, stopping pipeline exporter");
+                    return Ok(());
                 }
             }
         }
@@ -117,8 +119,12 @@ impl PipelineExporter {
                     if attempts > 0 {
                         log::info!("Successfully exported entry after {} retries", attempts);
                     }
+
                     // update file position
-                    PIPELINE_OFFSET_MANAGER
+                    let manager = PIPELINE_OFFSET_MANAGER
+                        .get_or_init(init_pipeline_offset_manager)
+                        .await;
+                    manager
                         .write()
                         .await
                         .save(
@@ -142,7 +148,7 @@ impl PipelineExporter {
                         let _ = s
                             .clone()
                             .unwrap()
-                            .send(WatcherEvent::StopWatchFile(path))
+                            .send(WatcherEvent::StopWatchFileAndWait(path))
                             .await;
 
                         return Err(e);

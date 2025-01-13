@@ -48,6 +48,7 @@ pub struct PipelineReceiver {
     pub stream_type: String,
     reader: Reader<BufReader<File>>,
     file_position: FilePosition,
+    file_end_position: FilePosition,
 }
 
 impl std::fmt::Debug for PipelineReceiver {
@@ -63,12 +64,13 @@ impl std::fmt::Debug for PipelineReceiver {
 
 impl PipelineReceiver {
     pub fn new(path: PathBuf, read_from: ReadFrom) -> Result<PipelineReceiver> {
-        let reader = Reader::from_path_position(path.clone(), read_from).unwrap();
+        let (reader, file_end_position) = Reader::from_path_position(path.clone(), read_from)
+            .map_err(|e| Error::WalFileError(e.to_string()))?;
         let file_position = match read_from {
             ReadFrom::Checkpoint(file_position) => file_position,
             ReadFrom::Beginning => wal::FILE_TYPE_IDENTIFIER_LEN as u64,
             ReadFrom::End => {
-                // cant be possible
+                // impossible
                 unimplemented!();
             }
         };
@@ -84,6 +86,7 @@ impl PipelineReceiver {
             stream_type: stream_type.to_string(),
             reader,
             file_position,
+            file_end_position,
         })
     }
 
@@ -201,5 +204,40 @@ mod tests {
         }
 
         remove_file(path).unwrap();
+    }
+    #[test]
+    fn test_file_position() {
+        env::set_var("ZO_PIPELINE_REMOTE_STREAM_WAL_DIR", "/tmp");
+        let entry_num = 100;
+        let config = &config::get_config();
+        let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
+            .join(WAL_DIR_DEFAULT_PREFIX);
+        let mut writer = Writer::new(dir.clone(), "org", "stream", 3, 1024_1024, 8 * 1024).unwrap();
+        for i in 0..entry_num {
+            let mut entry = Entry {
+                stream: Arc::from("example_stream"),
+                schema: None, // 示例空 Schema
+                schema_key: Arc::from("example_schema_key"),
+                partition_key: Arc::from("2023/12/18/00/country=US/state=CA"),
+                data: vec![Arc::new(Value::String(format!("example_data_{i}")))],
+                data_size: 1,
+            };
+            let bytes_entries = entry.into_bytes().unwrap();
+            writer.write(bytes_entries.as_bytes()).unwrap();
+        }
+        writer.close().unwrap();
+
+        let path = build_file_path(dir, "org", "stream", 3);
+        let mut fw = PipelineReceiver::new(path.clone(), ReadFrom::Beginning).unwrap();
+        let mut file_position = wal::FILE_TYPE_IDENTIFIER_LEN as u64;
+        for _ in 0..entry_num {
+            let (_, tmp_file_position) = fw.read_entry().unwrap();
+            file_position = tmp_file_position;
+        }
+
+        let _fw = PipelineReceiver::new(path.clone(), ReadFrom::Checkpoint(file_position)).unwrap();
+
+        remove_file(path).unwrap();
+
     }
 }

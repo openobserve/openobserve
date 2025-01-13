@@ -41,9 +41,13 @@ impl PipelineRouter for PipelineHttpExporterClient {
             .await?;
 
         if response.status().is_success() {
-            println!("Request sent successfully!");
+            println!("Request sent successfully! data: {:?}", entry.get_entry_data());
         } else {
-            println!("Failed to send request: {:?}", response.status());
+            log::info!("Failed to send request: {:?}, retry later", response);
+            println!("Failed to send request: {:?}", response);
+            return Err(infra::errors::Error::Message(
+                "Failed to send request".to_string(),
+            ));
         }
 
         Ok(())

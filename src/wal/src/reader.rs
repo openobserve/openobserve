@@ -23,7 +23,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
 use snafu::{ensure, ResultExt};
 
-use crate::{errors::*, ReadFrom};
+use crate::{errors::*, FilePosition, ReadFrom};
 
 pub struct Reader<R> {
     path: PathBuf,
@@ -49,23 +49,14 @@ impl Reader<BufReader<File>> {
         Ok(Self::new(path, f))
     }
 
-    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {
+    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<(Self, FilePosition)> {
         let path = path.into();
         let f = File::open(&path).context(FileOpenSnafu { path: path.clone() })?;
         let mut f = BufReader::new(f);
-
-        match read_from {
-            ReadFrom::Checkpoint(file_position) => {
-                let _ = f.seek(io::SeekFrom::Start(file_position)).unwrap();
-            }
-            ReadFrom::Beginning => {
-                let _ = f.seek(io::SeekFrom::Start(0)).unwrap();
-            }
-            ReadFrom::End => {
-                let _ = f.seek(io::SeekFrom::End(0)).unwrap();
-            }
-        };
-
+        // need to get the file length
+        let file_length = f.seek(io::SeekFrom::End(0)).context(FileOpenSnafu { path: path.clone() })?;
+        // move back
+        f.seek(io::SeekFrom::Start(0)).context(FileOpenSnafu { path: path.clone() })?;
         // check the file type identifier
         let mut buf = [0; super::FILE_TYPE_IDENTIFIER.len()];
         f.read_exact(&mut buf).context(UnableToReadArraySnafu {
@@ -76,7 +67,19 @@ impl Reader<BufReader<File>> {
             FileIdentifierMismatchSnafu,
         );
 
-        Ok(Self::new(path, f))
+        match read_from {
+            ReadFrom::Checkpoint(file_position) => {
+                let _ = f.seek(io::SeekFrom::Start(file_position)).unwrap();
+            }
+            ReadFrom::Beginning => {
+                // do nothing because the file is already at the beginning
+            }
+            ReadFrom::End => {
+                let _ = f.seek(io::SeekFrom::End(0)).unwrap();
+            }
+        };
+
+        Ok((Self::new(path, f), file_length))
     }
 
     pub fn metadata(&self) -> io::Result<Metadata> {
