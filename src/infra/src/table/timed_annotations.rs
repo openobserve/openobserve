@@ -64,6 +64,7 @@ pub async fn get(
     }
 
     // Step 3: Filter by time range (overlap condition)
+    // Handle entries where end_time is null and ensure start_time is within the query range
     query = query
         .filter(
             Expr::col((
@@ -73,11 +74,31 @@ pub async fn get(
             .lte(end_time), // annotation.start_time <= end_time
         )
         .filter(
-            Expr::col((
-                timed_annotations::Entity,
-                timed_annotations::Column::EndTime,
-            ))
-            .gte(start_time), // annotation.end_time >= start_time
+            Condition::any()
+                .add(
+                    Expr::col((
+                        timed_annotations::Entity,
+                        timed_annotations::Column::EndTime,
+                    ))
+                    .gte(start_time), // annotation.end_time >= start_time
+                )
+                .add(
+                    Condition::all()
+                        .add(
+                            Expr::col((
+                                timed_annotations::Entity,
+                                timed_annotations::Column::EndTime,
+                            ))
+                            .is_null(), // end_time is null
+                        )
+                        .add(
+                            Expr::col((
+                                timed_annotations::Entity,
+                                timed_annotations::Column::StartTime,
+                            ))
+                            .gte(start_time), // annotation.start_time >= start_time
+                        ),
+                ),
         );
 
     // Step 4: Select distinct annotations
