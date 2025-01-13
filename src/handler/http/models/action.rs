@@ -29,6 +29,7 @@ pub struct GetActionInfoResponse {
     pub last_successful_at: Option<DateTime<Utc>>,
     pub created_by: String,
     pub status: ActionStatus,
+    pub execution_details_type: ExecutionDetailsType,
 }
 
 impl TryFrom<Action> for GetActionInfoResponse {
@@ -43,6 +44,7 @@ impl TryFrom<Action> for GetActionInfoResponse {
             last_successful_at: value.last_successful_at,
             created_by: value.created_by,
             status: value.status,
+            execution_details_type: value.execution_details,
         })
     }
 }
