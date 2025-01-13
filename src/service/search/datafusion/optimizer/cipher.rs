@@ -31,12 +31,11 @@ use crate::service::search::datafusion::udf::cipher_udf::{
 };
 
 /// Optimization rule that rewrite decrypt if applicable
-/// This will convert
+/// This will convert the following and the other way around
 /// - decrypt(field,key_name) = value -> field = encrypt(value,key_name)
 /// - decrypt(field,key_name) != value -> field != encrypt(value,key_name)
 /// - encrypt(field,key_name) = value -> field = decrypt(value,key_name)
 /// - encrypt(field,key_name) != value -> field != decrypt(value,key_name)
-/// And The other way around
 ///
 /// The value must be static string, as otherwise there is no benefit to
 /// converting from decrypt->encrypt, both will have same const.

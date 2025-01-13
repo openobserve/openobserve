@@ -2198,12 +2198,10 @@ pub fn get_cluster_name() -> String {
 }
 
 fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.encryption.algorithm.is_empty() {
-        if cfg.encryption.algorithm != "aes-256-siv" {
-            return Err(anyhow::anyhow!(
-                "invalid algorithm specified, only [aes-256-siv] is supported"
-            ));
-        }
+    if !cfg.encryption.algorithm.is_empty() && cfg.encryption.algorithm != "aes-256-siv" {
+        return Err(anyhow::anyhow!(
+            "invalid algorithm specified, only [aes-256-siv] is supported"
+        ));
     }
     Ok(())
 }

@@ -1481,53 +1481,51 @@ impl VisitorMut for ExtractKeyNamesVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        match expr {
-            Expr::Function(Function {
-                name: ObjectName(names),
-                args,
-                ..
-            }) => {
-                // cipher functions will always be 1-part names
-                if names.len() != 1 {
-                    return ControlFlow::Continue(());
-                }
-                let fname = names.first().unwrap();
-                if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
-                    let list = match args {
-                        FunctionArguments::List(list) => list,
-                        _ => {
-                            self.error = Some(Error::Message(
-                                "invalid arguments to cipher function".to_string(),
-                            ));
-                            return ControlFlow::Continue(());
-                        }
-                    };
-                    if list.args.len() != 2 {
+        if let Expr::Function(Function {
+            name: ObjectName(names),
+            args,
+            ..
+        }) = expr
+        {
+            // cipher functions will always be 1-part names
+            if names.len() != 1 {
+                return ControlFlow::Continue(());
+            }
+            let fname = names.first().unwrap();
+            if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
+                let list = match args {
+                    FunctionArguments::List(list) => list,
+                    _ => {
                         self.error = Some(Error::Message(
-                            "invalid number of arguments to cipher function".to_string(),
+                            "invalid arguments to cipher function".to_string(),
                         ));
                         return ControlFlow::Continue(());
                     }
-                    let arg = match &list.args[1] {
-                        FunctionArg::Named { arg, .. } => arg,
-                        FunctionArg::Unnamed(arg) => arg,
-                    };
-                    match arg {
-                        FunctionArgExpr::Expr(Expr::Value(
-                            sqlparser::ast::Value::SingleQuotedString(s),
-                        )) => {
-                            self.keys.push(s.to_owned());
-                        }
-                        _ => {
-                            self.error = Some(Error::Message(
-                                "key name must be a static string in cipher function".to_string(),
-                            ));
-                            return ControlFlow::Continue(());
-                        }
+                };
+                if list.args.len() != 2 {
+                    self.error = Some(Error::Message(
+                        "invalid number of arguments to cipher function".to_string(),
+                    ));
+                    return ControlFlow::Continue(());
+                }
+                let arg = match &list.args[1] {
+                    FunctionArg::Named { arg, .. } => arg,
+                    FunctionArg::Unnamed(arg) => arg,
+                };
+                match arg {
+                    FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(s),
+                    )) => {
+                        self.keys.push(s.to_owned());
+                    }
+                    _ => {
+                        self.error = Some(Error::Message(
+                            "key name must be a static string in cipher function".to_string(),
+                        ));
+                        return ControlFlow::Continue(());
                     }
                 }
             }
-            _ => {}
         }
         ControlFlow::Continue(())
     }

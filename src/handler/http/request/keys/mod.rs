@@ -208,7 +208,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
         let org_id = path.into_inner();
 
         let filter = infra::table::cipher::ListFilter {
-            org: Some(org_id.into()),
+            org: Some(org_id),
             kind: Some(infra::table::cipher::EntryKind::CipherKey),
         };
 

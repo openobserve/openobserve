@@ -63,7 +63,7 @@ impl Algorithm {
     fn encrypt(&self, plaintext: &str) -> Result<String, errors::Error> {
         match self {
             Self::Aes256Siv(k) => {
-                let mut c = Aes256Siv::new_from_slice(&k).unwrap();
+                let mut c = Aes256Siv::new_from_slice(k).unwrap();
                 c.encrypt([&[]], plaintext.as_bytes())
                     .map_err(|e| {
                         errors::Error::Message(format!(
@@ -78,7 +78,7 @@ impl Algorithm {
     fn decrypt(&self, encrypted: &str) -> Result<String, errors::Error> {
         match self {
             Self::Aes256Siv(k) => {
-                let mut c = Aes256Siv::new_from_slice(&k).unwrap();
+                let mut c = Aes256Siv::new_from_slice(k).unwrap();
                 let v = BASE64_STANDARD.decode(encrypted).unwrap();
                 c.decrypt([&[]], &v)
                     .map_err(|e| {
@@ -93,10 +93,10 @@ impl Algorithm {
     }
 }
 
-impl ToString for EntryKind {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for EntryKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CipherKey => "cipher_key".to_owned(),
+            Self::CipherKey => write!(f, "cipher_key"),
         }
     }
 }
@@ -189,7 +189,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
-        .filter(Column::Kind.eq(&kind.to_string()))
+        .filter(Column::Kind.eq(kind.to_string()))
         .filter(Column::Name.eq(name))
         .exec(client)
         .await?;
@@ -206,7 +206,7 @@ pub async fn get_data(
 ) -> Result<Option<String>, errors::Error> {
     let res = get(org, kind, name).await?;
     match res {
-        Some(m) => MASTER_KEY.decrypt(&m.data).map(|v| Some(v)),
+        Some(m) => MASTER_KEY.decrypt(&m.data).map(Some),
         None => Ok(None),
     }
 }
@@ -216,7 +216,7 @@ async fn get(org: &str, kind: EntryKind, name: &str) -> Result<Option<Model>, er
     Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(name))
-        .filter(Column::Kind.eq(&kind.to_string()))
+        .filter(Column::Kind.eq(kind.to_string()))
         .into_model::<Model>()
         .one(client)
         .await
@@ -233,7 +233,7 @@ pub async fn list_all(limit: Option<i64>) -> Result<Vec<CipherEntry>, errors::Er
 
     let records: Vec<CipherEntry> = records
         .into_iter()
-        .map(|r| <Model as TryInto<CipherEntry>>::try_into(r))
+        .map(<Model as TryInto<CipherEntry>>::try_into)
         .collect::<Result<Vec<_>, _>>()?;
 
     records
@@ -258,7 +258,7 @@ pub async fn list_filtered(
         res = res.filter(Column::Org.eq(org));
     }
     if let Some(ref kind) = filter.kind {
-        res = res.filter(Column::Kind.eq(&kind.to_string()));
+        res = res.filter(Column::Kind.eq(kind.to_string()));
     }
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
@@ -267,7 +267,7 @@ pub async fn list_filtered(
 
     let records: Vec<CipherEntry> = records
         .into_iter()
-        .map(|r| <Model as TryInto<CipherEntry>>::try_into(r))
+        .map(<Model as TryInto<CipherEntry>>::try_into)
         .collect::<Result<Vec<_>, _>>()?;
 
     records

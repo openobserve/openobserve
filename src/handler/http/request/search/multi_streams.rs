@@ -284,12 +284,12 @@ pub async fn search_multi(
             // Check permissions on stream ends
             // Check permissions on keys
             for key in keys_used {
-                if !is_root_user(&user_id) {
+                if !is_root_user(user_id) {
                     let user: meta::user::User =
                         USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
                     if !crate::handler::http::auth::validator::check_permissions(
-                        &user_id,
+                        user_id,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
