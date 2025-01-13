@@ -291,7 +291,7 @@ fn get_hash_key(query: &str, step: i64) -> String {
 
 fn get_cache_item_key() -> String {
     format!(
-        "metrics_result/{}/{}",
+        "metrics_result/{}/{}.json",
         now().format("%Y/%m/%d/%H"),
         ider::uuid(),
     )
