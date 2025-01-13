@@ -36,7 +36,7 @@ use crate::{
         (
             status = 200,
             description = "Timed annotations created successfully",
-            body = TimedAnnotationResponse,
+            body = [TimedAnnotation],
             content_type = "application/json",
         ),
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")

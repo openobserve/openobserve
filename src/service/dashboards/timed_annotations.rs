@@ -19,7 +19,7 @@ use infra::table;
 pub async fn create_timed_annotations(
     org_id: &str,
     req: TimedAnnotationReq,
-) -> Result<Vec<String>, anyhow::Error> {
+) -> Result<Vec<TimedAnnotation>, anyhow::Error> {
     let dashboard_id = req.dashboard_id.clone();
     let res =
         table::timed_annotations::add_many(&dashboard_id, org_id, req.timed_annotations).await?;

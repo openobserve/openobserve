@@ -153,7 +153,6 @@ pub async fn add(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let insert_result = Entity::insert(record).exec(client).await?;
     let timed_annotation_id = insert_result.last_insert_id;
-    dbg!(&timed_annotation_id);
 
     // Insert into the annotation_panels table
     for panel_id in timed_annotation.panels {
@@ -175,17 +174,17 @@ pub async fn add_many(
     dashboard_id: &str,
     org_id: &str,
     timed_annotations: Vec<TimedAnnotation>,
-) -> Result<Vec<String>, errors::Error> {
+) -> Result<Vec<TimedAnnotation>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Vector to store the IDs of the inserted annotations
-    let mut inserted_annotation_ids = Vec::new();
-
     // Begin a transaction to ensure atomicity
     let txn = client.begin().await?;
+
+    // Vector to store the inserted `TimedAnnotation` objects
+    let mut inserted_annotations = Vec::new();
 
     for timed_annotation in timed_annotations {
         // Step 1: Insert the annotation into the `timed_annotations` table
@@ -195,41 +194,47 @@ pub async fn add_many(
             dashboard_id: Set(dashboard_id.to_string()),
             start_time: Set(timed_annotation.start_time),
             end_time: Set(timed_annotation.end_time),
-            title: Set(timed_annotation.title),
-            text: Set(timed_annotation.text),
-            tags: Set(timed_annotation.tags),
+            title: Set(timed_annotation.title.clone()),
+            text: Set(timed_annotation.text.clone()),
+            tags: Set(timed_annotation.tags.clone()),
             created_at: Set(Utc::now().timestamp_micros()),
             org_id: Set(org_id.to_string()),
         };
 
-        let insert_result = timed_annotations::Entity::insert(record)
+        timed_annotations::Entity::insert(record)
             .exec(&txn) // Use the transaction
             .await?;
-        let timed_annotation_id = insert_result.last_insert_id;
-        dbg!(&timed_annotation_id);
-
-        // Add the annotation ID to the list of inserted IDs
-        inserted_annotation_ids.push(timed_annotation_id.clone());
 
         // Step 2: Insert associated panels into the `annotation_panels` table
-        for panel_id in timed_annotation.panels {
+        for panel_id in &timed_annotation.panels {
             let panel_record = annotation_panels::ActiveModel {
                 id: Set(ider::uuid()),
                 timed_annotation_id: Set(annotation_id.clone()),
-                panel_id: Set(panel_id),
+                panel_id: Set(panel_id.clone()),
             };
 
             annotation_panels::Entity::insert(panel_record)
                 .exec(&txn) // Use the transaction
                 .await?;
         }
+
+        // Step 3: Construct the full `TimedAnnotation` object and add it to the list
+        inserted_annotations.push(TimedAnnotation {
+            annotation_id: Some(annotation_id),
+            start_time: timed_annotation.start_time,
+            end_time: timed_annotation.end_time,
+            title: timed_annotation.title,
+            text: timed_annotation.text,
+            tags: timed_annotation.tags,
+            panels: timed_annotation.panels,
+        });
     }
 
     // Commit the transaction
     txn.commit().await?;
 
-    // Return the list of inserted annotation IDs
-    Ok(inserted_annotation_ids)
+    // Return the list of inserted `TimedAnnotation` objects
+    Ok(inserted_annotations)
 }
 
 pub async fn update(_dashboard_id: &str, _timed_annotation_id: &str) -> Result<(), errors::Error> {
