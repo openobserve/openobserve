@@ -41,10 +41,7 @@ use {
     },
 };
 
-use super::{
-    auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
-    request::*,
-};
+use super::request::*;
 use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
 
 pub mod middlewares;
@@ -160,11 +157,12 @@ pub fn get_proxy_routes_inner(svc: &mut web::ServiceConfig, enable_validator: bo
         .allow_any_header();
 
     if enable_validator {
-        let auth = HttpAuthentication::with_fn(validator_proxy_url);
         svc.service(
             web::resource("/proxy/{org_id}/{target_url:.*}")
-                .wrap(auth)
                 .wrap(cors)
+                .wrap(HttpAuthentication::with_fn(
+                    super::auth::validator::validator_proxy_url,
+                ))
                 .route(web::get().to(proxy)),
         );
     } else {
@@ -432,6 +430,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(alerts::list_alerts)
         .service(alerts::enable_alert)
         .service(alerts::trigger_alert)
+        .service(alerts::move_alerts)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -530,31 +529,34 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
 
 pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
     let cors = get_cors();
-    let amz_auth = HttpAuthentication::with_fn(validator_aws);
     svc.service(
         web::scope("/aws")
             .wrap(cors.clone())
-            .wrap(amz_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_aws,
+            ))
             .service(logs::ingest::handle_kinesis_request),
     );
 
-    let gcp_auth = HttpAuthentication::with_fn(validator_gcp);
     svc.service(
         web::scope("/gcp")
             .wrap(cors.clone())
-            .wrap(gcp_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_gcp,
+            ))
             .service(logs::ingest::handle_gcp_request),
     );
 
     // NOTE: Here the order of middlewares matter. Once we consume the api-token in
     // `rum_auth`, we drop it in the RumExtraData data.
     // https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
-    let rum_auth = HttpAuthentication::with_fn(validator_rum);
     svc.service(
         web::scope("/rum")
             .wrap(cors)
             .wrap(from_fn(RumExtraData::extractor))
-            .wrap(rum_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_rum,
+            ))
             .service(rum::ingest::log)
             .service(rum::ingest::sessionreplay)
             .service(rum::ingest::data),

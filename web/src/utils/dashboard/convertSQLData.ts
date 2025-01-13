@@ -2383,7 +2383,7 @@ export const convertSQLData = async (
     // will return null if not exist
     // will return ASC or DESC if exist
     const isYAxisExistInOrderBy = await isGivenFieldInOrderBy(
-      panelSchema?.queries[0]?.query ?? "",
+      metadata?.queries[0]?.query ?? "",
       yAxisKeys[0],
     );
     if (isYAxisExistInOrderBy) {

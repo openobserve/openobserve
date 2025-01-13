@@ -22,7 +22,9 @@ use datafusion::{
     },
     logical_expr::LogicalPlan,
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    prelude::Expr,
 };
+use itertools::Itertools;
 
 use super::utils::AddSortAndLimit;
 
@@ -57,12 +59,36 @@ impl OptimizerRule for LimitJoinRightSide {
     ) -> Result<Transformed<LogicalPlan>> {
         match plan {
             LogicalPlan::Join(mut join) => {
-                let plan = (*join.right)
-                    .clone()
-                    .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
-                    .data;
-                join.right = Arc::new(plan);
-                Ok(Transformed::yes(LogicalPlan::Join(join)))
+                let right_column = join
+                    .on
+                    .iter()
+                    .filter_map(|(_, r)| {
+                        if let Expr::Column(col) = r {
+                            Some(col.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect_vec();
+                if right_column.is_empty() {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                        .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
+                } else {
+                    let plan = (*join.right)
+                        .clone()
+                        .rewrite(&mut AddSortAndLimit::new_with_deduplication(
+                            self.limit,
+                            0,
+                            right_column,
+                        ))?
+                        .data;
+                    join.right = Arc::new(plan);
+                    Ok(Transformed::yes(LogicalPlan::Join(join)))
+                }
             }
             _ => Ok(Transformed::no(plan)),
         }
@@ -88,6 +114,7 @@ mod tests {
     };
 
     use super::LimitJoinRightSide;
+    use crate::service::search::datafusion::planner::extension_planner::OpenobserveQueryPlanner;
 
     #[tokio::test]
     async fn test_subquery() -> Result<()> {
@@ -113,6 +140,7 @@ mod tests {
                 RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
             ))
             .with_default_features()
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
         let ctx = SessionContext::new_with_state(state);
         ctx.add_optimizer_rule(Arc::new(LimitJoinRightSide::new(50_000)));
@@ -148,14 +176,15 @@ mod tests {
             "            CoalesceBatchesExec: target_batch_size=8192", 
             "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12", 
             "                RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1", 
-            "                  GlobalLimitExec: skip=0, fetch=50000", 
-            "                    CoalescePartitionsExec", 
-            "                      AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]", 
-            "                        CoalesceBatchesExec: target_batch_size=8192", 
-            "                          RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12", 
-            "                            RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1", 
-            "                              AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]", 
-            "                                MemoryExec: partitions=1, partition_sizes=[1]"
+            "                  DeduplicationExec: columns: [Column { name: \"name\", index: 0 }]", 
+            "                    SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]", 
+            "                      CoalescePartitionsExec", 
+            "                        AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]", 
+            "                          CoalesceBatchesExec: target_batch_size=8192", 
+            "                            RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12", 
+            "                              RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1", 
+            "                                AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]", 
+            "                                  MemoryExec: partitions=1, partition_sizes=[1]"
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -184,6 +213,7 @@ mod tests {
             .with_runtime_env(Arc::new(
                 RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
             ))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
@@ -213,9 +243,11 @@ mod tests {
             "CoalesceBatchesExec: target_batch_size=8192", 
             "  HashJoinExec: mode=Partitioned, join_type=Inner, on=[(id@0, id@0)], projection=[id@1]", 
             "    ProjectionExec: expr=[id@0 as id]", 
-            "      SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000", 
-            "        SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]", 
-            "          MemoryExec: partitions=2, partition_sizes=[1, 1]", 
+            "      DeduplicationExec: columns: [Column { name: \"id\", index: 0 }]", 
+            "        SortExec: expr=[id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]", 
+            "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000", 
+            "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]", 
+            "              MemoryExec: partitions=2, partition_sizes=[1, 1]", 
             "    MemoryExec: partitions=1, partition_sizes=[1]"
         ];
 
@@ -247,6 +279,7 @@ mod tests {
             .with_runtime_env(Arc::new(
                 RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
             ))
+            .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
@@ -292,16 +325,20 @@ mod tests {
             "            CoalesceBatchesExec: target_batch_size=8192", 
             "              HashJoinExec: mode=Partitioned, join_type=Inner, on=[(usr_id@0, usr_id@0)], projection=[prod_id@1, usr_id@2]", 
             "                ProjectionExec: expr=[usr_id@0 as usr_id, prod_id@1 as prod_id]", 
-            "                  SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000", 
-            "                    SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]", 
-            "                      MemoryExec: partitions=2, partition_sizes=[1, 1]", 
+            "                  DeduplicationExec: columns: [Column { name: \"usr_id\", index: 0 }]", 
+            "                    SortExec: expr=[usr_id@0 DESC NULLS LAST, _timestamp@2 DESC NULLS LAST], preserve_partitioning=[false]", 
+            "                      SortPreservingMergeExec: [_timestamp@2 DESC NULLS LAST], fetch=50000", 
+            "                        SortExec: TopK(fetch=50000), expr=[_timestamp@2 DESC NULLS LAST], preserve_partitioning=[true]", 
+            "                          MemoryExec: partitions=2, partition_sizes=[1, 1]", 
             "                MemoryExec: partitions=1, partition_sizes=[1]", 
             "    CoalesceBatchesExec: target_batch_size=8192", 
             "      RepartitionExec: partitioning=Hash([prod_id@0], 12), input_partitions=1", 
             "        ProjectionExec: expr=[prod_id@0 as prod_id]", 
-            "          SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000", 
-            "            SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]", 
-            "              MemoryExec: partitions=3, partition_sizes=[1, 1, 1]"
+            "          DeduplicationExec: columns: [Column { name: \"prod_id\", index: 0 }]", 
+            "            SortExec: expr=[prod_id@0 DESC NULLS LAST, _timestamp@1 DESC NULLS LAST], preserve_partitioning=[false]", 
+            "              SortPreservingMergeExec: [_timestamp@1 DESC NULLS LAST], fetch=50000", 
+            "                SortExec: TopK(fetch=50000), expr=[_timestamp@1 DESC NULLS LAST], preserve_partitioning=[true]", 
+            "                  MemoryExec: partitions=3, partition_sizes=[1, 1, 1]"
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

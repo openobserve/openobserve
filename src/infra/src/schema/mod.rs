@@ -352,6 +352,10 @@ pub async fn merge(
     schema: &Schema,
     min_ts: Option<i64>,
 ) -> Result<Option<(Schema, Vec<Field>)>> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(None);
+    }
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
     let inferred_schema = schema.clone();
@@ -465,6 +469,10 @@ pub async fn update_setting(
     stream_type: StreamType,
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(());
+    }
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     db.get_for_update(
