@@ -20,7 +20,7 @@ const actions = {
     return http().post(`/api/${org_identifier}/actions/upload`, data);
   },
   update: (org_identifier: string, action_id: string, data: any) => {
-    return http().put(`/api/${org_identifier}/actions/${action_id}}`, data);
+    return http().put(`/api/${org_identifier}/actions/${action_id}`, data);
   },
   list: ( 
     page_num: number,
@@ -29,9 +29,7 @@ const actions = {
     desc: boolean,
     org_identifier: string,
   ) => {
-    return http().get(
-      `/api/${org_identifier}/actions/?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`,
-    );
+    return http().get(`/api/${org_identifier}/actions`);
   },
   get_by_id: (org_identifier: string, ksuid: string) => {
     return http().get(

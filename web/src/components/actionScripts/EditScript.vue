@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  v-if="frequency.type === 'once'"
+                  v-if="frequency.type === 'Once'"
                   class="flex justify-start items-center q-mt-md"
                 >
                   <q-icon name="event" class="q-mr-sm" />
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <template v-if="frequency.type === 'cron'">
+                <template v-if="frequency.type === 'Repeat'">
                   <div class="flex items-center justify-start q-mt-md">
                     <div
                       data-test="add-action-script-schedule-custom-interval-input"
@@ -592,6 +592,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="'Key'"
                       dense
                       tabindex="0"
+                      :rules="[isRequiredKey]"
+
                     />
                   </div>
                   <div class="col-5 q-ml-none">
@@ -607,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       isUpdatingDestination
                       tabindex="0"
+                      :rules="[isRequiredValue]"
                     />
                   </div>
                   <div class="col-2 q-ml-none">
@@ -695,7 +698,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -725,6 +728,8 @@ defineProps({
     default: null,
   },
 });
+const emit = defineEmits(["getActionScripts"]);
+
 
 const defaultActionScript = {
   codeZip: null,
@@ -735,10 +740,11 @@ const defaultActionScript = {
   start: 0,
   frequency: {
     interval: 1,
-    type: "cron",
+    type: "Repeat",
     cron: "",
   },
   environment_variables: {},
+  execution_details: "",
   timezone: "UTC",
   timezoneOffset: 0,
   lastTriggeredAt: null,
@@ -789,11 +795,11 @@ const timeTabs = [
 const frequencyTabs = [
   {
     label: "Cron Job",
-    value: "cron",
+    value: "Repeat",
   },
   {
     label: "Once",
-    value: "once",
+    value: "Once",
   },
 ];
 
@@ -823,7 +829,7 @@ const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
 
 const frequency = ref({
-  type: "once",
+  type: "Once",
   custom: {
     interval: 1,
     period: "days",
@@ -831,38 +837,19 @@ const frequency = ref({
   cron: "",
 });
 
-onBeforeMount(async () => {
-  isEditingActionScript.value = !!router.currentRoute.value.query?.id;
-
-  if (isEditingActionScript.value) {
-    isEditingActionScript.value = true;
-    isFetchingActionScript.value = true;
-
-    const actionId: string = (router.currentRoute.value.query?.id ||
-      "") as string;
-    actions
-      .get_by_id(store.state.selectedOrganization.identifier, actionId)
-      .then((res: any) => {
-        setupEditingActionScript(res.data);
-
-        originalActionScriptData.value = JSON.stringify(formData.value);
-      })
-      .catch((err) => {
-        if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
-            message: err?.data?.message || "Error while fetching Action Script!",
-            timeout: 4000,
-          });
-        }
-      })
-      .finally(() => {
-        isFetchingActionScript.value = false;
-      });
-  } else {
-    originalActionScriptData.value = JSON.stringify(formData.value);
-  }
+watch(
+  () => router.currentRoute.value.query?.id,
+  async (action_id) => {
+    await handleActionScript();
 });
+
+
+onBeforeMount(async () => {
+  await handleActionScript()
+});
+
+
+
 
 const onSubmit = () => {};
 
@@ -911,64 +898,89 @@ timezoneOptions.unshift(browserTime);
 
 const saveActionScript = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  if (frequency.value.type === "cron") {
-    const now = new Date();
+  // if (frequency.value.type === "cron") {
+  //   const now = new Date();
 
-    // Get the day, month, and year from the date object
-    const day = String(now.getDate()).padStart(2, "0");
-    const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-    const year = now.getFullYear();
+  //   // Get the day, month, and year from the date object
+  //   const day = String(now.getDate()).padStart(2, "0");
+  //   const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+  //   const year = now.getFullYear();
 
-    // Combine them in the DD-MM-YYYY format
-    scheduling.value.date = `${day}-${month}-${year}`;
+  //   // Combine them in the DD-MM-YYYY format
+  //   scheduling.value.date = `${day}-${month}-${year}`;
 
-    // Get the hours and minutes, ensuring they are formatted with two digits
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
+  //   // Get the hours and minutes, ensuring they are formatted with two digits
+  //   const hours = String(now.getHours()).padStart(2, "0");
+  //   const minutes = String(now.getMinutes()).padStart(2, "0");
 
-    // Combine them in the HH:MM format
-    scheduling.value.time = `${hours}:${minutes}`;
+  //   // Combine them in the HH:MM format
+  //   scheduling.value.time = `${hours}:${minutes}`;
+  // }
+
+  // // If the user has selected to schedule now, we set the timezone to the current timezone
+  // if (formData.value.frequency.type === "Once") {
+  //   scheduling.value.timezone = timezone.value;
+  // }
+  let form;
+
+// Determine if FormData is needed
+  const useFormData = !isEditingActionScript.value && formData.value.codeZip;
+
+  // Initialize form as FormData or plain object
+  form = useFormData ? new FormData() : {};
+
+  // Common fields
+  const commonFields: Record<string, any> = {
+      name: formData.value.name,
+      description: formData.value.description,
+      execution_details: frequency.value.type,
+      ordId: store.state.selectedOrganization.identifier,
+      owner: store.state.userInfo.email,
+  };
+
+  // Add cron expression if needed
+  if (frequency.value.type === "Repeat") {
+      commonFields.cron_expr = frequency.value.cron.toString().trim() + " *";
   }
 
-  // If the user has selected to schedule now, we set the timezone to the current timezone
-  if (formData.value.frequency.type === "once") {
-    scheduling.value.timezone = timezone.value;
-  }
-
-  const convertedDateTime = convertDateToTimestamp(
-    scheduling.value.date,
-    scheduling.value.time,
-    scheduling.value.timezone,
+// Add environment variables if present
+if (environmentalVariables.value.length > 0) {
+  const environment_variables = environmentalVariables.value.reduce(
+    (acc: any, curr: any) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    },
+    {}
   );
+  commonFields.environment_variables = environment_variables;
+}
 
-  const form = new FormData();
-  form.append("file", formData.value.codeZip || "");
-  if (
-    formData.value.codeZip &&
-    (formData.value.codeZip as File).name.length > 0
-  ) {
-    form.append("filename", (formData.value.codeZip as File).name || "");
+// Populate form (either FormData or plain object)
+  Object.entries(commonFields).forEach(([key, value]) => {
+    if (useFormData) {
+          form.append(
+            key,
+            typeof value === "object" ? JSON.stringify(value) : value,
+          );
+    } else {
+      form[key] = value;
+    }
+  });
+
+// Add file fields if using FormData
+  if (useFormData && formData.value.codeZip) {
+      form.append("file", formData.value.codeZip || "");
+      form.append("filename", (formData.value.codeZip as File).name || "");
   }
-  form.append("name", formData.value.name);
-  form.append("desription", formData.value.description);
-  form.append("execution_details", frequency.value.type);
-  form.append("ordId", store.state.selectedOrganization.identifier);
-  if (frequency.value.type === "cron")
-    form.append("cron_expr", frequency.value.cron.toString().trim() + " *");
-  if (environmentalVariables.value.length > 0) {
-    const enviroment_variables = environmentalVariables.value.reduce(
-      (acc: any, curr: any) => {
-        acc[curr.key] = curr.value;
-        return acc;
-      },
-      {},
-    );
-    form.append("environment_variables", JSON.stringify(enviroment_variables));
-  }
-  
-  // form.append("timezone", scheduling.value.timezone);
-  form.append("owner", store.state.userInfo.email);
-  form.append("lastEditedBy", store.state.userInfo.email);
+
+
+  // const convertedDateTime = convertDateToTimestamp(
+  //   scheduling.value.date,
+  //   scheduling.value.time,
+  //   scheduling.value.timezone,
+  // );
+
+
   // form.append("timezoneOffset", convertedDateTime.offset.toString());
   // Check if all report input fields are valid
   try {
@@ -1004,6 +1016,8 @@ const saveActionScript = async () => {
         timeout: 3000,
       });
       goToActionScripts();
+      emit("getActionScripts")
+      
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -1028,7 +1042,15 @@ const validateActionScriptData = async () => {
     step.value = 1;
     return;
   }
-  if (formData.value.frequency.type === "cron") {
+  if (
+    environmentalVariables.value[0].key == "" &&
+    environmentalVariables.value[0].value == "" &&
+    environmentalVariables.value.length == 1
+  ) {
+    step.value = 3;
+    return;
+  }
+  if (formData.value.execution_details === "Repeat") {
     try {
       cronParser.parseExpression(frequency.value.cron);
       cronError.value = "";
@@ -1039,7 +1061,7 @@ const validateActionScriptData = async () => {
     }
   }
 
-  if (!formData.value.frequency.type) {
+  if (!formData.value.execution_details) {
     step.value = 2;
     return;
   }
@@ -1065,41 +1087,37 @@ const setupEditingActionScript = async (report: any) => {
   };
   formData.value.fileNameToShow = report.zip_file_name;
   // set date, time and timezone in scheduling
-  const date = new Date(report.start / 1000);
+  // const date = new Date(report.start / 1000);
 
-  // Get the day, month, and year from the date object
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0"); // January is 0!
-  const year = date.getFullYear();
+  // // Get the day, month, and year from the date object
+  // const day = String(date.getDate()).padStart(2, "0");
+  // const month = String(date.getMonth() + 1).padStart(2, "0"); // January is 0!
+  // const year = date.getFullYear();
 
-  // Combine them in the DD-MM-YYYY format
-  scheduling.value.date = `${day}-${month}-${year}`;
+  // // Combine them in the DD-MM-YYYY format
+  // scheduling.value.date = `${day}-${month}-${year}`;
 
-  // Get the hours and minutes, ensuring they are formatted with two digits
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
+  // // Get the hours and minutes, ensuring they are formatted with two digits
+  // const hours = String(date.getHours()).padStart(2, "0");
+  // const minutes = String(date.getMinutes()).padStart(2, "0");
 
-  // Combine them in the HH:MM format
-  scheduling.value.time = `${hours}:${minutes}`;
+  // // Combine them in the HH:MM format
+  // scheduling.value.time = `${hours}:${minutes}`;
 
-  scheduling.value.timezone = report.timezone;
+  // scheduling.value.timezone = report.timezone;
 
-  // set selectedTimeTab to scheduleLater
-  selectedTimeTab.value = "scheduleLater";
+  // // set selectedTimeTab to scheduleLater
+  // selectedTimeTab.value = "scheduleLater";
 
   // set frequency
-  if (report.frequency.type == "cron") {
-    frequency.value.type = report.frequency.type;
+  if (report.execution_details == "Repeat") {
+    frequency.value.type = "Repeat";
     frequency.value.cron =
       report.cron_expr.split(" ").length === 7
         ? report.cron_expr.split(" ").slice(0, 6).join(" ")
         : report.cron_expr;
-  } else if (report.frequency.interval > 1) {
-    frequency.value.type = "custom";
-    frequency.value.custom.period = report.frequency.type;
-    frequency.value.custom.interval = report.frequency.interval;
   } else {
-    frequency.value.type = report.frequency.type;
+    frequency.value.type = "Once";
   }
   if (Object.keys(formData.value.environment_variables).length) {
     environmentalVariables.value = [];
@@ -1147,6 +1165,46 @@ const deleteApiHeader = (header: any) => {
 
   if (!environmentalVariables.value.length) addApiHeader();
 };
+const isRequiredKey = (value: any) => {
+  return value && value.trim() !== "" ? true : "Key is required";
+};
+
+const isRequiredValue = (value: any) => {
+  return value && value.trim() !== "" ? true : "Value is required";
+};
+
+const handleActionScript = async () => {
+  isEditingActionScript.value = !!router.currentRoute.value.query?.id;
+
+    if (isEditingActionScript.value) {
+      isEditingActionScript.value = true;
+      isFetchingActionScript.value = true;
+
+      const actionId: string = (router.currentRoute.value.query?.id ||
+        "") as string;
+      actions
+        .get_by_id(store.state.selectedOrganization.identifier, actionId)
+        .then((res: any) => {
+          setupEditingActionScript(res.data);
+
+          originalActionScriptData.value = JSON.stringify(formData.value);
+        })
+        .catch((err) => {
+          if (err.response.status != 403) {
+            q.notify({
+              type: "negative",
+              message: err?.data?.message || "Error while fetching Action Script!",
+              timeout: 4000,
+            });
+          }
+        })
+        .finally(() => {
+          isFetchingActionScript.value = false;
+        });
+    } else {
+      originalActionScriptData.value = JSON.stringify(formData.value);
+    }
+}
 </script>
 
 <style lang="scss">

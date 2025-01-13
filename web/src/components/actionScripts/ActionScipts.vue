@@ -148,12 +148,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isUpdated="isUpdated"
           @update:list="refreshList"
           @cancel:hideform="hideForm"
+          @get-action-scripts="getActionScripts"
         />
       </div>
     </template>
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete alert?"
+      title="Delete Action Script"
+      message="Are you sure you want to delete Action Script?"
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -408,7 +409,7 @@ export default defineComponent({
     const getActionScripts = () => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading alerts...",
+        message: "Please wait while loading action scripts...",
       });
       actions
         .list(
@@ -420,8 +421,8 @@ export default defineComponent({
         )
         .then((res) => {
           var counter = 1;
-          resultTotal.value = res.data.list.length;
-          alerts.value = res.data.list.map((alert: any) => {
+          resultTotal.value = res.data.length;
+          alerts.value = res.data.map((alert: any) => {
             return {
               ...alert,
               uuid: getUUID(),
@@ -434,11 +435,9 @@ export default defineComponent({
               name: data.name,
               uuid: data.uuid,
               created_by: data.created_by,
-              created_at: convertUnixToQuasarFormat(data.created_at),
-              last_run_at: convertUnixToQuasarFormat(data.last_run_at),
-              last_successful_at: convertUnixToQuasarFormat(
-                data.last_successful_at,
-              ),
+              created_at: data.created_at,
+              last_run_at: data.last_run_at,
+              last_successful_at: data.last_successful_at,
               status: data.status
 
             };
@@ -709,12 +708,10 @@ export default defineComponent({
       });
     };
     const deleteAlert = () => {
-      alertsService
+      actions
         .delete(
           store.state.selectedOrganization.identifier,
-          selectedDelete.value.stream_name,
-          selectedDelete.value.name,
-          selectedDelete.value.stream_type,
+          selectedDelete.value.id,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
