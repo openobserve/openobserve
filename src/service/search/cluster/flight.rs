@@ -782,7 +782,7 @@ pub async fn get_file_id_lists(
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
         if let Some(schema) = stream.schema() {
-            if schema == "enrich" || schema == "enrichment_table" {
+            if schema == "enrich" || schema == "enrichment_tables" {
                 let start = BASE_TIME.timestamp_micros();
                 let end = chrono::Utc::now().timestamp_micros();
                 time_range = Some((start, end));
