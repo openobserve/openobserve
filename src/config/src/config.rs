@@ -354,6 +354,7 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
+    pub pipeline: Pipeline,
 }
 
 #[derive(EnvConfig)]
@@ -1463,7 +1464,57 @@ pub struct RUM {
     #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
     pub insecure_http: bool,
 }
-
+#[derive(Debug, EnvConfig)]
+pub struct Pipeline {
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_WAL_DIR",
+        default = "",
+        help = "For the remote stream WAL directory, if the pipeline destination is a remote stream, we use a separate path to distinguish between local WAL and remote WAL"
+    )]
+    pub remote_stream_wal_dir: String,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_CONCURRENT_COUNT",
+        default = 30,
+        help = "control the remote stream wal send concurrent count"
+    )]
+    pub remote_stream_wal_concurrent_count: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_OFFSET_FLUSH_INTERVAL",
+        default = 10,
+        help = "flush remote stream wal sended-ok-offset interval"
+    )]
+    pub offset_flush_interval: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_TIMEOUT",
+        default = 600,
+        help = "pipeline exporter client request timeout"
+    )]
+    pub remote_request_timeout: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY",
+        default = 1024,
+        help = "pipeline exporter client request retry"
+    )]
+    pub remote_request_retry: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_CONNECTIONS",
+        default = 1024,
+        help = "pipeline exporter client max connections"
+    )]
+    pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_EXPORTER_CLIENT_TYPE",
+        default = "http",
+        help = "pipeline exporter client type, default use http"
+    )]
+    pub exporter_client_type: String,
+    #[env_config(
+        name = "ZO_PIPELINE_EXPORTER_TLS_ENABLE",
+        default = "false",
+        help = "enable exporter tls"
+    )]
+    pub tls_enable: bool,
+}
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1802,6 +1853,11 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
+    }
+
+    // pipeline
+    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
     }
     Ok(())
 }

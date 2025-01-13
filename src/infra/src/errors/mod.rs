@@ -78,6 +78,8 @@ pub enum Error {
     NotImplemented,
     #[error("Unknown error")]
     Unknown,
+    #[error("Error# {0}")]
+    Reqwest(#[from] reqwest::Error),
 }
 
 unsafe impl Send for Error {}

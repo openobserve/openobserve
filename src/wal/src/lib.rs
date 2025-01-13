@@ -26,10 +26,21 @@ pub use writer::Writer;
 const SOFT_MAX_BUFFER_LEN: usize = 1024 * 128; // 128KB
 
 pub const FILE_TYPE_IDENTIFIER_LEN: usize = 13;
+pub const ENTRY_HEADER_LEN: u64 = 8;
 type FileTypeIdentifier = [u8; FILE_TYPE_IDENTIFIER_LEN];
 const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
+
+pub type FilePosition = u64;
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum ReadFrom {
+    #[default]
+    Beginning,
+    End,
+    Checkpoint(FilePosition),
+}
 
 pub fn build_file_path(
     root_dir: impl Into<PathBuf>,

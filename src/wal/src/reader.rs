@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::File,
-    io::{self, BufReader, Read},
+    fs::{File, Metadata},
+    io::{self, BufReader, Read, Seek},
     path::PathBuf,
 };
 
@@ -23,7 +23,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
 use snafu::{ensure, ResultExt};
 
-use crate::errors::*;
+use crate::{errors::*, ReadFrom};
 
 pub struct Reader<R> {
     path: PathBuf,
@@ -48,6 +48,45 @@ impl Reader<BufReader<File>> {
 
         Ok(Self::new(path, f))
     }
+
+    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {
+        let path = path.into();
+        let f = File::open(&path).context(FileOpenSnafu { path: path.clone() })?;
+        let mut f = BufReader::new(f);
+
+        match read_from {
+            ReadFrom::Checkpoint(file_position) => {
+                let _ = f.seek(io::SeekFrom::Start(file_position)).unwrap();
+            }
+            ReadFrom::Beginning => {
+                let _ = f.seek(io::SeekFrom::Start(0)).unwrap();
+            }
+            ReadFrom::End => {
+                let _ = f.seek(io::SeekFrom::End(0)).unwrap();
+            }
+        };
+
+        // check the file type identifier
+        let mut buf = [0; super::FILE_TYPE_IDENTIFIER.len()];
+        f.read_exact(&mut buf).context(UnableToReadArraySnafu {
+            length: super::FILE_TYPE_IDENTIFIER.len(),
+        })?;
+        ensure!(
+            &buf == super::FILE_TYPE_IDENTIFIER,
+            FileIdentifierMismatchSnafu,
+        );
+
+        Ok(Self::new(path, f))
+    }
+
+    pub fn metadata(&self) -> io::Result<Metadata> {
+        Ok(self.f.get_ref().metadata()?)
+    }
+
+    pub fn current_position(&mut self) -> io::Result<u64> {
+        let position = self.f.seek(std::io::SeekFrom::Current(0))?;
+        Ok(position)
+    }
 }
 
 impl<R> Reader<R>
@@ -64,12 +103,23 @@ where
 
     // read entry from the wal file
     pub fn read_entry(&mut self) -> Result<Option<Vec<u8>>> {
+        match self._read_entry() {
+            Ok((data, _)) => Ok(data),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn read_entry_with_length(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
+        self._read_entry()
+    }
+
+    pub fn _read_entry(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
         let expected_checksum = match self.f.read_u32::<BigEndian>() {
-            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok((None, 0)),
             other => other.context(UnableToReadChecksumSnafu)?,
         };
         if expected_checksum == 0 {
-            return Ok(None);
+            return Ok((None, 0));
         }
 
         let expected_len = self
@@ -78,7 +128,7 @@ where
             .context(UnableToReadLengthSnafu)?
             .into();
         if expected_len == 0 {
-            return Ok(Some(vec![]));
+            return Ok((Some(vec![]), 0));
         }
 
         let compressed_read = self.f.by_ref().take(expected_len);
@@ -106,7 +156,7 @@ where
             });
         }
 
-        Ok(Some(data))
+        Ok((Some(data), actual_compressed_len))
     }
 }
 

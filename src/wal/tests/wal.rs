@@ -37,3 +37,26 @@ fn wal() {
     }
     assert!(reader.read_entry().unwrap().is_none());
 }
+
+#[test]
+fn position() {
+    let entry_num = 100;
+    let dir = tempdir().unwrap();
+    let dir = dir.path();
+    let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024, 8 * 1024).unwrap();
+    for i in 0..entry_num {
+        let data = format!("hello world {}", i);
+        writer.write(data.as_bytes()).unwrap();
+    }
+    writer.close().unwrap();
+
+    let path = build_file_path(dir, "org", "stream", 1);
+    let mut reader = Reader::from_path(path).unwrap();
+    let mut pos = wal::FILE_TYPE_IDENTIFIER_LEN as u64;
+    for _ in 0..entry_num {
+        let (_, len) = reader.read_entry_with_length().unwrap();
+        pos += wal::ENTRY_HEADER_LEN + len;
+        assert_eq!(pos as u64, reader.current_position().unwrap());
+    }
+    assert!(reader.read_entry().unwrap().is_none());
+}

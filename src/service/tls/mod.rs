@@ -86,3 +86,7 @@ pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
 
     Ok(Arc::new(config))
 }
+
+pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
+    todo!()
+}
