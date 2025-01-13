@@ -16,6 +16,7 @@
 use config::meta::timed_annotations::{TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq};
 use infra::table;
 
+#[tracing::instrument]
 pub async fn create_timed_annotations(
     org_id: &str,
     req: TimedAnnotationReq,
@@ -26,6 +27,7 @@ pub async fn create_timed_annotations(
     Ok(res)
 }
 
+#[tracing::instrument]
 pub async fn get_timed_annotations(
     dashboard_id: &str,
     panels: Option<Vec<String>>,
@@ -37,6 +39,7 @@ pub async fn get_timed_annotations(
     Ok(annotations)
 }
 
+#[tracing::instrument]
 pub async fn delete_timed_annotations(req: TimedAnnotationDelete) -> Result<(), anyhow::Error> {
     if req.annotation_ids.is_empty() {
         return Err(anyhow::anyhow!("annotation_ids cannot be empty"));
