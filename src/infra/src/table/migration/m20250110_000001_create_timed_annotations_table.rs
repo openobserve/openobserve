@@ -3,7 +3,7 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const ANNOTATIONS_DASHBOARD_ID_IDX: &str = "annotations_dashboard_id_idx";
+const ANNOTATIONS_DASHBOARD_ID_IDX: &str = "timed_annotations_dashboard_id_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
