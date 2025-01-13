@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="outlinedDashboard"
               :done="step > 1"
             >
-            <div class="flex items-center">
+            <div class="flex items-center o2-input">
               <q-file
                 v-if="!isEditingActionScript || formData.fileNameToShow == ''"
                 ref="fileInput"
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
-                    <!-- <div class="o2-input">
+                    <div class="o2-input">
                       <q-select
                         data-test="add-action-script-schedule-start-timezone-select"
                         v-model="scheduling.timezone"
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         outlined
                         style="width: 300px"
                       />
-                    </div> -->
+                    </div>
                   </div>
                 </template>
                 <!-- <template v-else>
@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(header, index) in environmentalVariables"
                   :key="header.uuid"
-                  class="row q-col-gutter-sm q-pb-sm"
+                  class="row q-col-gutter-sm o2-input"
                 >
                   <div class="col-5 q-ml-none">
                     <q-input
@@ -898,34 +898,35 @@ timezoneOptions.unshift(browserTime);
 
 const saveActionScript = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  // if (frequency.value.type === "cron") {
-  //   const now = new Date();
+  if (frequency.value.type === "Repeat") {
+    const now = new Date();
 
-  //   // Get the day, month, and year from the date object
-  //   const day = String(now.getDate()).padStart(2, "0");
-  //   const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-  //   const year = now.getFullYear();
+    // Get the day, month, and year from the date object
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+    const year = now.getFullYear();
 
-  //   // Combine them in the DD-MM-YYYY format
-  //   scheduling.value.date = `${day}-${month}-${year}`;
+    // Combine them in the DD-MM-YYYY format
+    scheduling.value.date = `${day}-${month}-${year}`;
 
-  //   // Get the hours and minutes, ensuring they are formatted with two digits
-  //   const hours = String(now.getHours()).padStart(2, "0");
-  //   const minutes = String(now.getMinutes()).padStart(2, "0");
+    // Get the hours and minutes, ensuring they are formatted with two digits
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
 
-  //   // Combine them in the HH:MM format
-  //   scheduling.value.time = `${hours}:${minutes}`;
-  // }
+    // Combine them in the HH:MM format
+    scheduling.value.time = `${hours}:${minutes}`;
+  }
 
-  // // If the user has selected to schedule now, we set the timezone to the current timezone
-  // if (formData.value.frequency.type === "Once") {
-  //   scheduling.value.timezone = timezone.value;
-  // }
+  // If the user has selected to schedule now, we set the timezone to the current timezone
+  if (formData.value.execution_details === "Once") {
+    scheduling.value.timezone = timezone.value;
+  }
   let form;
 
 // Determine if FormData is needed
-  const useFormData = !isEditingActionScript.value && formData.value.codeZip;
-
+  const useFormData =
+      !isEditingActionScript.value ||
+      (isEditingActionScript.value && formData.value.codeZip);
   // Initialize form as FormData or plain object
   form = useFormData ? new FormData() : {};
 
@@ -937,10 +938,22 @@ const saveActionScript = async () => {
       ordId: store.state.selectedOrganization.identifier,
       owner: store.state.userInfo.email,
   };
+  const convertedDateTime = convertDateToTimestamp(
+    scheduling.value.date,
+    scheduling.value.time,
+    scheduling.value.timezone,
+  );
 
   // Add cron expression if needed
   if (frequency.value.type === "Repeat") {
-      commonFields.cron_expr = frequency.value.cron.toString().trim() + " *";
+    commonFields.cron_expr = frequency.value.cron.toString().trim() + " *";
+    commonFields.timezoneOffset = convertedDateTime.offset.toString();
+    commonFields.timezone = scheduling.value.timezone;
+  }
+
+  if (frequency.value.type == "Once") {
+    commonFields.timezone = null;
+    commonFields.timezoneOffset = null;
   }
 
 // Add environment variables if present
@@ -974,14 +987,6 @@ if (environmentalVariables.value.length > 0) {
   }
 
 
-  // const convertedDateTime = convertDateToTimestamp(
-  //   scheduling.value.date,
-  //   scheduling.value.time,
-  //   scheduling.value.timezone,
-  // );
-
-
-  // form.append("timezoneOffset", convertedDateTime.offset.toString());
   // Check if all report input fields are valid
   try {
     validateActionScriptData();

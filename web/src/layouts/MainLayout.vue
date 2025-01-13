@@ -674,6 +674,7 @@ export default defineComponent({
         icon: outlinedCode,
         link: "/action-scripts",
         name: "actionScripts",
+        hide: config.isEnterprise == "true" ? false : true
       },
       {
         title: t("menu.ingestion"),
@@ -809,11 +810,10 @@ export default defineComponent({
           ?.split(",")
           ?.filter((val: string) => val?.trim()) || [],
       );
-
       store.dispatch("setHiddenMenus", disableMenus);
 
       linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name),
+        (link: { name: string ; hide: boolean }) => !disableMenus.has(link.name) && !link.hide,
       );
     };
 

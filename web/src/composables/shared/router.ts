@@ -67,7 +67,7 @@ const ActionScipts = () =>
   import("@/components/actionScripts/ActionScipts.vue");
 
 import useIngestionRoutes from "./useIngestionRoutes";
-import useIamRoutes from "./useIamRoutes";
+import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import config from "@/aws-exports";
 import useManagementRoutes from "./useManagementRoutes";
 
@@ -280,14 +280,6 @@ const useRoutes = () => {
       },
     },
     {
-      path: "action-scripts",
-      name: "actionScripts",
-      component: ActionScipts,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
       path: "rum",
       name: "RUM",
       component: RealUserMonitoring,
@@ -390,7 +382,7 @@ const useRoutes = () => {
       ],
     },
     ...useIngestionRoutes(),
-    ...useIamRoutes(),
+    ...useEnterpriseRoutes(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,
