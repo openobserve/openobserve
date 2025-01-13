@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, str::FromStr};
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
@@ -37,6 +37,9 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
 };
+
+const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
+    ["name", "owner", "file", "filename", "execution_details"];
 
 /// Delete Action
 #[utoipa::path(
@@ -189,11 +192,11 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
     match get_action_details(&org_id, &action_id).await {
         Ok(action) => {
             if let Ok(resp) = GetActionDetailsResponse::try_from(action) {
-                return Ok(MetaHttpResponse::json(resp));
+                Ok(MetaHttpResponse::json(resp))
             } else {
-                return Ok(MetaHttpResponse::bad_request(
+                Ok(MetaHttpResponse::bad_request(
                     "Failed to fetch action details",
-                ));
+                ))
             }
         }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -227,9 +230,10 @@ pub async fn upload_zipped_action(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut file_data = Vec::new();
-    let mut action = Action::default();
-
-    action.org_id = org_id.clone();
+    let mut action = Action {
+        org_id: org_id.clone(),
+        ..Default::default()
+    };
 
     // Validate Content-Type
     if let Some(content_type) = req.headers().get("Content-Type") {
@@ -242,11 +246,11 @@ pub async fn upload_zipped_action(
         }
     }
 
-    // mandatory fields needs to be tracked
-
+    let mut received_fields = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.name().unwrap_or("") {
             "description" => {
+                received_fields.push("description");
                 let mut description = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -266,6 +270,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "file" => {
+                received_fields.push("file");
                 if let Some(name) = field.content_disposition() {
                     action.zip_file_name = name.to_string();
                 }
@@ -281,6 +286,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "filename" => {
+                received_fields.push("filename");
                 let mut filename = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -305,6 +311,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "name" => {
+                received_fields.push("name");
                 let mut name = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -326,6 +333,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "execution_details" => {
+                received_fields.push("execution_details");
                 let mut details = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -348,6 +356,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "cron_expr" => {
+                received_fields.push("cron_expr");
                 let mut cron = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -367,6 +376,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "environment_variables" => {
+                received_fields.push("environment_variables");
                 let mut env_vars = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -391,6 +401,7 @@ pub async fn upload_zipped_action(
                 }
             }
             "owner" => {
+                received_fields.push("owner");
                 let mut owner = Vec::new();
                 while let Some(chunk) = field.next().await {
                     match chunk {
@@ -408,8 +419,36 @@ pub async fn upload_zipped_action(
                     );
                 }
             }
+            "id" => {
+                received_fields.push("id");
+                let mut id = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => id.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest().body("Failed to read id field"))
+                        }
+                    }
+                }
+                if let Ok(id) = String::from_utf8(id) {
+                    if let Ok(id) = Ksuid::from_str(&id) {
+                        action.id = Some(id);
+                    } else {
+                        return Ok(HttpResponse::BadRequest().body("Invalid ID"));
+                    }
+                } else {
+                    return Ok(HttpResponse::BadRequest().body("Invalid ID"));
+                }
+            }
             _ => {}
         }
+    }
+
+    if !MANDATORY_FIELDS_FOR_ACTION_CREATION
+        .iter()
+        .all(|field| received_fields.contains(field))
+    {
+        return Ok(HttpResponse::BadRequest().body("Missing mandatory fields"));
     }
 
     if file_data.is_empty() {

@@ -1,6 +1,6 @@
 // Copyright (c) 2024.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
 use sea_orm::{DeriveActiveEnum, EnumIter};
@@ -120,8 +120,6 @@ pub struct DeployActionRequest {
     #[serde(default)]
     pub environment_variables: HashMap<String, String>,
     #[serde(default)]
-    pub origin_cluster_web_url: String,
-    #[serde(default)]
     pub ksuid: String,
 }
 
@@ -133,12 +131,13 @@ pub enum ActionType {
     CronJob,
 }
 
-impl ToString for ActionType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for ActionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             ActionType::Job => "job".to_string(),
             ActionType::CronJob => "cronjob".to_string(),
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 impl From<&str> for ActionType {

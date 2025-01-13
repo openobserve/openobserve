@@ -2731,6 +2731,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cron"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbe58904b68d95ad2c69a2e9607ffc70ce196c1910f83a340029c1448e06ed65"
+dependencies = [
+ "chrono",
+ "once_cell",
+ "winnow 0.6.20",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6336,6 +6347,7 @@ dependencies = [
  "bytes",
  "chrono",
  "config",
+ "cron 0.14.0",
  "dashmap",
  "dotenv_config",
  "dotenvy",
@@ -6365,6 +6377,7 @@ dependencies = [
  "tonic 0.12.3",
  "tracing",
  "tracing-opentelemetry",
+ "url",
  "zip 2.2.2",
 ]
 
@@ -6613,7 +6626,7 @@ dependencies = [
  "cloudevents-sdk",
  "config",
  "console-subscriber",
- "cron",
+ "cron 0.12.1",
  "csv",
  "dashmap",
  "datafusion",
