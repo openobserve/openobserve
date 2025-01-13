@@ -26,7 +26,12 @@ use crate::{
 #[utoipa::path(
     post,
     context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "CreateAnnotations",
     path = "/{org_id}/annotations",
+    security(
+        ("Authorization" = [])
+    ),
     request_body(
         content = TimedAnnotationReq,
         description = "Timed annotation request payload",
@@ -41,7 +46,6 @@ use crate::{
         ),
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
-    tag = "Dashboards"
 )]
 #[post("/{org_id}/annotations")]
 pub async fn create_annotations(
@@ -69,7 +73,12 @@ pub async fn create_annotations(
 #[utoipa::path(
     get,
     context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "GetAnnotations",
     path = "/{org_id}/annotations",
+    security(
+        ("Authorization" = [])
+    ),
     params(
         ("org_id" = String, Path, description = "Organization ID"),
         ("dashboard_id" = String, Query, description = "Dashboard ID"),
@@ -87,7 +96,6 @@ pub async fn create_annotations(
         (status = 400, description = "Invalid query parameters", content_type = "application/json"),
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
-    tag = "Dashboards"
 )]
 #[get("/{org_id}/annotations")]
 pub async fn get_annotations(
@@ -119,8 +127,13 @@ pub async fn get_annotations(
 /// Delete Timed Annotations
 #[utoipa::path(
     delete,
+    tag = "Dashboards",
     context_path = "/api",
+    operation_id = "DeleteAnnotations",
     path = "/{org_id}/annotations",
+    security(
+        ("Authorization" = [])
+    ),
     request_body(
         content = TimedAnnotationDelete,
         description = "Timed annotation delete request payload",
@@ -133,7 +146,6 @@ pub async fn get_annotations(
         ),
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
-    tag = "Dashboards"
 )]
 #[delete("/{org_id}/annotations")]
 pub async fn delete_annotations(
