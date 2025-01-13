@@ -66,7 +66,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(TimedAnnotations::Tags)
                 .string_len(512)
-                .not_null(),
+                .null(),
         )
         .col(
             ColumnDef::new(TimedAnnotations::CreatedAt)
