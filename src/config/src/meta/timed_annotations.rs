@@ -34,7 +34,7 @@ pub struct TimedAnnotation {
     pub end_time: Option<i64>,
     pub title: String,
     pub text: Option<String>,
-    pub tags: String,
+    pub tags: Option<String>,
     pub panels: Vec<String>,
 }
 
