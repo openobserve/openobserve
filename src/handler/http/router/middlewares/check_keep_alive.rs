@@ -13,35 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use actix_web::{
+    body::MessageBody,
+    dev::{ServiceRequest, ServiceResponse},
+    http::{ConnectionType, StatusCode},
+};
+use actix_web_lab::middleware::Next;
 
-pub mod distributed_plan;
-pub mod exec;
-pub mod file_type;
-pub mod optimizer;
-pub mod plan;
-pub mod planner;
-pub mod storage;
-pub mod table_provider;
-pub mod udaf;
-pub mod udf;
-
-#[derive(PartialEq, Debug)]
-pub enum MemoryPoolType {
-    Greedy,
-    Fair,
-    None,
-}
-
-impl FromStr for MemoryPoolType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "greedy" => Ok(MemoryPoolType::Greedy),
-            "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
-            "none" | "off" => Ok(MemoryPoolType::None),
-            _ => Err(format!("Invalid memory pool type '{}'", s)),
-        }
+pub async fn check_keep_alive(
+    req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let req_conn_type = req.head().connection_type();
+    let mut resp = next.call(req).await?;
+    if resp.status() >= StatusCode::BAD_REQUEST || req_conn_type == ConnectionType::Close {
+        resp.response_mut()
+            .head_mut()
+            .set_connection_type(ConnectionType::Close);
     }
+    Ok(resp)
 }

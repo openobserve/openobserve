@@ -629,7 +629,13 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
     pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS", default = 0)]
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
@@ -941,8 +947,28 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 1000)]
+    #[deprecated(
+        since = "0.14.1",
+        note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
+    )]
+    #[env_config(
+        name = "ZO_UDSCHEMA_MAX_FIELDS",
+        default = 0,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
     pub udschema_max_fields: usize,
+    #[env_config(
+        name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS",
+        default = 1000,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
+    pub schema_max_fields_to_enable_uds: usize,
+    #[env_config(
+        name = "ZO_USER_DEFINED_SCHEMA_MAX_FIELDS",
+        default = 1000,
+        help = "Maximum number of fields allowed in user-defined schema"
+    )]
+    pub user_defined_schema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
@@ -1033,6 +1059,8 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
     pub keep_alive_disabled: bool,
+    #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
+    pub http_slow_log_threshold: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -1077,6 +1105,12 @@ pub struct Limit {
         help = "Timeout for query"
     )]
     pub search_job_timeout: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_RETENTION",
+        default = 30, // days
+        help = "Retention for search job"
+    )]
+    pub search_job_retention: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
@@ -1583,6 +1617,12 @@ pub fn init() -> Config {
         cfg.limit.consistent_hash_vnodes = 100;
     }
 
+    // check for uds
+    #[allow(deprecated)]
+    if cfg.limit.udschema_max_fields > 0 {
+        cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
+    }
+
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -1666,6 +1706,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30000;
+    }
+
+    // check search job retention
+    if cfg.limit.search_job_retention == 0 {
+        return Err(anyhow::anyhow!("search job retention is set to zero"));
     }
 
     // HACK instance_name
@@ -1766,6 +1811,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
         ));
+    }
+
+    // check for join match one
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    {
+        cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 
     Ok(())

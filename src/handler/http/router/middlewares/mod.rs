@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod deduplication;
-pub mod deduplication_exec;
-pub mod tantivy_count_exec;
+mod check_keep_alive;
+mod slow_log;
+
+pub use check_keep_alive::check_keep_alive;
+pub use slow_log::SlowLog;
