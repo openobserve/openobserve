@@ -14,19 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationReq {
     pub dashboard_id: String,
     pub timed_annotations: Vec<TimedAnnotation>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationRes {
     pub timed_annotation_ids: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotation {
     pub annotation_id: Option<String>,
     pub start_time: i64,
@@ -37,7 +38,7 @@ pub struct TimedAnnotation {
     pub panels: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationDelete {
     pub dashboard_id: String,
     pub annotation_ids: Vec<String>,

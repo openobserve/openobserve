@@ -22,6 +22,27 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards::timed_annotations,
 };
 
+/// Create Timed Annotations
+#[utoipa::path(
+    post,
+    context_path = "/api",
+    path = "/{org_id}/annotations",
+    request_body(
+        content = TimedAnnotationReq,
+        description = "Timed annotation request payload",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Timed annotations created successfully",
+            body = TimedAnnotationResponse,
+            content_type = "application/json",
+        ),
+        (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
+    ),
+    tag = "Dashboards"
+)]
 #[post("/{org_id}/annotations")]
 pub async fn create_annotations(
     path: web::Path<String>,
@@ -44,6 +65,30 @@ pub async fn create_annotations(
     }
 }
 
+/// Get Timed Annotations
+#[utoipa::path(
+    get,
+    context_path = "/api",
+    path = "/{org_id}/annotations",
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+        ("dashboard_id" = String, Query, description = "Dashboard ID"),
+        ("panels" = String, Query, description = "Comma-separated list of panel IDs"),
+        ("start_time" = i64, Query, description = "Start time (timestamp)"),
+        ("end_time" = i64, Query, description = "End time (timestamp)")
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Timed annotations retrieved successfully",
+            body = [TimedAnnotation],
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid query parameters", content_type = "application/json"),
+        (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
+    ),
+    tag = "Dashboards"
+)]
 #[get("/{org_id}/annotations")]
 pub async fn get_annotations(
     path: web::Path<String>,
@@ -71,6 +116,25 @@ pub async fn get_annotations(
     }
 }
 
+/// Delete Timed Annotations
+#[utoipa::path(
+    delete,
+    context_path = "/api",
+    path = "/{org_id}/annotations",
+    request_body(
+        content = TimedAnnotationDelete,
+        description = "Timed annotation delete request payload",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Timed annotations deleted successfully"
+        ),
+        (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
+    ),
+    tag = "Dashboards"
+)]
 #[delete("/{org_id}/annotations")]
 pub async fn delete_annotations(
     path: web::Path<String>,
