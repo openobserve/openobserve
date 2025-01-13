@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "annotations")]
+#[sea_orm(table_name = "timed_annotations")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
@@ -15,11 +15,19 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub text: Option<String>,
     pub tags: String,
-    pub panels: Option<String>,
     pub created_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::annotation_panels::Entity")]
+    AnnotationPanels,
+}
+
+impl Related<super::annotation_panels::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AnnotationPanels.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

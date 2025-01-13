@@ -20,7 +20,7 @@ impl MigrationTrait for Migration {
             .drop_index(Index::drop().name(ANNOTATIONS_DASHBOARD_ID_IDX).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(Annotations::Table).to_owned())
+            .drop_table(Table::drop().table(TimedAnnotations::Table).to_owned())
             .await?;
         Ok(())
     }
@@ -29,40 +29,47 @@ impl MigrationTrait for Migration {
 /// Statement to create table.
 fn create_table_stmt() -> TableCreateStatement {
     Table::create()
-        .table(Annotations::Table)
+        .table(TimedAnnotations::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(Annotations::Id)
+            ColumnDef::new(TimedAnnotations::Id)
                 .string_len(64)
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(Annotations::DashboardId)
+            ColumnDef::new(TimedAnnotations::DashboardId)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Annotations::OrgId)
+            ColumnDef::new(TimedAnnotations::OrgId)
                 .string_len(256)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Annotations::StartTime)
+            ColumnDef::new(TimedAnnotations::StartTime)
                 .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Annotations::EndTime).big_integer().null())
         .col(
-            ColumnDef::new(Annotations::Title)
+            ColumnDef::new(TimedAnnotations::EndTime)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(TimedAnnotations::Title)
                 .string_len(256)
                 .not_null(),
         )
-        .col(ColumnDef::new(Annotations::Text).text().null())
-        .col(ColumnDef::new(Annotations::Tags).string_len(512).not_null())
-        .col(ColumnDef::new(Annotations::Panels).string_len(512).null())
+        .col(ColumnDef::new(TimedAnnotations::Text).text().null())
         .col(
-            ColumnDef::new(Annotations::CreatedAt)
+            ColumnDef::new(TimedAnnotations::Tags)
+                .string_len(512)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(TimedAnnotations::CreatedAt)
                 .big_integer()
                 .not_null(),
         )
@@ -74,13 +81,13 @@ fn create_index_dashboard_id_stmt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
         .name(ANNOTATIONS_DASHBOARD_ID_IDX)
-        .table(Annotations::Table)
-        .col(Annotations::DashboardId)
+        .table(TimedAnnotations::Table)
+        .col(TimedAnnotations::DashboardId)
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum Annotations {
+enum TimedAnnotations {
     Table,
     Id,
     DashboardId,
@@ -90,6 +97,5 @@ enum Annotations {
     Title,
     Text,
     Tags,
-    Panels,
     CreatedAt,
 }
