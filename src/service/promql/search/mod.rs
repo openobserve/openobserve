@@ -119,6 +119,7 @@ async fn search_in_cluster(
     let (start, end) = adjust_start_end(start, end, step, cache_disabled);
 
     // get cache data
+    let original_start = start;
     let (start, cached_values, cached_took) = if cache_disabled {
         (start, vec![], 0)
     } else {
@@ -337,7 +338,7 @@ async fn search_in_cluster(
 
     // cache the result
     if let Some(matrix) = values.get_ref_matrix_values() {
-        if let Err(err) = cache::set(&trace_id, query, start, end, step, matrix).await {
+        if let Err(err) = cache::set(&trace_id, query, original_start, end, step, matrix).await {
             log::error!(
                 "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
                 err
