@@ -1,39 +1,44 @@
+// Copyright 2024 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Annotation {
+pub struct TimedAnnotationReq {
+    pub dashboard_id: String,
+    pub timed_annotations: Vec<TimedAnnotation>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TimedAnnotationRes {
+    pub timed_annotation_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TimedAnnotation {
+    pub annotation_id: Option<String>,
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub title: String,
     pub text: Option<String>,
     pub tags: String,
+    pub panels: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AnnotationObj {
+pub struct TimedAnnotationDelete {
     pub dashboard_id: String,
-    pub panels: Option<String>,
-    pub annotations: Vec<Annotation>,
-}
-
-impl AnnotationObj {
-    pub fn new(dashboard_id: String, panels: Option<String>, annotations: Vec<Annotation>) -> Self {
-        Self {
-            dashboard_id,
-            panels,
-            annotations,
-        }
-    }
-
-    pub fn get_panels(&self) -> Vec<i64> {
-        self.panels
-            .as_ref()
-            .map(|panels| {
-                panels
-                    .split(',')
-                    .filter_map(|panel| panel.parse::<i64>().ok())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
+    pub annotation_ids: Vec<String>,
 }

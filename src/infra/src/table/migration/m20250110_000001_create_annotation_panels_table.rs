@@ -51,19 +51,19 @@ fn create_table_stmt() -> TableCreateStatement {
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(AnnotationPanels::AnnotationId)
+            ColumnDef::new(AnnotationPanels::TimedAnnotationId)
                 .string_len(64)
                 .not_null(),
         )
         .col(
             ColumnDef::new(AnnotationPanels::PanelId)
-                .big_integer()
+                .string_len(256)
                 .not_null(),
         )
         .foreign_key(
             ForeignKey::create()
                 .name("fk_annotation_panels_annotation_id")
-                .from(AnnotationPanels::Table, AnnotationPanels::AnnotationId)
+                .from(AnnotationPanels::Table, AnnotationPanels::TimedAnnotationId)
                 .to(TimedAnnotations::Table, TimedAnnotations::Id)
                 .on_delete(ForeignKeyAction::Cascade),
         )
@@ -76,7 +76,7 @@ fn create_index_annotation_id_stmt() -> IndexCreateStatement {
         .if_not_exists()
         .name(ANNOTATION_PANELS_ANNOTATION_ID_IDX)
         .table(AnnotationPanels::Table)
-        .col(AnnotationPanels::AnnotationId)
+        .col(AnnotationPanels::TimedAnnotationId)
         .to_owned()
 }
 
@@ -94,7 +94,7 @@ fn create_index_panel_id_stmt() -> IndexCreateStatement {
 enum AnnotationPanels {
     Table,
     Id,
-    AnnotationId,
+    TimedAnnotationId,
     PanelId,
 }
 

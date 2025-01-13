@@ -7,15 +7,15 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub annotation_id: String,
-    pub panel_id: i64,
+    pub timed_annotation_id: String,
+    pub panel_id: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::timed_annotations::Entity",
-        from = "Column::AnnotationId",
+        from = "Column::TimedAnnotationId",
         to = "super::timed_annotations::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
