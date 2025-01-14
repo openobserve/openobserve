@@ -181,7 +181,6 @@ def test_new_alert_create(create_session, base_url):
     "context_attributes": {},
     "enabled": True,
     "description": "test",
-    "owner": "root@example.com",
     "folderId": folder_id
  }
     resp_post_alertnew = session.post(
@@ -393,7 +392,6 @@ def test_put_alertnew_update(create_session, base_url):
     "context_attributes": {},
     "enabled": True,
     "description": "test",
-    "owner": "root@example.com",
     "folderId": folder_id
     }
     resp_post_alertnew = session.post(
@@ -478,12 +476,9 @@ def test_put_alertnew_update(create_session, base_url):
         "tz_offset": 0,
         "last_triggered_at": None,
         "last_satisfied_at": None,
-        "owner": "root@example.com",
-        "updated_at": 1736486401000,
-        "last_edited_by": "root@example.com",
-        "createdAt": 1736486401000,
-        "lastTriggeredAt": 1736767838564,
-        "lastEditedBy": "root@example.com"
+        "updated_at": int(time.time() * 1000),
+        "createdAt": int(time.time() * 1000),
+        "lastTriggeredAt": int(time.time() * 1000),
         } 
         resp_put_alertnew = session.put(
         f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs",
