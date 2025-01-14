@@ -37,6 +37,7 @@ mod m20241227_000300_create_org_users_table;
 mod m20241227_000400_populate_users_table;
 mod m20241227_000500_delete_meta_users_table;
 mod m20250109_092400_recreate_tables_with_ksuids;
+mod m20250113_144600_create_unique_folder_name_idx;
 
 pub struct Migrator;
 
@@ -67,6 +68,7 @@ impl MigratorTrait for Migrator {
             // TODO: Include this in a future pr
             // Box::new(m20241227_000500_delete_meta_users_table::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
+            Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
         ]
     }
 }
