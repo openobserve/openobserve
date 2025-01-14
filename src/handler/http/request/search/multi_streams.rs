@@ -281,6 +281,9 @@ pub async fn search_multi(
                     ));
                 }
             };
+            if !keys_used.is_empty() {
+                log::info!("keys used : {:?}", keys_used);
+            }
             // Check permissions on stream ends
             // Check permissions on keys
             for key in keys_used {
