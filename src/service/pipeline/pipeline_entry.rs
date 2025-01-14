@@ -52,7 +52,6 @@ impl PipelineEntry {
     }
 
     pub fn get_token(&self) -> &str {
-        // self.stream_info.stream_token.clone().unwrap_or_default()
         self.stream_info.stream_token.as_deref().unwrap_or_default()
     }
 

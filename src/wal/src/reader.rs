@@ -23,7 +23,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
 use snafu::{ensure, ResultExt};
 
-use crate::{errors::*, FilePosition, ReadFrom};
+use crate::{errors::*, ReadFrom};
 
 pub struct Reader<R> {
     path: PathBuf,
@@ -49,14 +49,11 @@ impl Reader<BufReader<File>> {
         Ok(Self::new(path, f))
     }
 
-    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<(Self, FilePosition)> {
+    pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {
         let path = path.into();
         let f = File::open(&path).context(FileOpenSnafu { path: path.clone() })?;
         let mut f = BufReader::new(f);
-        // need to get the file length
-        let file_length = f.seek(io::SeekFrom::End(0)).context(FileOpenSnafu { path: path.clone() })?;
-        // move back
-        f.seek(io::SeekFrom::Start(0)).context(FileOpenSnafu { path: path.clone() })?;
+
         // check the file type identifier
         let mut buf = [0; super::FILE_TYPE_IDENTIFIER.len()];
         f.read_exact(&mut buf).context(UnableToReadArraySnafu {
@@ -79,7 +76,7 @@ impl Reader<BufReader<File>> {
             }
         };
 
-        Ok((Self::new(path, f), file_length))
+        Ok(Self::new(path, f))
     }
 
     pub fn metadata(&self) -> io::Result<Metadata> {

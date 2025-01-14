@@ -1562,12 +1562,6 @@ pub struct Pipeline {
     )]
     pub max_connections: usize,
     #[env_config(
-        name = "ZO_PIPELINE_EXPORTER_CLIENT_TYPE",
-        default = "http",
-        help = "pipeline exporter client type, default use http"
-    )]
-    pub exporter_client_type: String,
-    #[env_config(
         name = "ZO_PIPELINE_EXPORTER_TLS_ENABLE",
         default = "false",
         help = "enable exporter tls"

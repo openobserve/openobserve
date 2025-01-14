@@ -15,11 +15,13 @@
 
 use std::{
     collections::HashMap,
-    fs, io,
+    fs,
+    fs::remove_file,
+    io,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use std::fs::remove_file;
+
 use infra::errors::{Error, Result};
 use tokio::sync::{OnceCell, RwLock};
 use wal::FilePosition;

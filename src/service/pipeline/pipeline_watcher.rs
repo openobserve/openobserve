@@ -27,7 +27,8 @@ use tokio::{
 use wal::{FilePosition, ReadFrom};
 
 use crate::service::pipeline::{
-    pipeline_entry::{PipelineEntry, PipelineEntryBuilder},
+    pipeline_entry::PipelineEntryBuilder,
+    pipeline_exporter::PipelineExporter,
     pipeline_offset_manager::{init_pipeline_offset_manager, PIPELINE_OFFSET_MANAGER},
     pipeline_receiver::PipelineReceiver,
 };
@@ -35,7 +36,8 @@ use crate::service::pipeline::{
 #[derive(Debug)]
 pub enum WatcherEvent {
     NewFile(PathBuf),
-    StopWatchFile(PathBuf), // todo: how to confirm all the data send out successfully, reach the end of file? so we can remove the file
+    StopWatchFile(PathBuf), /* todo: how to confirm all the data send out successfully, reach
+                             * the end of file? so we can remove the file */
     StopWatchFileAndWait(PathBuf),
     LoadFromPersistFile((PathBuf, FilePosition)),
     Shutdown,
@@ -73,15 +75,8 @@ impl PipelineWatcher {
         }
     }
 
-    pub async fn run(
-        &mut self,
-        pipeline_exporter_sender: Sender<PipelineEntry>,
-        mut stop_pipeline_watcher_rx: Receiver<()>,
-    ) -> Result<()> {
-        tokio::spawn(PipelineWatcher::export(
-            self.concurrent,
-            pipeline_exporter_sender,
-        ));
+    pub async fn run(&mut self, mut stop_pipeline_watcher_rx: Receiver<()>) -> Result<()> {
+        tokio::spawn(PipelineWatcher::export(self.concurrent));
 
         let config = &config::get_config();
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
@@ -90,7 +85,9 @@ impl PipelineWatcher {
 
         {
             // init offset manager, load offset from persist file first
-            let _manager = PIPELINE_OFFSET_MANAGER.get_or_init(init_pipeline_offset_manager).await;
+            let _manager = PIPELINE_OFFSET_MANAGER
+                .get_or_init(init_pipeline_offset_manager)
+                .await;
         }
 
         loop {
@@ -148,7 +145,12 @@ impl PipelineWatcher {
         {
             Ok(receiver) => receiver,
             Err(e) => {
-                log::error!("Error watching new file for path {:?}: position: {:?}, error: {:?}", path, read_from, e);
+                log::error!(
+                    "Error watching new file for path {:?}: position: {:?}, error: {:?}",
+                    path,
+                    read_from,
+                    e
+                );
                 return Err(e);
             }
         };
@@ -171,7 +173,6 @@ impl PipelineWatcher {
 
     async fn stop_watch_file(path: &PathBuf, need_remove_file: bool) -> Result<()> {
         log::info!("Stop watching file for path: {:?}", path);
-        println!("Stop watching file for path: {:?}", path);
         if need_remove_file {
             if let Err(e) = remove_file(&path).await {
                 log::warn!(
@@ -220,10 +221,7 @@ impl PipelineWatcher {
         Ok(())
     }
 
-    async fn export(
-        concurrent: usize,
-        pipeline_exporter_sender: Sender<PipelineEntry>,
-    ) -> Result<()> {
+    async fn export(concurrent: usize) -> Result<()> {
         // control the task running concurrently
         let semaphore = Arc::new(Semaphore::new(concurrent));
         loop {
@@ -236,7 +234,6 @@ impl PipelineWatcher {
             } // release read lock
 
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let pipeline_exporter_sender = pipeline_exporter_sender.clone();
             let mut map = FILE_RECEIVER_MAP.write().await;
             let mut keys = map.keys().take(1).cloned();
             if let Some(random_key) = keys.next() {
@@ -244,9 +241,7 @@ impl PipelineWatcher {
                 let path = pr.path.clone();
                 let (stop_tx, stop_rx) = tokio::sync::mpsc::channel::<()>(1);
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        PipelineWatcher::sink(&mut pr, pipeline_exporter_sender, stop_rx).await
-                    {
+                    if let Err(e) = PipelineWatcher::sink(&mut pr, stop_rx).await {
                         log::error!("Error sending file receiver to current_tx: {:?}", e);
                     }
                     drop(permit);
@@ -258,11 +253,7 @@ impl PipelineWatcher {
         }
     }
 
-    async fn sink(
-        pr: &mut PipelineReceiver,
-        pipeline_exporter_sender: Sender<PipelineEntry>,
-        mut stop_rx: Receiver<()>,
-    ) -> Result<()> {
+    async fn sink(pr: &mut PipelineReceiver, mut stop_rx: Receiver<()>) -> Result<()> {
         let path = pr.path.clone();
         loop {
             tokio::select! {
@@ -270,8 +261,7 @@ impl PipelineWatcher {
                     log::info!("Received stop signal for file: {:?}", path);
                     break
                 }
-                res = Self::read_entry_and_hanlde(pr, pipeline_exporter_sender.clone())  => {
-                    // let res = PipelineWatcher::handle_entry(entry, pr.org_id.clone(), pr.stream_type.clone(), pr.path.clone(), pipeline_exporter_sender.clone()).await?;
+                res = Self::read_entry_and_hanlde(pr)  => {
                     match res {
                         Ok(None) => {
                             log::info!("No more entries to read from file: {:?}", path);
@@ -288,23 +278,26 @@ impl PipelineWatcher {
             }
         }
 
-        if let Err(e) = PipelineWatcher::stop_watch_file(&path, false).await {
+        if let Err(e) = PipelineWatcher::stop_watch_file(&path, true).await {
             log::warn!(
                 "Failed to remove processed file {:?}: {:?}. Will retry later",
                 path,
                 e
             );
-            // TODO: Implement retry mechanism
         }
 
         Ok(())
     }
-    async fn read_entry_and_hanlde(
-        pr: &mut PipelineReceiver,
-        pipeline_exporter_sender: Sender<PipelineEntry>,
-    ) -> Result<Option<()>> {
+    async fn read_entry_and_hanlde(pr: &mut PipelineReceiver) -> Result<Option<()>> {
         let entry = pr.read_entry();
-        PipelineWatcher::handle_entry(entry, pr.org_id.clone(), pr.stream_type.clone(), pr.path.clone(), pipeline_exporter_sender).await
+        PipelineWatcher::handle_entry(
+            entry,
+            pr.org_id.clone(),
+            pr.stream_type.clone(),
+            pr.path.clone(),
+            &pr.pipeline_exporter,
+        )
+        .await
     }
 
     async fn handle_entry(
@@ -312,11 +305,11 @@ impl PipelineWatcher {
         stream_org_id: String,
         stream_type: String,
         stream_path: PathBuf,
-        pipeline_exporter_sender: Sender<PipelineEntry>,
+        pipeline_exporter: &PipelineExporter,
     ) -> Result<Option<()>> {
         match entry {
             Ok((Some(entry), file_position)) => {
-                log::info!(
+                log::debug!(
                     "Read entry from file, stream: {}, stream_key: {}, stream_data: {:?}, stream_path: {}",
                     entry.stream,
                     entry.schema_key,
@@ -326,7 +319,7 @@ impl PipelineWatcher {
 
                 let data = PipelineEntryBuilder::new()
                     .stream_path(stream_path)
-                    .stream_endpoint("http://127.0.0.1:50800/api/default/default/_json".to_string())
+                    .stream_endpoint("http://127.0.0.1:5080/api/default/default/_json".to_string())
                     .stream_org_id(stream_org_id)
                     .stream_type(stream_type)
                     .stream_token(Some(
@@ -336,15 +329,14 @@ impl PipelineWatcher {
                     .entry(entry)
                     .build();
 
-                if let Err(e) = pipeline_exporter_sender.send(data).await {
+                if let Err(e) = pipeline_exporter.export_entry(data).await {
                     log::error!("Failed to send entry to exporter: {}", e.to_string());
+                    return Err(e);
                 }
 
                 Ok(Some(()))
             }
-            Ok((None, _)) => {
-                Ok(None)
-            }
+            Ok((None, _)) => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -368,10 +360,9 @@ mod tests {
         let concurrent = 100;
         let (s, r) = mpsc::channel(concurrent);
         let mut fw = PipelineWatcher::init(s, r, concurrent).await;
-        let (exporter_tx, _) = mpsc::channel(1024);
         let (stop_tx, stop_rx) = mpsc::channel(1);
         tokio::spawn(async move {
-            fw.run(exporter_tx, stop_rx).await.unwrap();
+            fw.run(stop_rx).await.unwrap();
         });
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -410,10 +401,9 @@ mod tests {
             .await
             .unwrap();
 
-        let (exporter_tx, _) = mpsc::channel(1024);
         let (stop_tx, stop_rx) = mpsc::channel(1);
         tokio::spawn(async move {
-            fw.run(exporter_tx, stop_rx).await.unwrap();
+            fw.run(stop_rx).await.unwrap();
         });
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;

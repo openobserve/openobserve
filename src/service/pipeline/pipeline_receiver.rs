@@ -23,6 +23,9 @@ use infra::errors::{Error, Result};
 use ingester::Entry;
 use serde::{Deserialize, Serialize};
 use wal::{FilePosition, ReadFrom, Reader, ENTRY_HEADER_LEN};
+
+use crate::service::pipeline::pipeline_exporter::PipelineExporter;
+
 /// File position to use when reading a new file.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -46,9 +49,10 @@ pub struct PipelineReceiver {
     pub path: PathBuf,
     pub org_id: String,
     pub stream_type: String,
+    stream_name: String,
     reader: Reader<BufReader<File>>,
+    pub pipeline_exporter: PipelineExporter,
     file_position: FilePosition,
-    file_end_position: FilePosition,
 }
 
 impl std::fmt::Debug for PipelineReceiver {
@@ -64,7 +68,7 @@ impl std::fmt::Debug for PipelineReceiver {
 
 impl PipelineReceiver {
     pub fn new(path: PathBuf, read_from: ReadFrom) -> Result<PipelineReceiver> {
-        let (reader, file_end_position) = Reader::from_path_position(path.clone(), read_from)
+        let reader = Reader::from_path_position(path.clone(), read_from)
             .map_err(|e| Error::WalFileError(e.to_string()))?;
         let file_position = match read_from {
             ReadFrom::Checkpoint(file_position) => file_position,
@@ -79,14 +83,15 @@ impl PipelineReceiver {
         let file_columns = file_str.split('/').collect::<Vec<_>>();
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
-        // todo: find out stream_name
+        let pipeline_exporter = PipelineExporter::init()?;
         Ok(PipelineReceiver {
             path,
             org_id: org_id.to_string(),
             stream_type: stream_type.to_string(),
             reader,
             file_position,
-            file_end_position,
+            pipeline_exporter,
+            stream_name: "".to_string(), // init when read the first entry
         })
     }
 
@@ -115,6 +120,14 @@ impl PipelineReceiver {
         self.file_position += ENTRY_HEADER_LEN + len
     }
 
+    pub fn set_stream_name(&mut self, stream_name: String) {
+        self.stream_name = stream_name;
+    }
+
+    pub fn get_stream_name(&self) -> &str {
+        self.stream_name.as_str()
+    }
+
     /// Read a entry from the wal file
     pub(super) fn read_entry(&mut self) -> Result<(Option<Entry>, FilePosition)> {
         let (entry_bytes, len) = match self.read_entry_vecu8()? {
@@ -129,6 +142,13 @@ impl PipelineReceiver {
         })?;
 
         self.set_file_position(len);
+        // if we inject stream name into file path, we can set stream name when init the receiver, this would be better
+        // why we need to set stream name here, it`s because we need to ensure the request protocal of the stream when entry send to remote cluster
+        // each stream will have its remote request protocol(http or grpc)
+        if self.get_stream_name().is_empty() {
+            self.set_stream_name(entry.stream.to_string());
+        }
+
         Ok((Some(entry), self.get_file_position()))
     }
 
@@ -238,6 +258,5 @@ mod tests {
         let _fw = PipelineReceiver::new(path.clone(), ReadFrom::Checkpoint(file_position)).unwrap();
 
         remove_file(path).unwrap();
-
     }
 }

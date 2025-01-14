@@ -20,10 +20,8 @@ use ingester::{Entry, WAL_DIR_DEFAULT_PREFIX};
 use tokio::sync::{mpsc, oneshot};
 use wal::Writer;
 
-use crate::service::pipeline::{
-    pipeline_entry::PipelineEntry,
-    pipeline_exporter::PipelineExporter,
-    pipeline_watcher::{PipelineWatcher, WatcherEvent, FILE_WATCHER_NOTIFY},
+use crate::service::pipeline::pipeline_watcher::{
+    PipelineWatcher, WatcherEvent, FILE_WATCHER_NOTIFY,
 };
 
 pub struct PipelineFileServerBuilder {}
@@ -38,17 +36,10 @@ impl PipelineFileServerBuilder {
             PipelineWatcher::init(s, r, cfg.pipeline.remote_stream_wal_concurrent_count).await;
 
         // build pipeline_exporter
-        let (stop_pipeline_expoter_tx, stop_pipleline_exporter_rx) = mpsc::channel(1);
         let (stop_pipeline_watcher_tx, stop_pipleline_watcher_rx) = mpsc::channel(1);
-        let (pipeline_exporter_tx, pipeline_exporter_rx) = mpsc::channel::<PipelineEntry>(1);
-        let pipelins_exporter =
-            PipelineExporter::init(pipeline_exporter_rx, stop_pipleline_exporter_rx).unwrap();
 
         PipelineFileServer::new(
             pipeline_watcher,
-            pipelins_exporter,
-            pipeline_exporter_tx,
-            stop_pipeline_expoter_tx,
             stop_pipeline_watcher_tx,
             stop_pipleline_watcher_rx,
         )
@@ -57,9 +48,6 @@ impl PipelineFileServerBuilder {
 
 pub struct PipelineFileServer {
     pub pipeline_watcher: PipelineWatcher,
-    pub pipeline_exporter: PipelineExporter,
-    pipeline_exporter_sender: mpsc::Sender<PipelineEntry>,
-    stop_pipeline_expoter_tx: mpsc::Sender<()>,
     stop_pipeline_watcher_tx: mpsc::Sender<()>,
     stop_pipeline_watcher_rx: mpsc::Receiver<()>,
 }
@@ -67,37 +55,19 @@ pub struct PipelineFileServer {
 impl PipelineFileServer {
     pub fn new(
         pipeline_watcher: PipelineWatcher,
-        pipeline_exporter: PipelineExporter,
-        pipeline_exporter_sender: mpsc::Sender<PipelineEntry>,
-        stop_pipeline_expoter_tx: mpsc::Sender<()>,
         stop_pipeline_watcher_tx: mpsc::Sender<()>,
         stop_pipeline_watcher_rx: mpsc::Receiver<()>,
     ) -> Self {
         Self {
             pipeline_watcher,
-            pipeline_exporter,
-            stop_pipeline_expoter_tx,
-            pipeline_exporter_sender,
             stop_pipeline_watcher_tx,
             stop_pipeline_watcher_rx,
         }
     }
 
-    pub fn destructure(
-        self,
-    ) -> (
-        PipelineWatcher,
-        PipelineExporter,
-        mpsc::Sender<PipelineEntry>,
-        mpsc::Sender<()>,
-        mpsc::Sender<()>,
-        mpsc::Receiver<()>,
-    ) {
+    pub fn destructure(self) -> (PipelineWatcher, mpsc::Sender<()>, mpsc::Receiver<()>) {
         (
             self.pipeline_watcher,
-            self.pipeline_exporter,
-            self.pipeline_exporter_sender,
-            self.stop_pipeline_expoter_tx,
             self.stop_pipeline_watcher_tx,
             self.stop_pipeline_watcher_rx,
         )
@@ -105,36 +75,19 @@ impl PipelineFileServer {
 
     pub async fn run(outside_shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
         log::info!("PipelineFileServer started");
-        let (
-            mut pipeline_watcher,
-            mut pipeline_exporter,
-            pipeline_exporter_sender,
-            stop_pipeline_exporter_sender,
-            stop_pipeline_watcher_sender,
-            stop_pipeline_watcher_rx,
-        ) = PipelineFileServerBuilder::build().await.destructure();
+        let (mut pipeline_watcher, stop_pipeline_watcher_sender, stop_pipeline_watcher_rx) =
+            PipelineFileServerBuilder::build().await.destructure();
 
         tokio::spawn(async move {
             log::info!("PipelineWatcher started");
-            let _ = pipeline_watcher
-                .run(pipeline_exporter_sender, stop_pipeline_watcher_rx)
-                .await;
+            let _ = pipeline_watcher.run(stop_pipeline_watcher_rx).await;
             log::info!("PipelineWatcher end");
-        });
-
-        tokio::spawn(async move {
-            log::info!("PipelineExporter started");
-            let _ = pipeline_exporter.export().await;
-            log::info!("PipelineExporter end");
         });
 
         tokio::spawn(async move {
             log::info!("PipelineFileServer running and waiting for shutdown signal");
             loop {
                 let _ = outside_shutdown_rx.await;
-                println!("PipelineExporter begin to shutdown");
-                log::info!("PipelineExporter begin to shutdown");
-                let _ = stop_pipeline_exporter_sender.send(()).await;
 
                 log::info!("PipelineWatcher begin to shutdown");
                 let _ = stop_pipeline_watcher_sender.send(()).await;
@@ -163,7 +116,7 @@ impl PipelineFileServer {
         let config = &config::get_config();
         let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
             .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024, 8 * 1024).unwrap();
+        let mut writer = Writer::new(dir, "org", "logs", 1, 1024_1024, 8 * 1024).unwrap();
 
         for i in 0..100 {
             let data = serde_json::json!(
