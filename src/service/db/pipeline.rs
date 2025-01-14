@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// use std::sync::Arc;
-
 use std::sync::Arc;
 
 use config::meta::{
@@ -325,7 +323,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         .is_some()
                     {
                         log::info!(
-                            "[Pipeline]: pipeline {} disabled and removed from cache.",
+                            "[Pipeline]: pipeline {} deleted and removed from cache.",
                             pipeline_id
                         );
                     };
