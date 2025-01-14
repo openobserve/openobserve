@@ -108,7 +108,7 @@ pub async fn process_session_detail(
     query: web::Query<CheckoutSessionDetailRequestQuery>,
 ) -> impl Responder {
     let org_id = path.into_inner();
-    if query.success != "success" {
+    if query.status != "success" {
         return o2_cloud_billings::BillingError::InvalidStatus.into_http_response();
     }
 

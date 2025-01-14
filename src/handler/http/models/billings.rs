@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 #[derive(Debug, Deserialize)]
 pub struct CheckoutSessionDetailRequestQuery {
     pub session_id: String,
-    pub success: String,
+    pub status: String,
     pub plan: String,
 }
 
