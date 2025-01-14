@@ -150,6 +150,17 @@ pub async fn get_folder(
 }
 
 #[tracing::instrument()]
+pub async fn get_folder_by_name(
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get_by_name(org_id, folder_name, folder_type)
+        .await?
+        .ok_or(FolderError::NotFound)
+}
+
+#[tracing::instrument()]
 pub async fn delete_folder(
     org_id: &str,
     folder_id: &str,
