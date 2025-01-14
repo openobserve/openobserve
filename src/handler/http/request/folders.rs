@@ -417,7 +417,7 @@ pub mod deprecated {
     #[utoipa::path(
         context_path = "/api",
         tag = "Folders",
-        operation_id = "GetFolder",
+        operation_id = "GetFolderByName",
         security(
             ("Authorization" = [])
         ),
