@@ -55,11 +55,6 @@ pub async fn get(
     end: i64,
     step: i64,
 ) -> Result<Option<(i64, Vec<RangeValue>)>> {
-    let cfg = get_config();
-    if !cfg.common.result_cache_enabled {
-        return Ok(None);
-    }
-
     // get the bucket cache
     let key = get_hash_key(query, step);
     let bucket_id = get_bucket_id(&key);
@@ -163,7 +158,7 @@ pub async fn set(
     let cfg = get_config();
     let max_ts = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64);
     let new_end = if end > max_ts { max_ts } else { end };
-    if start >= max_ts || new_end <= start + step {
+    if range_values.is_empty() || start >= max_ts || new_end <= start + step {
         // all of the data in retention time, no need to store
         return Ok(());
     }
@@ -385,7 +380,7 @@ mod tests {
         let trace_id = "test_trace1";
         let query = "test_query1";
         let end = now_micros();
-        let start = end - second_micros(300);
+        let start = end - second_micros(3600);
         let step = second_micros(15);
         let (start, end) = adjust_start_end(start, end, step, false);
 
@@ -425,7 +420,7 @@ mod tests {
             );
             assert_eq!(new_start, valid_max_ts + step);
         } else {
-            panic!("Failed to get cached samples");
+            panic!("Failed to get cached values");
         }
     }
 
@@ -434,12 +429,13 @@ mod tests {
         let trace_id = "test_trace2";
         let query = "test_query2";
         let end = now_micros();
-        let start = end - second_micros(60);
+        let start = end - second_micros(3600);
         let step = second_micros(15);
+        let (start, end) = adjust_start_end(start, end, step, false);
 
         // Add more than METRICS_INDEX_CACHE_MAX_ITEMS entries
         for i in 0..METRICS_INDEX_CACHE_MAX_ITEMS + 2 {
-            let end = start + second_micros(3600 * (i as i64 + 1));
+            let start = start + step * i as i64;
             let range_values = vec![RangeValue {
                 labels: Labels::new(),
                 samples: vec![Sample {

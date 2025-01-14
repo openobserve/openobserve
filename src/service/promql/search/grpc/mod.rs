@@ -121,9 +121,8 @@ pub async fn search(
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
             log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp {:?}, took: {:?}",
-                resp,
-                start_time.elapsed().as_millis() as i32
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
+                 start_time.elapsed().as_millis() 
             );
             results.push(resp);
         }

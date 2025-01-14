@@ -337,12 +337,15 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if let Some(matrix) = values.get_ref_matrix_values() {
-        if let Err(err) = cache::set(&trace_id, query, original_start, end, step, matrix).await {
-            log::error!(
-                "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
-                err
-            );
+    if !cache_disabled {
+        if let Some(matrix) = values.get_ref_matrix_values() {
+            if let Err(err) = cache::set(&trace_id, query, original_start, end, step, matrix).await
+            {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
+                    err
+                );
+            }
         }
     }
 
