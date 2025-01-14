@@ -897,10 +897,12 @@ const mandatoryKeys = ref([
 {
     key: "ORIGIN_CLUSTER_TOKEN",
     value: "",
+    uuid: getUUID()
 },
 {
     key: "ORIGIN_CLUSTER_URL",
     value: "",
+    uuid: getUUID()
 }
 ]);
 
@@ -1104,23 +1106,26 @@ const saveActionScript = async () => {
 // Populate form (either FormData or plain object)
   Object.entries(commonFields).forEach(([key, value]) => {
     if (useFormData) {
-          form.append(
+      (form as FormData).append(
             key,
             typeof value === "object" ? JSON.stringify(value) : value,
           );
     } else {
-      form[key] = value;
-    }
+      (form as Record<string, any>)[key] = value;
+      }
   });
 
-// Add file fields if using FormData
+  // Add file fields if using FormData
   if (useFormData && formData.value.codeZip) {
-    form.append("file", formData.value.codeZip || "");
-    form.append("filename", (formData.value.codeZip as File).name || "");
+    (form as FormData).append("file", formData.value.codeZip || "");
+    (form as FormData).append(
+      "filename",
+      (formData.value.codeZip as File).name || "",
+    );
   }
 
   if (isEditingActionScript.value && formData.value.codeZip) {
-    form.append("id", formData.value.id);
+    (form as FormData).append("id", formData.value.id);
   }
 
 

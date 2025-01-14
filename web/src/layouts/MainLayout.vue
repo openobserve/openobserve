@@ -812,9 +812,10 @@ export default defineComponent({
       );
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter(
-        (link: { name: string ; hide: boolean }) => !disableMenus.has(link.name) && !link.hide,
-      );
+      linksList.value = linksList.value.filter((link) => {
+          const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
+          return !disableMenus.has(link.name) && !hide;
+        });
     };
 
     // additional links based on environment and conditions
