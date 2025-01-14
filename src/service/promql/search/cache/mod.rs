@@ -63,8 +63,8 @@ pub async fn get(
     // get the bucket cache
     let key = get_hash_key(query, step);
     let bucket_id = get_bucket_id(&key);
-    let metrics = GLOBAL_CACHE[bucket_id].read().await;
-    let Some(index) = metrics.cache.get(&key) else {
+    let r = GLOBAL_CACHE[bucket_id].read().await;
+    let Some(index) = r.cache.get(&key) else {
         return Ok(None);
     };
 
@@ -84,12 +84,19 @@ pub async fn get(
             best_diff = d;
         }
     }
+    drop(r);
     if best_key.is_empty() {
         return Ok(None);
     }
 
     // get the data
     let Ok(data) = infra::cache::file_data::get(trace_id, &best_key, None).await else {
+        // need to drop the key from index
+        let mut w = GLOBAL_CACHE[bucket_id].write().await;
+        if let Some(index) = w.cache.get_mut(&key) {
+            index.entries.retain(|entry| entry.key != best_key);
+        }
+        drop(w);
         return Ok(None);
     };
     let data = data.to_vec();

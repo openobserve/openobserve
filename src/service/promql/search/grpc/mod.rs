@@ -99,6 +99,7 @@ pub async fn search(
     let start = query.start;
     let end = query.end;
     let step = query.step;
+    let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
 
     let mut results = Vec::new();
     if start == end {
@@ -106,6 +107,12 @@ pub async fn search(
     } else {
         let group_interval = max_interval - max_interval % step;
         let group = generate_search_group(start, end, step, group_interval);
+        if group.len() > 1 {
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: get groups {:?}",
+                group
+            );
+        }
         for (start, end) in group {
             let mut req = req.clone();
             req.need_wal =
@@ -113,6 +120,11 @@ pub async fn search(
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp {:?}, took: {:?}",
+                resp,
+                start_time.elapsed().as_millis() as i32
+            );
             results.push(resp);
         }
     }
@@ -143,7 +155,7 @@ pub async fn search_inner(
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = parser::parse(&query.query).map_err(|e| {
-        log::error!("promQL parse query error: {e}");
+        log::error!("[trace_id {trace_id}] promql->search->grpc: parse query error: {e}");
         DataFusionError::Execution(e)
     })?;
 
