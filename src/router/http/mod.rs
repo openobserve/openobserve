@@ -304,25 +304,32 @@ async fn proxy_querier_by_body(
         || path.contains("/prometheus/api/v1/query_exemplars")
     {
         if req.method() == "GET" {
-            let query: web::Query<RequestRangeQuery> =
-                web::Query::from_query(req.query_string()).unwrap();
+            let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
+            };
             (query.query.clone().unwrap_or_default(), None)
         } else {
-            let query: web::Form<RequestRangeQuery> =
-                web::Form::from_request(&req, &mut payload.into_inner())
-                    .await
-                    .unwrap();
+            let Ok(query) =
+                web::Form::<RequestRangeQuery>::from_request(&req, &mut payload.into_inner()).await
+            else {
+                return Ok(HttpResponse::BadRequest().body("Failed to parse form data"));
+            };
             (query.query.clone().unwrap_or_default(), Some(query))
         }
     } else {
         return default_proxy(req, payload, client, new_url, start).await;
     };
 
-    let node_id = cluster::get_node_from_consistent_hash(&key, &Role::Querier, None).await;
-    if node_id.is_none() {
+    // get node name by consistent hash
+    let Some(node_name) = cluster::get_node_from_consistent_hash(&key, &Role::Querier, None).await
+    else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
-    }
-    let node = cluster::get_node_by_uuid(&node_id.unwrap()).await.unwrap();
+    };
+
+    // get node by name
+    let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+        return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
+    };
     let new_url = format!("{}{}", node.http_addr, path);
 
     // send query
