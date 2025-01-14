@@ -893,16 +893,16 @@ const frequencyTabs = [
 ];
 
 const mandatoryKeys = ref([
-{
-    key: "ORIGIN_CLUSTER_TOKEN",
-    value: "",
-    uuid: getUUID()
-},
-{
-    key: "ORIGIN_CLUSTER_URL",
-    value: "",
-    uuid: getUUID()
-}
+    {
+        key: "ORIGIN_CLUSTER_URL",
+        value: "",
+        uuid: getUUID(),
+    },
+    {
+        key: "ORIGIN_CLUSTER_TOKEN",
+        value: "",
+        uuid: getUUID(),
+    },
 ]);
 
 
@@ -1070,7 +1070,7 @@ const saveActionScript = async () => {
             (mandatory) => mandatory.key === curr.key
           );
 
-          if (!isMandatoryKey) {
+          if (!isMandatoryKey && curr.key) {
             // Add the key only if it is not a mandatory key
             acc[curr.key] = curr.value;
           }
