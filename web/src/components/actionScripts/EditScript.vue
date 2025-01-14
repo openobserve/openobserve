@@ -261,16 +261,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-tooltip anchor="center right" self="center left">
                             <span style="font-size: 14px">
-                              Pattern: * * * * * * means every second.
+                              Pattern: * * * * * means every minute .
                               <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                              Format: [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] 
+                              [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
                               <br />
                               Use '*' to represent any value, 'L' for the last
                               day/weekday. <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
+                              Example: 0 12 * * ? - Triggers at 12:00 PM
+                              daily. It specifies minute, hour, day of
                               month, month, and day of week, respectively.</span
                             >
                           </q-tooltip>
@@ -1048,7 +1047,7 @@ const saveActionScript = async () => {
 
   // Add cron expression if needed
   if (frequency.value.type === "Repeat") {
-    commonFields.cron_expr = frequency.value.cron.toString().trim() + " *";
+    commonFields.cron_expr = frequency.value.cron.toString().trim();
     // commonFields.timezoneOffset = convertedDateTime.offset.toString();
     // commonFields.timezone = scheduling.value.timezone;
   }
