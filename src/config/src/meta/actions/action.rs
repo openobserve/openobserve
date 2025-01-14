@@ -20,12 +20,14 @@ pub enum ExecutionDetailsType {
     Repeat,
 }
 
-impl From<&str> for ExecutionDetailsType {
-    fn from(s: &str) -> Self {
-        match s {
-            "once" => ExecutionDetailsType::Once,
-            "repeat" => ExecutionDetailsType::Repeat,
-            _ => ExecutionDetailsType::Once,
+impl TryFrom<&str> for ExecutionDetailsType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "Once" => Ok(ExecutionDetailsType::Once),
+            "Repeat" => Ok(ExecutionDetailsType::Repeat),
+            _ => Err(anyhow::anyhow!("Invalid ExecutionDetailsType")),
         }
     }
 }

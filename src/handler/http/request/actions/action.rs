@@ -34,7 +34,10 @@ use o2_enterprise::enterprise::actions::action_manager::{
 use svix_ksuid::Ksuid;
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{check_permissions, remove_ownership, set_ownership, UserEmail},
+    },
     handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
 };
 
@@ -62,7 +65,10 @@ const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
 pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpResponse, Error> {
     let (org_id, ksuid) = path.into_inner();
     match delete_app_from_target_cluster(&org_id, ksuid).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Action deleted")),
+        Ok(_) => {
+            remove_ownership(&org_id, "actions", Authz::new(&ksuid.to_string())).await;
+            Ok(MetaHttpResponse::ok("Action deleted"))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -203,6 +209,10 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
     }
 }
 
+// fn to_err_message(error: &str) -> serde_json::Value {
+//     serde_json::json!({"message": error})
+// }
+
 /// Upload a zipped action file and process it.
 /// This endpoint allows uploading a ZIP file containing an action, which will be extracted,
 /// processed, and executed.
@@ -227,6 +237,7 @@ pub async fn upload_zipped_action(
     path: web::Path<String>,
     mut payload: Multipart,
     req: HttpRequest,
+    user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut file_data = Vec::new();
@@ -349,7 +360,11 @@ pub async fn upload_zipped_action(
                         .body("Execution details field is missing or empty"));
                 }
                 if let Ok(exec_details) = std::str::from_utf8(&details) {
-                    action.execution_details = ExecutionDetailsType::from(exec_details);
+                    if let Ok(exec_details_type) = ExecutionDetailsType::try_from(exec_details) {
+                        action.execution_details = exec_details_type;
+                    } else {
+                        return Ok(HttpResponse::BadRequest().body("Invalid execution details"));
+                    }
                 } else {
                     return Ok(HttpResponse::BadRequest()
                         .body("Execution details field contains invalid UTF-8 data"));
@@ -451,6 +466,24 @@ pub async fn upload_zipped_action(
         return Ok(HttpResponse::BadRequest().body("Missing mandatory fields"));
     }
 
+    // If action ID is present as field then we know its an update request
+    // Hence we treat it as a PUT request and check for permissions
+    let method = match action.id {
+        Some(_) => "PUT",
+        None => "POST",
+    };
+    if !check_permissions(
+        action.id.map(|ksuid| ksuid.to_string()),
+        &org_id,
+        &user_email.user_id,
+        "actions",
+        method,
+    )
+    .await
+    {
+        return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
+    }
+
     if file_data.is_empty() {
         return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
     }
@@ -461,17 +494,21 @@ pub async fn upload_zipped_action(
     // Attempt to read the uploaded data as a ZIP file
     match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => {
-            println!("Successfully read ZIP archive with {} files", archive.len());
+            log::info!("Successfully read ZIP archive with {} files", archive.len());
             match register_app(action, archive, &file_path).await {
-                Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
-                Err(e) => {
-                    Ok(HttpResponse::BadRequest().body(format!("Failed to process action: {}", e)))
+                Ok(uuid) => {
+                    set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
+                    Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid})))
                 }
+                Err(e) => Ok(HttpResponse::BadRequest().json(
+                    serde_json::json!({"message":format!("Failed to process action:{}", e)}),
+                )),
             }
         }
         Err(e) => {
-            eprintln!("Error reading ZIP file: {:?}", e);
-            Ok(HttpResponse::BadRequest().body(format!("Error reading ZIP file: {:?}", e)))
+            log::error!("Error reading ZIP file: {:?}", e);
+            Ok(HttpResponse::BadRequest()
+                .json(serde_json::json!({"message":format!("Error reading ZIP file: {:?}", e)})))
         }
     }
 }
