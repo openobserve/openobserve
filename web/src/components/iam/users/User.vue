@@ -628,13 +628,17 @@ export default defineComponent({
       });
     };
 
-    const updateMember = (data: any) => {
+    const updateMember = async (data: any) => {
       if (data.data != undefined) {
-        usersState.users.forEach((member: any, key: number) => {
-          if (member.org_member_id == data.data.id) {
-            usersState.users[key].role = data.data.role;
-          }
-        });
+        try {
+          await getOrgMembers();
+        } catch (error) {
+          $q.notify({
+            color: "negative",
+            message: "Failed to refresh user list",
+          });
+        }
+        updateUserActions();
         showUpdateUserDialog.value = false;
       }
     };
