@@ -393,6 +393,11 @@ export default defineComponent({
             ) {
               dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+            } else if (streamResponse.stats.created_at) {
+              // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
+              // Stats will be available asynchronously, so we can use created_at time to get the time range.
+              dateTime["from"] = streamResponse.stats.created_at - 60000000;
+              dateTime["to"] = streamResponse.stats.created_at + 3600000000;
             } else {
               dateTime["period"] = "15m";
             }
