@@ -1006,7 +1006,10 @@ pub async fn match_file(
     equal_items: &[(String, String)],
 ) -> bool {
     // fast path
-    if partition_keys.is_empty() || !source.key.contains('=') {
+    if partition_keys.is_empty()
+        || !source.key.contains('=')
+        || stream_type == StreamType::EnrichmentTables
+    {
         return true;
     }
 
