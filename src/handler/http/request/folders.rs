@@ -216,7 +216,7 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
         (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
     ),
 )]
-#[get("/v2/{org_id}/folders/name/{folder_type}/{folder_name}")]
+#[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
 pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -> impl Responder {
     let (org_id, folder_type, folder_name) = path.into_inner();
     match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
