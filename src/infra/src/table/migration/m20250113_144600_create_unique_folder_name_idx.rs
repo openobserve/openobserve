@@ -99,7 +99,7 @@ struct FolderCount {
     name: String,
 
     /// The count of folders that have this `org`, `type`, and `name`.
-    count: i32,
+    count: i64,
 }
 
 impl FolderCount {
