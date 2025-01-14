@@ -1486,7 +1486,12 @@ const useLogs = () => {
       // else use organization settings
       const shouldUseWebSocket = isWebSocketEnabled();
 
-      searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
+      const isMultiStreamSearch =
+        searchObj.data.stream.selectedStream.length > 1 &&
+        !searchObj.meta.sqlMode;
+
+      searchObj.communicationMethod =
+        shouldUseWebSocket && !isMultiStreamSearch ? "ws" : "http";
 
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);
