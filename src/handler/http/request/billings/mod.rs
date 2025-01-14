@@ -66,7 +66,7 @@ pub async fn create_checkout_session(
     }
 
     match o2_cloud_billings::create_checkout_session(
-        &get_config().common.base_uri,
+        &get_config().common.web_url,
         email,
         &org_id,
         sub_type,
@@ -125,7 +125,7 @@ pub async fn process_session_detail(
     {
         Err(e) => e.into_http_response(),
         Ok(()) => {
-            let redirect_url = format!("{}/billings/plans", &get_config().common.base_uri);
+            let redirect_url = format!("{}/billings/plans", &get_config().common.web_url);
             RedirectResponseBuilder::new(&redirect_url)
                 .build()
                 .redirect_http()
@@ -193,7 +193,9 @@ pub async fn list_invoices(path: web::Path<String>, user_email: UserEmail) -> im
     }
     match o2_cloud_billings::list_invoice(&org_id, email).await {
         Ok(invoices) => {
-            let body = ListInvoicesResponseBody { invoices };
+            let body = ListInvoicesResponseBody {
+                invoices: invoices.unwrap_or_default(),
+            };
             HttpResponse::Ok().json(body)
         }
         Err(e) => e.into_http_response(),

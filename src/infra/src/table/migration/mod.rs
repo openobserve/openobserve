@@ -69,4 +69,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
         ]
     }
+
+    
 }
