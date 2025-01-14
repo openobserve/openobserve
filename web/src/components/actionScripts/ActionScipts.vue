@@ -419,13 +419,7 @@ export default defineComponent({
         message: "Please wait while loading action scripts...",
       });
       actions
-        .list(
-          1,
-          1000,
-          "name",
-          false,
-          store.state.selectedOrganization.identifier,
-        )
+        .list(store.state.selectedOrganization.identifier)
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.length;
