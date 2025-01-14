@@ -611,7 +611,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       isUpdatingDestination
                       tabindex="0"
-                        :rules="[isRequiredValue]"
+                      :rules="[isRequiredValue]"
+                      hide-bottom-space
+
                     />
                   </div>
                   <div class="col-2 q-ml-none">
