@@ -38,10 +38,7 @@ pub struct ListInvoicesResponseBody {
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ListSubscriptionResponseBody {
-    pub customer_id: Option<String>,
-    pub subscription_id: Option<String>,
     pub subscription_type: String,
-    pub session_id: Option<String>,
 }
 
 /// HTTP request body for `CreateQuotaThreshold` endpoint.
@@ -83,10 +80,7 @@ impl From<cloud_org_usage::OrgUsageRecord> for GetQuotaThresholdResponseBody {
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
     fn from(value: cloud_billings::CustomerBilling) -> Self {
         Self {
-            customer_id: value.customer_id,
-            subscription_id: value.subscription_id,
             subscription_type: value.subscription_type.to_string(),
-            session_id: value.sessions_id,
         }
     }
 }

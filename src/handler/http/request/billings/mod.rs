@@ -66,7 +66,7 @@ pub async fn create_checkout_session(
     }
 
     match o2_cloud_billings::create_checkout_session(
-        &get_config().common.web_url,
+        &format!("{}/web", get_config().common.web_url),
         email,
         &org_id,
         sub_type,
