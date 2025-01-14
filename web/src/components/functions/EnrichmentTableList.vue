@@ -384,18 +384,24 @@ export default defineComponent({
         color: "secondary",
       });
 
-      await getStream(stream.name, stream.stream_type, true)
-        .then((streamResponse) => {
-          dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
-          dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
-        })
-        .catch((err) => {
-          console.error("Error while getting enrichment table: ", err);
-          dateTime["period"] = "15m";
-        })
-        .finally(() => {
-          dismiss();
-        });
+      try {
+        await getStream(stream.name, stream.stream_type, true)
+          .then((streamResponse) => {
+            dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+            dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+          })
+          .catch((err) => {
+            console.error("Error while getting enrichment table: ", err);
+            dateTime["period"] = "15m";
+          })
+          .finally(() => {
+            dismiss();
+          });
+      } catch (err) {
+        console.error("Error while getting enrichment table: ", err);
+        dateTime["period"] = "15m";
+        dismiss();
+      }
 
       return dateTime;
     };
