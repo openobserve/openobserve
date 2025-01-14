@@ -264,7 +264,7 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["error"] || "Organization creation failed."
+                err?.response?.data["message"] || "Organization creation failed."
               ),
             });
             dismiss();

@@ -220,7 +220,6 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (
-        showSSO.value &&
         router.currentRoute.value?.redirectedFrom?.query?.action == "getstarted"
       ) {
         autoRedirectDexLogin.value = true;

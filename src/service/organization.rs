@@ -509,6 +509,14 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     .await
     .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
 
+    // Add to OFGA
+    o2_enterprise::enterprise::openfga::authorizer::authz::add_user_to_org(
+        &org_id,
+        user_email,
+        &invite.role,
+    )
+    .await;
+
     if let Err(e) =
         org_invites::update_invite_status(invite_token, user_email, OrgInviteStatus::Accepted).await
     {

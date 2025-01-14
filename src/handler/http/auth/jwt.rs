@@ -18,9 +18,7 @@ use std::str::FromStr;
 #[cfg(feature = "enterprise")]
 use jsonwebtoken::TokenData;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::authorizer::authz::{
-    get_user_creation_tuples, get_user_org_tuple, update_tuples,
-};
+use o2_enterprise::enterprise::openfga::authorizer::authz::{get_user_org_tuple, update_tuples};
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::{
@@ -77,7 +75,7 @@ pub async fn process_token(
     {
         use config::get_config;
         use o2_enterprise::enterprise::openfga::authorizer::authz::{
-            get_user_role_creation_tuple, get_user_role_deletion_tuple,
+            get_user_creation_tuples, get_user_role_creation_tuple, get_user_role_deletion_tuple,
         };
 
         use crate::common::meta::user::UserOrgRole;
@@ -591,10 +589,6 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
                             org_id,
                             e
                         );
-                    } else {
-                        let mut tuples = vec![];
-                        get_user_creation_tuples(&org_id, user_email, &invite.role, &mut tuples);
-                        tuples_to_add.insert(org_id, tuples);
                     }
                 }
             }
