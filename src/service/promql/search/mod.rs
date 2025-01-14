@@ -114,7 +114,7 @@ async fn search_in_cluster(
 
     // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
     let cache_disabled =
-        !cfg.common.result_cache_enabled || req.no_cache || start == end || step == 0;
+        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step, cache_disabled);
 

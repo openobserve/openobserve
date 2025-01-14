@@ -267,7 +267,7 @@ pub async fn set(
 
 async fn gc(bucket_id: usize) -> Result<()> {
     let cfg = get_config();
-    if !cfg.common.result_cache_enabled {
+    if !cfg.common.metrics_cache_enabled {
         return Ok(());
     }
 

@@ -911,6 +911,12 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(
+        name = "ZO_METRICS_CACHE_ENABLED",
+        default = true,
+        help = "Enable result cache for PromQL metrics queries"
+    )]
+    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
