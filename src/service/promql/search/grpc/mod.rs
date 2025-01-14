@@ -122,7 +122,7 @@ pub async fn search(
             let resp = search_inner(&req).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
-                 start_time.elapsed().as_millis() 
+                 start_time.elapsed().as_millis()
             );
             results.push(resp);
         }
