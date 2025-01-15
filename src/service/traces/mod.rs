@@ -405,7 +405,7 @@ pub async fn handle_otlp_request(
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "stream did not receive a valid json objectt".into(),
+                                    "stream did not receive a valid json object".into(),
                                 ),
                             ));
                         }
@@ -559,6 +559,9 @@ pub async fn handle_otlp_request(
     format_response(partial_success, req_type)
 }
 
+/// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
+/// Only accepts data that has already been validated against the otlp protocol.
+/// Please use other ingestion handlers when ingesting raw trace data.
 pub async fn ingest_json(
     org_id: &str,
     body: web::Bytes,
@@ -644,7 +647,7 @@ pub async fn ingest_json(
                     span_status: span.span_status,
                     span_kind: span.span_kind,
                     duration: ((span.end_time - span.start_time) / 1_000_000) as f64, /* milliseconds */
-                    span_id: span.trace_id.clone(),
+                    span_id: span.span_id,
                 };
                 span_metrics.push(sm);
                 v
@@ -657,7 +660,7 @@ pub async fn ingest_json(
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        "stream did not receive a valid json objectt".into(),
+                        "stream did not receive a valid json object".into(),
                     )),
                 );
             }
