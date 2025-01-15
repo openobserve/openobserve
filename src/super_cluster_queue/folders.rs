@@ -35,6 +35,7 @@ pub(crate) async fn process_msg(msg: FolderMessage) -> Result<()> {
         } => {
             table::folders::put(
                 &org_id,
+                Some(id),
                 Folder {
                     folder_id,
                     name,
@@ -53,6 +54,7 @@ pub(crate) async fn process_msg(msg: FolderMessage) -> Result<()> {
         } => {
             table::folders::put(
                 &org_id,
+                None,
                 Folder {
                     folder_id,
                     name,

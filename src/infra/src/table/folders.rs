@@ -98,6 +98,7 @@ pub async fn list_folders(
 /// the new or updated folder.
 pub async fn put(
     org_id: &str,
+    id: Option<Ksuid>,
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder), errors::Error> {
@@ -118,8 +119,9 @@ pub async fn put(
         // active record so that Sea ORM will create a new DB record when the
         // active model is saved.
         None => {
+            let ksuid = id.unwrap_or_else(|| svix_ksuid::Ksuid::new(None, None));
             let active = ActiveModel {
-                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                id: Set(ksuid.to_string()),
                 org: Set(org_id.to_owned()),
                 // We should probably generate folder_id here for new folders,
                 // rather than depending on caller code to generate it.
