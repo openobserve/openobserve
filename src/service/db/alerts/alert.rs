@@ -271,16 +271,55 @@ pub async fn delete_by_name(
     Ok(())
 }
 
-pub async fn list<C: ConnectionTrait>(
+pub async fn list(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, infra::errors::Error> {
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    let params = if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+    } else {
+        params
+    };
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = table::list(client, params)
+        .await?
+        .into_iter()
+        .map(|(_f, a)| a)
+        .collect();
+    Ok(alerts)
+}
+
+pub async fn list_with_folders<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
-    let items = table::list(conn, params).await?.into_iter().collect();
-    Ok(items)
+    table::list(conn, params).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     cluster::watch_events(put_into_cache, delete_from_cache).await
+}
+
+pub async fn cache() -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = table::list_all(client).await?;
+
+    for alert in alerts {
+        let mut cacher = STREAM_ALERTS.write().await;
+        let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
+        let group = cacher.entry(stream_key.to_string()).or_default();
+        group.push(alert);
+    }
+    log::info!("Alerts Cached");
+    Ok(())
+}
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let key = "/alerts/";
+    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }
 
 async fn put_into_cache(
@@ -341,25 +380,6 @@ async fn delete_from_cache(
     };
     group.retain(|v| !v.name.eq(&alert_name));
     Ok(())
-}
-
-pub async fn cache() -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = table::list_all(client).await?;
-
-    for alert in alerts {
-        let mut cacher = STREAM_ALERTS.write().await;
-        let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
-        let group = cacher.entry(stream_key.to_string()).or_default();
-        group.push(alert);
-    }
-    log::info!("Alerts Cached");
-    Ok(())
-}
-
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/alerts/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }
 
 /// Returns the key used to store alerts in the in-memory cache, grouped by
