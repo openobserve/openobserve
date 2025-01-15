@@ -228,21 +228,6 @@ impl Sample {
     pub(crate) fn is_nan(&self) -> bool {
         self.value.is_nan()
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = json::Map::new();
-        buf.insert("_timestamp".to_string(), json::Value::from(self.timestamp));
-        buf.insert("value".to_string(), json::Value::from(self.value));
-        json::to_vec(&buf).unwrap()
-    }
-
-    pub fn from_bytes(data: &[u8]) -> Sample {
-        let data: json::Value = json::from_slice(data).unwrap();
-        let data = data.as_object().unwrap();
-        let timestamp = data.get("_timestamp").unwrap().as_i64().unwrap();
-        let value = data.get("value").unwrap().as_f64().unwrap();
-        Sample::new(timestamp, value)
-    }
 }
 
 #[derive(Debug, Default, Clone)]
