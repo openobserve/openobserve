@@ -130,9 +130,9 @@ pub async fn get(
 
         // update the new start
         let ns = if let Some(exemplars) = series.exemplars.as_ref() {
-            exemplars.last().unwrap().timestamp
+            exemplars.last().map(|v| v.timestamp).unwrap_or(0)
         } else {
-            series.samples.last().unwrap().timestamp
+            series.samples.last().map(|v| v.timestamp).unwrap_or(0)
         };
         if ns > new_start {
             new_start = ns;
