@@ -135,9 +135,9 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
-        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
-    } else {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
+    } else {
+        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
     }
     Ok(())
 }
