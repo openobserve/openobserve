@@ -20,7 +20,7 @@ mod meta;
 mod pipelines;
 mod scheduler;
 mod schemas;
-mod search_jobs;
+mod search_job;
 mod short_urls;
 
 use config::cluster::{is_offline, LOCAL_NODE};
@@ -39,7 +39,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_schema_msg: schemas::process,
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
-        on_search_job_msg: search_jobs::process,
+        on_search_job_msg: search_job::process,
         on_dashboard_msg: dashboards::process,
         on_pipeline_msg: pipelines::process,
     };
@@ -51,7 +51,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_scheduler_msg: scheduler::process,
     };
     let search_jobs_queue = SearchJobsQueue {
-        on_search_job_msg: search_jobs::process,
+        on_search_job_msg: search_job::process,
     };
     let dashboards_queue = DashboardsQueue {
         on_dashboard_msg: dashboards::process,

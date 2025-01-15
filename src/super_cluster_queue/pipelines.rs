@@ -35,6 +35,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::PipelineDelete => {
             let pipeline_id = parse_key(&msg.key)?;
             infra::cluster_coordinator::pipelines::emit_delete_event(&pipeline_id).await?;
+            infra::pipeline::delete(&pipeline_id).await?;
         }
         _ => {
             log::error!(

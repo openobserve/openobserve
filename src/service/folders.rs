@@ -18,12 +18,12 @@ use config::{
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
     },
 };
 use infra::{
     db::{connect_to_orm, ORM_CLIENT},
-    table::{self, folders::FolderType},
+    table,
 };
 
 use crate::common::{
