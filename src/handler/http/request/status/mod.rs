@@ -221,6 +221,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     };
     #[cfg(not(feature = "enterprise"))]
     let custom_logo_text = "".to_string();
+    #[cfg(not(feature = "enterprise"))]
+    let warning_text = "".to_string();
     #[cfg(feature = "enterprise")]
     let custom_slack_url = &o2cfg.common.custom_slack_url;
     #[cfg(not(feature = "enterprise"))]
