@@ -170,7 +170,6 @@ use crate::{common::meta, handler::http::request};
             config::meta::alerts::QueryCondition,
             config::meta::alerts::TriggerCondition,
             config::meta::destinations::HTTPType,
-            config::meta::alerts::templates::Template,
             // Dashboards
             crate::handler::http::models::dashboards::CreateDashboardRequestBody,
             crate::handler::http::models::dashboards::CreateDashboardResponseBody,

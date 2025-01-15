@@ -128,7 +128,7 @@ pub enum AlertError {
     SendNotificationError { error_message: String },
 
     #[error(transparent)]
-    GetDestinationWithTemplateError(anyhow::Error),
+    GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
     #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
     PeriodExceedsMaxQueryRange {
@@ -720,15 +720,13 @@ impl AlertExt for Alert {
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
-            let (dest, template) = destinations::get_with_template(&self.org_id, dest)
-                .await
-                .map_err(AlertError::GetDestinationWithTemplateError)?;
+            let (dest, template) = destinations::get_with_template(&self.org_id, dest).await?;
             let Module::Alert {
                 destination_type, ..
             } = dest.module
             else {
                 return Err(AlertError::GetDestinationWithTemplateError(
-                    anyhow::anyhow!("This is not an alert destination"),
+                    db::alerts::destinations::DestinationError::UnsupportedType,
                 ));
             };
             match send_notification(
