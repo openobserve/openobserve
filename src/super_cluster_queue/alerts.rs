@@ -45,8 +45,8 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             folder_id,
             alert,
         } => {
-            let alert_id = alert.id.clone();
-            let alert = table::alerts::create(conn, &org_id, &folder_id, alert, alert_id).await?;
+            log::debug!("Creating alert: {:?}", alert);
+            let alert = table::alerts::create(conn, &org_id, &folder_id, alert, true).await?;
             infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert).await?;
         }
         AlertMessage::Update {
