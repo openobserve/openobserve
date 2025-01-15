@@ -460,7 +460,7 @@ mod tests {
         let step = 60000000; // 60 seconds in microseconds
 
         let key = get_hash_key(query, step);
-        assert_eq!(key, "test_query-60000000");
+        assert_eq!(key, "b235015c612525ad7c11c109e3fdc261");
     }
 
     #[test]
