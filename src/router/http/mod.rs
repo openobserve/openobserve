@@ -166,6 +166,7 @@ async fn dispatch(
     client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
 
     // get online nodes
     let path = req
@@ -186,7 +187,7 @@ async fn dispatch(
     }
 
     // check if the request need to be proxied by body
-    if is_querier_route_by_body(&path) {
+    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
         return proxy_querier_by_body(req, payload, client, new_url, start, &path).await;
     }
 

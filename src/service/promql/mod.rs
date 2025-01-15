@@ -99,6 +99,7 @@ pub(crate) enum ApiFuncResponse<T: Serialize> {
         #[serde(rename = "errorType")]
         error_type: ApiErrorType,
         error: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
 }
