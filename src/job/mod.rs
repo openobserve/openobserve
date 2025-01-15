@@ -201,6 +201,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
 
+    // load metrics disk cache
+    tokio::task::spawn(async move { crate::service::promql::search::init().await });
+
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
 

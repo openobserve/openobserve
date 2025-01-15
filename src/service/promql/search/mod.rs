@@ -50,6 +50,16 @@ use crate::{
 mod cache;
 pub mod grpc;
 
+pub async fn init() -> Result<()> {
+    if !config::cluster::LOCAL_NODE.is_querier() {
+        return Ok(());
+    }
+    if let Err(e) = cache::init().await {
+        log::error!("Error init metrics disk cache: {}", e);
+    }
+    Ok(())
+}
+
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
 pub async fn search(
     trace_id: &str,
@@ -82,11 +92,17 @@ async fn search_in_cluster(
         query_exemplars: _,
     } = req.query.as_ref().unwrap();
 
+    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
+    let cache_disabled =
+        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
+    // adjust start and end time
+    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
         req.no_cache,
-        start,end,query,
+        start,end,step,query,
     );
 
     // get querier nodes from cluster
@@ -112,12 +128,6 @@ async fn search_in_cluster(
         0 => 1,
         n => n,
     };
-
-    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
-    let cache_disabled =
-        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
-    // adjust start and end time
-    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
 
     // get cache data
     let original_start = start;
