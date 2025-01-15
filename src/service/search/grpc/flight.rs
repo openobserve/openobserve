@@ -26,11 +26,12 @@ use config::{
         bitvec::BitVec,
         inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
+        sql::TableReferenceExt,
         stream::{FileKey, StreamPartition, StreamType},
     },
     utils::json,
 };
-use datafusion::physical_plan::union::UnionExec;
+use datafusion::{common::TableReference, physical_plan::union::UnionExec};
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -65,6 +66,7 @@ use crate::service::{
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
 pub async fn search(
+    trace_id: &str,
     req: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     // let start = std::time::Instant::now();
@@ -74,7 +76,7 @@ pub async fn search(
     let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
     let work_group = req.super_cluster_info.work_group.clone();
 
-    let trace_id = Arc::new(req.query_identifier.trace_id.to_string());
+    let trace_id = Arc::new(trace_id.to_string());
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
@@ -115,10 +117,12 @@ pub async fn search(
     }
 
     // get stream name
-    let stream_name = empty_exec.name();
+    let stream = TableReference::from(empty_exec.name());
+    let stream_name = stream.stream_name().to_string();
+    let stream_type = stream.get_stream_type(stream_type);
 
     // check if we are allowed to search
-    if db::compact::retention::is_deleting_stream(&org_id, stream_type, stream_name, None) {
+    if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
             "stream [{}] is being deleted",
             &stream_name
@@ -174,7 +178,6 @@ pub async fn search(
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
-        job_id: req.query_identifier.job_id.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: Some((req.search_info.start_time, req.search_info.end_time)),
@@ -193,14 +196,14 @@ pub async fn search(
     // search in object storage
     let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
-        let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
+        let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
         let (mut file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
             &org_id,
             stream_type,
-            stream_name,
+            &stream_name,
             query_params.time_range,
             &stream_settings.partition_keys,
             &search_partition_keys,

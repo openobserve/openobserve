@@ -19,8 +19,12 @@ use actix_web::{http, http::StatusCode, HttpResponse};
 use arrow_schema::DataType;
 use config::{
     is_local_disk_storage,
-    meta::stream::{
-        DistinctField, StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings,
+    meta::{
+        promql,
+        stream::{
+            DistinctField, StreamParams, StreamSettings, StreamStats, StreamType,
+            UpdateStreamSettings,
+        },
     },
     utils::{json, time::now_micros},
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -33,17 +37,16 @@ use infra::{
         unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
-    table::distinct_values::{self, DistinctFieldRecord, OriginType},
+    table::distinct_values::{check_field_use, DistinctFieldRecord, OriginType},
 };
 
 use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        prom,
         stream::{Stream, StreamProperty},
     },
-    service::{db, metrics::get_prom_metadata_from_schema},
+    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
 };
 
 const LOCAL: &str = "disk";
@@ -152,18 +155,18 @@ pub fn stream_res(
     stats.created_at = stream_created(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(prom::Metadata {
-            metric_type: prom::MetricType::Empty,
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+            metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),
             unit: "".to_string(),
         });
-        if meta.metric_type == prom::MetricType::Empty
+        if meta.metric_type == promql::MetricType::Empty
             && (stream_name.ends_with("_bucket")
                 || stream_name.ends_with("_sum")
                 || stream_name.ends_with("_count"))
         {
-            meta.metric_type = prom::MetricType::Counter;
+            meta.metric_type = promql::MetricType::Counter;
         }
         Some(meta)
     } else {
@@ -336,6 +339,7 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
     match infra::schema::get_settings(org_id, stream_name, stream_type).await {
         Some(mut settings) => {
             if let Some(max_query_range) = new_settings.max_query_range {
@@ -356,6 +360,7 @@ pub async fn update_stream_settings(
                 settings.data_retention = data_retention;
             }
 
+            // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
                 settings.defined_schema_fields =
                     if let Some(mut schema_fields) = settings.defined_schema_fields {
@@ -365,31 +370,41 @@ pub async fn update_stream_settings(
                         Some(new_settings.defined_schema_fields.add)
                     }
             }
-
             if !new_settings.defined_schema_fields.remove.is_empty() {
                 if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
                     schema_fields
                         .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
                 }
             }
+            if let Some(schema_fields) = settings.defined_schema_fields.as_ref() {
+                if schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!(
+                            "user defined schema fields count exceeds the limit: {}",
+                            cfg.limit.user_defined_schema_max_fields
+                        ),
+                    )));
+                }
+            }
 
+            // check for bloom filter fields
             if !new_settings.bloom_filter_fields.add.is_empty() {
                 settings
                     .bloom_filter_fields
                     .extend(new_settings.bloom_filter_fields.add);
             }
-
             if !new_settings.bloom_filter_fields.remove.is_empty() {
                 settings
                     .bloom_filter_fields
                     .retain(|field| !new_settings.bloom_filter_fields.remove.contains(field));
             }
 
+            // check for index fields
             if !new_settings.index_fields.add.is_empty() {
                 settings.index_fields.extend(new_settings.index_fields.add);
                 settings.index_updated_at = now_micros();
             }
-
             if !new_settings.index_fields.remove.is_empty() {
                 settings
                     .index_fields
@@ -445,24 +460,18 @@ pub async fn update_stream_settings(
 
             if !new_settings.distinct_value_fields.remove.is_empty() {
                 for f in &new_settings.distinct_value_fields.remove {
-                    let usage = match distinct_values::check_field_use(
-                        org_id,
-                        stream_name,
-                        stream_type.as_str(),
-                        f,
-                    )
-                    .await
-                    {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return Ok(HttpResponse::InternalServerError().json(
-                                MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    format!("error in updating settings : {e}"),
-                                ),
-                            ));
-                        }
-                    };
+                    let usage =
+                        match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
+                            Ok(entry) => entry,
+                            Err(e) => {
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                        format!("error in updating settings : {e}"),
+                                    ),
+                                ));
+                            }
+                        };
                     // if there are multiple uses, we cannot allow it to be removed
                     if usage.len() > 1 {
                         return Ok(HttpResponse::BadRequest().json(
@@ -653,11 +662,6 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    if !config::get_config().common.widening_schema_evolution {
-        return Err(anyhow::anyhow!(
-            "widening schema evolution is disabled, can't delete fields"
-        ));
-    }
     if fields.is_empty() {
         return Ok(());
     }

@@ -2,6 +2,9 @@
 
 pub use super::{
     alerts::Entity as Alerts, dashboards::Entity as Dashboards,
-    destinations::Entity as Destinations, folders::Entity as Folders,
+    destinations::Entity as Destinations,
+    distinct_value_fields::Entity as DistinctValueFields, folders::Entity as Folders,
+    search_job_partitions::Entity as SearchJobPartitions,
+    search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,
     search_queue::Entity as SearchQueue, templates::Entity as Templates,
 };

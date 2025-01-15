@@ -18,20 +18,21 @@ use std::{
     str::FromStr,
 };
 
-use actix_web::http;
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
     meta::{
         alerts::{
-            alert::{Alert, AlertListFilter},
+            alert::{Alert, AlertListFilter, ListAlertsParams},
             FrequencyType, Operator, QueryType,
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
         },
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
+        sql::resolve_stream_names,
         stream::StreamType,
     },
     utils::{
@@ -41,7 +42,11 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
+use infra::{schema::unwrap_stream_settings, table};
+use itertools::Itertools;
 use lettre::{message::MultiPart, AsyncTransport, Message};
+use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::Ksuid;
 
 use crate::{
     common::{
@@ -50,11 +55,100 @@ use crate::{
     },
     service::{
         alerts::{build_sql, destinations, QueryConditionExt},
-        db,
+        db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
     },
 };
+
+/// Errors that can occur when interacting with alerts.
+#[derive(Debug, thiserror::Error)]
+pub enum AlertError {
+    /// An error that occurs while interacting with the database through the
+    /// [infra] crate.
+    #[error("InfraError# {0}")]
+    InfraError(#[from] infra::errors::Error),
+
+    #[error("Error creating default alerts folder")]
+    CreateDefaultFolderError,
+
+    #[error("Alert name is required")]
+    AlertNameMissing,
+
+    #[error("Alert name cannot contain ':', '#', '?', '&', '%', quotes and space characters")]
+    AlertNameOfgaUnsupported,
+
+    #[error("Alert name cannot contain '/'")]
+    AlertNameContainsForwardSlash,
+
+    #[error("Alert destinations is required")]
+    AlertDestinationMissing,
+
+    #[error("Alert already exists")]
+    CreateAlreadyExists,
+
+    /// Error that occurs when trying to create an alert in a folder that cannot
+    /// be found.
+    #[error("Error creating alert in folder that cannot be found")]
+    CreateFolderNotFound,
+
+    /// Error that occurs when trying to move an alert to a destination folder
+    /// that cannot be found.
+    #[error("Error moving alert to folder that cannot be found")]
+    MoveDestinationFolderNotFound,
+
+    #[error("Alert not found")]
+    AlertNotFound,
+
+    #[error("Alert destination {dest} not found")]
+    AlertDestinationNotFound { dest: String },
+
+    #[error("Stream {stream_name} not found")]
+    StreamNotFound { stream_name: String },
+
+    #[error("Error decoding vrl function for alert: {0}")]
+    DecodeVrl(#[from] std::io::Error),
+
+    #[error(transparent)]
+    ParseCron(#[from] cron::error::Error),
+
+    #[error("Realtime alert should use Custom query type")]
+    RealtimeMissingCustomQuery,
+
+    #[error("Alert with SQL mode should have a query")]
+    SqlMissingQuery,
+
+    #[error("Alert with SQL can not contain SELECT * in the SQL query")]
+    SqlContainsSelectStar,
+
+    #[error("Alert with PromQL mode should have a query")]
+    PromqlMissingQuery,
+
+    #[error("{error_message}")]
+    SendNotificationError { error_message: String },
+
+    #[error(transparent)]
+    GetDestinationWithTemplateError(anyhow::Error),
+
+    #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
+    PeriodExceedsMaxQueryRange {
+        max_query_range_hours: i64,
+        stream_name: String,
+    },
+
+    #[error("Error resolving stream names in SQL query: {0}")]
+    ResolveStreamNameError(#[source] anyhow::Error),
+
+    /// An error occured trying to get the list of permitted alerts in
+    /// enterprise mode because no user_id was provided.
+    #[error("user_id required to get permitted alerts in enterprise mode")]
+    PermittedAlertsMissingUser,
+
+    /// An error occured trying to get the list of permitted alerts in
+    /// enterprise mode using the validator.
+    #[error("PermittedAlertsValidator# {0}")]
+    PermittedAlertsValidator(String),
+}
 
 pub async fn save(
     org_id: &str,
@@ -62,7 +156,48 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
     create: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), AlertError> {
+    // Currently all alerts are stored in the default folder so create the
+    // default folder for the org if it doesn't exist yet.
+    if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
+        create_default_alerts_folder(org_id).await?;
+    };
+
+    prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
+
+    // save the alert
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
+        .await
+        .map_err(|_| AlertError::CreateDefaultFolderError)?;
+    Ok(())
+}
+
+/// Validates the alert and prepares it before it is written to the database.
+async fn prepare_alert(
+    org_id: &str,
+    stream_name: &str,
+    name: &str,
+    alert: &mut Alert,
+    create: bool,
+) -> Result<(), AlertError> {
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -70,19 +205,17 @@ pub async fn save(
 
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&alert.name) {
-        return Err(anyhow::anyhow!(
-            "Alert name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
-        ));
+        return Err(AlertError::AlertNameOfgaUnsupported);
     }
     alert.org_id = org_id.to_string();
     let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
+    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(old_alert)) => {
             if create {
-                return Err(anyhow::anyhow!("Alert already exists"));
+                return Err(AlertError::CreateAlreadyExists);
             }
             alert.last_triggered_at = old_alert.last_triggered_at;
             alert.last_satisfied_at = old_alert.last_satisfied_at;
@@ -90,11 +223,11 @@ pub async fn save(
         }
         Ok(None) => {
             if !create {
-                return Err(anyhow::anyhow!("Alert not found"));
+                return Err(AlertError::AlertNotFound);
             }
         }
         Err(e) => {
-            return Err(e);
+            return Err(AlertError::InfraError(e));
         }
     }
 
@@ -111,7 +244,7 @@ pub async fn save(
             );
         }
         // Check the cron expression
-        Schedule::from_str(&alert.trigger_condition.cron)?;
+        Schedule::from_str(&alert.trigger_condition.cron).map_err(AlertError::ParseCron)?;
     } else if alert.trigger_condition.frequency == 0 {
         // default frequency is 60 seconds
         alert.trigger_condition.frequency =
@@ -119,10 +252,10 @@ pub async fn save(
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
-        return Err(anyhow::anyhow!("Alert name is required"));
+        return Err(AlertError::AlertNameMissing);
     }
     if alert.name.contains('/') {
-        return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
+        return Err(AlertError::AlertNameContainsForwardSlash);
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
@@ -138,20 +271,20 @@ pub async fn save(
                 }
             }
             Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Error decoding vrl function for alert: {e}"
-                ));
+                return Err(AlertError::DecodeVrl(e));
             }
         }
     }
 
     // before saving alert check alert destination
     if alert.destinations.is_empty() {
-        return Err(anyhow::anyhow!("Alert destinations is required"));
+        return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
-            return Err(anyhow::anyhow!("Alert destination {dest} not found"));
+            return Err(AlertError::AlertDestinationNotFound {
+                dest: dest.to_string(),
+            });
         };
     }
 
@@ -171,13 +304,27 @@ pub async fn save(
     // before saving alert check column type to decide numeric condition
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if stream_name.is_empty() || schema.fields().is_empty() {
-        return Err(anyhow::anyhow!("Stream {stream_name} not found"));
+        return Err(AlertError::StreamNotFound {
+            stream_name: stream_name.to_owned(),
+        });
+    }
+
+    // Alerts must follow the max_query_range of the stream as set in the schema
+    if let Some(settings) = unwrap_stream_settings(&schema) {
+        let max_query_range = settings.max_query_range;
+        if max_query_range > 0
+            && !alert.is_real_time
+            && alert.trigger_condition.period > max_query_range * 60
+        {
+            return Err(AlertError::PeriodExceedsMaxQueryRange {
+                max_query_range_hours: max_query_range,
+                stream_name: stream_name.to_owned(),
+            });
+        }
     }
 
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
-        return Err(anyhow::anyhow!(
-            "Realtime alert should use Custom query type"
-        ));
+        return Err(AlertError::RealtimeMissingCustomQuery);
     }
 
     match alert.query_condition.query_type {
@@ -192,14 +339,41 @@ pub async fn save(
             if alert.query_condition.sql.is_none()
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert with SQL mode should have a query"));
+                return Err(AlertError::SqlMissingQuery);
             }
             if alert.query_condition.sql.is_some()
                 && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
             {
-                return Err(anyhow::anyhow!(
-                    "Alert with SQL can not contain SELECT * in the SQL query"
-                ));
+                return Err(AlertError::SqlContainsSelectStar);
+            }
+
+            let sql = alert.query_condition.sql.as_ref().unwrap();
+            let stream_names = match resolve_stream_names(sql) {
+                Ok(stream_names) => stream_names,
+                Err(e) => {
+                    return Err(AlertError::ResolveStreamNameError(e));
+                }
+            };
+
+            // SQL may contain multiple stream names, check for each stream
+            // if the alert period is greater than the max query range
+            for stream in stream_names.iter() {
+                if !stream.eq(stream_name) {
+                    if let Some(settings) =
+                        infra::schema::get_settings(org_id, stream, stream_type).await
+                    {
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && !alert.is_real_time
+                            && alert.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(AlertError::PeriodExceedsMaxQueryRange {
+                                max_query_range_hours: max_query_range,
+                                stream_name: stream_name.to_owned(),
+                            });
+                        }
+                    }
+                }
             }
         }
         QueryType::PromQL => {
@@ -207,9 +381,7 @@ pub async fn save(
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
                 || alert.query_condition.promql_condition.is_none()
             {
-                return Err(anyhow::anyhow!(
-                    "Alert with PromQL mode should have a query"
-                ));
+                return Err(AlertError::PromqlMissingQuery);
             }
         }
     }
@@ -221,25 +393,97 @@ pub async fn save(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
-    // save the alert
-    match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
-        Ok(_) => {
-            if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
-            }
-            Ok(())
+    Ok(())
+}
+
+/// Creates a new alert in the specified folder.
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+        if folder_id == DEFAULT_FOLDER {
+            create_default_alerts_folder(org_id).await?;
+        } else {
+            return Err(AlertError::CreateFolderNotFound);
         }
-        Err(e) => Err(e),
+    }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+
+    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
+}
+
+/// Moves the alerts into the specified destination folder.
+pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+    dst_folder_id: &str,
+) -> Result<(), AlertError> {
+    for alert_id in alert_ids {
+        let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, *alert_id).await? else {
+            return Err(AlertError::AlertNotFound);
+        };
+
+        update(conn, org_id, Some(dst_folder_id), alert).await?;
+    }
+    Ok(())
+}
+
+/// Updates the alert.
+///
+/// Updates the alert's parent folder if a `folder_id` is given.
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if let Some(folder_id) = folder_id {
+        // Ensure that the destination folder exists.
+        if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+            if folder_id == DEFAULT_FOLDER {
+                create_default_alerts_folder(org_id).await?;
+            } else {
+                return Err(AlertError::MoveDestinationFolderNotFound);
+            }
+        }
+    }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
+
+    let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
+}
+
+/// Gets the alert by its KSUID primary key.
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Alert, AlertError> {
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
     }
 }
 
-pub async fn get(
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<Option<Alert>, anyhow::Error> {
-    db::alerts::alert::get(org_id, stream_type, stream_name, name).await
+) -> Result<Option<Alert>, AlertError> {
+    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await?;
+    Ok(alert)
 }
 
 pub async fn list(
@@ -248,7 +492,7 @@ pub async fn list(
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
     filter: AlertListFilter,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<Alert>, AlertError> {
     match db::alerts::alert::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
             let owner = filter.owner;
@@ -276,76 +520,144 @@ pub async fn list(
             }
             Ok(result)
         }
-        Err(e) => Err(e),
+        Err(e) => Err(e.into()),
     }
 }
 
-pub async fn delete(
+/// Gets a list of alerts.
+pub async fn list_v2<C: ConnectionTrait>(
+    conn: &C,
+    user_id: Option<&str>,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, AlertError> {
+    let (permissions, is_all_permitted) = match permitted_alerts(&params.org_id, user_id).await? {
+        Some(ps) => {
+            let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
+            (ps, org_all_permitted)
+        }
+        None => (vec![], true),
+    };
+
+    let alerts = db::alerts::alert::list_with_folders(conn, params)
+        .await?
+        .into_iter()
+        .filter(|(_f, a)| {
+            // Include the alert if all alerts are permitted.
+            is_all_permitted
+                // Include the alert if the alert is permitted with the old OpenFGA identifier.
+                || permissions.contains(&format!("alert:{}", a.name))
+                // Include the alert if the alert is permitted with the new OpenFGA identifier.
+                || a.id
+                    .filter(|id| permissions.contains(&format!("alert:{id}")))
+                    .is_some()
+        })
+        .collect_vec();
+    Ok(alerts)
+}
+
+/// Deletes an alert by its KSUID primary key.
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), AlertError> {
+    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Ok(());
+    };
+
+    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
+        Ok(_) => {
+            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    if db::alerts::alert::get(org_id, stream_type, stream_name, name)
+) -> Result<(), AlertError> {
+    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
-        return Err((
-            http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Alert not found"),
-        ));
+        return Err(AlertError::AlertNotFound);
     }
-    match db::alerts::alert::delete(org_id, stream_type, stream_name, name).await {
+    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
         }
-        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
+        Err(e) => Err(e.into()),
     }
 }
 
-pub async fn enable(
+/// Enables an alert.
+pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    should_enable: bool,
+) -> Result<(), AlertError> {
+    let Some((_, mut alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
+    };
+    alert.enabled = should_enable;
+    update(conn, org_id, None, alert).await?;
+    Ok(())
+}
+
+pub async fn enable_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
     value: bool,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let mut alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
-        Ok(Some(alert)) => alert,
-        _ => {
-            return Err((
-                http::StatusCode::NOT_FOUND,
-                anyhow::anyhow!("Alert not found"),
-            ));
-        }
-    };
+) -> Result<(), AlertError> {
+    let mut alert =
+        match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
+            Ok(Some(alert)) => alert,
+            _ => {
+                return Err(AlertError::AlertNotFound);
+            }
+        };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, &alert, false)
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
+    Ok(())
 }
 
-pub async fn trigger(
+/// Triggers an alert.
+pub async fn trigger_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(String, String), AlertError> {
+    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
+    };
+    let now = Utc::now().timestamp_micros();
+    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+    Ok((success_message, err_message))
+}
+
+pub async fn trigger_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(String, String), (http::StatusCode, anyhow::Error)> {
-    let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
+) -> Result<(String, String), AlertError> {
+    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
-            return Err((
-                http::StatusCode::NOT_FOUND,
-                anyhow::anyhow!("Alert not found"),
-            ));
+            return Err(AlertError::AlertNotFound);
         }
     };
     let now = Utc::now().timestamp_micros();
-    alert
-        .send_notification(&[], now, None, now)
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+    Ok((success_message, err_message))
 }
 
 #[async_trait]
@@ -366,7 +678,7 @@ pub trait AlertExt: Sync + Send + 'static {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
-    ) -> Result<(String, String), anyhow::Error>;
+    ) -> Result<(String, String), AlertError>;
 }
 
 #[async_trait]
@@ -403,17 +715,21 @@ impl AlertExt for Alert {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
-    ) -> Result<(String, String), anyhow::Error> {
+    ) -> Result<(String, String), AlertError> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
-            let (dest, template) = destinations::get_with_template(&self.org_id, dest).await?;
+            let (dest, template) = destinations::get_with_template(&self.org_id, dest)
+                .await
+                .map_err(AlertError::GetDestinationWithTemplateError)?;
             let Module::Alert {
                 destination_type, ..
             } = dest.module
             else {
-                return Err(anyhow::anyhow!("This is not an alert destination"));
+                return Err(AlertError::GetDestinationWithTemplateError(
+                    anyhow::anyhow!("This is not an alert destination"),
+                ));
             };
             match send_notification(
                 self,
@@ -449,14 +765,16 @@ impl AlertExt for Alert {
             }
         }
         if no_of_error == self.destinations.len() {
-            Err(anyhow::anyhow!(err_message))
+            Err(AlertError::SendNotificationError {
+                error_message: err_message,
+            })
         } else {
             Ok((success_message, err_message))
         }
     }
 }
 
-pub async fn send_notification(
+async fn send_notification(
     alert: &Alert,
     dest_type: &DestinationType,
     template: &Template,
@@ -510,10 +828,7 @@ pub async fn send_notification(
     }
 }
 
-pub async fn send_http_notification(
-    endpoint: &Endpoint,
-    msg: String,
-) -> Result<String, anyhow::Error> {
+async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
     let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -571,7 +886,7 @@ pub async fn send_http_notification(
     Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
 }
 
-pub async fn send_email_notification(
+async fn send_email_notification(
     email_subject: &str,
     email: &Email,
     msg: String,
@@ -605,7 +920,7 @@ pub async fn send_email_notification(
     }
 }
 
-pub async fn send_sns_notification(
+async fn send_sns_notification(
     alert_name: &str,
     aws_sns: &AwsSns,
     msg: String,
@@ -854,7 +1169,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -865,6 +1180,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
             function_content,
+            SearchEventType::Alerts
         )
     } else {
         match alert.query_condition.query_type {
@@ -892,7 +1208,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -903,6 +1219,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query),
             alert.org_id,
             function_content,
+            SearchEventType::Alerts
         )
     };
 
@@ -1137,6 +1454,30 @@ impl VarValue<'_> {
             VarValue::Vector(v) => v[0..n].join(if is_email { "" } else { "\\n" }),
         }
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn permitted_alerts(
+    _org_id: &str,
+    _user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, AlertError> {
+    Ok(None)
+}
+
+#[cfg(feature = "enterprise")]
+async fn permitted_alerts(
+    org_id: &str,
+    user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let Some(user_id) = user_id else {
+        return Err(AlertError::PermittedAlertsMissingUser);
+    };
+    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "alert",
+    )
+    .await
+    .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(stream_list)
 }
 
 #[cfg(test)]

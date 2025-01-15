@@ -28,9 +28,8 @@ use once_cell::sync::Lazy;
 use opentelemetry::{global, metrics::Histogram, KeyValue};
 use opentelemetry_sdk::{
     metrics::{
-        new_view,
-        reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
-        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream,
+        new_view, reader::DefaultTemporalitySelector, Aggregation, Instrument, PeriodicReader,
+        SdkMeterProvider, Stream,
     },
     runtime, Resource,
 };
@@ -40,7 +39,7 @@ use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
     service::{
         db,
-        exporter::otlp_o2_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
+        exporter::otlp_metrics_exporter::{O2MetricsClient, O2MetricsExporter},
     },
 };
 
@@ -291,7 +290,6 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
     let exporter = O2MetricsExporter::new(
         O2MetricsClient::new(),
         Box::new(DefaultTemporalitySelector::new()),
-        Box::new(DefaultAggregationSelector::new()),
     );
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
         .with_interval(Duration::from_secs(

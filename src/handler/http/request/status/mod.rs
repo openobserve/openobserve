@@ -49,7 +49,7 @@ use {
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
-            auditor::AuditMessage,
+            auditor::{AuditMessage, HttpMeta, Protocol},
             infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
             settings::{get_logo, get_logo_text},
         },
@@ -113,9 +113,12 @@ struct ConfigResponse<'a> {
     meta_org: String,
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
+    user_defined_schema_max_fields: usize,
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
+    websocket_enabled: bool,
+    min_auto_refresh_interval: u32,
 }
 
 #[derive(Serialize)]
@@ -288,9 +291,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         meta_org: cfg.common.usage_org.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
+        user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
+        websocket_enabled: cfg.common.websocket_enabled,
+        min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
     }))
 }
 
@@ -380,12 +386,14 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         // Since this is not a protected route, there is no way to get the user email
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
         _timestamp: chrono::Utc::now().timestamp_micros(),
-        path: "/config/reload".to_string(),
-        query_params: "".to_string(),
-        body: "".to_string(),
-        response_code: 200,
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/reload".to_string(),
+            query_params: "".to_string(),
+            body: "".to_string(),
+            response_code: 200,
+        }),
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
@@ -427,7 +435,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::AuthTokens;
+    use crate::common::meta::user::{AuthTokens, UserRole};
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -439,12 +447,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
-        path: "/config/redirect".to_string(),
-        body: "".to_string(),
-        query_params: req.query_string().to_string(),
-        response_code: 302,
         _timestamp: chrono::Utc::now().timestamp_micros(),
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/redirect".to_string(),
+            body: "".to_string(),
+            query_params: req.query_string().to_string(),
+            response_code: 302,
+        }),
     };
 
     match query.get("state") {
@@ -454,7 +464,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                audit_message.response_code = 400;
+                if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                    http_meta.response_code = 400;
+                }
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
@@ -462,7 +474,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            audit_message.response_code = 400;
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
+            }
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -486,6 +500,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let id_token;
             match token_ver {
                 Ok(res) => {
+                    // check for service accounts , do not to allow login
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
+                        if db_user
+                            .organizations
+                            .iter()
+                            .any(|org| org.role.eq(&UserRole::ServiceAccount))
+                        {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Service accounts are not allowed to login".to_string()));
+                        }
+                    }
+
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
@@ -504,7 +530,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    audit_message.response_code = 401;
+                    if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                        http_meta.response_code = 400;
+                    }
                     audit_message._timestamp = chrono::Utc::now().timestamp_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -548,7 +576,9 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            audit_message.response_code = 401;
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
+            }
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
@@ -695,12 +725,14 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         audit(AuditMessage {
             user_email,
             org_id: "".to_string(),
-            method: "GET".to_string(),
             _timestamp: chrono::Utc::now().timestamp_micros(),
-            path: "/config/logout".to_string(),
-            query_params: req.query_string().to_string(),
-            body: "".to_string(),
-            response_code: 200,
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/config/logout".to_string(),
+                query_params: req.query_string().to_string(),
+                body: "".to_string(),
+                response_code: 200,
+            }),
         })
         .await;
     }

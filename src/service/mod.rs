@@ -37,11 +37,14 @@ pub mod pipeline;
 pub mod promql;
 pub mod schema;
 pub mod search;
+#[cfg(feature = "enterprise")]
+pub mod search_jobs;
 pub mod self_reporting;
 pub mod session;
 pub mod short_url;
 pub mod stream;
 pub mod syslogs_route;
+pub mod tls;
 pub mod traces;
 pub mod users;
 

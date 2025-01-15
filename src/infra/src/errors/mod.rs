@@ -28,6 +28,10 @@ pub enum Error {
     DbError(#[from] DbError),
     #[error("EtcdError# {0}")]
     EtcdError(#[from] etcd_client::Error),
+    #[error("FromStrError# {0}")]
+    FromStrError(#[from] FromStrError),
+    #[error("FromI16Error# {0}")]
+    FromI16Error(#[from] FromI16Error),
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]
@@ -79,6 +83,20 @@ pub enum Error {
 unsafe impl Send for Error {}
 
 #[derive(ThisError, Debug)]
+#[error("cannot parse \"{value}\" as {ty}")]
+pub struct FromStrError {
+    pub value: String,
+    pub ty: String,
+}
+
+#[derive(ThisError, Debug)]
+#[error("cannot convert \"{value}\" to {ty}")]
+pub struct FromI16Error {
+    pub value: i16,
+    pub ty: String,
+}
+
+#[derive(ThisError, Debug)]
 pub enum DbError {
     #[error("key {0} does not exist")]
     KeyNotExists(String),
@@ -96,6 +114,8 @@ pub enum DbError {
     DestinationError(#[from] DestinationError),
     #[error("TemplateError# {0}")]
     TemplateError(#[from] TemplateError),
+    #[error("PutAlert# {0}")]
+    PutAlert(#[from] PutAlertError),
 }
 
 #[derive(ThisError, Debug)]
@@ -116,8 +136,20 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
-    #[error("error converting created timestamp with timezone to Unix timestamp")]
-    ConvertingCreatedTimestamp,
+}
+
+#[derive(ThisError, Debug)]
+pub enum PutAlertError {
+    #[error("cannot provide alert ID when creating an alert")]
+    CreateAlertSetID,
+    #[error("must provide alert ID when updating an alert")]
+    UpdateAlertMissingID,
+    #[error("alert to update not found")]
+    UpdateAlertNotFound,
+    #[error("error putting alert with folder that does not exist")]
+    FolderDoesNotExist,
+    #[error("cannot convert {0} into a trigger threshold operator")]
+    IntoTriggerThresholdOperator(config::meta::alerts::Operator),
 }
 
 #[derive(ThisError, Debug)]
@@ -149,6 +181,7 @@ pub enum ErrorCodes {
     SearchSQLExecuteError(String),
     SearchCancelQuery(String),
     SearchTimeout(String),
+    InvalidParams(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -206,6 +239,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(_) => 20008,
             ErrorCodes::SearchCancelQuery(_) => 20009,
             ErrorCodes::SearchTimeout(_) => 20010,
+            ErrorCodes::InvalidParams(_) => 20011,
         }
     }
 
@@ -230,6 +264,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
             ErrorCodes::SearchCancelQuery(_) => "Search query was cancelled".to_string(),
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
+            ErrorCodes::InvalidParams(_) => "Invalid parameters".to_string(),
         }
     }
 
@@ -246,6 +281,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
+            ErrorCodes::InvalidParams(msg) => msg.to_owned(),
         }
     }
 
@@ -262,6 +298,7 @@ impl ErrorCodes {
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
             ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
+            ErrorCodes::InvalidParams(msg) => msg.to_owned(),
         }
     }
 

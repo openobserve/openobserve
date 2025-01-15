@@ -16,6 +16,7 @@
 use chrono::{DateTime, FixedOffset};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use crate::meta::{
@@ -25,6 +26,8 @@ use crate::meta::{
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
+    #[serde(default)]
+    pub id: Option<Ksuid>,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -76,6 +79,7 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            id: None,
             name: "".to_string(),
             org_id: "".to_string(),
             stream_type: StreamType::default(),
@@ -102,4 +106,63 @@ impl Default for Alert {
 pub struct AlertListFilter {
     pub enabled: Option<bool>,
     pub owner: Option<String>,
+}
+
+/// Parameters for listing alerts.
+#[derive(Debug, Clone)]
+pub struct ListAlertsParams {
+    /// The optional org ID surrogate key with which to filter alerts.
+    pub org_id: String,
+
+    /// The optional folder ID surrogate key with which to filter alerts.
+    pub folder_id: Option<String>,
+
+    /// The optional stream type and stream name with which to filter alerts.
+    ///
+    /// The stream name can only be provided if the stream type is also provide.
+    pub stream_type_and_name: Option<(StreamType, Option<String>)>,
+
+    /// The optional filter on the enabled field. `Some(true)` indicates that
+    /// only enabled alerts should be returned, while `Some(false)` indicates
+    /// that only disabled alerts should be returned.
+    pub enabled: Option<bool>,
+
+    /// The optional owner with which to filter alerts.
+    pub owner: Option<String>,
+
+    /// The optional page size and page index of results to retrieve.
+    pub page_size_and_idx: Option<(u64, u64)>,
+}
+
+impl ListAlertsParams {
+    /// Returns new parameters to list dashboards for the given org ID surrogate
+    /// key.
+    pub fn new(org_id: &str) -> Self {
+        Self {
+            org_id: org_id.to_owned(),
+            folder_id: None,
+            stream_type_and_name: None,
+            enabled: None,
+            owner: None,
+            page_size_and_idx: None,
+        }
+    }
+
+    /// Filter dashboards by the given folder ID surrogate key.
+    pub fn in_folder(mut self, folder_id: &str) -> Self {
+        self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Filter alerts by the given stream type and optional stream name.
+    pub fn for_stream(mut self, stream_type: StreamType, stream_name: Option<&str>) -> Self {
+        self.stream_type_and_name = Some((stream_type, stream_name.map(|n| n.to_string())));
+        self
+    }
+
+    /// Paginate the results by the given page size and page index.
+    pub fn paginate(mut self, page_size: u64, page_idx: u64) -> Self {
+        self.page_size_and_idx = Some((page_size, page_idx));
+        self
+    }
 }

@@ -333,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+// TODO: Remove ts-ignore from the code
 // @ts-nocheck
 import {
   defineComponent,
@@ -369,7 +370,7 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import type { ActivationState, PageType } from "@/ts/interfaces/logs.ts";
+import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -427,6 +428,7 @@ export default defineComponent({
         // As page count request was getting fired on changing date records per page instead of histogram,
         // so added this condition to avoid that
         this.searchObj.meta.refreshHistogram = true;
+        this.searchObj.data.queryResults.aggs = null;
 
         await this.getQueryData(false);
         this.refreshHistogramChart();
@@ -533,7 +535,7 @@ export default defineComponent({
       getFunctions,
       extractFields,
       resetHistogramWithError,
-      isNonAggregatedQuery,
+      isLimitQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1459,7 +1461,7 @@ export default defineComponent({
       closeSearchHistoryfn,
       resetHistogramWithError,
       fnParsedSQL,
-      isNonAggregatedQuery,
+      isLimitQuery,
     };
   },
   computed: {
@@ -1536,10 +1538,7 @@ export default defineComponent({
       ) {
         this.searchObj.data.queryResults.aggs = [];
 
-        if (
-          this.searchObj.meta.sqlMode &&
-          !this.isNonAggregatedQuery(parsedSQL)
-        ) {
+        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
             "Histogram is not available for limit queries.",
           );

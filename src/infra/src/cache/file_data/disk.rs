@@ -18,6 +18,7 @@ use std::{
     fs,
     ops::Range,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use async_recursion::async_recursion;
@@ -79,6 +80,10 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
 
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
+
+pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 pub struct FileData {
     max_size: usize,
@@ -186,11 +191,12 @@ impl FileData {
                 .with_label_values(&[columns[1], columns[2]])
                 .add(data_size as i64);
         } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .inc();
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
+                .add(data_size as i64);
+        } else if columns[0] == "metrics_results" {
+            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                .with_label_values(&[])
                 .add(data_size as i64);
         };
         Ok(())
@@ -262,11 +268,12 @@ impl FileData {
                     .with_label_values(&[columns[1], columns[2]])
                     .sub(data_size as i64);
             } else if columns[0] == "results" {
-                metrics::QUERY_DISK_RESULT_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2]])
+                    .sub(data_size as i64);
+            } else if columns[0] == "metrics_results" {
+                metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                    .with_label_values(&[])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -328,11 +335,12 @@ impl FileData {
                 .with_label_values(&[columns[1], columns[2]])
                 .sub(data_size as i64);
         } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .dec();
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
+                .sub(data_size as i64);
+        } else if columns[0] == "metrics_results" {
+            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                .with_label_values(&[])
                 .sub(data_size as i64);
         }
 
@@ -385,6 +393,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             "Loading disk cache done, total files: {} ",
             len(FileType::DATA).await
         );
+        LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
     tokio::task::spawn(async move {
@@ -482,6 +491,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
     let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
+    let mut metrics_cache: Vec<String> = Vec::new();
     loop {
         match entries.next_entry().await {
             Err(e) => return Err(e.into()),
@@ -549,7 +559,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         metrics::QUERY_DISK_CACHE_USED_BYTES
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
-                    } else {
+                    } else if file_key.starts_with("results") {
                         let mut w = RESULT_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
@@ -562,9 +572,6 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
 
-                        metrics::QUERY_DISK_RESULT_CACHE_FILES
-                            .with_label_values(&[columns[1], columns[2]])
-                            .inc();
                         metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
@@ -587,6 +594,18 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                                 },
                             );
                         };
+                    } else if file_key.starts_with("metrics_results") {
+                        // print progress
+                        let total = metrics_cache.len();
+                        if total % 1000 == 0 {
+                            log::info!("Loading disk cache {}", total);
+                        }
+                        // metrics
+                        metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                            .with_label_values(&[])
+                            .add(data_size as i64);
+
+                        metrics_cache.push(file_key);
                     }
                 }
             }
@@ -595,6 +614,8 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
     // write all data from result_cache to QUERY_RESULT_CACHE
     QUERY_RESULT_CACHE.write().await.extend(result_cache);
+    // write all data from metrics_cache to QUERY_METRICS_CACHE
+    METRICS_RESULT_CACHE.write().await.extend(metrics_cache);
     Ok(())
 }
 
@@ -776,7 +797,7 @@ mod tests {
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
             let file_key = format!(
-                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
+                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
             let resp = file_data.set(trace_id, &file_key, content.clone()).await;
@@ -789,7 +810,7 @@ mod tests {
         let trace_id = "session_123";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
@@ -810,8 +831,8 @@ mod tests {
     async fn test_fifo_cache_miss() {
         let trace_id = "session_456";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
-        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
-        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
+        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_1.parquet";
+        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
@@ -841,7 +862,7 @@ mod tests {
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         file_data.multi_dir = multi_dir;
-        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data

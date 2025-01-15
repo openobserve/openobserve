@@ -18,6 +18,7 @@ pub mod authz;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;
+#[allow(deprecated)]
 pub mod folders;
 pub mod functions;
 pub mod kv;
@@ -25,7 +26,7 @@ pub mod logs;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;
-pub mod prom;
+pub mod promql;
 pub mod rum;
 pub mod search;
 pub mod service_accounts;
@@ -35,6 +36,7 @@ pub mod stream;
 pub mod syslog;
 pub mod traces;
 pub mod users;
+pub mod websocket;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

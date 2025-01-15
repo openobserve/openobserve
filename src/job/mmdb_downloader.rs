@@ -13,14 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, path::Path, sync::Arc};
+use std::sync::Arc;
 
-use config::{MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME};
-use futures::stream::StreamExt;
+use config::{
+    utils::download_utils::{download_file, is_digest_different},
+    MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME,
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use once_cell::sync::Lazy;
-use reqwest::Client;
-use sha256::try_digest;
-use tokio::{fs::File, io::AsyncWriteExt, sync::Notify, time};
+use tokio::{sync::Notify, time};
 
 use crate::{
     common::{
@@ -48,8 +50,24 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_download_files() {
     let cfg = config::get_config();
 
+    log::info!("Checking mmdb files");
+
     // send request and await response
     let client = reqwest::Client::new();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().common.enable_enterprise_mmdb {
+        o2_enterprise::enterprise::mmdb::mmdb_downloader::run_download_files().await;
+
+        let fname = format!(
+            "{}{}",
+            &cfg.common.mmdb_data_dir,
+            get_o2_config().common.mmdb_enterprise_file_name
+        );
+
+        update_maxmind_table(&fname).await;
+    }
+
     let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
     let asn_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
 
@@ -83,87 +101,84 @@ async fn run_download_files() {
         }
     }
 
-    let client = Lazy::get(&CLIENT_INITIALIZED);
-
-    if client.is_none() {
-        update_global_maxmind_client(&asn_fname).await;
-        update_global_maxmind_client(&city_fname).await;
+    if Lazy::get(&CLIENT_INITIALIZED).is_none() {
+        update_maxmind_table(&asn_fname).await;
+        update_maxmind_table(&city_fname).await;
+        update_maxmind_client().await;
         log::info!("Maxmind client initialized");
         Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");
-            update_global_maxmind_client(&asn_fname).await;
+            update_maxmind_table(&asn_fname).await;
         }
 
         if download_city_files {
             log::info!("New city file found, updating client");
-            update_global_maxmind_client(&city_fname).await;
+            update_maxmind_table(&city_fname).await;
+            update_maxmind_client().await;
         }
     }
+
+    log::info!("Maxmind client initialized");
 
     Lazy::force(&CLIENT_INITIALIZED);
 }
 
-/// Update the global maxdb client object
-pub async fn update_global_maxmind_client(fname: &str) {
-    match MaxmindClient::new_with_path(fname) {
+/// Update the maxmind client
+async fn update_maxmind_client() {
+    let cfg = config::get_config();
+    let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    #[cfg(feature = "enterprise")]
+    let city_fname = if get_o2_config().common.enable_enterprise_mmdb {
+        format!(
+            "{}{}",
+            &cfg.common.mmdb_data_dir,
+            get_o2_config().common.mmdb_enterprise_file_name
+        )
+    } else {
+        city_fname
+    };
+    match MaxmindClient::new_with_path(&city_fname) {
         Ok(maxminddb_client) => {
             let mut client = MAXMIND_DB_CLIENT.write().await;
             *client = Some(maxminddb_client);
-
-            if fname.ends_with(MMDB_CITY_FILE_NAME) {
-                let mut geoip_city = GEOIP_CITY_TABLE.write();
-                *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
-            } else {
-                let mut geoip_asn = GEOIP_ASN_TABLE.write();
-                *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
-            }
         }
         Err(e) => log::warn!(
-            "Failed to create MaxmindClient with path: {}, {}",
-            fname,
+            "Failed to update maxmind client with path: {}, {}",
+            city_fname,
             e.to_string()
         ),
     }
 }
 
-pub async fn is_digest_different(
-    local_file_path: &str,
-    remote_sha256sum_path: &str,
-) -> Result<bool, anyhow::Error> {
-    let response = reqwest::get(remote_sha256sum_path).await?;
-    let remote_file_sha = response.text().await?;
-    let local_file_sha = try_digest(Path::new(local_file_path)).unwrap_or_default();
-    Ok(remote_file_sha.trim() != local_file_sha.trim())
-}
+/// Update the maxmind table
+async fn update_maxmind_table(fname: &str) {
+    match MaxmindClient::new_with_path(fname) {
+        Ok(_) => {
+            #[cfg(feature = "enterprise")]
+            if get_o2_config().common.enable_enterprise_mmdb {
+                let mut geoip = crate::common::infra::config::GEOIP_ENT_TABLE.write();
+                *geoip = Some(
+                    Geoip::new(GeoipConfig::new(
+                        &get_o2_config().common.mmdb_enterprise_file_name,
+                    ))
+                    .unwrap(),
+                );
+            }
 
-pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(), String> {
-    // Reqwest setup
-    let res = client
-        .get(url)
-        .send()
-        .await
-        .or(Err(format!("Failed to GET from '{}'", &url)))?;
-    let total_size = res
-        .content_length()
-        .ok_or(format!("Failed to get content length from '{}'", &url))?;
-
-    // download chunks
-    let mut file = File::create(path)
-        .await
-        .or(Err(format!("Failed to create file '{}'", path)))?;
-    let mut downloaded: u64 = 0;
-    let mut stream = res.bytes_stream();
-
-    while let Some(item) = stream.next().await {
-        let chunk = item.or(Err("Error while downloading file".to_string()))?;
-        file.write_all(&chunk)
-            .await
-            .or(Err("Error while writing to file".to_string()))?;
-        let new = min(downloaded + (chunk.len() as u64), total_size);
-        downloaded = new;
+            if fname.ends_with(MMDB_CITY_FILE_NAME) {
+                let mut geoip_city = GEOIP_CITY_TABLE.write();
+                *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
+            } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
+                let mut geoip_asn = GEOIP_ASN_TABLE.write();
+                *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
+            };
+        }
+        Err(e) => log::warn!(
+            "Failed to update maxmind table with path: {}, {}",
+            fname,
+            e.to_string()
+        ),
     }
-
-    Ok(())
 }

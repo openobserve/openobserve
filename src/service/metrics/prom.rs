@@ -22,6 +22,7 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
+        promql::*,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -43,7 +44,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{prom::*, stream::SchemaRecords},
+        meta::stream::SchemaRecords,
     },
     service::{
         alerts::alert::AlertExt,
@@ -743,6 +744,7 @@ pub(crate) async fn get_series(
         timeout: 0,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -888,6 +890,7 @@ pub(crate) async fn get_label_values(
         timeout: 0,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

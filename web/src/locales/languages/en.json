@@ -65,7 +65,16 @@
     "horizontal": "Horizontal",
     "custom": "Custom",
     "none": "None",
-    "auto": "Auto"
+    "auto": "Auto",
+    "duration": "Duration",
+    "fullscreen": "Go Full Screen",
+    "query": "Query",
+    "output": "Output",
+    "selectStream": "Select Stream",
+    "unsavedTitle": "Unsaved Changes",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "cancelTitle": "Cancel Changes",
+    "cancelMessage": "Are you sure you want to cancel the changes?"
   },
   "search": {
     "metrics": "Metrics",
@@ -414,6 +423,7 @@
     "timezone": "Timezone",
     "deleteActionLabel": "Delete",
     "deleteActionMessage": "Are you sure you want to delete the selected fields? This action cannot be undone.",
+    "deleteDatesMessage": "Are you sure you want to delete the selected dates? This action cannot be undone.",
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
@@ -430,7 +440,9 @@
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
-    "indexSize": "Index Size"
+    "indexSize": "Index Size",
+    "extendedStartDate":"Start Date",
+    "extendedEndDate":"End Date"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -458,7 +470,7 @@
     "search": "Search Function",
     "name": "Name",
     "function": "Function Detail",
-    "save": "Save",
+    "save": "Save Function",
     "jsfunction": "Function",
     "stream_name": "Stream Name",
     "order": "Order",
@@ -487,7 +499,9 @@
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
     "streamPipeline": "Pipelines",
-    "streamRouting": "Stream Routing"
+    "streamRouting": "Stream Routing",
+    "testFunction": "Test Function",
+    "errorDetails": "Error"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -766,15 +780,23 @@
     "totalDataIngested": "Ingested Size",
     "totalDataCompressed": "Compressed Size",
     "view": "View More >>",
-    "queryFunctions": "Query functions",
-    "ingestFunctions": "Ingest functions",
-    "scheduledAlert": "Scheduled alerts",
-    "rtAlert": "Real time alerts",
+    "scheduledAlert": "Scheduled",
+    "rtAlert": "Real time",
     "noData": "No Data Ingested",
+    "indexSizeLbl": "Index Size",
+    "docsCountLbl": "Records",
     "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "It appears you have not ingested any data to the selected organization. There are various ways to ingest data, such as using Fluent Bit.",
     "inestedInSearch": "Try Log Search",
-    "searchInDemoOrg": "You can explore search capabilities by switching to the demo organization. To switch, select 'Demo Organization' using the organization dropdown at the top. We keep ingesting dummy data into the demo organization."
+    "searchInDemoOrg": "You can explore search capabilities by switching to the demo organization. To switch, select 'Demo Organization' using the organization dropdown at the top. We keep ingesting dummy data into the demo organization.",
+    "functionTitle": "Functions",
+    "schedulePipelineTitle": "Scheduled",
+    "rtPipelineTitle": "Real time",
+    "pipelineTitle": "Pipelines",
+    "alertTitle": "Alerts",
+    "dashboardTitle": "Dashboards",
+    "streamTotal": "Streams",
+    "totalDashboard": "Dashboards"
   },
   "billing": {
     "header": "Usage & Billing",
@@ -945,6 +967,7 @@
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "enableWebsocketSearch": "Enable Websocket Search",
     "enterpriseTitle": "Enterprise Settings",
     "logoLabel": "Drag & Drop Logo Image",
     "customLogoTitle": "Custom Logo",

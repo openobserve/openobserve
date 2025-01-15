@@ -24,7 +24,7 @@ use config::{
         cluster::RoleGroup,
         search,
         self_reporting::usage::{RequestStats, UsageType},
-        sql::{OrderBy, SqlOperator},
+        sql::{OrderBy, SqlOperator, TableReferenceExt},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     metrics,
@@ -53,18 +53,14 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::get_cached_channel,
-    config::meta::cluster::get_internal_grpc_token,
-    o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup,
-    std::collections::HashSet,
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
+    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
     tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster},
+    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
 };
 
@@ -72,6 +68,7 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod grpc_search;
 pub(crate) mod index;
 pub(crate) mod request;
 pub(crate) mod sql;
@@ -95,11 +92,14 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("datafusion_runtime")
         .worker_threads(config::get_config().limit.cpu_num)
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .unwrap()
 });
 
+// Please note: `query_fn` which is the vrl needs to be base64::decoded
+// when using this search
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,
@@ -547,8 +547,10 @@ pub async fn search_multi(
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
+    user_id: Option<&str>,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
+    skip_max_query_range: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -605,7 +607,9 @@ pub async fn search_partition(
 
     let mut max_query_range = 0;
     let mut max_query_range_in_hour = 0;
-    for (stream_name, schema) in sql.schemas.iter() {
+    for (stream, schema) in sql.schemas.iter() {
+        let stream_type = stream.get_stream_type(stream_type);
+        let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let use_stream_stats_for_partition = stream_settings.approx_partition;
 
@@ -613,22 +617,29 @@ pub async fn search_partition(
             let stream_files = crate::service::file_list::query_ids(
                 &sql.org_id,
                 stream_type,
-                stream_name,
+                &stream_name,
                 sql.time_range,
             )
             .await?;
             max_query_range = max(
                 max_query_range,
-                stream_settings.max_query_range * 3600 * 1_000_000,
+                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
+                    .await
+                    * 3600
+                    * 1_000_000,
             );
-            max_query_range_in_hour = max(max_query_range_in_hour, stream_settings.max_query_range);
+            max_query_range_in_hour = max(
+                max_query_range_in_hour,
+                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
+                    .await,
+            );
             files.extend(stream_files);
         } else {
             // data retention in seconds
             let mut data_retention = stream_settings.data_retention * 24 * 60 * 60;
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
-            let stats = stats::get_stream_stats(org_id, stream_name, stream_type);
+            let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
             let data_end_time = std::cmp::min(Utc::now().timestamp_micros(), stats.doc_time_max);
             let data_retention_based_on_stats = (data_end_time - stats.doc_time_min) / 1000 / 1000;
             if data_retention_based_on_stats > 0 {
@@ -726,7 +737,7 @@ pub async fn search_partition(
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range
-    if max_query_range > 0 && step > max_query_range {
+    if !skip_max_query_range && max_query_range > 0 && step > max_query_range {
         step = if min_step < max_query_range {
             max_query_range - max_query_range % min_step
         } else {
@@ -771,8 +782,6 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-
-    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -796,46 +805,15 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
         let task = tokio::task::spawn(
             async move {
-                let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "search->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let node = Arc::new(node) as _;
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
                             "search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
+                            &node.get_grpc_addr(),
                             err
                         );
                         if err.code() == tonic::Code::Internal {
@@ -959,47 +937,17 @@ pub async fn cancel_query(
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
-                let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "grpc_cancel_query: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let node = Arc::new(node) as _;
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response: cluster_rpc::CancelQueryResponse =
                     match client.cancel_query(request).await {
                         Ok(res) => res.into_inner(),
                         Err(err) => {
                             log::error!(
                                 "grpc_cancel_query: node: {}, search err: {:?}",
-                                &node.grpc_addr,
+                                &node.get_grpc_addr(),
                                 err
                             );
                             if err.code() == tonic::Code::Internal {
@@ -1059,7 +1007,10 @@ pub async fn match_file(
     equal_items: &[(String, String)],
 ) -> bool {
     // fast path
-    if partition_keys.is_empty() || !source.key.contains('=') {
+    if partition_keys.is_empty()
+        || !source.key.contains('=')
+        || stream_type == StreamType::EnrichmentTables
+    {
         return true;
     }
 
@@ -1153,6 +1104,7 @@ pub fn server_internal_error(error: impl ToString) -> Error {
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,
+    user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
@@ -1162,6 +1114,7 @@ pub async fn search_partition_multi(
         match search_partition(
             trace_id,
             org_id,
+            Some(user_id),
             stream_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,
@@ -1173,6 +1126,7 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
             },
+            false,
         )
         .await
         {
@@ -1206,7 +1160,7 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 }
 
 // generate parquet file search schema
-fn generate_search_schema_diff(
+pub fn generate_search_schema_diff(
     schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {

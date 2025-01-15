@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- select folder or create new folder and select -->
           <select-folder-dropdown
             @folder-selected="selectedFolderAtJson = $event"
+            :activeFolderId="selectedFolderAtJson.value"
           />
 
           <div>
@@ -108,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- select folder or create new folder and select -->
           <select-folder-dropdown
             @folder-selected="selectedFolderAtUrl = $event"
+            :activeFolderId="selectedFolderAtUrl.value"
           />
 
           <div class="q-my-md">
@@ -144,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- select folder or create new folder and select -->
         <select-folder-dropdown
           @folder-selected="selectedFolderAtJsonObj = $event"
+          :activeFolderId="selectedFolderAtJsonObj.value"
         />
 
         <div class="q-my-md">

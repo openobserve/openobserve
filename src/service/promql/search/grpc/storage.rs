@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
+        promql::VALUE_LABEL,
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -27,34 +28,39 @@ use datafusion::{
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+    },
 };
+use promql_parser::label::{MatchOp, Matchers};
 use tokio::sync::Semaphore;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec::register_table, match_source},
+    search::{
+        datafusion::exec::register_table,
+        grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+        index::{Condition, IndexCondition},
+        match_source,
+    },
 };
 
-#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
+    matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
+) -> Result<Option<(SessionContext, Arc<Schema>, ScanStats)>> {
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{}] is being deleted", stream_name);
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // get latest schema
@@ -62,13 +68,25 @@ pub(crate) async fn create_context(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
-            log::error!("get schema error: {}", err);
+            log::error!("[trace_id {trace_id}] get schema error: {}", err);
             return Err(datafusion::error::DataFusionError::Execution(
                 err.to_string(),
             ));
         }
     };
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(None);
+    }
+
+    // get index fields
+    let stream_settings = unwrap_stream_settings(&schema);
+    let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+    // get partition time level
+    let stream_settings = stream_settings.unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
@@ -97,38 +115,34 @@ pub(crate) async fn create_context(
     )
     .await?;
     if files.is_empty() {
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // calculate scan size
     let scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
-            log::error!("calculate files size error: {}", err);
+            log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
             return Err(datafusion::error::DataFusionError::Execution(
                 "calculate files size error".to_string(),
             ));
         }
     };
     log::info!(
-        "promql->search->storage: load files {}, scan_size {}, compressed_size {}",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, scan_size {}, compressed_size {}",
         scan_stats.files,
         scan_stats.original_size,
         scan_stats.compressed_size
     );
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(&files, &scan_stats).await?;
+    let (cache_type, deleted_files) = cache_parquet_files(trace_id, &files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files
         files.retain(|f| !deleted_files.contains(&f.key));
     }
     log::info!(
-        "promql->search->storage: load files {}, into {:?} cache done",
+        "[trace_id {trace_id}] promql->search->storage: load files {}, into {:?} cache done",
         scan_stats.files,
         cache_type
     );
@@ -147,6 +161,31 @@ pub(crate) async fn create_context(
             .with_metadata(std::collections::HashMap::new()),
     );
 
+    let query = Arc::new(QueryParams {
+        trace_id: trace_id.to_string(),
+        org_id: org_id.to_string(),
+        stream_type: StreamType::Metrics,
+        stream_name: stream_name.to_string(),
+        time_range: Some(time_range),
+        work_group: None,
+        use_inverted_index: true,
+    });
+
+    // search tantivy index
+    let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
+    if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
+        let (idx_took, ..) =
+            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index error: {e}"
+                    );
+                    DataFusionError::Execution(e.to_string())
+                })?;
+        log::info!("[trace_id {trace_id}] promql->search->storage: filter file list by tantivy index took: {idx_took} ms",);
+    }
+
     let session = SearchSession {
         id: trace_id.to_string(),
         storage_type: StorageType::Memory,
@@ -163,14 +202,10 @@ pub(crate) async fn create_context(
         &[],
     )
     .await?;
-    Ok((ctx, schema, scan_stats))
+    Ok(Some((ctx, schema, scan_stats)))
 }
 
-#[tracing::instrument(
-    name = "promql:search:grpc:storage:get_file_list",
-    skip_all,
-    fields(org_id, stream_name)
-)]
+#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
 async fn get_file_list(
     trace_id: &str,
     org_id: &str,
@@ -209,8 +244,10 @@ async fn get_file_list(
     Ok(files)
 }
 
+// TODO: unify cache_parquet_files and cache_files
 #[tracing::instrument(name = "promql:search:grpc:storage:cache_parquet_files", skip_all)]
 async fn cache_parquet_files(
+    trace_id: &str,
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>)> {
@@ -266,11 +303,11 @@ async fn cache_parquet_files(
                     // delete file from file list
                     log::warn!("found invalid file: {}", file_name);
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("promql->search->storage: delete from file_list err: {}", e);
+                        log::error!("[trace_id {trace_id}] promql->search->storage: delete from file_list err: {}", e);
                     }
                     Some(file_name)
                 } else {
-                    log::error!("promql->search->storage: download file to cache err: {}", e);
+                    log::error!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}", e);
                     None
                 }
             } else {
@@ -291,10 +328,38 @@ async fn cache_parquet_files(
                 }
             }
             Err(e) => {
-                log::error!("promql->search->storage: load file task err: {}", e);
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->storage: load file task err: {}",
+                    e
+                );
             }
         }
     }
 
     Ok((cache_type, delete_files))
+}
+
+fn convert_matchers_to_index_condition(
+    matchers: &Matchers,
+    schema: &Arc<Schema>,
+    index_fields: &HashSet<String>,
+) -> Result<IndexCondition> {
+    let mut index_condition = IndexCondition::default();
+    let cfg = get_config();
+    for mat in matchers.matchers.iter() {
+        if mat.name == cfg.common.column_timestamp
+            || mat.name == VALUE_LABEL
+            || !index_fields.contains(&mat.name)
+            || schema.field_with_name(&mat.name).is_err()
+        {
+            continue;
+        }
+        let condition = match &mat.op {
+            MatchOp::Equal => Condition::Equal(mat.name.clone(), mat.value.clone()),
+            MatchOp::Re(regex) => Condition::Regex(mat.name.clone(), regex.to_string()),
+            _ => continue,
+        };
+        index_condition.add_condition(condition);
+    }
+    Ok(index_condition)
 }

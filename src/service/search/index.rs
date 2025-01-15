@@ -82,6 +82,7 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    Regex(String, String),
     In(String, Vec<String>),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
@@ -164,6 +165,7 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::FuzzyMatchAll(value, distance) => format!(
@@ -262,6 +264,10 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
+            Condition::Regex(field, value) => {
+                let field = schema.get_field(field)?;
+                Box::new(RegexQuery::from_pattern(value, field)?)
+            }
             Condition::In(field, values) => {
                 let field = schema.get_field(field)?;
                 let terms: Vec<Box<dyn Query>> = values
@@ -342,6 +348,9 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
+            Condition::Regex(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
@@ -363,6 +372,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::Regex(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -395,6 +407,9 @@ impl Condition {
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
+            Condition::Regex(..) => {
+                unreachable!("Condition::Regex query only support for promql")
+            }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
                 let left = Arc::new(Column::new(name, index));
@@ -406,13 +421,18 @@ impl Condition {
                 Ok(Arc::new(InListExpr::new(left, values, false, None)))
             }
             Condition::MatchAll(value) => {
+                let value = value
+                    .trim_start_matches("re:") // regex
+                    .trim_start_matches('*') // contains
+                    .trim_end_matches('*') // prefix or contains
+                    .to_string();
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
                     let new_expr = Arc::new(LikeExpr::new(
                         false,
-                        false,
+                        true,
                         Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                         term.clone(),
                     ));

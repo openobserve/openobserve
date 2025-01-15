@@ -89,6 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use openobserve::service::tls::{awc_client_tls_config, http_tls_config};
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -210,7 +211,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = o2_enterprise::enterprise::init().await {
+            if let Err(e) = init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -541,18 +542,29 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+        let scheme = if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        };
         log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
+            "Starting {} server at: {}, thread_id: {}",
+            scheme,
             haddr,
             local_id
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = awc::Client::builder()
+            let mut client_builder = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects()
-                .finish();
+                .disable_redirects();
+            if cfg.http.tls_enabled {
+                let config = awc_client_tls_config().unwrap();
+                client_builder =
+                    client_builder.connector(awc::Connector::new().rustls_0_23(config));
+            }
+            let client = client_builder.finish();
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -586,13 +598,19 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        15,
-        cfg.limit.keep_alive,
-    ))))
-    .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
-    .bind(haddr)?;
+    .keep_alive(if cfg.limit.keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
+    })
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
+    let server = if cfg.http.tls_enabled {
+        let sc = http_tls_config()?;
+        server.bind_rustls_0_23(haddr, sc)?
+    } else {
+        server.bind(haddr)?
+    };
 
     let server = server
         .workers(cfg.limit.http_worker_num)
@@ -630,11 +648,19 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         if cfg.common.feature_per_thread_lock {
             thread_id.fetch_add(1, Ordering::SeqCst);
         }
+
+        let scheme = if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        };
         log::info!(
-            "starting HTTP server at: {}, thread_id: {}",
+            "Starting {} server at: {}, thread_id: {}",
+            scheme,
             haddr,
             local_id
         );
+
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
             let client = awc::Client::builder()
@@ -674,13 +700,19 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        15,
-        cfg.limit.keep_alive,
-    ))))
-    .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
-    .bind(haddr)?;
+    .keep_alive(if cfg.limit.keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
+    })
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
+    let server = if cfg.http.tls_enabled {
+        let sc = http_tls_config()?;
+        server.bind_rustls_0_23(haddr, sc)?
+    } else {
+        server.bind(haddr)?
+    };
 
     let server = server
         .workers(cfg.limit.http_worker_num)
@@ -856,5 +888,21 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             tracer.tracer("tracing-otel-subscriber"),
         ))
         .init();
+    Ok(())
+}
+
+/// Initializes enterprise features.
+#[cfg(feature = "enterprise")]
+async fn init_enterprise() -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::search::init().await?;
+
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        log::info!("init super cluster");
+        o2_enterprise::enterprise::super_cluster::kv::init().await?;
+        openobserve::super_cluster_queue::init().await?;
+    }
     Ok(())
 }

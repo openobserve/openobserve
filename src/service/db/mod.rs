@@ -25,6 +25,7 @@ use {
 pub mod alerts;
 pub mod compact;
 pub mod dashboards;
+pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod functions;
@@ -38,6 +39,7 @@ pub mod pipeline;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
+pub mod search_job;
 pub mod session;
 pub mod short_url;
 pub mod syslog;

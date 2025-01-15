@@ -16,11 +16,15 @@
 use config::{
     ider,
     meta::{
+        alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
     },
 };
-use infra::table::{self, folders::FolderType};
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    table,
+};
 
 use crate::common::{
     meta::authz::Authz,
@@ -46,6 +50,10 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains dashboards.
     #[error("Folder contains dashboards. Please move/delete dashboards from folder.")]
     DeleteWithDashboards,
+
+    /// An error that occurs when trying to delete a folder that contains alerts.
+    #[error("Folder contains alerts. Please move/delete alerts from folder.")]
+    DeleteWithAlerts,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -82,8 +90,20 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+        org_id,
+        _id,
+        &folder.folder_id,
+        folder_type,
+        &folder.name,
+        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+    )
+    .await;
+
     Ok(folder)
 }
 
@@ -99,7 +119,18 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
+        org_id,
+        folder_id,
+        folder_type,
+        &folder.name,
+        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+    )
+    .await;
+
     Ok(folder)
 }
 
@@ -142,6 +173,17 @@ pub async fn get_folder(
 }
 
 #[tracing::instrument()]
+pub async fn get_folder_by_name(
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get_by_name(org_id, folder_name, folder_type)
+        .await?
+        .ok_or(FolderError::NotFound)
+}
+
+#[tracing::instrument()]
 pub async fn delete_folder(
     org_id: &str,
     folder_id: &str,
@@ -149,10 +191,18 @@ pub async fn delete_folder(
 ) -> Result<(), FolderError> {
     match folder_type {
         FolderType::Dashboards => {
-            let filter = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
-            let dashboards = table::dashboards::list(filter).await?;
+            let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
+            let dashboards = table::dashboards::list(params).await?;
             if !dashboards.is_empty() {
                 return Err(FolderError::DeleteWithDashboards);
+            }
+        }
+        FolderType::Alerts => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let params = ListAlertsParams::new(org_id).in_folder(folder_id);
+            let alerts = table::alerts::list(client, params).await?;
+            if !alerts.is_empty() {
+                return Err(FolderError::DeleteWithAlerts);
             }
         }
     };
@@ -163,6 +213,15 @@ pub async fn delete_folder(
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
     remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+        org_id,
+        folder_id,
+        folder_type,
+    )
+    .await;
+
     Ok(())
 }
 

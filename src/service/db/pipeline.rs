@@ -13,36 +13,52 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// use std::sync::Arc;
+use std::sync::Arc;
 
-use anyhow::Result;
 use config::meta::{
     pipeline::{components::PipelineSource, Pipeline},
     stream::StreamParams,
 };
-use infra::pipeline::{self as infra_pipeline};
+use infra::{
+    cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
+    db,
+    pipeline::{self as infra_pipeline},
+};
 use once_cell::sync::Lazy;
 
 use crate::{
-    common::infra::config::STREAM_EXECUTABLE_PIPELINES,
+    common::infra::config::{PIPELINE_STREAM_MAPPING, STREAM_EXECUTABLE_PIPELINES},
     service::pipeline::batch_execution::ExecutablePipeline,
 };
+
+#[derive(Debug, thiserror::Error)]
+pub enum PipelineError {
+    // internal
+    #[error("InfraError# {0}")]
+    InfraError(#[from] infra::errors::Error),
+    // not found
+    #[error("Pipeline with ID {0} not found.")]
+    NotFound(String),
+    // conflict
+    #[error("Pipeline with ID {0} modified by someone else. Please refresh.")]
+    Modified(String),
+    // bad request
+    #[error("A realtime pipeline with same source stream already exists")]
+    StreamInUse,
+    #[error("Invalid pipeline {0}")]
+    InvalidPipeline(String),
+    #[error("Invalid DerivedStream config: {0}")]
+    InvalidDerivedStream(String),
+    #[error("Error deleting previous DerivedStream: {0}")]
+    DeleteDerivedStream(String),
+}
 
 /// Stores a new pipeline to database.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn set(pipeline: &Pipeline) -> Result<()> {
-    if let Err(e) = infra_pipeline::put(pipeline).await {
-        log::error!("Error saving pipeline: {}", e);
-        return Err(anyhow::anyhow!("Error saving pipeline: {}", e));
-    }
-
-    // save to cache if realtime pipeline
-    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-        if pipeline.enabled {
-            update_cache(stream_params, PipelineTableEvent::Add(pipeline)).await;
-        }
-    }
+pub async fn set(pipeline: &Pipeline) -> Result<(), PipelineError> {
+    infra_pipeline::put(pipeline).await?;
+    update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
 }
@@ -50,37 +66,24 @@ pub async fn set(pipeline: &Pipeline) -> Result<()> {
 /// Updates a pipeline entry with the sane values.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn update(pipeline: &Pipeline, prev_source_stream: Option<StreamParams>) -> Result<()> {
-    if let Err(e) = infra_pipeline::update(pipeline).await {
-        log::error!("Error updating pipeline: {}", e);
-        return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
+pub async fn update(
+    pipeline: &Pipeline,
+    prev_source_stream: Option<StreamParams>,
+) -> Result<(), PipelineError> {
+    if prev_source_stream.is_some() {
+        // remove first since source stream changed
+        update_cache(PipelineTableEvent::Remove(&pipeline.id)).await;
     }
 
-    if let Some(prev_stream_params) = prev_source_stream {
-        update_cache(&prev_stream_params, PipelineTableEvent::Remove).await;
-    }
-
-    // save to cache if realtime pipeline
-    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-        let db_event = if pipeline.enabled {
-            PipelineTableEvent::Add(pipeline)
-        } else {
-            PipelineTableEvent::Remove
-        };
-        update_cache(stream_params, db_event).await;
-    }
+    infra_pipeline::put(pipeline).await?;
+    update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
 }
 
 /// Returns all streams with existing pipelines.
-pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> {
-    infra_pipeline::list_streams_with_pipeline(org)
-        .await
-        .map_err(|e| {
-            log::error!("Error getting streams with pipeline for org({org}): {}", e);
-            anyhow::anyhow!("Error getting streams with pipeline for org({org}): {}", e)
-        })
+pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, PipelineError> {
+    Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
 }
 
 /// Transform the initialized and enabled pipeline into ExecutablePipeline struct that's ready for
@@ -121,55 +124,33 @@ pub async fn get_by_stream(stream_params: &StreamParams) -> Option<Pipeline> {
 /// Returns the pipeline by id.
 ///
 /// Used to get the pipeline associated with the ID when scheduled job is ran.
-pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
-    infra_pipeline::get_by_id(pipeline_id).await.map_err(|e| {
-        log::error!("Error getting pipeline with ID({pipeline_id}): {}", e);
-        anyhow::anyhow!("Error getting pipeline with ID({pipeline_id}): {}", e)
-    })
+pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
+    Ok(infra_pipeline::get_by_id(pipeline_id).await?)
 }
 
 /// Finds the pipeline with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
-pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline> {
-    infra_pipeline::get_with_same_source_stream(pipeline)
-        .await
-        .map_err(|_| anyhow::anyhow!("No pipeline with the same source found"))
+pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline, PipelineError> {
+    Ok(infra_pipeline::get_with_same_source_stream(pipeline).await?)
 }
 
 /// Lists all pipelines across all orgs.
-pub async fn list() -> Result<Vec<Pipeline>> {
-    infra_pipeline::list().await.map_err(|e| {
-        log::debug!("Error listing pipelines for all orgs: {}", e);
-        anyhow::anyhow!("Error listing pipelines for all orgs: {}", e)
-    })
+pub async fn list() -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(infra_pipeline::list().await?)
 }
 
 /// Lists all pipelines for a given organization.
-pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
-    infra_pipeline::list_by_org(org).await.map_err(|e| {
-        log::debug!("Error listing pipelines for org({org}): {}", e);
-        anyhow::anyhow!("Error listing pipelines for org({org}): {}", e)
-    })
+pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(infra_pipeline::list_by_org(org).await?)
 }
 
 /// Deletes a pipeline by ID.
-pub async fn delete(pipeline_id: &str) -> Result<()> {
-    match infra_pipeline::delete(pipeline_id).await {
-        Err(e) => {
-            log::error!("Error deleting pipeline with ID({pipeline_id}): {}", e);
-            return Err(anyhow::anyhow!(
-                "Error deleting pipeline with ID({pipeline_id}): {}",
-                e
-            ));
-        }
-        Ok(pipeline) => {
-            // remove from cache if realtime pipeline
-            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                update_cache(stream_params, PipelineTableEvent::Remove).await;
-            }
-        }
-    }
+pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
+    // remove from cache first
+    update_cache(PipelineTableEvent::Remove(pipeline_id)).await;
+
+    infra_pipeline::delete(pipeline_id).await?;
 
     Ok(())
 }
@@ -213,42 +194,150 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 /// Update STREAM_PIPELINES cache for realtime pipelines
-async fn update_cache<'a>(stream_params: &StreamParams, event: PipelineTableEvent<'a>) {
+async fn update_cache(event: PipelineTableEvent<'_>) {
     match event {
-        PipelineTableEvent::Remove => {
-            if let Some(removed) = STREAM_EXECUTABLE_PIPELINES
-                .write()
-                .await
-                .remove(stream_params)
+        PipelineTableEvent::Remove(pipeline_id) => {
+            if let Err(e) =
+                infra::cluster_coordinator::pipelines::emit_delete_event(pipeline_id).await
             {
-                log::info!(
-                    "[Pipeline]: pipeline {} removed from cache.",
-                    removed.get_pipeline_id()
-                );
+                log::error!("[Pipeline] error triggering event to remove pipeline from cache: {e}");
+            }
+
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::infra::config::get_config()
+                .super_cluster
+                .enabled
+            {
+                let key = format!("{PIPELINES_WATCH_PREFIX}{pipeline_id}");
+                if let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::pipelines_delete(&key).await
+                {
+                    log::error!("[Pipeline] error triggering super cluster event to remove pipeline from cache: {e}");
+                }
             }
         }
         PipelineTableEvent::Add(pipeline) => {
-            match ExecutablePipeline::new(pipeline).await {
-                Err(e) => {
-                    log::error!(
-                        "[Pipeline] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
-                        pipeline.org,
-                        pipeline.name,
-                        pipeline.id,
-                        e
-                    );
-                }
-                Ok(exec_pl) => {
-                    let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
-                    stream_pl_exec.insert(stream_params.clone(), exec_pl);
-                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
-                }
-            };
+            if let Err(e) =
+                infra::cluster_coordinator::pipelines::emit_put_event(&pipeline.id).await
+            {
+                log::error!("[Pipeline] error triggering event to add pipeline to cache: {e}");
+            }
+
+            // super cluster
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::infra::config::get_config()
+                .super_cluster
+                .enabled
+            {
+                let key = format!("{PIPELINES_WATCH_PREFIX}{}", &pipeline.id);
+                match config::utils::json::to_vec(pipeline) {
+                    Err(e) => {
+                        log::error!(
+                            "[Pipeline] error serializing pipeline for super_cluster event: {}",
+                            e
+                        );
+                    }
+                    Ok(value_vec) => {
+                        if let Err(e) =
+                            o2_enterprise::enterprise::super_cluster::queue::pipelines_put(
+                                &key,
+                                value_vec.into(),
+                            )
+                            .await
+                        {
+                            log::error!("[Pipeline] error triggering super cluster event to add pipeline to cache: {e}");
+                        }
+                    }
+                };
+            }
         }
     }
 }
 
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("[Pipeline::watch] His watch is started");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_pipelines: event channel closed");
+                break;
+            }
+        };
+        match ev {
+            db::Event::Put(ev) => {
+                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+                let Ok(pipeline) = get_by_id(pipeline_id).await else {
+                    log::error!("[Pipeline::watch] error getting pipeline by id from db");
+                    continue;
+                };
+                // Only realtime & enabled pipeline should be added cache
+                if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+                    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
+                    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+                    if pipeline.enabled {
+                        match ExecutablePipeline::new(&pipeline).await {
+                            Err(e) => {
+                                log::error!(
+                                    "[Pipeline::watch] {}/{}/{}: Error initializing pipeline into ExecutablePipeline when updating cache: {}",
+                                    pipeline.org,
+                                    pipeline.name,
+                                    pipeline.id,
+                                    e
+                                );
+                            }
+                            Ok(exec_pl) => {
+                                pipeline_stream_mapping_cache
+                                    .insert(pipeline_id.to_string(), stream_params.clone());
+                                stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                                log::info!(
+                                    "[Pipeline::watch]: pipeline {} added to cache.",
+                                    &pipeline.id
+                                );
+                            }
+                        };
+                    } else {
+                        // remove pipeline from cache if the update is to disable
+                        if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
+                            if stream_exec_pl.remove(&removed).is_some() {
+                                log::info!(
+                                    "[Pipeline]: pipeline {} disabled and removed from cache.",
+                                    pipeline_id
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            db::Event::Delete(ev) => {
+                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id) {
+                    if STREAM_EXECUTABLE_PIPELINES
+                        .write()
+                        .await
+                        .remove(&removed)
+                        .is_some()
+                    {
+                        log::info!(
+                            "[Pipeline]: pipeline {} deleted and removed from cache.",
+                            pipeline_id
+                        );
+                    };
+                }
+            }
+            db::Event::Empty => {}
+        }
+    }
+
+    log::info!("[Pipeline::watch] His watch is ended");
+    Ok(())
+}
+
+#[derive(Debug)]
 enum PipelineTableEvent<'a> {
     Add(&'a Pipeline),
-    Remove,
+    Remove(&'a str),
 }

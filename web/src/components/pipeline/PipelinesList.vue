@@ -359,7 +359,7 @@ const updateActiveTab = () => {
 
 const toggleAlertState = (row : any) =>{
   const newState = !row.enabled;
-  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,newState).then((response) => {
     row.enabled = newState;
     const message = row.enabled 
     ? `${row.name} state resumed successfully` 
@@ -512,6 +512,7 @@ const editPipeline = (pipeline: any) => {
     query: {
       id: pipeline.pipeline_id,
       name: pipeline.name,
+      org_identifier: store.state.selectedOrganization.identifier,
     },
   });
 };

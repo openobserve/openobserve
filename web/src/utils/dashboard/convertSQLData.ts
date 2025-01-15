@@ -25,6 +25,8 @@ import { toZonedTime } from "date-fns-tz";
 import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import {
+  calculateOptimalFontSize,
+  calculateWidthText,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -589,7 +591,7 @@ export const convertSQLData = async (
       }
 
       if (!options.series?.length) {
-        throw new Error("No series data available");
+        return;
       }
 
       const yAxisNameGap = getYAxisNameGap();
@@ -1188,7 +1190,11 @@ export const convertSQLData = async (
         panelSchema.type == "h-stacked") &&
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
-      return yAxisKeys.length === 1 ? xAXisKey : `${xAXisKey} (${label})`;
+      return yAxisKeys.length === 1
+        ? xAXisKey
+          ? xAXisKey
+          : label
+        : `${xAXisKey} (${label})`;
     }
 
     return label;
@@ -1210,7 +1216,14 @@ export const convertSQLData = async (
         .map((yAxis: any) => {
           let yAxisName = getYAxisLabel(yAxis);
 
-          if (breakDownKeys.length) {
+          if (
+            breakDownKeys.length &&
+            (panelSchema.type === "bar" || panelSchema.type === "h-bar") &&
+            !panelSchema.config.trellis?.layout
+          ) {
+            const seriesData = getAxisDataFromKey(yAxis);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig);
+          } else if (breakDownKeys.length) {
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               yAxisName = getYAxisLabel(yAxis, key);
@@ -1364,9 +1377,9 @@ export const convertSQLData = async (
         updateTrellisConfig();
       } else if (breakDownKeys.length) {
         options.xAxis.forEach((it: any, index: number) => {
-          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 5;
+          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 20;
           it.axisLabel.margin =
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5;
+            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 25;
           it.axisTick.length =
             20 * (xAxisKeys.length + breakDownKeys.length - index);
         });
@@ -2089,9 +2102,14 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis.forEach((it: any) => {
-        it.type = "time";
-      });
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
 
       options.xAxis[0].data = [];
 
@@ -2243,7 +2261,16 @@ export const convertSQLData = async (
           ]);
         }
       });
-      options.xAxis[0].type = "time";
+
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
+
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -2356,7 +2383,7 @@ export const convertSQLData = async (
     // will return null if not exist
     // will return ASC or DESC if exist
     const isYAxisExistInOrderBy = await isGivenFieldInOrderBy(
-      panelSchema?.queries[0]?.query ?? "",
+      metadata?.queries[0]?.query ?? "",
       yAxisKeys[0],
     );
     if (isYAxisExistInOrderBy) {
@@ -2469,37 +2496,6 @@ const getLegendPosition = (legendPosition: string) => {
     default:
       return "horizontal";
   }
-};
-
-/**
- * Calculates the width of a given text.
- * Useful to calculate nameGap for the left axis
- *
- * @param {string} text - The text to calculate the width of.
- * @param {string} fontSize - The font size of the text.
- * @return {number} The width of the text in pixels.
- */
-const calculateWidthText = (
-  text: string,
-  fontSize: string = "12px",
-): number => {
-  if (!text) return 0;
-
-  const span = document.createElement("span");
-  document.body.appendChild(span);
-
-  span.style.font = "sans-serif";
-  span.style.fontSize = fontSize || "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
-
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
 };
 
 /**
@@ -2706,30 +2702,4 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
         type: "bar",
       };
   }
-};
-
-/**
- * Calculates the optimal font size for a given text that fits the canvas width.
- * @param text - The text to calculate the font size for.
- * @param canvasWidth - canvas width in pixels
- * @returns {number} - The optimal font size in pixels.
- */
-const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
-  let minFontSize = 1; // Start with the smallest font size
-  let maxFontSize = 90; // Set a maximum possible font size
-  let optimalFontSize = minFontSize;
-
-  while (minFontSize <= maxFontSize) {
-    const midFontSize = Math.floor((minFontSize + maxFontSize) / 2);
-    const textWidth = calculateWidthText(text, `${midFontSize}px`);
-
-    if (textWidth > canvasWidth) {
-      maxFontSize = midFontSize - 1; // Text is too wide, reduce font size
-    } else {
-      optimalFontSize = midFontSize; // Text fits, but we try larger
-      minFontSize = midFontSize + 1;
-    }
-  }
-
-  return optimalFontSize; // Return the largest font size that fits
 };
