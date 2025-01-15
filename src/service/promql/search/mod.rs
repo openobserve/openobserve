@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         cluster::RoleGroup,
         search::ScanStats,
@@ -47,10 +47,22 @@ use crate::{
     },
 };
 
+mod cache;
 pub mod grpc;
+
+pub async fn init() -> Result<()> {
+    if !config::cluster::LOCAL_NODE.is_querier() {
+        return Ok(());
+    }
+    if let Err(e) = cache::init().await {
+        log::error!("Error init metrics disk cache: {}", e);
+    }
+    Ok(())
+}
 
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
 pub async fn search(
+    trace_id: &str,
     org_id: &str,
     req: &MetricsQueryRequest,
     user_email: &str,
@@ -59,26 +71,38 @@ pub async fn search(
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.timeout = timeout;
-    search_in_cluster(req, user_email).await
+    search_in_cluster(trace_id, req, user_email).await
 }
 
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
 async fn search_in_cluster(
+    trace_id: &str,
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
-    let trace_id = ider::uuid();
     let cfg = get_config();
 
+    let &cluster_rpc::MetricsQueryStmt {
+        ref query,
+        start,
+        end,
+        step,
+        query_exemplars: _,
+    } = req.query.as_ref().unwrap();
+
+    // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
+    let cache_disabled =
+        !cfg.common.metrics_cache_enabled || req.no_cache || start == end || step == 0;
+    // adjust start and end time
+    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+
     log::info!(
-        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), query: {}",
+        "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
         req.no_cache,
-        req.query.as_ref().unwrap().start,
-        req.query.as_ref().unwrap().end,
-        req.query.as_ref().unwrap().query,
+        start,end,step,query,
     );
 
     // get querier nodes from cluster
@@ -97,14 +121,6 @@ async fn search_in_cluster(
     }
     let nr_queriers = nodes.len() as i64;
 
-    let &cluster_rpc::MetricsQueryStmt {
-        query: _,
-        start,
-        end,
-        step,
-        query_exemplars: _,
-    } = req.query.as_ref().unwrap();
-
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
     let partition_step = max(micros(DEFAULT_LOOKBACK), step);
@@ -113,9 +129,37 @@ async fn search_in_cluster(
         n => n,
     };
 
-    // adjust start and end time
-    let cache_disabled = req.no_cache || !cfg.common.result_cache_enabled;
-    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+    // get cache data
+    let original_start = start;
+    let (start, cached_values, cached_took) = if cache_disabled {
+        (start, vec![], 0)
+    } else {
+        let start_time = std::time::Instant::now();
+        match cache::get(trace_id, query, start, end, step).await {
+            Ok(Some((new_start, samples))) => {
+                let took = start_time.elapsed().as_millis() as i32;
+                log::info!(
+                    "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
+                    took
+                );
+                (new_start, samples, took)
+            }
+            Ok(None) => (start, vec![], 0),
+            Err(err) => {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->cache: get cache err: {:?}",
+                    err
+                );
+                (start, vec![], 0)
+            }
+        }
+    };
+
+    // cache hits and full cache found
+    if start > end && !cached_values.is_empty() {
+        log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
+        return Ok(Value::Matrix(cached_values));
+    }
 
     let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
         cfg.limit.metrics_max_points_per_series
@@ -139,7 +183,7 @@ async fn search_in_cluster(
     // lose some precision XXX-REFACTORME: move this into a function
     let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
-        trace_id: trace_id.clone(),
+        trace_id: trace_id.to_string(),
         job: job_id,
         stage: 0,
         partition: 0,
@@ -247,6 +291,20 @@ async fn search_in_cluster(
         });
     }
 
+    // add cached values to series_data, need convert to cluster_rpc::Series
+    if !cached_values.is_empty() {
+        let mut resp = cluster_rpc::MetricsQueryResponse {
+            job: req.job.clone(),
+            took: cached_took,
+            result_type: result_type.clone(),
+            ..Default::default()
+        };
+        grpc::add_value(&mut resp, Value::Matrix(cached_values));
+        resp.result.into_iter().for_each(|series| {
+            series_data.push(series);
+        });
+    }
+
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
@@ -270,11 +328,11 @@ async fn search_in_cluster(
         records: scan_stats.records,
         size: scan_stats.original_size as f64,
         response_time: op_start.elapsed().as_secs_f64(),
-        request_body: Some(req.query.unwrap().query),
+        request_body: Some(query.to_string()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(start),
         max_ts: Some(end),
-        trace_id: Some(trace_id),
+        trace_id: Some(trace_id.to_string()),
         ..Default::default()
     };
 
@@ -288,6 +346,19 @@ async fn search_in_cluster(
         started_at,
     )
     .await;
+
+    // cache the result
+    if !cache_disabled {
+        if let Some(matrix) = values.get_ref_matrix_values() {
+            if let Err(err) = cache::set(trace_id, query, original_start, end, step, matrix).await {
+                log::error!(
+                    "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
+                    err
+                );
+            }
+        }
+    }
+
     Ok(values)
 }
 
@@ -308,7 +379,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
         });
         merged_metrics.insert(signature(&labels), labels);
     }
-    let merged_data = merged_data
+    let mut merged_data = merged_data
         .into_iter()
         .map(|(sig, samples)| {
             let mut samples = samples
@@ -319,9 +390,15 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 })
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-            RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
+            (
+                sig.clone(),
+                RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
+            )
         })
-        .collect();
+        .collect::<Vec<_>>();
+    // sort by signature
+    merged_data.sort_by(|a, b| a.0.cmp(&b.0));
+    let merged_data = merged_data.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
 
     let mut value = Value::Matrix(merged_data);
     value.sort();

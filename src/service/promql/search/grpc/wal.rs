@@ -71,6 +71,10 @@ pub(crate) async fn create_context(
                 DataFusionError::Execution(err.to_string())
             })?,
     );
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(vec![]);
+    }
 
     // get wal record batches
     let (stats, batches, schema) = get_wal_batches(
