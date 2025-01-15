@@ -13,47 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::alerts::alert::Alert, utils::json};
 use infra::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors::{Error, Result},
+    errors::Result,
     table,
 };
-use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use serde::{Deserialize, Serialize};
-use svix_ksuid::Ksuid;
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum AlertMessage {
-    Create {
-        org_id: String,
-        folder_id: String,
-        alert: Alert,
-    },
-    Update {
-        org_id: String,
-        folder_id: Option<String>,
-        alert: Alert,
-    },
-    Delete {
-        org_id: String,
-        alert_id: Ksuid,
-    },
-}
-
-impl TryFrom<Message> for AlertMessage {
-    type Error = Error;
-
-    fn try_from(msg: Message) -> std::result::Result<Self, Self::Error> {
-        let bytes = msg
-            .value
-            .ok_or(Error::Message("Message missing value".to_string()))?;
-        let alert_msg: AlertMessage = json::from_slice(&bytes).inspect_err(|_| {
-            log::error!("[SUPER_CLUSTER:DB] Failed to parse alert message");
-        })?;
-        Ok(alert_msg)
-    }
-}
+use o2_enterprise::enterprise::super_cluster::queue::{AlertMessage, Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -80,7 +45,8 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             folder_id,
             alert,
         } => {
-            let alert = table::alerts::create(conn, &org_id, &folder_id, alert).await?;
+            log::debug!("Creating alert: {:?}", alert);
+            let alert = table::alerts::create(conn, &org_id, &folder_id, alert, true).await?;
             infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert).await?;
         }
         AlertMessage::Update {
