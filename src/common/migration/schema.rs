@@ -385,22 +385,11 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
             temp.name = into_ofga_supported_format(temp_name);
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
-
-            // [service::db] has been migrated to `template` table. This should continue to operate
-            // on the `meta` table, where values are read from
-
             // First create an alert copy with formatted template name
-            match db::put(
-                &db_key,
-                json::to_vec(&temp).unwrap().into(),
-                db::NO_NEED_WATCH,
-                None,
-            )
-            .await
-            {
+            match meta::set_template_in_meta(keys[0], &mut temp).await {
                 // Delete template with unsupported template name
                 Ok(_) => {
-                    if let Err(e) = db::delete(&db_key, false, db::NO_NEED_WATCH, None).await {
+                    if let Err(e) = db::alerts::templates::delete(keys[0], temp_name).await {
                         log::error!(
                             "[Template:Migration]: Error deleting unsupported template name {temp_name}: {e}"
                         );
@@ -593,6 +582,8 @@ mod meta {
 
     use super::*;
 
+    const DEFAULT_ORG: &str = "default";
+
     /// Inserts the alert into the meta table if it doesn't already exist or updates
     /// it if it does already exist.
     pub async fn set_alert(
@@ -607,7 +598,7 @@ mod meta {
         match db::put(
             &key,
             json::to_vec(alert).unwrap().into(),
-            db::NO_NEED_WATCH,
+            db::NEED_WATCH,
             None,
         )
         .await
@@ -666,7 +657,7 @@ mod meta {
     ) -> Result<(), anyhow::Error> {
         let schedule_key = format!("{stream_type}/{stream_name}/{name}");
         let key = format!("/alerts/{org_id}/{}", &schedule_key);
-        match db::delete(&key, false, db::NO_NEED_WATCH, None).await {
+        match db::delete(&key, false, db::NEED_WATCH, None).await {
             Ok(_) => {
                 match db::scheduler::delete(
                     org_id,
@@ -696,7 +687,24 @@ mod meta {
         Ok(db::put(
             &key,
             json::to_vec(destination).unwrap().into(),
-            db::NO_NEED_WATCH,
+            db::NEED_WATCH,
+            None,
+        )
+        .await?)
+    }
+
+    /// Inserts the template into the meta table if it doesn't already exist or
+    /// updates it if it does already exist.
+    pub async fn set_template_in_meta(
+        org_id: &str,
+        template: &mut Template,
+    ) -> Result<(), anyhow::Error> {
+        template.is_default = Some(org_id == DEFAULT_ORG);
+        let key = format!("/templates/{org_id}/{}", template.name);
+        Ok(db::put(
+            &key,
+            json::to_vec(template).unwrap().into(),
+            db::NEED_WATCH,
             None,
         )
         .await?)

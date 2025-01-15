@@ -65,7 +65,6 @@ pub async fn put(
     org_id: &str,
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, Error> {
-    // TODO(taiming): this org can be default or any other org
     let template_id = if let destinations::Module::Alert { template, .. } = &destination.module {
         super::templates::get(org_id, template)
             .await?

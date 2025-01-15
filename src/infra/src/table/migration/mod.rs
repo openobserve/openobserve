@@ -24,10 +24,6 @@ mod m20241119_000002_populate_dashboards_table;
 mod m20241119_000003_delete_metas;
 mod m20241204_143100_create_table_search_queue;
 mod m20241209_120000_create_alerts_table;
-mod m20241212_115400_create_templates_table;
-mod m20241212_132500_populate_templates_table;
-mod m20241213_102300_create_destinations_table;
-mod m20241213_133700_populate_destinations_table;
 mod m20241215_190333_delete_metas;
 mod m20241217_154900_alter_folders_table_idx;
 mod m20241217_155000_populate_alerts_table;
@@ -36,6 +32,12 @@ mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
+mod m20250115_102300_create_destinations_table;
+mod m20250115_115400_create_templates_table;
+mod m20250115_132500_populate_templates_table;
+mod m20250115_133700_populate_destinations_table;
+mod m20250115_153005_delete_metas_destinations;
+mod m20250115_172300_delete_metas_templates;
 
 pub struct Migrator;
 
@@ -52,10 +54,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20241119_000003_delete_metas::Migration),
             Box::new(m20241204_143100_create_table_search_queue::Migration),
             Box::new(m20241209_120000_create_alerts_table::Migration),
-            Box::new(m20241212_115400_create_templates_table::Migration),
-            Box::new(m20241212_132500_populate_templates_table::Migration),
-            Box::new(m20241213_102300_create_destinations_table::Migration),
-            Box::new(m20241213_133700_populate_destinations_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
             Box::new(m20241217_154900_alter_folders_table_idx::Migration),
             Box::new(m20241217_155000_populate_alerts_table::Migration),
@@ -64,6 +62,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
+            Box::new(m20250115_115400_create_templates_table::Migration),
+            Box::new(m20250115_132500_populate_templates_table::Migration),
+            // Box::new(m20250115_172300_delete_metas_templates::Migration),
+            Box::new(m20250115_102300_create_destinations_table::Migration),
+            Box::new(m20250115_133700_populate_destinations_table::Migration),
+            // Box::new(m20250115_153005_delete_metas_destinations::Migration),
         ]
     }
 }
