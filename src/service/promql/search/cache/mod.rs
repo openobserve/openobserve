@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicI64, Ordering},
+    Arc,
+};
 
 use config::{
-    get_config, ider,
+    get_config,
     utils::{
         hash::{gxhash, Sum64},
         json,
@@ -31,14 +34,17 @@ use tokio::sync::RwLock;
 use super::RangeValue;
 
 const METRICS_INDEX_CACHE_MAX_ENTRIES: usize = 100_000;
-const METRICS_INDEX_CACHE_MAX_BUCKETS: usize = 100;
-const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 5;
+const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
+const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 10;
+const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
+
+static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
-    let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_MAX_BUCKETS);
-    for _ in 0..METRICS_INDEX_CACHE_MAX_BUCKETS {
+    let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
+    for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(
-            METRICS_INDEX_CACHE_MAX_ENTRIES / METRICS_INDEX_CACHE_MAX_BUCKETS,
+            METRICS_INDEX_CACHE_MAX_ENTRIES / METRICS_INDEX_CACHE_BUCKETS,
         )));
     }
     metrics
@@ -177,7 +183,7 @@ pub async fn set(
             return Ok(());
         }
     }
-    let need_gc = r.cache.len() + 10 >= r.max_entries;
+    let need_gc = r.cache.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
 
     if need_gc {
@@ -295,13 +301,13 @@ fn get_cache_item_key() -> String {
     format!(
         "metrics_result/{}/{}.json",
         now().format("%Y/%m/%d/%H"),
-        ider::uuid(),
+        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
     )
 }
 
 fn get_bucket_id(key: &str) -> usize {
     let hash = gxhash::new().sum64(key);
-    hash as usize % METRICS_INDEX_CACHE_MAX_BUCKETS
+    hash as usize % METRICS_INDEX_CACHE_BUCKETS
 }
 
 struct MetricsIndex {
@@ -371,8 +377,8 @@ mod tests {
         let bucket1 = get_bucket_id(key1);
         let bucket2 = get_bucket_id(key2);
 
-        assert!(bucket1 < METRICS_INDEX_CACHE_MAX_BUCKETS);
-        assert!(bucket2 < METRICS_INDEX_CACHE_MAX_BUCKETS);
+        assert!(bucket1 < METRICS_INDEX_CACHE_BUCKETS);
+        assert!(bucket2 < METRICS_INDEX_CACHE_BUCKETS);
     }
 
     #[tokio::test]
