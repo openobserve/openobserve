@@ -810,6 +810,18 @@ impl Value {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Signature([u8; 32]);
 
+impl PartialOrd for Signature {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Signature {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
 impl From<Signature> for String {
     fn from(sig: Signature) -> Self {
         hex::encode(sig.0)

@@ -66,7 +66,10 @@ impl TableProvider for StorageProvider {
             filters,
         )
         .await?;
-        resp.push(ctx);
+        if let Some(ctx) = ctx {
+            resp.push(ctx);
+        }
+
         // register Wal table
         if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
