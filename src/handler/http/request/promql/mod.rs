@@ -423,13 +423,10 @@ async fn query_range(
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse promql error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                log::error!("[trace_id: {trace_id}] parse promql error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                ));
             }
         };
         let mut visitor = promql::name_visitor::MetricNameVisitor::default();
@@ -477,7 +474,7 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {}", e);
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
             }
         },
@@ -489,7 +486,7 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {}", e);
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
             }
         },
@@ -501,7 +498,7 @@ async fn query_range(
             Err(e) => {
                 log::error!("parse time error: {}", e);
                 return Ok(HttpResponse::BadRequest().json(
-                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
                 ));
             }
         },
