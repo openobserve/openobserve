@@ -13,42 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::dashboards::Dashboard, utils::json};
-use infra::{
-    errors::{Error, Result},
-    table,
-};
-use o2_enterprise::enterprise::super_cluster::queue::Message;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[allow(clippy::large_enum_variant)]
-pub enum DashboardMessage {
-    Put {
-        org_id: String,
-        folder_id: String,
-        dashboard: Dashboard,
-    },
-    Delete {
-        org_id: String,
-        folder_id: String,
-        dashboard_id: String,
-    },
-}
-
-impl TryFrom<Message> for DashboardMessage {
-    type Error = Error;
-
-    fn try_from(msg: Message) -> std::result::Result<Self, Self::Error> {
-        let bytes = msg
-            .value
-            .ok_or(Error::Message("Message missing value".to_string()))?;
-        let alert_msg: DashboardMessage = json::from_slice(&bytes).inspect_err(|_| {
-            log::error!("[SUPER_CLUSTER:DB] Failed to parse dashboard message");
-        })?;
-        Ok(alert_msg)
-    }
-}
+use infra::{errors::Result, table};
+use o2_enterprise::enterprise::super_cluster::queue::{DashboardMessage, Message};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg = msg.try_into()?;
