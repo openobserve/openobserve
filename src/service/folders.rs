@@ -18,12 +18,12 @@ use config::{
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
     },
 };
 use infra::{
     db::{connect_to_orm, ORM_CLIENT},
-    table::{self, folders::FolderType},
+    table,
 };
 
 use crate::common::{
@@ -145,6 +145,17 @@ pub async fn get_folder(
     folder_type: FolderType,
 ) -> Result<Folder, FolderError> {
     table::folders::get(org_id, folder_id, folder_type)
+        .await?
+        .ok_or(FolderError::NotFound)
+}
+
+#[tracing::instrument()]
+pub async fn get_folder_by_name(
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get_by_name(org_id, folder_name, folder_type)
         .await?
         .ok_or(FolderError::NotFound)
 }
