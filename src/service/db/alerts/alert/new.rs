@@ -135,9 +135,9 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
-        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
-    } else {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
+    } else {
+        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
     }
     Ok(())
 }
@@ -148,7 +148,7 @@ pub async fn create<C: TransactionTrait>(
     folder_id: &str,
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
-    let alert = table::create(conn, org_id, folder_id, alert).await?;
+    let alert = table::create(conn, org_id, folder_id, alert, false).await?;
 
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
@@ -376,10 +376,7 @@ fn scheduler_key(stream_type: StreamType, stream_name: &str, alert_name: &str) -
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::{
-        meta::{alerts::alert::Alert, stream::StreamType},
-        utils::json,
-    };
+    use config::meta::{alerts::alert::Alert, stream::StreamType};
     use infra::errors::Error;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
@@ -392,11 +389,12 @@ mod super_cluster {
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
-            let value = json::to_vec(&alert)?.into();
-            o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
+            // let value = json::to_vec(&alert)?.into();
+            log::debug!("Sending super cluster alert creation event: {:?}", alert);
+            // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_create(org, folder_id, alert)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -412,11 +410,12 @@ mod super_cluster {
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
-            let value = json::to_vec(&alert)?.into();
-            o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
+            // let value = json::to_vec(&alert)?.into();
+            log::debug!("Sending super cluster alert update event: {:?}", alert);
+            // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_update(org, folder_id, alert)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -435,9 +434,10 @@ mod super_cluster {
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             let key = alert_key(org, stream_type, stream_name, alert_name);
-            o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            log::debug!("Sending super cluster alert delete event: {:?}", key);
+            // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_delete(org, alert_id)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
