@@ -66,7 +66,10 @@ impl TableProvider for StorageProvider {
             filters,
         )
         .await?;
-        resp.push(ctx);
+        if let Some(ctx) = ctx {
+            resp.push(ctx);
+        }
+
         // register Wal table
         if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
@@ -94,18 +97,24 @@ pub async fn search(
     let cfg = config::get_config();
     let start_time = std::time::Instant::now();
     let query = req.query.as_ref().unwrap();
-    let max_interval = cfg.limit.metrics_max_search_interval_per_group * 3_600_000_000; // convert hours to microseconds
 
     let start = query.start;
     let end = query.end;
     let step = query.step;
+    let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
 
     let mut results = Vec::new();
     if start == end {
         results.push(search_inner(req).await?);
     } else {
-        let group_interval = max_interval - max_interval % step;
+        let group_interval = cfg.limit.metrics_max_search_interval_per_group;
         let group = generate_search_group(start, end, step, group_interval);
+        if group.len() > 1 {
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: get groups {:?}",
+                group
+            );
+        }
         for (start, end) in group {
             let mut req = req.clone();
             req.need_wal =
@@ -113,6 +122,10 @@ pub async fn search(
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
+                 start_time.elapsed().as_millis()
+            );
             results.push(resp);
         }
     }
@@ -143,7 +156,7 @@ pub async fn search_inner(
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
     let prom_expr = parser::parse(&query.query).map_err(|e| {
-        log::error!("promQL parse query error: {e}");
+        log::error!("[trace_id {trace_id}] promql->search->grpc: parse query error: {e}");
         DataFusionError::Execution(e)
     })?;
 
@@ -195,13 +208,18 @@ pub async fn search_inner(
 }
 
 /// generate search group
+/// if the group_interval is less than 10 steps, it will be set to 10 * step
 /// if the last group is less than group_interval * 25%, it will be merged into the previous group
 fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -> Vec<(i64, i64)> {
+    let mut group_interval = group_interval - group_interval % step;
+    if group_interval < step * 10 {
+        group_interval = step * 10;
+    }
     let mut resp = Vec::new();
     let mut start = start;
     while start < end {
         let next = start + group_interval;
-        if next >= end - group_interval / 4 {
+        if next >= end - step - group_interval / 4 {
             resp.push((start, end));
             break;
         }
@@ -211,7 +229,7 @@ fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -
     resp
 }
 
-fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
+pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
     match value {
         value::Value::None => {}
         value::Value::Instant(v) => {
@@ -281,33 +299,52 @@ fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
 
 #[cfg(test)]
 mod tests {
+    use config::utils::time::hour_micros;
+
     use super::*;
+    use crate::service::promql::{round_step, MAX_DATA_POINTS};
 
     #[test]
     fn test_generate_search_group() {
         // test case 1: normal case
-        let resp = generate_search_group(0, 10, 2, 4);
-        let expected = vec![(0, 4), (6, 10)];
+        let resp = generate_search_group(0, 100, 2, 24);
+        let expected = vec![(0, 24), (26, 50), (52, 76), (78, 100)];
         assert_eq!(resp, expected);
 
         // test case 2: start == end
-        let resp = generate_search_group(0, 0, 2, 4);
+        let resp = generate_search_group(0, 0, 2, 24);
         let expected = vec![];
         assert_eq!(resp, expected);
 
         // test case 3: start > end
-        let resp = generate_search_group(10, 0, 2, 4);
+        let resp = generate_search_group(10, 0, 2, 24);
         let expected = vec![];
         assert_eq!(resp, expected);
 
         // test case 4, the last group is greater than group_interval * 25%
-        let resp = generate_search_group(0, 11, 2, 8);
-        let expected = vec![(0, 8), (10, 11)];
+        let resp = generate_search_group(0, 111, 2, 24);
+        let expected = vec![(0, 24), (26, 50), (52, 76), (78, 102), (104, 111)];
         assert_eq!(resp, expected);
 
         // test case 5, the last group is less than group_interval * 25%
-        let resp = generate_search_group(0, 10, 2, 8);
-        let expected = vec![(0, 10)];
+        let resp = generate_search_group(0, 109, 2, 24);
+        let expected = vec![(0, 24), (26, 50), (52, 76), (78, 109)];
+        assert_eq!(resp, expected);
+
+        // test case 6, over 1 month
+        let end = now_micros();
+        let start = end - hour_micros(24 * 31);
+        let step = round_step((end - start) / MAX_DATA_POINTS);
+        let group_interval = hour_micros(1);
+        let resp = generate_search_group(start, end, step, group_interval);
+        let mut expected = Vec::new();
+        for i in 0..24 {
+            expected.push((
+                start + i * step * 10 + i * step,
+                start + (i + 1) * step * 10 + i * step,
+            ));
+        }
+        expected.last_mut().unwrap().1 = end;
         assert_eq!(resp, expected);
     }
 }
