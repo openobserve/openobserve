@@ -1707,7 +1707,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.metrics_max_search_interval_per_group < 3600 {
         // convert hours to microseconds
-        cfg.limit.metrics_max_search_interval_per_group *= 3600_000_000;
+        cfg.limit.metrics_max_search_interval_per_group *= 3_600_000_000;
     }
     if cfg.limit.metrics_max_series_per_query == 0 {
         cfg.limit.metrics_max_series_per_query = 30000;
