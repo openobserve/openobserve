@@ -21,7 +21,7 @@ use config::meta::{
         alert::{Alert as MetaAlert, ListAlertsParams},
         QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
     },
-    folder::Folder as MetaFolder,
+    folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
 };
 use hashbrown::HashMap;
@@ -34,7 +34,7 @@ use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::{
     entity::{alerts, folders},
-    folders::FolderType,
+    folders::folder_type_into_i16,
 };
 use crate::errors::{self, FromStrError, PutAlertError};
 
@@ -456,7 +456,7 @@ async fn get_model_by_name<C: ConnectionTrait>(
 ) -> Result<Option<(folders::Model, Option<alerts::Model>)>, sea_orm::DbErr> {
     let select_folders = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
         .filter(folders::Column::FolderId.eq(folder_id));
 
     let Some(folder) = select_folders.one(conn).await? else {
@@ -483,7 +483,7 @@ async fn list_models<C: ConnectionTrait>(
 ) -> Result<Vec<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
     let query = alerts::Entity::find()
         .find_also_related(folders::Entity)
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
         .filter(folders::Column::Org.eq(params.org_id));
 
     // Apply the optional folder_id filter.

@@ -37,7 +37,7 @@ impl From<Model> for Folder {
 }
 
 /// Converts the [FolderType] into its [i16] representation in the database.
-fn folder_type_into_i16(folder_type: FolderType) -> i16 {
+pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
     match folder_type {
         FolderType::Dashboards => 0,
         FolderType::Alerts => 1,
