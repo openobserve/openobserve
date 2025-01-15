@@ -19,7 +19,7 @@ use config::meta::{
         v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
         ListDashboardsParams,
     },
-    folder::Folder,
+    folder::{Folder, FolderType},
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -31,7 +31,7 @@ use svix_ksuid::KsuidLike;
 use super::{
     distinct_values::{self, OriginType},
     entity::{dashboards, folders},
-    folders::FolderType,
+    folders::folder_type_into_i16,
 };
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
@@ -290,7 +290,7 @@ async fn get_model_from_folder(
 ) -> Result<Option<(folders::Model, Option<dashboards::Model>)>, sea_orm::DbErr> {
     let select_folders = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
         .filter(folders::Column::FolderId.eq(folder_id));
 
     let Some(folder) = select_folders.one(db).await? else {
@@ -332,7 +332,7 @@ async fn list_models(
     let query = dashboards::Entity::find()
         .find_also_related(folders::Entity)
         .filter(folders::Column::Org.eq(params.org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)));
 
     // Apply the optional folder_id filter.
     let query = if let Some(folder_id) = &params.folder_id {
@@ -378,7 +378,7 @@ async fn list_all_models(
     db: &DatabaseConnection,
 ) -> Result<Vec<(String, dashboards::Model)>, sea_orm::DbErr> {
     let query = folders::Entity::find()
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)));
 
     // Apply ordering. Confusingly, it is necessary to apply the ordering BEFORE
     // adding a join to the query builder. If we don't do this then Sea ORM will
