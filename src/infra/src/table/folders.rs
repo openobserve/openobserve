@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::folder::Folder;
+use config::meta::folder::{Folder, FolderType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
     IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
@@ -26,22 +26,6 @@ use crate::{
     errors,
 };
 
-/// Indicates the type of data that the folder can contain.
-#[derive(Debug, Clone, Copy)]
-pub enum FolderType {
-    Dashboards,
-    Alerts,
-}
-
-impl From<FolderType> for i16 {
-    fn from(value: FolderType) -> Self {
-        match value {
-            FolderType::Dashboards => 0,
-            FolderType::Alerts => 1,
-        }
-    }
-}
-
 impl From<Model> for Folder {
     fn from(value: Model) -> Self {
         Self {
@@ -49,6 +33,14 @@ impl From<Model> for Folder {
             name: value.name,
             description: value.description.unwrap_or_default(),
         }
+    }
+}
+
+/// Converts the [FolderType] into its [i16] representation in the database.
+pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
+    match folder_type {
+        FolderType::Dashboards => 0,
+        FolderType::Alerts => 1,
     }
 }
 
@@ -132,7 +124,7 @@ pub async fn put(
                 // We should probably generate folder_id here for new folders,
                 // rather than depending on caller code to generate it.
                 folder_id: Set(folder.folder_id),
-                r#type: Set::<i16>(folder_type.into()),
+                r#type: Set::<i16>(folder_type_into_i16(folder_type)),
                 name: Set(folder.name),
                 description: Set(Some(folder.description).filter(|d| !d.is_empty())),
             };
@@ -170,7 +162,7 @@ pub(crate) async fn get_model<C: ConnectionTrait>(
     Entity::find()
         .filter(Column::Org.eq(org_id))
         .filter(Column::FolderId.eq(folder_id))
-        .filter(Column::Type.eq(i16::from(folder_type)))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
         .one(db)
         .await
 }
@@ -185,7 +177,7 @@ pub(crate) async fn get_model_by_name<C: ConnectionTrait>(
     Entity::find()
         .filter(Column::Org.eq(org_id))
         .filter(Column::Name.eq(folder_name))
-        .filter(Column::Type.eq(i16::from(folder_type)))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
         .one(db)
         .await
 }
@@ -198,7 +190,7 @@ async fn list_models(
 ) -> Result<Vec<Model>, sea_orm::DbErr> {
     Entity::find()
         .filter(Column::Org.eq(org_id))
-        .filter(Column::Type.eq::<i16>(folder_type.into()))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
         .order_by(Column::Id, sea_orm::Order::Asc)
         .all(db)
         .await

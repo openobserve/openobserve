@@ -17,7 +17,7 @@ use config::{
     ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         stream::{DistinctField, StreamType},
     },
 };
@@ -25,7 +25,6 @@ use hashbrown::HashMap;
 use infra::table::{
     self,
     distinct_values::{DistinctFieldRecord, OriginType},
-    folders::FolderType,
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
