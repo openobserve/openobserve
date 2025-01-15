@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               data-test="settings_ent_logo_custom_text"
               :label="t('settings.customLoginWarning')"
-              v-model="customLoginWarning"
+              v-model.trim="customLoginWarning"
               type="textarea"
             />
             <div
