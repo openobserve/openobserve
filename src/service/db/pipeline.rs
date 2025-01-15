@@ -276,8 +276,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 // Only realtime & enabled pipeline should be added cache
                 if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
                     let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
+                    let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
                     if pipeline.enabled {
                         match ExecutablePipeline::new(&pipeline).await {
                             Err(e) => {
