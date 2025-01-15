@@ -18,12 +18,12 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
     IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
-use svix_ksuid::KsuidLike;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors,
+    errors::{self, FromStrError},
 };
 
 impl From<Model> for Folder {
@@ -98,9 +98,10 @@ pub async fn list_folders(
 /// the new or updated folder.
 pub async fn put(
     org_id: &str,
+    id: Option<Ksuid>,
     folder: Folder,
     folder_type: FolderType,
-) -> Result<Folder, errors::Error> {
+) -> Result<(Ksuid, Folder), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let model = match get_model(client, org_id, &folder.folder_id, folder_type).await? {
@@ -118,8 +119,9 @@ pub async fn put(
         // active record so that Sea ORM will create a new DB record when the
         // active model is saved.
         None => {
+            let ksuid = id.unwrap_or_else(|| svix_ksuid::Ksuid::new(None, None));
             let active = ActiveModel {
-                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                id: Set(ksuid.to_string()),
                 org: Set(org_id.to_owned()),
                 // We should probably generate folder_id here for new folders,
                 // rather than depending on caller code to generate it.
@@ -133,7 +135,11 @@ pub async fn put(
         }
     };
 
-    Ok(model.into())
+    let ksuid = Ksuid::from_base62(&model.id).map_err(|_| FromStrError {
+        value: model.id.clone(),
+        ty: "svix_ksuid::Ksuid".to_owned(),
+    })?;
+    Ok((ksuid, model.into()))
 }
 
 /// Deletes a folder with the given `folder_id` surrogate key.

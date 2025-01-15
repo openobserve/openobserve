@@ -90,8 +90,20 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+        org_id,
+        _id,
+        &folder.folder_id,
+        folder_type,
+        &folder.name,
+        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+    )
+    .await;
+
     Ok(folder)
 }
 
@@ -107,7 +119,18 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
+        org_id,
+        folder_id,
+        folder_type,
+        &folder.name,
+        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+    )
+    .await;
+
     Ok(folder)
 }
 
@@ -190,6 +213,15 @@ pub async fn delete_folder(
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
     remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+        org_id,
+        folder_id,
+        folder_type,
+    )
+    .await;
+
     Ok(())
 }
 
