@@ -65,6 +65,19 @@ pub async fn get(
     Ok(folder)
 }
 
+/// Gets a folder by its ID.
+pub async fn get_by_name(
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Option<Folder>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let folder = get_model_by_name(client, org_id, folder_name, folder_type)
+        .await
+        .map(|f| f.map(Folder::from))?;
+    Ok(folder)
+}
+
 /// Checks if the folder with the given ID exists.
 pub async fn exists(
     org_id: &str,
@@ -157,6 +170,21 @@ pub(crate) async fn get_model<C: ConnectionTrait>(
     Entity::find()
         .filter(Column::Org.eq(org_id))
         .filter(Column::FolderId.eq(folder_id))
+        .filter(Column::Type.eq(i16::from(folder_type)))
+        .one(db)
+        .await
+}
+
+/// Gets a folder ORM entity by its `folder_id`.
+pub(crate) async fn get_model_by_name<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::Name.eq(folder_name))
         .filter(Column::Type.eq(i16::from(folder_type)))
         .one(db)
         .await

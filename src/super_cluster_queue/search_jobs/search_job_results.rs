@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,19 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(btree_cursors)]
+use infra::{
+    errors::Result,
+    table::search_job::search_job_results::{JobResultOperator, *},
+};
 
-pub mod cli;
-pub mod common;
-pub mod handler;
-pub mod job;
-pub mod router;
-pub mod service;
-
-#[cfg(feature = "enterprise")]
-pub mod super_cluster_queue;
-
-pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/ua_regex/regexes.yaml"
-));
+pub(crate) async fn process(operator: JobResultOperator) -> Result<()> {
+    match operator {
+        JobResultOperator::Delete { job_id } => {
+            if let Err(e) = clean_deleted_job_result(job_id.as_str()).await {
+                log::error!(
+                    "[SUPER_CLUSTER:DB] Failed to clean deleted job result: {job_id}, error: {e}",
+                );
+                return Err(e);
+            }
+        }
+    }
+    Ok(())
+}
