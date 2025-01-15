@@ -559,6 +559,175 @@ pub async fn handle_otlp_request(
     format_response(partial_success, req_type)
 }
 
+pub async fn ingest_json(
+    org_id: &str,
+    body: web::Bytes,
+    req_type: OtlpRequestType,
+    traces_stream_name: &str,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+
+    if !LOCAL_NODE.is_ingester() {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                "not an ingester".to_string(),
+            )),
+        );
+    }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            format!("Quota exceeded for this organization [{}]", org_id),
+        )));
+    }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        log::error!(
+            "[TRACES:JSON] ingestion error while checking memtable size: {}",
+            e
+        );
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
+    let cfg = get_config();
+    let min_ts = (Utc::now()
+        - Duration::try_hours(cfg.limit.ingest_allowed_upto)
+            .expect("configuration error: too large ingest_allowed_upto"))
+    .timestamp_micros();
+
+    let json_values: Vec<json::Value> = json::from_slice(&body)?;
+    let mut span_metrics = Vec::with_capacity(json_values.len());
+    let mut json_data_by_stream = HashMap::new();
+    let mut partial_success = ExportTracePartialSuccess::default();
+    for mut value in json_values {
+        let span: Span = json::from_value(value.clone())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+
+        let timestamp = (span.start_time / 1000) as i64;
+        if timestamp < min_ts {
+            log::error!(
+                    "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
+                    &span.trace_id
+                );
+            partial_success.rejected_spans += 1;
+            continue;
+        }
+
+        // JSON Flattening
+        value = flatten::flatten(value)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+
+        // get json object
+        let mut record_val = match value.take() {
+            json::Value::Object(mut v) => {
+                // build span metrics item
+                let sm = crate::job::metrics::TraceMetricsItem {
+                    organization: org_id.to_string(),
+                    traces_stream_name: traces_stream_name.to_string(),
+                    service_name: span.service_name,
+                    span_name: v
+                        .remove("o2_span_metrics_name")
+                        .map_or(span.operation_name, |name| {
+                            name.as_str().unwrap().to_string()
+                        }),
+                    span_status: span.span_status,
+                    span_kind: span.span_kind,
+                    duration: ((span.end_time - span.start_time) / 1_000_000) as f64, /* milliseconds */
+                    span_id: span.trace_id.clone(),
+                };
+                span_metrics.push(sm);
+                v
+            }
+            _ => {
+                log::error!(
+                    "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
+                    &span.trace_id
+                );
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        "stream did not receive a valid json objectt".into(),
+                    )),
+                );
+            }
+        };
+
+        // add timestamp
+        record_val.insert(
+            cfg.common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
+        let (ts_data, _) = json_data_by_stream
+            .entry(traces_stream_name.to_string())
+            .or_insert((Vec::new(), None));
+        ts_data.push((timestamp, record_val));
+    }
+
+    // if no data, fast return
+    if json_data_by_stream.is_empty() {
+        return format_response(partial_success, req_type);
+    }
+
+    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    {
+        log::error!("Error while writing traces: {}", e);
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("error while writing trace data: {e}",),
+            )),
+        );
+    }
+
+    let time = start.elapsed().as_secs_f64();
+    let ep = match req_type {
+        OtlpRequestType::Grpc => "/grpc/otlp/traces",
+        _ => "/api/otlp/v1/traces",
+    };
+
+    if cfg.common.traces_span_metrics_enabled {
+        // record span metrics
+        for m in span_metrics {
+            // send to metrics job
+            if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
+                log::error!("traces metrics item send to job fail: {e}")
+            }
+        }
+    }
+
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.to_string().as_str(),
+        ])
+        .inc();
+
+    format_response(partial_success, req_type)
+}
+
 fn get_span_status(status: Option<Status>) -> String {
     match status {
         Some(v) => match v.code() {

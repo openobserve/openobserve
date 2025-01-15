@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{meta::stream::StreamType, metrics, utils::json};
+use config::{
+    meta::{otlp::OtlpRequestType, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use proto::cluster_rpc::{
     ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType,
 };
@@ -88,7 +92,7 @@ impl Ingest for Ingester {
                     ))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::traces::otlp_json(&org_id, data, Some(&stream_name))
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| anyhow::anyhow!("error in ingesting traces {}", e))
