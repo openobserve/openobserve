@@ -268,6 +268,7 @@ pub async fn create<C: TransactionTrait>(
     org_id: &str,
     folder_id: &str,
     alert: MetaAlert,
+    given_id: Option<Ksuid>,
 ) -> Result<MetaAlert, errors::Error> {
     // Ensure that no ID is provided.
     if alert.id.is_some() {
@@ -284,7 +285,9 @@ pub async fn create<C: TransactionTrait>(
         return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
     };
 
-    let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let id = given_id
+        .unwrap_or_else(|| svix_ksuid::Ksuid::new(None, None))
+        .to_string();
     let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
     let mut alert_am = alerts::ActiveModel {
         id: Set(id),

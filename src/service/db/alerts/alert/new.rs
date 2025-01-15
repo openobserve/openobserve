@@ -148,7 +148,7 @@ pub async fn create<C: TransactionTrait>(
     folder_id: &str,
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
-    let alert = table::create(conn, org_id, folder_id, alert).await?;
+    let alert = table::create(conn, org_id, folder_id, alert, None).await?;
 
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
