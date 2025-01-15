@@ -90,13 +90,13 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    let (id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
+    let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
     let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
         org_id,
-        id,
+        _id,
         &folder.folder_id,
         folder_type,
         &folder.name,
