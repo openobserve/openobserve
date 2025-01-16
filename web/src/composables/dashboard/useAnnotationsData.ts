@@ -50,7 +50,7 @@ export const useAnnotationsData = (
         end_time: null,
         title: annotationData.name,
         text: annotationData.description || null,
-        tags: annotationData.tags || "",
+        tags: annotationData.tags || [],
         panels: [panelId],
       };
 

@@ -129,6 +129,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-if="showAnnotationButton"
+        class="annotation-button-container"
+        :style="buttonStyle"
+        @click.stop
+      >
+        <q-btn
+          label="Add Annotation"
+          color="primary"
+          @click="handleAddAnnotationClick"
+        />
+      </div>
+      <div
         style="
           border: 1px solid gray;
           border-radius: 4px;
@@ -163,17 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ drilldown.name }}</span>
           </div>
         </div>
-      </div>
-      <div
-        v-if="showAnnotationButton"
-        class="annotation-button-container"
-        @click.stop
-      >
-        <q-btn
-          label="Add Annotation"
-          color="primary"
-          @click="handleAddAnnotationClick"
-        />
       </div>
 
       <!-- Annotation Dialog -->
@@ -314,6 +315,12 @@ export default defineComponent({
       width: "100%",
     });
 
+    const buttonStyle: any = ref({
+      position: "absolute",
+      left: "0px",
+      top: "0px",
+      zIndex: 9999998,
+    });
     // get refs from props
     const {
       panelSchema,
@@ -683,6 +690,19 @@ export default defineComponent({
       console.log("Chart clicked with params:", params);
 
       if (params?.data) {
+        const clickX = params?.event?.offsetX || 0;
+        const clickY = params?.event?.offsetY || 0;
+        console.log("Click X:", clickX, "Click Y:", clickY);
+
+        const BUTTON_HEIGHT = 20;
+        const MARGIN = 50;
+        buttonStyle.value = {
+          position: "absolute",
+          left: `${clickX - MARGIN}px`,
+          top: `${clickY - BUTTON_HEIGHT - MARGIN}px`,
+          zIndex: 9999998,
+        };
+
         handleChartClick(params.data);
       }
       if (
@@ -1243,6 +1263,7 @@ export default defineComponent({
       metadata,
       tableRendererRef,
       onChartClick,
+      buttonStyle,
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
@@ -1291,5 +1312,8 @@ export default defineComponent({
   top: 20%;
   width: 100%;
   text-align: center;
+}
+.annotation-button-container {
+  
 }
 </style>
