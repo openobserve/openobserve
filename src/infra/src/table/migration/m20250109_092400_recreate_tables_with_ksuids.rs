@@ -78,7 +78,9 @@ impl MigrationTrait for Migration {
             .await?;
         let txn = manager.get_connection().begin().await?;
         legacy_folders::populate_ksuid_column(&txn, 100).await?;
+        log::info!("Populated ksuid column in legacy_folders");
         legacy_dashboards::populate_ksuid_column(&txn, 100).await?;
+        log::info!("Populated ksuid column in legacy_dashboards");
         txn.commit().await?;
 
         // Create the new `folders`, `dashboards`, and `alerts` tables which use
@@ -87,40 +89,54 @@ impl MigrationTrait for Migration {
         manager
             .create_table(new_folders::create_folders_table_statement())
             .await?;
+        log::info!("Created new folders table");
         manager
             .create_index(new_folders::create_folders_org_idx_stmnt())
             .await?;
+        log::info!("Created new folders org index");
         manager
             .create_index(new_folders::create_folders_org_type_folder_id_idx_stmnt())
             .await?;
+        log::info!("Created new folders org, type, folder_id index");
         manager
             .create_table(new_dashboards::create_dashboards_table_statement())
             .await?;
+        log::info!("Created new dashboards table");
         manager
             .create_index(new_dashboards::create_dashboards_folder_id_dashboard_id_idx_stmnt())
             .await?;
+        log::info!("Created new dashboards folder_id, dashboard_id index");
         manager
             .create_table(new_alerts::create_alerts_table_statement())
             .await?;
+        log::info!("Created new alerts table");
         manager
             .create_index(new_alerts::create_alerts_folder_id_idx_stmnt())
             .await?;
+        log::info!("Created new alerts folder_id index");
         manager
             .create_index(new_alerts::create_alerts_org_stream_type_stream_name_name_idx_stmnt())
             .await?;
+        log::info!("Created new alerts org, stream_type, stream_name, name index");
 
         // Populate the new `folders`, `dashboards`, and `alerts` tables with
         // data from the legacy tables.
         let txn = manager.get_connection().begin().await?;
         new_folders::populate(&txn).await?;
+        log::info!("Populated new folders table");
         new_dashboards::populate(&txn).await?;
+        log::info!("Populated new dashboards table");
         new_alerts::populate(&txn).await?;
+        log::info!("Populated new alerts table");
         txn.commit().await?;
 
         // Delete each of the legacy tables.
         manager.drop_table(legacy_dashboards::drop_table()).await?;
+        log::info!("Dropped legacy dashboards table");
         manager.drop_table(legacy_alerts::drop_table()).await?;
+        log::info!("Dropped legacy alerts table");
         manager.drop_table(legacy_folders::drop_table()).await?;
+        log::info!("Dropped legacy folders table");
 
         Ok(())
     }
@@ -174,10 +190,11 @@ mod legacy_folders {
             .paginate(conn, page_size);
 
         while let Some(folders) = pages.fetch_and_next().await? {
+            log::info!("Populating ksuid column for folders len: {}", folders.len());
             for folder in folders {
-                let mut am = folder.into_active_model();
                 let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
-                println!("folder ksuid: {}", ksuid);
+                println!("folder {:?} ksuid: {}", folder, ksuid);
+                let mut am = folder.into_active_model();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
@@ -239,9 +256,14 @@ mod legacy_dashboards {
             .paginate(conn, page_size);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
+            log::info!(
+                "Populating ksuid column for dashboards len: {}",
+                dashboards.len()
+            );
             for dashboard in dashboards {
-                let mut am = dashboard.into_active_model();
                 let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
+                println!("dashboard {:?} ksuid: {}", dashboard, ksuid);
+                let mut am = dashboard.into_active_model();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
