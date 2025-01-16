@@ -184,10 +184,13 @@ pub async fn get(
         }
     }
 
-    // if new_start > start, it means we have data in cache, so we need to add step for next query
-    if new_start > start {
-        new_start += step;
+    // if new_start == start, it means we have no data in cache, so we need to return None
+    if new_start == start {
+        return Ok(None);
     }
+
+    // if new_start > start, it means we have data in cache, so we need to add step for next query
+    new_start += step;
     Ok(Some((new_start, range_values)))
 }
 
