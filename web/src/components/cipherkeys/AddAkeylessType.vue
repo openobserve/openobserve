@@ -117,6 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
+          type="password"
+          autocomplete="new-password"
           :rules="[(val: any) => !!val || 'LDAP Password is required']"
         />
       </div>

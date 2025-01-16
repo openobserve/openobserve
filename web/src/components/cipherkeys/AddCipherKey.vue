@@ -68,6 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     `Characters like :, ?, /, #, and spaces are not allowed.`
                   : 'Name is required',
               (val: any) => maxLengthCharValidation(val, 50),
+              (val: any) =>
+                /^[a-zA-Z0-9_-]+$/.test(val) ||
+                'Only alphanumeric characters, underscores, and hyphens are allowed',
             ]"
             tabindex="0"
           />

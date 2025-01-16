@@ -274,6 +274,7 @@ export default defineComponent({
     };
 
     const getData = () => {
+      loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading data...",
@@ -294,13 +295,18 @@ export default defineComponent({
 
           tabledata.value = data;
           resultTotal.value = responseData.length;
+          loading.value = false;
           dismiss();
         })
         .catch((error) => {
+          loading.value = false;
           dismiss();
           $q.notify({
             type: "negative",
-            message: error.response.data.message,
+            message:
+              error.response?.data?.message ||
+              "Failed to fetch cipher keys. Please try again.",
+            timeout: 5000,
           });
         });
     };
