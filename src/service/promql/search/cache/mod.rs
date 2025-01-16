@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc,
+use std::{
+    collections::VecDeque,
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Arc,
+    },
 };
 
 use config::{
@@ -33,18 +36,19 @@ use tokio::sync::RwLock;
 
 use super::{RangeValue, Value};
 
-const METRICS_INDEX_CACHE_MAX_ENTRIES: usize = 100_000;
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
+const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // 10% of the items will be removed
 const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 10;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
 
 static CACHE_KEY_SUFFIX: Lazy<AtomicI64> = Lazy::new(|| AtomicI64::new(now_micros()));
 
 static GLOBAL_CACHE: Lazy<Vec<RwLock<MetricsIndex>>> = Lazy::new(|| {
+    let cfg = get_config();
     let mut metrics = Vec::with_capacity(METRICS_INDEX_CACHE_BUCKETS);
     for _ in 0..METRICS_INDEX_CACHE_BUCKETS {
         metrics.push(RwLock::new(MetricsIndex::new(
-            METRICS_INDEX_CACHE_MAX_ENTRIES / METRICS_INDEX_CACHE_BUCKETS,
+            cfg.limit.metrics_cache_max_entries / METRICS_INDEX_CACHE_BUCKETS,
         )));
     }
     metrics
@@ -95,7 +99,7 @@ pub async fn get(
     let key = get_hash_key(query, step);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
-    let Some(index) = r.cache.get(&key) else {
+    let Some(index) = r.data.get(&key) else {
         return Ok(None);
     };
     if !index.query.is_empty() && index.query != query {
@@ -132,7 +136,7 @@ pub async fn get(
     let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
         // need to drop the key from index
         let mut w = GLOBAL_CACHE[bucket_id].write().await;
-        if let Some(index) = w.cache.get_mut(&key) {
+        if let Some(index) = w.data.get_mut(&key) {
             index.entries.retain(|entry| entry.key != best_key);
         }
         drop(w);
@@ -221,7 +225,7 @@ pub async fn set(
     let key = get_hash_key(query, step);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
-    if let Some(index) = r.cache.get(&key) {
+    if let Some(index) = r.data.get(&key) {
         if !index.query.is_empty() && index.query != query {
             log::warn!(
                 "HASH conflict, query changed from {} to {}, skip cache",
@@ -239,7 +243,7 @@ pub async fn set(
             return Ok(());
         }
     }
-    let need_gc = r.cache.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
+    let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
 
     if need_gc {
@@ -325,7 +329,8 @@ pub async fn set(
     // store the cache item
     let cache_item = MetricsIndexCacheItem::new(&cache_key, start, new_end);
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    let index = w.cache.entry(key).or_insert(MetricsIndexCache::new(query));
+    w.cacher.push_back(key.to_string());
+    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(query));
     if index.entries.len() >= METRICS_INDEX_CACHE_MAX_ITEMS {
         // remove the first half items
         index.entries.drain(0..METRICS_INDEX_CACHE_MAX_ITEMS / 2);
@@ -348,7 +353,8 @@ pub async fn load(cache_key: &str) -> Result<()> {
     let bucket_id = get_bucket_id(&key);
     let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    let index = w.cache.entry(key).or_insert(MetricsIndexCache::new(""));
+    w.cacher.push_back(key.to_string());
+    let index = w.data.entry(key).or_insert(MetricsIndexCache::new(""));
     index.entries.push(Arc::new(cache_item));
     drop(w);
 
@@ -356,21 +362,14 @@ pub async fn load(cache_key: &str) -> Result<()> {
 }
 
 async fn gc(bucket_id: usize) -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.metrics_cache_enabled {
-        return Ok(());
-    }
-
-    // remove 10% of the items
+    log::warn!("MetricsIndexCache is full, releasing 10% of the cache");
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
-    let keys = w
-        .cache
-        .keys()
-        .take(w.cache.len() / 10)
-        .map(|x| x.to_string())
-        .collect::<Vec<_>>();
-    for key in keys {
-        w.cache.remove(&key);
+    for _ in 0..(w.max_entries / METRICS_INDEX_CACHE_GC_PERCENT) {
+        if let Some(key) = w.cacher.pop_front() {
+            w.data.remove(&key);
+        } else {
+            break;
+        }
     }
     drop(w);
 
@@ -421,14 +420,16 @@ fn get_bucket_id(key: &str) -> usize {
 }
 
 struct MetricsIndex {
-    cache: HashMap<String, MetricsIndexCache>,
+    data: HashMap<String, MetricsIndexCache>,
+    cacher: VecDeque<String>,
     max_entries: usize,
 }
 
 impl MetricsIndex {
     fn new(max_entries: usize) -> Self {
         Self {
-            cache: HashMap::new(),
+            data: HashMap::new(),
+            cacher: VecDeque::new(),
             max_entries,
         }
     }
@@ -575,7 +576,7 @@ mod tests {
         let bucket_id = get_bucket_id(&key);
         let metrics = GLOBAL_CACHE[bucket_id].read().await;
 
-        if let Some(index) = metrics.cache.get(&key) {
+        if let Some(index) = metrics.data.get(&key) {
             assert!(index.entries.len() <= METRICS_INDEX_CACHE_MAX_ITEMS);
         } else {
             panic!("Cache entry not found");
