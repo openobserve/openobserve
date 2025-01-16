@@ -17,7 +17,7 @@ use config::{
     ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         stream::{DistinctField, StreamType},
     },
 };
@@ -25,7 +25,6 @@ use hashbrown::HashMap;
 use infra::table::{
     self,
     distinct_values::{DistinctFieldRecord, OriginType},
-    folders::FolderType,
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
@@ -428,17 +427,25 @@ pub async fn move_dashboard(
     };
 
     // add the dashboard to the destination folder
-    put(org_id, dashboard_id, to_folder, dashboard, None).await?;
+    put(org_id, dashboard_id, to_folder, dashboard.clone(), None).await?;
     // OFGA ownership
     #[cfg(feature = "enterprise")]
-    if get_o2_config().openfga.enabled {
-        set_parent_relation(
-            dashboard_id,
-            &get_ofga_type("dashboards"),
-            to_folder,
-            &get_ofga_type("folders"),
-        )
-        .await;
+    {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+                org_id, to_folder, dashboard,
+            )
+            .await;
+        }
+        if get_o2_config().openfga.enabled {
+            set_parent_relation(
+                dashboard_id,
+                &get_ofga_type("dashboards"),
+                to_folder,
+                &get_ofga_type("folders"),
+            )
+            .await;
+        }
     }
 
     // delete the dashboard from the source folder
@@ -453,14 +460,24 @@ pub async fn move_dashboard(
         })?;
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().openfga.enabled {
-        remove_parent_relation(
-            dashboard_id,
-            &get_ofga_type("dashboards"),
-            from_folder,
-            &get_ofga_type("folders"),
-        )
-        .await;
+    {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_delete(
+                org_id,
+                from_folder,
+                dashboard_id,
+            )
+            .await;
+        }
+        if get_o2_config().openfga.enabled {
+            remove_parent_relation(
+                dashboard_id,
+                &get_ofga_type("dashboards"),
+                from_folder,
+                &get_ofga_type("folders"),
+            )
+            .await;
+        }
     }
     Ok(())
 }
