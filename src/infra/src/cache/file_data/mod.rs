@@ -148,16 +148,11 @@ pub async fn set(trace_id: &str, key: &str, data: bytes::Bytes) -> Result<(), an
     }
 }
 
-pub async fn get(
-    _trace_id: &str,
-    file: &str,
-    range: Option<Range<usize>>,
-) -> object_store::Result<bytes::Bytes> {
-    get_opts(_trace_id, file, range, true).await
+pub async fn get(file: &str, range: Option<Range<usize>>) -> object_store::Result<bytes::Bytes> {
+    get_opts(file, range, true).await
 }
 
 pub async fn get_opts(
-    _trace_id: &str,
     file: &str,
     range: Option<Range<usize>>,
     remote: bool,
@@ -189,15 +184,11 @@ pub async fn get_opts(
     })
 }
 
-pub async fn get_size(_trace_id: &str, file: &str) -> object_store::Result<usize> {
-    get_size_opts(_trace_id, file, true).await
+pub async fn get_size(file: &str) -> object_store::Result<usize> {
+    get_size_opts(file, true).await
 }
 
-pub async fn get_size_opts(
-    _trace_id: &str,
-    file: &str,
-    remote: bool,
-) -> object_store::Result<usize> {
+pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usize> {
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled {

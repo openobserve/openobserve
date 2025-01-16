@@ -703,7 +703,7 @@ pub async fn merge_files(
     for file in new_file_list.iter() {
         fi += 1;
         log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
-        let buf = file_data::get("", &file.key, None).await?;
+        let buf = file_data::get(&file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();

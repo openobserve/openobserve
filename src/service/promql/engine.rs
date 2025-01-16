@@ -56,15 +56,17 @@ pub struct Engine {
     /// Filters to include certain columns
     col_filters: Option<HashSet<String>>,
     result_type: Option<String>,
+    trace_id: String,
 }
 
 impl Engine {
-    pub fn new(ctx: Arc<PromqlContext>, time: i64) -> Self {
+    pub fn new(trace_id: &str, ctx: Arc<PromqlContext>, time: i64) -> Self {
         Self {
             ctx,
             time,
             col_filters: Some(HashSet::new()),
             result_type: None,
+            trace_id: trace_id.to_string(),
         }
     }
 
@@ -244,7 +246,8 @@ impl Engine {
                     (Value::None, Value::None) => Value::None,
                     _ => {
                         log::debug!(
-                            "[PromExpr::Binary] either lhs or rhs vector is found to be empty"
+                            "[trace_id: {}] [PromExpr::Binary] either lhs or rhs vector is found to be empty",
+                            self.trace_id
                         );
                         Value::Vector(vec![])
                     }
@@ -504,7 +507,7 @@ impl Engine {
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[PromQL] Failed to load data for stream: {table_name}, error: {e:?}");
+                log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
                 *data_loaded = true;
                 return Err(e);
             }
@@ -573,7 +576,8 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[PromQL] Loading data for stream: {}, range: [{},{}), filter: {:?}",
+            "[trace_id: {}] [PromQL] Loading data for stream: {}, range: [{},{}), filter: {:?}",
+            self.trace_id,
             table_name,
             start,
             end,
@@ -647,6 +651,13 @@ impl Engine {
                 }
             }
         }
+
+        log::info!(
+            "[trace_id: {}] [PromQL] Load data done for stream: {}",
+            self.trace_id,
+            table_name
+        );
+
         Ok(metrics)
     }
 
