@@ -79,12 +79,12 @@ export const useAnnotationsData = (
     showAddAnnotationDialog();
   };
 
-  const { showPositiveNotification } = useNotifications();
+  const { showInfoNotification } = useNotifications();
 
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
       // show a notification
-      showPositiveNotification("Click on the chart to add an annotation", {});
+      showInfoNotification("Click on the chart data or select a range to add an annotation", {});
     }
   });
 

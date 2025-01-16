@@ -76,9 +76,29 @@ const useNotifications = () => {
     });
   };
 
+  const showInfoNotification = (message: string, options?: any) => {
+    return quasar.notify({
+      type: "info",
+      message: message,
+      timeout: 5000,
+      actions: [
+        {
+          icon: "close",
+          color: "white",
+          round: true,
+          handler: () => {
+            /* ... */
+          },
+        },
+      ],
+      ...(options || {}),
+    });
+  }
+
   return {
     showErrorNotification,
     showPositiveNotification,
+    showInfoNotification,
     showConfictErrorNotificationWithRefreshBtn,
   };
 };
