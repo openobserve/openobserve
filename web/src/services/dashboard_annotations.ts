@@ -40,7 +40,7 @@ export const annotationService = {
       org_id: string,
       dashboard_id: string,
       params: {
-        panels: string;
+        panels: string[];
         start_time: number;
         end_time: number;
       },

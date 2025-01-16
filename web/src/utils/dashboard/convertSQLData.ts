@@ -75,6 +75,7 @@ export const convertMultiSQLData = async (
         [resultMetaData.value[i]],
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
+        dashboardId,
       ),
     );
   }
