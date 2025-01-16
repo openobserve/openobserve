@@ -4,6 +4,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const ANNOTATIONS_DASHBOARD_ID_IDX: &str = "timed_annotations_dashboard_id_idx";
+const TIMED_ANNOTATIONS_DASHBOARDS_FK: &str = "fk_timed_annotation_panels_dashboard_id";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -31,16 +32,17 @@ fn create_table_stmt() -> TableCreateStatement {
     Table::create()
         .table(TimedAnnotations::Table)
         .if_not_exists()
+        // The ID is 27-character human readable KSUID.
         .col(
             ColumnDef::new(TimedAnnotations::Id)
-                .string_len(64)
+                .char_len(27)
                 .not_null()
                 .primary_key(),
         )
         .col(
             ColumnDef::new(TimedAnnotations::DashboardId)
-                .string_len(256)
-                .not_null(),
+                .char_len(27)
+                .not_null()
         )
         .col(
             ColumnDef::new(TimedAnnotations::OrgId)
@@ -65,13 +67,21 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(TimedAnnotations::Text).text().null())
         .col(
             ColumnDef::new(TimedAnnotations::Tags)
-                .string_len(512)
-                .null(),
+                .json()
+                .not_null()
+                .default(serde_json::json!([])),
         )
         .col(
             ColumnDef::new(TimedAnnotations::CreatedAt)
                 .big_integer()
                 .not_null(),
+        )
+        .foreign_key(
+            sea_query::ForeignKey::create()
+                    .name(TIMED_ANNOTATIONS_DASHBOARDS_FK)
+                    .from(TimedAnnotations::Table, TimedAnnotations::DashboardId)
+                    .to(Dashboards::Table, Dashboards::DashboardId)
+                    .on_delete(ForeignKeyAction::Cascade)
         )
         .to_owned()
 }
@@ -98,4 +108,10 @@ enum TimedAnnotations {
     Text,
     Tags,
     CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Dashboards {
+    Table,
+    DashboardId,
 }

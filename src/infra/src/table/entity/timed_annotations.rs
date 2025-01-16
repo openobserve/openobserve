@@ -14,19 +14,33 @@ pub struct Model {
     pub title: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub text: Option<String>,
-    pub tags: Option<String>,
+    pub tags: Json,
     pub created_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::annotation_panels::Entity")]
-    AnnotationPanels,
+    #[sea_orm(
+        belongs_to = "super::dashboards::Entity",
+        from = "Column::DashboardId",
+        to = "super::dashboards::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Dashboards,
+    #[sea_orm(has_many = "super::timed_annotation_panels::Entity")]
+    TimedAnnotationPanels,
 }
 
-impl Related<super::annotation_panels::Entity> for Entity {
+impl Related<super::dashboards::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::AnnotationPanels.def()
+        Relation::Dashboards.def()
+    }
+}
+
+impl Related<super::timed_annotation_panels::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TimedAnnotationPanels.def()
     }
 }
 

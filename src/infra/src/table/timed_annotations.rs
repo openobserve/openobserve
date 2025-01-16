@@ -21,7 +21,7 @@ use sea_orm::{
 
 use super::{
     entity::{
-        annotation_panels,
+        timed_annotation_panels,
         timed_annotations::{self, *},
     },
     get_lock,
@@ -49,15 +49,15 @@ pub async fn get(
         .filter(timed_annotations::Column::DashboardId.eq(dashboard_id))
         .join(
             JoinType::InnerJoin,
-            timed_annotations::Relation::AnnotationPanels.def(),
+            timed_annotations::Relation::TimedAnnotationPanels.def(),
         );
 
     // Step 2: If `panel_ids` is provided, filter by `panel_id`
     if let Some(panel_ids) = panel_ids {
         query = query.filter(
             Expr::col((
-                annotation_panels::Entity,
-                annotation_panels::Column::PanelId,
+                timed_annotation_panels::Entity,
+                timed_annotation_panels::Column::PanelId,
             ))
             .is_in(panel_ids),
         );
@@ -115,8 +115,8 @@ pub async fn get(
     let annotation_ids: Vec<String> = annotations.iter().map(|a| a.id.clone()).collect();
 
     // Step 6: Fetch associated panels for the retrieved annotations
-    let panels = annotation_panels::Entity::find()
-        .filter(annotation_panels::Column::TimedAnnotationId.is_in(annotation_ids.clone()))
+    let panels = timed_annotation_panels::Entity::find()
+        .filter(timed_annotation_panels::Column::TimedAnnotationId.is_in(annotation_ids.clone()))
         .all(client)
         .await?;
 
@@ -144,7 +144,13 @@ pub async fn get(
             end_time: annotation.end_time,
             title: annotation.title,
             text: annotation.text,
-            tags: annotation.tags,
+            tags: annotation
+                .tags
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
         })
         .collect();
 
@@ -163,7 +169,7 @@ pub async fn add(
         end_time: Set(timed_annotation.end_time),
         title: Set(timed_annotation.title),
         text: Set(timed_annotation.text),
-        tags: Set(timed_annotation.tags),
+        tags: Set(timed_annotation.tags.into()),
         created_at: Set(Utc::now().timestamp_micros()),
         org_id: Set(org_id.to_string()),
     };
@@ -177,13 +183,13 @@ pub async fn add(
 
     // Insert into the annotation_panels table
     for panel_id in timed_annotation.panels {
-        let record = annotation_panels::ActiveModel {
+        let record = timed_annotation_panels::ActiveModel {
             id: (Set(panel_id.clone())),
             timed_annotation_id: Set(timed_annotation_id.clone()),
             panel_id: Set(panel_id),
         };
 
-        annotation_panels::Entity::insert(record)
+        timed_annotation_panels::Entity::insert(record)
             .exec(client)
             .await?;
     }
@@ -217,7 +223,7 @@ pub async fn add_many(
             end_time: Set(timed_annotation.end_time),
             title: Set(timed_annotation.title.clone()),
             text: Set(timed_annotation.text.clone()),
-            tags: Set(timed_annotation.tags.clone()),
+            tags: Set(timed_annotation.tags.clone().into()),
             created_at: Set(Utc::now().timestamp_micros()),
             org_id: Set(org_id.to_string()),
         };
@@ -228,13 +234,13 @@ pub async fn add_many(
 
         // Step 2: Insert associated panels into the `annotation_panels` table
         for panel_id in &timed_annotation.panels {
-            let panel_record = annotation_panels::ActiveModel {
+            let panel_record = timed_annotation_panels::ActiveModel {
                 id: Set(ider::uuid()),
                 timed_annotation_id: Set(annotation_id.clone()),
                 panel_id: Set(panel_id.clone()),
             };
 
-            annotation_panels::Entity::insert(panel_record)
+            timed_annotation_panels::Entity::insert(panel_record)
                 .exec(&txn) // Use the transaction
                 .await?;
         }

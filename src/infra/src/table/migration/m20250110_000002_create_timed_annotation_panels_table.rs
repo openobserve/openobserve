@@ -3,8 +3,9 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const ANNOTATION_PANELS_ANNOTATION_ID_IDX: &str = "annotation_panels_annotation_id_idx";
-const ANNOTATION_PANELS_PANEL_ID_IDX: &str = "annotation_panels_panel_id_idx";
+const TIMED_ANNOTATION_PANELS_ANNOTATION_ID_IDX: &str = "timed_annotation_panels_annotation_id_idx";
+const TIMED_ANNOTATION_PANELS_PANEL_ID_IDX: &str = "timed_annotation_panels_panel_id_idx";
+const TIMED_ANNOTATION_PANELS_ANNOTATION_ID_FK: &str = "fk_timed_annotation_panels_annotation_id";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -21,19 +22,19 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
-                    .name(ANNOTATION_PANELS_ANNOTATION_ID_IDX)
+                    .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_IDX)
                     .to_owned(),
             )
             .await?;
         manager
             .drop_index(
                 Index::drop()
-                    .name(ANNOTATION_PANELS_PANEL_ID_IDX)
+                    .name(TIMED_ANNOTATION_PANELS_PANEL_ID_IDX)
                     .to_owned(),
             )
             .await?;
         manager
-            .drop_table(Table::drop().table(AnnotationPanels::Table).to_owned())
+            .drop_table(Table::drop().table(TimedAnnotationPanels::Table).to_owned())
             .await?;
         Ok(())
     }
@@ -42,28 +43,29 @@ impl MigrationTrait for Migration {
 /// Statement to create the annotation_panels table
 fn create_table_stmt() -> TableCreateStatement {
     Table::create()
-        .table(AnnotationPanels::Table)
+        .table(TimedAnnotationPanels::Table)
         .if_not_exists()
+        // The ID is 27-character human readable KSUID.
         .col(
-            ColumnDef::new(AnnotationPanels::Id)
-                .string_len(64)
+            ColumnDef::new(TimedAnnotationPanels::Id)
+                .char_len(27)
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(AnnotationPanels::TimedAnnotationId)
-                .string_len(64)
-                .not_null(),
+            ColumnDef::new(TimedAnnotationPanels::TimedAnnotationId)
+                .char_len(27)
+                .not_null()
         )
         .col(
-            ColumnDef::new(AnnotationPanels::PanelId)
+            ColumnDef::new(TimedAnnotationPanels::PanelId)
                 .string_len(256)
                 .not_null(),
         )
         .foreign_key(
             ForeignKey::create()
-                .name("fk_annotation_panels_annotation_id")
-                .from(AnnotationPanels::Table, AnnotationPanels::TimedAnnotationId)
+                .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_FK)
+                .from(TimedAnnotationPanels::Table, TimedAnnotationPanels::TimedAnnotationId)
                 .to(TimedAnnotations::Table, TimedAnnotations::Id)
                 .on_delete(ForeignKeyAction::Cascade),
         )
@@ -74,9 +76,9 @@ fn create_table_stmt() -> TableCreateStatement {
 fn create_index_annotation_id_stmt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(ANNOTATION_PANELS_ANNOTATION_ID_IDX)
-        .table(AnnotationPanels::Table)
-        .col(AnnotationPanels::TimedAnnotationId)
+        .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_IDX)
+        .table(TimedAnnotationPanels::Table)
+        .col(TimedAnnotationPanels::TimedAnnotationId)
         .to_owned()
 }
 
@@ -84,14 +86,14 @@ fn create_index_annotation_id_stmt() -> IndexCreateStatement {
 fn create_index_panel_id_stmt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(ANNOTATION_PANELS_PANEL_ID_IDX)
-        .table(AnnotationPanels::Table)
-        .col(AnnotationPanels::PanelId)
+        .name(TIMED_ANNOTATION_PANELS_PANEL_ID_IDX)
+        .table(TimedAnnotationPanels::Table)
+        .col(TimedAnnotationPanels::PanelId)
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum AnnotationPanels {
+enum TimedAnnotationPanels {
     Table,
     Id,
     TimedAnnotationId,

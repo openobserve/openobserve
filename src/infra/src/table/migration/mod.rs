@@ -31,8 +31,9 @@ mod m20241222_085111_search_jobs;
 mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
 mod m20250109_092400_recreate_tables_with_ksuids;
-mod m20250110_000001_create_annotation_panels_table;
+mod m20250109_123850_add_dashboard_id_unique_idx_dashboard_table;
 mod m20250110_000001_create_timed_annotations_table;
+mod m20250110_000002_create_timed_annotation_panels_table;
 
 pub struct Migrator;
 
@@ -56,8 +57,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085135_search_job_partitions::Migration),
             Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
+            Box::new(m20250109_123850_add_dashboard_id_unique_idx_dashboard_table::Migration),
             Box::new(m20250110_000001_create_timed_annotations_table::Migration),
-            Box::new(m20250110_000001_create_annotation_panels_table::Migration),
+            Box::new(m20250110_000002_create_timed_annotation_panels_table::Migration),
         ]
     }
 }
