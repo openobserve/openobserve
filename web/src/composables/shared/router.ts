@@ -210,7 +210,7 @@ const useRoutes = () => {
       component: ImportDashboard,
       props: true,
       meta: {
-        keepAlive: true,
+        // keepAlive: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
