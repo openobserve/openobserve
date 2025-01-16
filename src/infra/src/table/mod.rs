@@ -45,6 +45,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::up(client, Some(12)).await?; // hack for failing alerts migration
     Migrator::up(client, None).await?;
     dist_lock::unlock(&locker).await?;
     Ok(())
