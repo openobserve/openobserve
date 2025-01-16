@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-stepper-navigation>
             <q-btn
               data-test="add-report-step1-continue-btn"
-              @click="step = 2"
+              @click="validateForm(2)"
               color="secondary"
               label="Continue"
               no-caps
@@ -171,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="openCancelDialog"
         />
         <q-btn
+          :disable="step === 1"
           data-test="add-cipher-key-save-btn"
           :label="t('common.save')"
           class="text-bold no-border q-ml-md"
@@ -385,5 +386,14 @@ const openCancelDialog = () => {
 
 const goToCipherList = () => {
   emit("cancel:hideform");
+};
+
+const validateForm = async (stepNumber) => {
+  // Validate form and expand steps with errors
+  let isValid = await addCipherKeyFormRef.value.validate();
+
+  if (isValid) {
+    step.value = stepNumber;
+  }
 };
 </script>

@@ -162,6 +162,7 @@ export default defineComponent({
     const tabledata = ref([]);
     const showAddDialog = ref(false);
     const qTable: any = ref(null);
+    const loading = ref(false);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -377,7 +378,7 @@ export default defineComponent({
       store,
       router,
       qTable,
-      loading: ref(false),
+      loading,
       tabledata,
       columns,
       showAddDialog,

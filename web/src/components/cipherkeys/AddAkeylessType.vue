@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           data-test="add-cipher-key-akeyless-dfc-iv-input"
           v-model="formData.key.store.akeyless.store.dfc.iv"
-          :label="t('cipherKey.dfcIV') + ' *'"
+          :label="t('cipherKey.dfcIV')"
           color="input-border"
           bg-color="input-bg"
           class="showLabelOnTop q-w-lg"
@@ -190,7 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val: any) => !!val || 'DFC IV is required']"
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
