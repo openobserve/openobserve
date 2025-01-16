@@ -94,15 +94,20 @@ pub async fn save_folder(
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
-        org_id,
-        _id,
-        &folder.folder_id,
-        folder_type,
-        &folder.name,
-        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
-    )
-    .await;
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+            org_id,
+            _id,
+            &folder.folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
 
     Ok(folder)
 }
@@ -122,14 +127,19 @@ pub async fn update_folder(
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
-    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
-        org_id,
-        folder_id,
-        folder_type,
-        &folder.name,
-        Some(folder.description.as_str()).filter(|d| !d.is_empty()),
-    )
-    .await;
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
+            org_id,
+            folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
 
     Ok(folder)
 }
@@ -215,12 +225,17 @@ pub async fn delete_folder(
     remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
-        org_id,
-        folder_id,
-        folder_type,
-    )
-    .await;
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+            org_id,
+            folder_id,
+            folder_type,
+        )
+        .await;
+    }
 
     Ok(())
 }
