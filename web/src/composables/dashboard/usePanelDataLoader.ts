@@ -707,6 +707,9 @@ export const usePanelDataLoader = (
     // remove current traceId
     cleanupSearchRetries(payload?.traceId);
 
+    // save current state to cache
+    saveCurrentStateToCache();
+
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
