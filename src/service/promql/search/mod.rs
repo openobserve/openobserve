@@ -89,7 +89,7 @@ async fn search_in_cluster(
         start,
         end,
         step,
-        query_exemplars: _,
+        query_exemplars,
     } = req.query.as_ref().unwrap();
 
     // cache disabled if result cache is disabled or no_cache is true or start == end or step == 0
@@ -131,15 +131,15 @@ async fn search_in_cluster(
 
     // get cache data
     let original_start = start;
-    let (start, cached_values, cached_took) = if cache_disabled {
-        (start, vec![], 0)
+    let (start, cached_values) = if cache_disabled {
+        (start, vec![])
     } else {
         config::metrics::QUERY_METRICS_CACHE_REQUESTS
             .with_label_values(&[])
             .inc();
         let start_time = std::time::Instant::now();
         match cache::get(query, start, end, step).await {
-            Ok(Some((new_start, samples))) => {
+            Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 config::metrics::QUERY_METRICS_CACHE_HITS
                     .with_label_values(&[])
@@ -148,15 +148,15 @@ async fn search_in_cluster(
                     "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
                     took
                 );
-                (new_start, samples, took)
+                (new_start, values)
             }
-            Ok(None) => (start, vec![], 0),
+            Ok(None) => (start, vec![]),
             Err(err) => {
                 log::error!(
                     "[trace_id {trace_id}] promql->search->cache: get cache err: {:?}",
                     err
                 );
-                (start, vec![], 0)
+                (start, vec![])
             }
         }
     };
@@ -164,7 +164,12 @@ async fn search_in_cluster(
     // cache hits and full cache found
     if start > end && !cached_values.is_empty() {
         log::info!("[trace_id {trace_id}] promql->search->cache: hit full cache");
-        return Ok(Value::Matrix(cached_values));
+        let values = if query_exemplars {
+            merge_exemplars_query(&cached_values)
+        } else {
+            merge_matrix_query(&cached_values)
+        };
+        return Ok(values);
     }
 
     let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
@@ -292,24 +297,15 @@ async fn search_in_cluster(
         if result_type.is_empty() {
             result_type = resp.result_type.clone();
         }
-        resp.result.into_iter().for_each(|series| {
+        resp.series.into_iter().for_each(|series| {
             series_data.push(series);
         });
     }
 
-    // add cached values to series_data, need convert to cluster_rpc::Series
-    if !cached_values.is_empty() {
-        let mut resp = cluster_rpc::MetricsQueryResponse {
-            job: req.job.clone(),
-            took: cached_took,
-            result_type: result_type.clone(),
-            ..Default::default()
-        };
-        grpc::add_value(&mut resp, Value::Matrix(cached_values));
-        resp.result.into_iter().for_each(|series| {
-            series_data.push(series);
-        });
-    }
+    // add cached values to series_data
+    cached_values.into_iter().for_each(|series| {
+        series_data.push(series);
+    });
 
     // merge result
     let values = if result_type == "matrix" {
@@ -356,7 +352,9 @@ async fn search_in_cluster(
     // cache the result
     if !cache_disabled {
         if let Some(matrix) = values.get_ref_matrix_values() {
-            if let Err(err) = cache::set(trace_id, query, original_start, end, step, matrix).await {
+            if let Err(err) =
+                cache::set(trace_id, query, original_start, end, step, matrix.to_vec()).await
+            {
                 log::error!(
                     "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
                     err

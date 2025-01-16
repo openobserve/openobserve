@@ -22,16 +22,16 @@ use config::{
     get_config,
     utils::{
         hash::{gxhash, Sum64},
-        json,
         time::{now, now_micros, second_micros},
     },
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
+use prost::Message;
 use tokio::sync::RwLock;
 
-use super::RangeValue;
+use super::{RangeValue, Value};
 
 const METRICS_INDEX_CACHE_MAX_ENTRIES: usize = 100_000;
 const METRICS_INDEX_CACHE_GC_TRIGGER_NUM: usize = 10;
@@ -90,7 +90,7 @@ pub async fn get(
     start: i64,
     end: i64,
     step: i64,
-) -> Result<Option<(i64, Vec<RangeValue>)>> {
+) -> Result<Option<(i64, Vec<proto::cluster_rpc::Series>)>> {
     // get the bucket cache
     let key = get_hash_key(query, step);
     let bucket_id = get_bucket_id(&key);
@@ -138,45 +138,52 @@ pub async fn get(
         drop(w);
         return Ok(None);
     };
-    let data = data.to_vec();
-    let mut range_values: Vec<RangeValue> = json::from_slice(&data)?;
-    if range_values.is_empty() {
+    let mut resp = match proto::cluster_rpc::MetricsQueryResponse::decode(data) {
+        Ok(resp) => resp,
+        Err(e) => {
+            log::error!("decode metrics query response error: {}", e);
+            return Ok(None);
+        }
+    };
+    if resp.series.is_empty() {
         return Ok(None);
     }
 
     let mut new_start = start;
-    for series in range_values.iter_mut() {
+    for series in resp.series.iter_mut() {
         // filter the samples, remove the samples over end
-        let mut last_i = series.samples.len();
+        let value_n = series.samples.len();
+        let mut last_i = value_n;
         for i in 0..last_i {
-            if series.samples[i].timestamp > end {
+            if series.samples[i].time > end {
                 last_i = i;
                 break;
             }
         }
-        if last_i < series.samples.len() {
+        if last_i < value_n {
             series.samples.drain(last_i..);
         }
 
         // filter the exemplars, remove the exemplars over end
         if let Some(exemplars) = series.exemplars.as_mut() {
-            let mut last_i = exemplars.len();
+            let value_n = exemplars.exemplars.len();
+            let mut last_i = value_n;
             for i in (0..last_i).rev() {
-                if exemplars[i].timestamp < end {
+                if exemplars.exemplars[i].time < end {
                     last_i = i;
                     break;
                 }
             }
-            if last_i < exemplars.len() {
-                exemplars.drain(last_i..);
+            if last_i < value_n {
+                exemplars.exemplars.drain(last_i..);
             }
         }
 
         // update the new start
         let ns = if let Some(exemplars) = series.exemplars.as_ref() {
-            exemplars.last().map(|v| v.timestamp).unwrap_or(0)
+            exemplars.exemplars.last().map(|v| v.time).unwrap_or(0)
         } else {
-            series.samples.last().map(|v| v.timestamp).unwrap_or(0)
+            series.samples.last().map(|v| v.time).unwrap_or(0)
         };
         if ns > new_start {
             new_start = ns;
@@ -190,7 +197,7 @@ pub async fn get(
 
     // if new_start > start, it means we have data in cache, so we need to add step for next query
     new_start += step;
-    Ok(Some((new_start, range_values)))
+    Ok(Some((new_start, resp.series)))
 }
 
 pub async fn set(
@@ -199,7 +206,7 @@ pub async fn set(
     start: i64,
     end: i64,
     step: i64,
-    range_values: &[RangeValue],
+    mut range_values: Vec<RangeValue>,
 ) -> Result<()> {
     // check time range, if over ZO_MAX_FILE_RETENTION_TIME, return
     let cfg = get_config();
@@ -245,46 +252,45 @@ pub async fn set(
     }
 
     // filter the samples
-    let json_data = if end < max_ts {
-        json::to_vec(range_values)?
-    } else {
-        let mut new_range_values = Vec::with_capacity(range_values.len());
-        for series in range_values.iter() {
+    if end >= max_ts {
+        let mut empty_item_index = Vec::new();
+        for (i, series) in range_values.iter_mut().enumerate() {
             let mut empty_data = false;
-            let mut new_series = series.clone();
             // check samples
-            let mut last_i = new_series.samples.len();
+            let value_n = series.samples.len();
+            let mut last_i = value_n;
             for i in (0..last_i).rev() {
-                if new_series.samples[i].timestamp < max_ts {
+                if series.samples[i].timestamp < max_ts {
                     last_i = i;
                     break;
                 }
             }
-            if last_i == new_series.samples.len() {
+            if last_i == value_n {
                 // all of the data are over the retention time, no need to store
                 empty_data = true;
-            } else if last_i + 1 == new_series.samples.len() {
+            } else if last_i + 1 == value_n {
                 // all of the data are not in retention time, no need to drain
             } else {
                 // last_i is the last item not in retention time, so we need to drain the samples
                 // after last_i
-                new_series.samples.drain(last_i + 1..);
+                series.samples.drain(last_i + 1..);
             }
 
             // check exemplars
-            if let Some(exemplars) = new_series.exemplars.as_mut() {
+            if let Some(exemplars) = series.exemplars.as_mut() {
                 empty_data = false;
-                let mut last_i = exemplars.len();
+                let value_n = exemplars.len();
+                let mut last_i = value_n;
                 for i in (0..last_i).rev() {
                     if exemplars[i].timestamp < max_ts {
                         last_i = i;
                         break;
                     }
                 }
-                if last_i == exemplars.len() {
+                if last_i == value_n {
                     // all of the data are over the retention time, no need to store
                     empty_data = true;
-                } else if last_i + 1 == exemplars.len() {
+                } else if last_i + 1 == value_n {
                     // all of the data are not in retention time, no need to drain
                 } else {
                     // last_i is the last item not in retention time, so we need to drain the
@@ -293,16 +299,26 @@ pub async fn set(
                 }
             }
 
-            if !empty_data {
-                new_range_values.push(new_series);
+            if empty_data {
+                empty_item_index.push(i);
             }
         }
-        json::to_vec(&new_range_values)?
+        // remove the empty items
+        if !empty_item_index.is_empty() {
+            for i in empty_item_index.into_iter().rev() {
+                range_values.remove(i);
+            }
+        }
     };
+
+    // convert RangeValue to proto::cluster_rpc::MetricsQueryResponse then encode to vec
+    let mut resp = proto::cluster_rpc::MetricsQueryResponse::default();
+    super::grpc::add_value(&mut resp, Value::Matrix(range_values));
+    let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
     let cache_key = get_cache_item_key(&key, start, new_end);
-    infra::cache::file_data::disk::set(trace_id, &cache_key, json_data.into())
+    infra::cache::file_data::disk::set(trace_id, &cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
@@ -367,7 +383,7 @@ fn get_hash_key(query: &str, step: i64) -> String {
 
 fn get_cache_item_key(prefix: &str, start: i64, end: i64) -> String {
     format!(
-        "metrics_results/{}/{}_{}_{}_{}.json",
+        "metrics_results/{}/{}_{}_{}_{}.pb",
         now().format("%Y/%m/%d/%H"),
         prefix,
         start,
@@ -380,7 +396,7 @@ fn get_cache_item_key(prefix: &str, start: i64, end: i64) -> String {
 ///
 /// the key format is: metrics_results/{date}/{prefix}_{start}_{end}_{suffix}.json
 fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
-    if !key.starts_with("metrics_results/") {
+    if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
         return None;
     }
     let item_key = key.split('/').last().unwrap_or("");
@@ -506,8 +522,10 @@ mod tests {
             });
         }
 
+        let expected_value = range_values.first().unwrap().clone();
+
         // Test setting cache
-        let set_result = set(trace_id, query, start, end, step, &range_values).await;
+        let set_result = set(trace_id, query, start, end, step, range_values).await;
         assert!(set_result.is_ok());
 
         // Test getting cache
@@ -518,7 +536,7 @@ mod tests {
             assert!(!cached_range_values.is_empty());
             assert_eq!(
                 cached_range_values[0].samples[0].value,
-                range_values[0].samples[0].value
+                expected_value.samples[0].value
             );
             assert_eq!(new_start, valid_max_ts + step);
         } else {
@@ -548,7 +566,7 @@ mod tests {
                 time_window: None,
             }];
 
-            let set_result = set(trace_id, query, start, end, step, &range_values).await;
+            let set_result = set(trace_id, query, start, end, step, range_values.clone()).await;
             assert!(set_result.is_ok());
         }
 
@@ -567,7 +585,7 @@ mod tests {
     #[test]
     fn test_parse_cache_item_key() {
         // Test valid key
-        let key = "metrics_results/2024/01/01/00/prefix_1234_5678_suffix.json";
+        let key = "metrics_results/2024/01/01/00/prefix_1234_5678_suffix.pb";
         let result = parse_cache_item_key(key);
         assert!(result.is_some());
         let (prefix, start, end) = result.unwrap();
@@ -577,10 +595,10 @@ mod tests {
 
         // Test invalid keys
         let invalid_keys = vec![
-            "invalid_key",                        // Too few parts
-            "prefix_abc_def_suffix.json",         // Non-numeric values
-            "prefix_1234_5678",                   // Missing .json extension
-            "prefix/1234/5678/extra/suffix.json", // Too many parts
+            "invalid_key",                      // Too few parts
+            "prefix_abc_def_suffix.pb",         // Non-numeric values
+            "prefix_1234_5678",                 // Missing .pb extension
+            "prefix/1234/5678/extra/suffix.pb", // Too many parts
         ];
 
         for invalid_key in invalid_keys {

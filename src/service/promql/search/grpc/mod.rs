@@ -233,14 +233,14 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
     match value {
         value::Value::None => {}
         value::Value::Instant(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 sample: Some((&v.sample).into()),
                 ..Default::default()
             });
         }
         value::Value::Range(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 samples: v.samples.iter().map(|x| x.into()).collect(),
                 ..Default::default()
@@ -248,7 +248,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
         }
         value::Value::Vector(v) => {
             v.iter().for_each(|v| {
-                resp.result.push(cluster_rpc::Series {
+                resp.series.push(cluster_rpc::Series {
                     metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                     sample: Some((&v.sample).into()),
                     ..Default::default()
@@ -267,7 +267,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
                     cluster_rpc::Exemplars { exemplars }
                 });
                 if !samples.is_empty() || exemplars.is_some() {
-                    resp.result.push(cluster_rpc::Series {
+                    resp.series.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                         samples,
                         exemplars,
@@ -277,19 +277,19 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
             });
         }
         value::Value::Sample(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 sample: Some((&v).into()),
                 ..Default::default()
             });
         }
         value::Value::Float(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 scalar: Some(v),
                 ..Default::default()
             });
         }
         value::Value::String(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 stringliteral: Some(v),
                 ..Default::default()
             });
