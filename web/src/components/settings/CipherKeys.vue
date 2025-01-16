@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="scope">
           <QTablePagination
+            v-if="resultTotal > 0"
             :scope="scope"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -203,7 +204,6 @@ export default defineComponent({
       { label: "100", value: 100 },
       { label: "250", value: 250 },
       { label: "500", value: 500 },
-      { label: "All", value: 0 },
     ];
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
