@@ -25,7 +25,6 @@ use crate::{
 };
 
 pub async fn save(
-    org_id: &str,
     name: &str,
     mut destination: Destination,
     create: bool,
@@ -46,7 +45,7 @@ pub async fn save(
                 for email in email.recipients.iter() {
                     let email = email.trim().to_lowercase();
                     // Check if the email is part of the org
-                    let res = user::get(Some(org_id), &email).await;
+                    let res = user::get(Some(&destination.org_id), &email).await;
                     if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
                         return Err(DestinationError::UserNotPermitted);
                     }
@@ -83,7 +82,7 @@ pub async fn save(
         return Err(DestinationError::InvalidName);
     }
 
-    match db::alerts::destinations::get(org_id, &destination.name).await {
+    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
         Ok(_) => {
             if create {
                 return Err(DestinationError::AlreadyExists);
@@ -96,9 +95,9 @@ pub async fn save(
         }
     }
 
-    let saved = db::alerts::destinations::set(org_id, destination).await?;
+    let saved = db::alerts::destinations::set(destination).await?;
     if name.is_empty() {
-        set_ownership(org_id, "destinations", Authz::new(&saved.name)).await;
+        set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
     Ok(())
 }

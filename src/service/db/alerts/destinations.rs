@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use bytes::Bytes;
 use config::meta::destinations::Destination;
 use infra::table;
 use itertools::Itertools;
@@ -69,19 +68,40 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationErr
         .ok_or(DestinationError::NotFound)
 }
 
-pub async fn set(org_id: &str, destination: Destination) -> Result<Destination, DestinationError> {
-    let saved = table::destinations::put(org_id, destination).await?;
+pub async fn set(destination: Destination) -> Result<Destination, DestinationError> {
+    let saved = table::destinations::put(destination).await?;
 
-    // trigger watch event by putting empty value to cluster coordinator
-    let cluster_coordinator = db::get_coordinator().await;
-    cluster_coordinator
-        .put(
-            &format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, saved.name),
-            Bytes::new(),
-            db::NEED_WATCH,
-            None,
-        )
-        .await?;
+    // trigger watch event to update in-memory cache
+    let event_key = format!(
+        "{DESTINATION_WATCHER_PREFIX}{}/{}",
+        &saved.org_id, &saved.name
+    );
+    infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        match config::utils::json::to_vec(&saved) {
+            Err(e) => {
+                log::error!(
+                    "[Destination] error serializing the destination for super_cluster event: {}",
+                    e
+                );
+            }
+            Ok(value_vec) => {
+                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
+                    &event_key,
+                    value_vec.into(),
+                )
+                .await
+                {
+                    log::error!("[Destination] error triggering super cluster event to add destination to cache: {e}");
+                }
+            }
+        };
+    }
 
     Ok(saved)
 }
@@ -92,16 +112,22 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     }
     table::destinations::delete(org_id, name).await?;
 
-    // trigger watch event to delete from cache
-    let cluster_coordinator = db::get_coordinator().await;
-    cluster_coordinator
-        .delete(
-            &format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, name),
-            false,
-            db::NEED_WATCH,
-            None,
-        )
-        .await?;
+    // trigger watch event to update in-memory cache
+    let event_key = format!("{DESTINATION_WATCHER_PREFIX}{}/{}", org_id, name);
+    // in-cluster
+    infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::destinations_delete(&event_key).await
+        {
+            log::error!("[Destination] error triggering super cluster event to remove destination from cache: {e}");
+        }
+    }
 
     Ok(())
 }

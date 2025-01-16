@@ -62,11 +62,10 @@ impl Model {
 }
 
 pub async fn put(
-    org_id: &str,
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, Error> {
     let template_id = if let destinations::Module::Alert { template, .. } = &destination.module {
-        super::templates::get(org_id, template)
+        super::templates::get(&destination.org_id, template)
             .await?
             .and_then(|temp| temp.id.map(|id| id.to_string()))
     } else {
@@ -78,7 +77,7 @@ pub async fn put(
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     let (model, template): (Model, Option<String>) =
-        match get_model_and_template(client, org_id, &destination.name).await? {
+        match get_model_and_template(client, &destination.org_id, &destination.name).await? {
             Some((model, ..)) => {
                 let mut active: ActiveModel = model.into();
                 active.name = Set(destination.name);

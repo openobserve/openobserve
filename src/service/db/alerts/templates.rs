@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use bytes::Bytes;
 use config::meta::destinations::{Module, Template};
 use infra::table;
 use itertools::Itertools;
@@ -74,16 +73,35 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
 pub async fn set(template: Template) -> Result<Template, TemplateError> {
     let saved = table::templates::put(template).await?;
 
-    // trigger watch event by putting empty value to cluster coordinator
-    let cluster_coordinator = db::get_coordinator().await;
-    cluster_coordinator
-        .put(
-            &format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name),
-            Bytes::new(),
-            db::NEED_WATCH,
-            None,
-        )
-        .await?;
+    // trigger watch event to update in-memory cache
+    let event_key = format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", saved.org_id, saved.name);
+    // in-cluster
+    infra::cluster_coordinator::destinations::emit_put_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        match config::utils::json::to_vec(&saved) {
+            Err(e) => {
+                log::error!(
+                    "[Template] error serializing the template for super_cluster event: {}",
+                    e
+                );
+            }
+            Ok(value_vec) => {
+                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
+                    &event_key,
+                    value_vec.into(),
+                )
+                .await
+                {
+                    log::error!("[Template] error triggering super cluster event to add template to cache: {e}");
+                }
+            }
+        };
+    }
 
     Ok(saved)
 }
@@ -97,18 +115,29 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
             return Err(TemplateError::DeleteWithDestination(dest.name.to_string()));
         }
     }
-    let key = match table::templates::get(org_id, name).await? {
+    let event_key = match table::templates::get(org_id, name).await? {
         None => return Err(TemplateError::NotFound),
         Some(temp) => format!("{TEMPLATE_WATCHER_PREFIX}{}/{}", temp.org_id, temp.name),
     };
 
     table::templates::delete(org_id, name).await?;
 
-    // trigger watch event to delete from cache
-    let cluster_coordinator = db::get_coordinator().await;
-    cluster_coordinator
-        .delete(&key, false, db::NEED_WATCH, None)
-        .await?;
+    // trigger watch event to update in-memory cache
+    // in-cluster
+    infra::cluster_coordinator::destinations::emit_delete_event(&event_key).await?;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::templates_delete(&event_key).await
+        {
+            log::error!("[Template] error triggering super cluster event to remove template from cache: {e}");
+        }
+    }
+
     Ok(())
 }
 

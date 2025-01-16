@@ -63,7 +63,7 @@ pub async fn save_destination(
         Ok(dest) => dest,
         Err(e) => return Ok(e.into()),
     };
-    match destinations::save(&org_id, "", dest, true).await {
+    match destinations::save("", dest, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => Ok(e.into()),
     }
@@ -97,7 +97,7 @@ pub async fn update_destination(
         Ok(dest) => dest,
         Err(e) => return Ok(e.into()),
     };
-    match destinations::save(&org_id, &name, dest, false).await {
+    match destinations::save(&name, dest, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => Ok(e.into()),
     }
