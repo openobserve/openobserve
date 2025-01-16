@@ -208,6 +208,7 @@ mod legacy_folders {
         use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(folder.org.clone());
+        hasher.update(folder.r#type.to_string());
         hasher.update(folder.folder_id.clone());
         let hash = hasher.finalize();
         svix_ksuid::Ksuid::from_bytes(hash.into())
