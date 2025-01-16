@@ -332,6 +332,7 @@ export default defineComponent({
       errorDetail,
       metadata,
       resultMetaData,
+      annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
       searchRequestTraceIds,
@@ -438,7 +439,7 @@ export default defineComponent({
               resultMetaData,
               metadata.value,
               chartPanelStyle.value,
-              dashboardId,
+              annotations,
             );
 
             errorDetail.value = "";

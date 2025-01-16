@@ -45,6 +45,7 @@ import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotationsData } from "./useAnnotationsData";
+import { useAnnotations } from "./useAnnotations";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -78,6 +79,8 @@ export const usePanelDataLoader = (
 
   const searchRetriesCount = ref<{ [key: string]: number }>({});
 
+  const store = useStore();
+
   // Add cleanup function
   const cleanupSearchRetries = (traceId: string) => {
     if (searchRetriesCount.value[traceId]) {
@@ -91,6 +94,12 @@ export const usePanelDataLoader = (
     cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
+
+  const { refreshAnnotations } = useAnnotations(
+    store.state.selectedOrganization.identifier,
+    dashboardId?.value,
+    panelSchema.value.id,
+  );
 
   /**
    * Calculate cache key for panel
@@ -123,6 +132,7 @@ export const usePanelDataLoader = (
     metadata: {
       queries: [] as any,
     },
+    annotations: [] as any,
     resultMetaData: [] as any,
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
@@ -181,8 +191,6 @@ export const usePanelDataLoader = (
       )
     : [];
   // let currentAdHocVariablesData: any = null;
-
-  const store = useStore();
 
   let abortController = new AbortController();
 
@@ -779,12 +787,6 @@ export const usePanelDataLoader = (
     }
   };
 
-  const { refreshAnnotations, updateTimeRange } = useAnnotationsData(
-    panelSchema.value.id,
-    store.state.selectedOrganization?.identifier,
-    dashboardId.value,
-  );
-
   const loadData = async () => {
     try {
       log("loadData: entering...");
@@ -848,9 +850,6 @@ export const usePanelDataLoader = (
 
       console.log("loadData: entering...", startISOTimestamp, endISOTimestamp);
 
-      updateTimeRange(startISOTimestamp, endISOTimestamp);
-
-      await refreshAnnotations(startISOTimestamp, endISOTimestamp);
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
@@ -924,6 +923,12 @@ export const usePanelDataLoader = (
           },
         );
 
+        // get annotations
+        const annotationList = await refreshAnnotations(
+          startISOTimestamp,
+          endISOTimestamp,
+        );
+
         // Wait for all query promises to resolve
         const queryResults: any = await Promise.all(queryPromises);
         state.loading = false;
@@ -931,6 +936,7 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: queryResults.map((it: any) => it?.metadata),
         };
+        state.annotations = annotationList || [];
 
         saveCurrentStateToCache();
       } else {
@@ -945,6 +951,7 @@ export const usePanelDataLoader = (
             queries: [],
           };
           state.resultMetaData = [];
+          state.annotations = [];
 
           // Call search API
 
@@ -1131,6 +1138,13 @@ export const usePanelDataLoader = (
                     );
                   }
 
+                  // get annotations
+                  const annotationList = await refreshAnnotations(
+                    startISOTimestamp,
+                    endISOTimestamp,
+                  );
+                  state.annotations = annotationList;
+
                   // need to break the loop, save the cache
                   saveCurrentStateToCache();
                 } finally {
@@ -1196,6 +1210,13 @@ export const usePanelDataLoader = (
                   abortControllerRef,
                 );
               }
+
+              const annotations = await refreshAnnotations(
+                Number(startISOTimestamp),
+                Number(endISOTimestamp),
+              );
+              state.annotations = annotations;
+              saveCurrentStateToCache();
             }
           }
 

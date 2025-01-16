@@ -56,7 +56,7 @@ export const convertMultiSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
-  dashboardId: any,
+  annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     return { options: null };
@@ -75,7 +75,7 @@ export const convertMultiSQLData = async (
         [resultMetaData.value[i]],
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
-        dashboardId,
+        annotations,
       ),
     );
   }
@@ -111,7 +111,7 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
-  dashboardId: any,
+  annotations: any,
 ) => {
   // if no data than return it
   if (
@@ -268,11 +268,30 @@ export const convertSQLData = async (
     return resultArray;
   };
 
-  const { getCombinedMarkLines } = useAnnotationsData(
-    panelSchema.id,
-    store.state.selectedOrganization?.identifier,
-    dashboardId,
-  );
+  const getMarkLineData = (panelSchema: any) => {
+    return (
+      panelSchema?.config?.mark_line?.map((markLine: any) => {
+        return {
+          name: markLine.name,
+          type: markLine.type,
+          xAxis: markLine.type == "xAxis" ? markLine.value : null,
+          yAxis: markLine.type == "yAxis" ? markLine.value : null,
+          label: {
+            formatter: markLine.name ? "{b}:{c}" : "{c}",
+            position: "insideEndTop",
+          },
+        };
+      }) ?? []
+    );
+  };
+
+  // const { getCombinedMarkLines } = useAnnotationsData(
+  //   panelSchema.id,
+  //   store.state.selectedOrganization?.identifier,
+  //   dashboardId,
+  // );
+
+  annotations;
 
   const noValueConfigOption = panelSchema?.config?.no_value_replacement ?? "";
 
@@ -1112,11 +1131,31 @@ export const convertSQLData = async (
     };
   };
 
+  const getAnnotationsMarklines = () => {
+    return annotations?.value?.map((annotation: any) => ({
+      symbol: ["none", "none"],
+      name: annotation.name,
+      type: annotation.type,
+      xAxis:
+        annotation.type === "xAxis"
+          ? formatDate(annotation.value)
+          : null,
+      yAxis:
+        annotation.type === "yAxis"
+          ? formatDate(annotation.value)
+          : null,
+      label: {
+        formatter: annotation.name ? "{b}:{c}" : "{c}",
+        position: "insideEndTop",
+      },
+    })) ?? [];
+  };
+
   const getSeriesMarkLine = () => {
     return {
       silent: true,
       animation: false,
-      data: getCombinedMarkLines(panelSchema),
+      data: [...getMarkLineData(panelSchema), ...getAnnotationsMarklines()],
     };
   };
 
