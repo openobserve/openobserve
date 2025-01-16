@@ -24,7 +24,7 @@
           :rows="3"
         />
         <div class="text-caption q-mt-sm">
-          Timestamp: {{ annotationData.value }}
+          Timestamp: {{ dateString }}
         </div>
       </q-card-section>
       <q-card-actions align="right">
@@ -51,10 +51,18 @@
 import { ref } from "vue";
 
 const props = defineProps({
-  timestamp: {
-    type: String,
+  startTime: {
+    type: [String, Number],
     required: true,
   },
+  endTime: {
+    type: [String, Number],
+    required: false,
+  },
+  dateString: {
+    type: String,
+    required: false,
+  }
 });
 
 const emit = defineEmits(["save", "remove", "close"]);
@@ -66,7 +74,7 @@ const annotationData = ref({
   name: "",
   description: "",
   type: "xAxis",
-  value: props.timestamp,
+  value: props.startTime,
 });
 
 const handleClose = () => {

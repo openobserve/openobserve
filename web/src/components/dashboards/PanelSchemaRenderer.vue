@@ -129,16 +129,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
-        v-if="isAddAnnotationButtonVisible"
         class="annotation-button-container"
-        :style="addAnnotationbuttonStyle"
+        style="position: absolute; top: 0px; right: 0px; z-index: 9999999;"
         @click.stop
       >
         <q-btn
-          label="Add Annotation"
           color="primary"
-          @click="handleAddAnnotationButtonClick"
-        />
+          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
+          round
+          outline
+          size="sm"
+          @click="toggleAddAnnotationMode"
+        >
+          <q-tooltip anchor="top middle" self="bottom right">
+            {{ isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations" }}
+          </q-tooltip>
+        </q-btn>
       </div>
       <div
         style="
@@ -180,7 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Annotation Dialog -->
       <AddAnnotation
         v-if="isAddAnnotationDialogVisible"
-        :timestamp="selectedTimestamp"
+        :startTime="annotationStartTimestamp"
+        :endTime="annotationEndTimestamp"
+        :dateString="annotationDateString"
         @save="handleSave"
         @remove="handleRemove"
         @close="closeAddAnnotation"
@@ -357,14 +365,14 @@ export default defineComponent({
     );
 
     const {
+      annotationStartTimestamp,
+      annotationEndTimestamp,
+      annotationDateString,
       addAnnotationbuttonStyle,
-      isAddAnnotationButtonVisible,
+      isAddAnnotationMode,
       isAddAnnotationDialogVisible,
-      selectedTimestamp,
-      hideAddAnnotationButton,
-      showAddAnnotationButton,
-      handleChartClickForAnnotation,
-      handleAddAnnotationButtonClick,
+      toggleAddAnnotationMode,
+      handleAddAnnotation,
       handleSaveAnnotation,
       handleDeleteAnnotation,
       closeAddAnnotation,
@@ -514,15 +522,17 @@ export default defineComponent({
 
     const dataZoomEventDataTempStorage = ref(null);
     const onDataZoom = (event: any) => {
-      if (!allowAnnotationsAdd.value) {
-        // default behavior
-        emit("updated:data-zoom", event);
-        dataZoomEventDataTempStorage.value = null;
-      } else {
+      if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
         // looks like zoom not needed
         // handle add annotation
         console.log("onDataZoom", event);
         // TODO: HANDLE annotations
+        handleAddAnnotation(event.start, event.end);
+      } else {
+        // default behavior
+        emit("updated:data-zoom", event);
+        dataZoomEventDataTempStorage.value = null;
+        
       }
     };
 
@@ -638,10 +648,6 @@ export default defineComponent({
       if (drilldownPopUpRef.value) {
         drilldownPopUpRef.value.style.display = "none";
       }
-
-      if(isAddAnnotationButtonVisible.value) {
-        hideAddAnnotationButton();
-      }
     };
 
     // drilldown
@@ -703,8 +709,8 @@ export default defineComponent({
     const onChartClick = async (params: any, ...args: any) => {
       console.log("Chart clicked with params:", params);
 
-      if(allowAnnotationsAdd.value) {
-        handleChartClickForAnnotation(params);
+      if(allowAnnotationsAdd.value && isAddAnnotationMode.value) {
+        handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
       }
 
       if (
@@ -1267,6 +1273,9 @@ export default defineComponent({
       onChartClick,
       onDataZoom,
       addAnnotationbuttonStyle,
+      annotationStartTimestamp,
+      annotationEndTimestamp,
+      annotationDateString,
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
@@ -1277,9 +1286,8 @@ export default defineComponent({
       handleSave,
       handleRemove,
       closeAddAnnotation,
-      isAddAnnotationButtonVisible,
-      handleAddAnnotationButtonClick,
-      selectedTimestamp,
+      isAddAnnotationMode,
+      toggleAddAnnotationMode,
     };
   },
 });

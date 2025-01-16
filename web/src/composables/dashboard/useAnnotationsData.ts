@@ -1,5 +1,6 @@
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { annotationService } from "../../services/dashboard_annotations";
+import useNotifications from "../useNotifications";
 
 export const useAnnotationsData = (
   organization: any,
@@ -7,13 +8,31 @@ export const useAnnotationsData = (
   panelId: string,
 ) => {
   // show annotation button
-  const isAddAnnotationButtonVisible = ref(false);
+  const isAddAnnotationMode = ref(false);
 
   // show add annotation dialog
   const isAddAnnotationDialogVisible = ref(false);
 
   // selected timestamp
-  const selectedTimestamp = ref<any>(null);
+  const annotationStartTimestamp = ref<any>(null);
+  const annotationEndTimestamp = ref<any>(null);
+
+  const annotationDateString = computed<string>(() => {
+    let timestampString = "";
+
+    if (annotationStartTimestamp.value) {
+      const startDate = new Date(annotationStartTimestamp.value);
+      timestampString += startDate.toLocaleString("sv-SE").replace("T", " ");
+    }
+
+    if (annotationEndTimestamp.value) {
+      const endDate = new Date(annotationEndTimestamp.value);
+      timestampString +=
+        " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
+    }
+
+    return timestampString;
+  });
 
   // loading state
   const loading = ref(false);
@@ -25,13 +44,17 @@ export const useAnnotationsData = (
   // Function
 
   // show add annotation button
-  const showAddAnnotationButton = () => {
-    isAddAnnotationButtonVisible.value = true;
+  const enableAddAnnotationMode = () => {
+    isAddAnnotationMode.value = true;
   };
 
   // hide add annotation button
-  const hideAddAnnotationButton = () => {
-    isAddAnnotationButtonVisible.value = false;
+  const disableAddAnnotationMode = () => {
+    isAddAnnotationMode.value = false;
+  };
+
+  const toggleAddAnnotationMode = () => {
+    isAddAnnotationMode.value = !isAddAnnotationMode.value;
   };
 
   // show annoation dialog
@@ -45,41 +68,25 @@ export const useAnnotationsData = (
   };
 
   const handleAddAnnotationButtonClick = () => {
-    hideAddAnnotationButton();
+    disableAddAnnotationMode();
     showAddAnnotationDialog();
   };
 
-  const handleChartClickForAnnotation = (params: any) => {
-    if (params) {
-      const clickX = params?.event?.offsetX || 0;
-      const clickY = params?.event?.offsetY || 0;
-      console.log("Click X:", clickX, "Click Y:", clickY);
+  const handleAddAnnotation = (start: any, end: any) => {
+    annotationStartTimestamp.value = start;
+    annotationEndTimestamp.value = end;
 
-      const BUTTON_HEIGHT = 20;
-      const MARGIN = 50;
-      addAnnotationbuttonStyle.value = {
-        position: "absolute",
-        left: `${clickX}px`,
-        top: `-${BUTTON_HEIGHT}px`,
-        transform: "translateX(-50%)",
-        zIndex: 9999998,
-      };
-
-      const clickedTimestamp =
-        params?.data?.[0] || params?.data?.time || params?.data?.name;
-
-      if (clickedTimestamp) {
-        // TODO: convert from timezone selected
-        const date = new Date(clickedTimestamp);
-        selectedTimestamp.value = date
-          .toLocaleString("sv-SE")
-          .replace("T", " ");
-
-        //TODO: only show a button if it is a valid timestamp
-        showAddAnnotationButton();
-      }
-    }
+    showAddAnnotationDialog();
   };
+
+  const { showPositiveNotification } = useNotifications();
+
+  watch(isAddAnnotationMode, () => {
+    if (isAddAnnotationMode.value) {
+      // show a notification
+      showPositiveNotification("Click on the chart to add an annotation", {});
+    }
+  });
 
   /// =========================================================================================
 
@@ -102,7 +109,7 @@ export const useAnnotationsData = (
         selectedTimestamp.value = date
           .toLocaleString("sv-SE")
           .replace("T", " ");
-        isAddAnnotationButtonVisible.value = true;
+        isAddAnnotationMode.value = true;
       }
     }
   };
@@ -159,7 +166,7 @@ export const useAnnotationsData = (
 
   const closeAddAnnotation = () => {
     isAddAnnotationDialogVisible.value = false;
-    isAddAnnotationButtonVisible.value = false;
+    isAddAnnotationMode.value = false;
   };
 
   const getLabelFormatter = (name: string) => ({
@@ -267,18 +274,21 @@ export const useAnnotationsData = (
   };
 
   return {
-    isAddAnnotationButtonVisible,
+    isAddAnnotationMode,
     isAddAnnotationDialogVisible,
-    selectedTimestamp,
+    annotationStartTimestamp,
+    annotationEndTimestamp,
+    annotationDateString,
     annotations,
     loading,
     error,
     addAnnotationbuttonStyle,
-    showAddAnnotationButton,
-    hideAddAnnotationButton,
+    enableAddAnnotationMode,
+    disableAddAnnotationMode,
+    toggleAddAnnotationMode,
     showAddAnnotationDialog,
     hideAddAnnotationDialog,
-    handleChartClickForAnnotation,
+    handleAddAnnotation,
     handleAddAnnotationButtonClick,
     handleSaveAnnotation,
     handleDeleteAnnotation,
