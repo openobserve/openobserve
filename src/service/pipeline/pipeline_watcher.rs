@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use infra::errors::Result;
 use ingester::Entry;
@@ -27,17 +27,14 @@ use tokio::{
 use wal::{FilePosition, ReadFrom};
 
 use crate::service::pipeline::{
-    pipeline_entry::PipelineEntryBuilder,
-    pipeline_exporter::PipelineExporter,
-    pipeline_offset_manager::{init_pipeline_offset_manager, PIPELINE_OFFSET_MANAGER},
+    pipeline_entry::PipelineEntryBuilder, pipeline_offset_manager::get_pipeline_offset_manager,
     pipeline_receiver::PipelineReceiver,
 };
 
 #[derive(Debug)]
 pub enum WatcherEvent {
     NewFile(PathBuf),
-    StopWatchFile(PathBuf), /* todo: how to confirm all the data send out successfully, reach
-                             * the end of file? so we can remove the file */
+    StopWatchFile(PathBuf),
     StopWatchFileAndWait(PathBuf),
     LoadFromPersistFile((PathBuf, FilePosition)),
     Shutdown,
@@ -49,6 +46,7 @@ pub static FILE_WATCHER_NOTIFY: Lazy<Arc<tokio::sync::RwLock<Option<Sender<Watch
 pub static FILE_RECEIVER_MAP: Lazy<Arc<tokio::sync::RwLock<HashMap<PathBuf, PipelineReceiver>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 
+#[allow(clippy::type_complexity)]
 pub static RECEVIER_TASK_MAP: Lazy<Arc<tokio::sync::RwLock<HashMap<PathBuf, Sender<()>>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 
@@ -69,6 +67,7 @@ impl PipelineWatcher {
     }
 
     fn new(signal_receiver: Receiver<WatcherEvent>, concurrent: usize) -> Self {
+        // let pipeline_destination_map = HashMap::new();
         Self {
             signal_receiver,
             concurrent,
@@ -85,15 +84,13 @@ impl PipelineWatcher {
 
         {
             // init offset manager, load offset from persist file first
-            let _manager = PIPELINE_OFFSET_MANAGER
-                .get_or_init(init_pipeline_offset_manager)
-                .await;
+            let _manager = get_pipeline_offset_manager().await;
         }
 
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    let manager = PIPELINE_OFFSET_MANAGER.get_or_init(init_pipeline_offset_manager).await;
+                    let manager = get_pipeline_offset_manager().await;
                     if let Err(e) = manager.write().await.flush().await {
                         log::error!("Error saving offset: {:?}", e);
                     }
@@ -105,12 +102,12 @@ impl PipelineWatcher {
                 Some(event) = self.signal_receiver.recv() => {
                     match event {
                         WatcherEvent::NewFile(path) => {
-                            if let Err(_) = PipelineWatcher::watch_file(path, ReadFrom::Beginning).await {
+                            if PipelineWatcher::watch_file(path, ReadFrom::Beginning).await.is_err() {
                                 continue;
                             }
                         }
                         WatcherEvent::LoadFromPersistFile((path, position)) => {
-                            if let Err(_) = PipelineWatcher::watch_file(path, ReadFrom::Checkpoint(position)).await {
+                            if PipelineWatcher::watch_file(path, ReadFrom::Checkpoint(position)).await.is_err() {
                                 continue;
                             }
                         }
@@ -125,7 +122,7 @@ impl PipelineWatcher {
                             }
                         }
                         WatcherEvent::Shutdown => {
-                            let manager = PIPELINE_OFFSET_MANAGER.get_or_init(init_pipeline_offset_manager).await;
+                            let manager = get_pipeline_offset_manager().await;
                             if let Err(e) = manager.write().await.flush().await {
                                 log::error!("Error saving offset: {:?}", e);
                             }
@@ -155,9 +152,34 @@ impl PipelineWatcher {
             }
         };
 
-        let mut map = FILE_RECEIVER_MAP.write().await;
-        map.insert(file_receiver.path.clone(), file_receiver);
-        log::debug!("file receiver inserted into FILE_RECEIVER_MAP: {:?}", map);
+        {
+            let position = file_receiver.get_file_position();
+            log::debug!(
+                "file receiver begin inject into FILE_OFFSET_MANAGER: {:?}",
+                path.display()
+            );
+            let offset_manager = get_pipeline_offset_manager().await;
+            offset_manager
+                .write()
+                .await
+                .save(path.to_str().unwrap(), position)
+                .await;
+            log::debug!(
+                "file receiver inserted into FILE_OFFSET_MANAGER: {:?}",
+                path.display()
+            );
+        }
+
+        {
+            log::debug!(
+                "file receiver begin inject into FILE_RECEIVER_MAP: {:?}",
+                path.display()
+            );
+            let mut map = FILE_RECEIVER_MAP.write().await;
+            map.insert(file_receiver.path.clone(), file_receiver);
+            log::debug!("file receiver inserted into FILE_RECEIVER_MAP: {:?}", map);
+        }
+
         Ok(())
     }
 
@@ -172,8 +194,19 @@ impl PipelineWatcher {
     }
 
     async fn stop_watch_file(path: &PathBuf, need_remove_file: bool) -> Result<()> {
-        log::info!("Stop watching file for path: {:?}", path);
+        log::info!(
+            "Stop watching file for path: {:?}, need_remove_file: {}",
+            path,
+            need_remove_file
+        );
         if need_remove_file {
+            let manager = get_pipeline_offset_manager().await;
+            manager.write().await.remove(path.to_str().unwrap()).await?;
+            log::info!(
+                "remove wal file:[{:?}] from PIPELINE_OFFSET_MANAGER successfully",
+                path
+            );
+
             if let Err(e) = remove_file(&path).await {
                 log::warn!(
                     "Failed to remove processed file {:?}: {:?}. Will retry later",
@@ -188,7 +221,7 @@ impl PipelineWatcher {
         {
             let task_map = RECEVIER_TASK_MAP.read().await;
             if let Some(stop_sender) = task_map.get(path.as_path()) {
-                let _ = stop_sender.send(());
+                let _ = stop_sender.send(()).await;
             }
             log::info!(
                 "remove wal file:[{:?}] from RECEVIER_TASK_MAP successfully",
@@ -198,22 +231,11 @@ impl PipelineWatcher {
 
         {
             let mut recevier_map = FILE_RECEIVER_MAP.write().await;
-            if let Some(_) = recevier_map.get(path.as_path()) {
+            if recevier_map.get(path.as_path()).is_some() {
                 recevier_map.remove(path);
             }
             log::info!(
                 "remove wal file:[{:?}] from FILE_RECEIVER_MAP successfully",
-                path
-            );
-        }
-
-        {
-            let manager = PIPELINE_OFFSET_MANAGER
-                .get_or_init(init_pipeline_offset_manager)
-                .await;
-            manager.write().await.remove(path.to_str().unwrap()).await?;
-            log::info!(
-                "remove wal file:[{:?}] from PIPELINE_OFFSET_MANAGER successfully",
                 path
             );
         }
@@ -264,13 +286,23 @@ impl PipelineWatcher {
                 res = Self::read_entry_and_hanlde(pr)  => {
                     match res {
                         Ok(None) => {
-                            log::info!("No more entries to read from file: {:?}", path);
-                            // break the loop and stop_watch_file
-                            break
-                        } // read to the end
+                            log::debug!("No more entries to read from file: {:?}, file_position: {}", path, pr.get_file_position());
+                            // read to the end of the file, but can`t sure that real-time ingest is stop write data to the file.
+                            // so we need to keep the file, and wait for the next
+                            // we only delete file when receiver read to the end and wal file modified time over max_file_retention_time
+                            if pr.should_delete() {
+                                log::info!("File: {:?} reached EOF, and modified time over max_file_retention_time, will remove it", pr.path.display());
+                                PipelineWatcher::stop_watch_file(&path, true).await?;
+                                break
+                            }
+                            // let`s wait for a while
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                            continue
+                        }
                         Ok(Some(())) => {continue} // continue read next entry
                         Err(e) => {
-                            log::error!("Error reading entry from file: {:?}, error: {:?}", path, e);
+                            log::error!("Error reading entry from file: {:?}, error: {:?}, will stop watch this file", path, e);
+                            PipelineWatcher::stop_watch_file(&path, false).await?;
                             break
                         }
                     }
@@ -278,34 +310,16 @@ impl PipelineWatcher {
             }
         }
 
-        if let Err(e) = PipelineWatcher::stop_watch_file(&path, true).await {
-            log::warn!(
-                "Failed to remove processed file {:?}: {:?}. Will retry later",
-                path,
-                e
-            );
-        }
-
         Ok(())
     }
     async fn read_entry_and_hanlde(pr: &mut PipelineReceiver) -> Result<Option<()>> {
         let entry = pr.read_entry();
-        PipelineWatcher::handle_entry(
-            entry,
-            pr.org_id.clone(),
-            pr.stream_type.clone(),
-            pr.path.clone(),
-            &pr.pipeline_exporter,
-        )
-        .await
+        PipelineWatcher::handle_entry(entry, pr).await
     }
 
     async fn handle_entry(
         entry: Result<(Option<Entry>, FilePosition)>,
-        stream_org_id: String,
-        stream_type: String,
-        stream_path: PathBuf,
-        pipeline_exporter: &PipelineExporter,
+        pr: &PipelineReceiver,
     ) -> Result<Option<()>> {
         match entry {
             Ok((Some(entry), file_position)) => {
@@ -314,22 +328,29 @@ impl PipelineWatcher {
                     entry.stream,
                     entry.schema_key,
                     entry.data,
-                    stream_path.display(),
+                    pr.path.display(),
                 );
 
+                let endpoint = pr.get_stream_endpoint().await;
+                let stream_name = pr.get_stream_name();
+                let header = pr.get_stream_endpoint_header().await;
                 let data = PipelineEntryBuilder::new()
-                    .stream_path(stream_path)
-                    .stream_endpoint("http://127.0.0.1:5080/api/default/default/_json".to_string())
-                    .stream_org_id(stream_org_id)
-                    .stream_type(stream_type)
-                    .stream_token(Some(
-                        "cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=".to_string(),
+                    .stream_path(pr.path.clone())
+                    .stream_endpoint(format!(
+                        "{}/api/{}/{}/_json",
+                        endpoint.strip_suffix("/").unwrap(),
+                        pr.get_org_id(),
+                        stream_name
                     ))
+                    .stream_org_id(pr.get_org_id().to_string())
+                    .stream_type(pr.get_stream_type().to_string())
+                    .stream_name(stream_name.to_string())
+                    .stream_header(header)
                     .set_entry_position_of_file(file_position)
                     .entry(entry)
                     .build();
 
-                if let Err(e) = pipeline_exporter.export_entry(data).await {
+                if let Err(e) = pr.pipeline_exporter.export_entry(data).await {
                     log::error!("Failed to send entry to exporter: {}", e.to_string());
                     return Err(e);
                 }
@@ -355,8 +376,16 @@ mod tests {
     use crate::service::pipeline::pipeline_watcher::{
         PipelineWatcher, WatcherEvent, FILE_WATCHER_NOTIFY,
     };
+
+    async fn init_filewatcher() {
+        let (signal_sender, _) = tokio::sync::mpsc::channel(1);
+        let mut notify = FILE_WATCHER_NOTIFY.write().await;
+        *notify = Some(signal_sender);
+    }
+
     #[tokio::test]
     async fn test_shutdown() {
+        init_filewatcher().await;
         let concurrent = 100;
         let (s, r) = mpsc::channel(concurrent);
         let mut fw = PipelineWatcher::init(s, r, concurrent).await;
@@ -368,16 +397,21 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let notify = FILE_WATCHER_NOTIFY.write().await;
         let s = notify.clone().unwrap();
-        s.send(WatcherEvent::Shutdown).await.unwrap();
+        if let Err(e) = s.send(WatcherEvent::Shutdown).await {
+            println!("send error {}", e.to_string())
+        }
+
         let _ = stop_tx.send(()).await;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
     #[tokio::test]
     async fn test_file_watcher() {
+        init_filewatcher().await;
         let config = &config::get_config();
         let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
             .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024, 8 * 1024).unwrap();
+        let mut writer =
+            Writer::new(dir, "org", "stream", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
         for i in 0..100 {
             let mut entry = Entry {
                 stream: Arc::from("example_stream"),

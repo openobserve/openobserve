@@ -15,6 +15,7 @@
 
 use std::{path::PathBuf, sync::Arc};
 
+use hashbrown::HashMap;
 use ingester::Entry;
 use wal::FilePosition;
 
@@ -25,7 +26,7 @@ struct PipelineStreamInfo {
     pub stream_org_id: String,
     pub stream_type: String,
     pub stream_name: String,
-    pub stream_token: Option<String>,
+    pub stream_header: Option<HashMap<String, String>>,
     #[allow(dead_code)]
     pub stream_tls_cert_path: Option<String>,
     #[allow(dead_code)]
@@ -39,20 +40,22 @@ pub struct PipelineEntry {
 }
 
 impl PipelineEntry {
+    #[allow(dead_code)]
     pub fn get_stream_name(&self) -> &str {
         self.stream_info.stream_name.as_str()
     }
-
+    #[allow(dead_code)]
     pub fn get_org_id(&self) -> &str {
         self.stream_info.stream_org_id.as_str()
     }
 
+    #[allow(dead_code)]
     pub fn get_stream_type(&self) -> &str {
         self.stream_info.stream_type.as_str()
     }
 
-    pub fn get_token(&self) -> &str {
-        self.stream_info.stream_token.as_deref().unwrap_or_default()
+    pub fn get_stream_endpoint_header(&self) -> Option<&HashMap<String, String>> {
+        self.stream_info.stream_header.as_ref()
     }
 
     pub fn get_stream_path(&self) -> PathBuf {
@@ -109,9 +112,9 @@ impl PipelineEntryBuilder {
         self
     }
 
-    pub fn stream_token(mut self, token: Option<String>) -> Self {
-        if let Some(token) = token {
-            self.stream_info.stream_token = Some(format!("Basic {token}"));
+    pub fn stream_header(mut self, header: Option<HashMap<String, String>>) -> Self {
+        if let Some(header) = header {
+            self.stream_info.stream_header = Some(header);
         }
         self
     }
@@ -129,9 +132,8 @@ impl PipelineEntryBuilder {
     }
 
     pub fn entry(mut self, entry: Entry) -> Self {
-        let stream_name = entry.stream.to_string();
         self.entry = entry;
-        self.stream_name(stream_name)
+        self
     }
 
     pub fn set_entry_position_of_file(mut self, position: FilePosition) -> Self {

@@ -17,7 +17,7 @@ mod errors;
 mod reader;
 mod writer;
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub use errors::*;
 pub use reader::Reader;
@@ -33,6 +33,8 @@ const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
 const FILE_EXTENSION: &str = "wal";
 
 pub type FilePosition = u64;
+pub type FileHeader = HashMap<String, String>;
+pub const WAL_FILE_HEADER_LEN: usize = 4;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ReadFrom {
@@ -46,12 +48,12 @@ pub fn build_file_path(
     root_dir: impl Into<PathBuf>,
     org_id: &str,
     stream_type: &str,
-    id: u64,
+    id: String,
 ) -> PathBuf {
     let mut path = root_dir.into();
     path.push(org_id);
     path.push(stream_type);
-    path.push(id.to_string());
+    path.push(id);
     path.set_extension(FILE_EXTENSION);
     path
 }

@@ -106,14 +106,9 @@ impl PipelineExporter {
                             e
                         );
 
-                        // let path = entry.get_stream_path();
-                        // let s = FILE_WATCHER_NOTIFY.write().await;
-                        // let _ = s
-                        //     .clone()
-                        //     .unwrap()
-                        //     .send(WatcherEvent::StopWatchFileAndWait(path))
-                        //     .await;
-
+                        // return err will break the read_entry loop, so we do not read this file
+                        // again no need to send
+                        // WatcherEvent::StopWatchFileAndWait(path) to file watcher
                         return Err(e);
                     }
 

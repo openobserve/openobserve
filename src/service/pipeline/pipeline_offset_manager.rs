@@ -22,6 +22,8 @@ use std::{
     sync::Arc,
 };
 
+use async_walkdir::WalkDir;
+use futures_util::StreamExt;
 use infra::errors::{Error, Result};
 use tokio::sync::{OnceCell, RwLock};
 use wal::FilePosition;
@@ -39,6 +41,13 @@ pub(crate) static PIPELINE_OFFSET_MANAGER: OnceCell<Arc<RwLock<PipelineOffsetMan
 pub async fn init_pipeline_offset_manager() -> Arc<RwLock<PipelineOffsetManager>> {
     Arc::new(RwLock::new(PipelineOffsetManager::init().await.unwrap()))
 }
+
+pub async fn get_pipeline_offset_manager() -> &'static Arc<RwLock<PipelineOffsetManager>> {
+    PIPELINE_OFFSET_MANAGER
+        .get_or_init(init_pipeline_offset_manager)
+        .await
+}
+
 #[derive(Debug)]
 pub(crate) struct PipelineOffsetManager {
     offset_persist_file: PathBuf,
@@ -66,10 +75,30 @@ impl PipelineOffsetManager {
     pub async fn init() -> Result<Self> {
         let mut p = PipelineOffsetManager::new();
         match p.load() {
-            Ok(offset_data) => {
+            Ok(mut offset_data) => {
+                let mut new_offset_data = OffsetData::new();
+
+                // scan the wal dir to find the wal file that not in the offset json, just a
+                // fallback policy if the offset json is lost, we can still recover
+                // the offset data from the wal file, but it will cause dup data and
+                // we should check the wal file is expired or not
+                let _ = p
+                    .recover_wal_file_not_in_offset_json(&mut offset_data)
+                    .await;
+
                 // notify watcher begin to work
                 let watcher = FILE_WATCHER_NOTIFY.write().await;
                 for (stream_file, position) in &offset_data {
+                    // check the setream file is exist
+                    if !Path::new(stream_file).exists() {
+                        log::warn!(
+                            "stream wal file: {:?} not exist, remove offset data",
+                            stream_file
+                        );
+                        p.remove(stream_file).await?;
+                        continue;
+                    }
+
                     let _ = watcher
                         .clone()
                         .unwrap()
@@ -78,10 +107,12 @@ impl PipelineOffsetManager {
                             *position,
                         )))
                         .await;
+                    new_offset_data.insert(stream_file.clone(), *position);
                     log::info!("pipeline offset-manager notify offset-watcher to load file: {:?}, position: {:?}", stream_file, position);
                 }
                 drop(watcher);
-                p.offset_data = RwLock::new(offset_data);
+
+                p.offset_data = RwLock::new(new_offset_data);
                 Ok(p)
             }
             Err(e) => Err(e),
@@ -142,18 +173,57 @@ impl PipelineOffsetManager {
         }
     }
 
+    async fn recover_wal_file_not_in_offset_json(
+        &self,
+        offset_data: &mut OffsetData,
+    ) -> Result<()> {
+        let cfg = config::get_config();
+        let wal_dir = Path::new(cfg.pipeline.remote_stream_wal_dir.as_str());
+        let wal_file_iter = WalkDir::new(wal_dir)
+            .filter_map(|entry| async {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        let path_ext = path
+                            .extension()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or_default();
+
+                        if path.is_file() && path_ext == "wal" {
+                            Some(path.to_path_buf())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => None,
+                }
+            })
+            .collect::<Vec<PathBuf>>()
+            .await;
+
+        for wal_file in wal_file_iter.iter() {
+            let wal_file_str = wal_file.to_str().unwrap();
+            if !offset_data.contains_key(wal_file_str) {
+                log::warn!(
+                    "wal file: {:?} not in offset json, recover it from beginning",
+                    wal_file_str
+                );
+                offset_data.insert(wal_file_str.to_string(), 0);
+            }
+        }
+
+        Ok(())
+    }
+
     fn read_persist_file(&self, path: &Path) -> Result<OffsetData> {
         let reader = io::BufReader::new(fs::File::open(path)?);
-        serde_json::from_reader(reader).map_err(|e| Error::SerdeJsonError(e))
+        serde_json::from_reader(reader).map_err(Error::SerdeJsonError)
     }
 
     pub async fn save(&mut self, stream_file: &str, position: FilePosition) {
         let mut data = self.offset_data.write().await;
         data.entry(stream_file.to_string())
             .and_modify(|pos| {
-                // update the position if the new position is greater than the old one
-                // save function will be executed concurrently, so we need to check the position
-                // todo: how to confirm the file eof?
                 if position > *pos {
                     *pos = position
                 }
@@ -175,7 +245,7 @@ impl PipelineOffsetManager {
     pub async fn flush(&self) -> Result<()> {
         // drop util rename tmp file to stable file
         let data = self.offset_data.write().await;
-
+        log::debug!("Flushing pipeline offset data: {:?}", data);
         // Write the new offset to a tmp file and flush it fully to
         // disk. If o2 dies anywhere during this section, the existing
         // stable file will still be in its current valid state and we'll be
@@ -200,16 +270,25 @@ impl PipelineOffsetManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::pipeline::pipeline_offset_manager::PipelineOffsetManager;
+    use crate::service::pipeline::{
+        pipeline_offset_manager::PipelineOffsetManager, pipeline_watcher::FILE_WATCHER_NOTIFY,
+    };
 
+    async fn init_filewatcher() {
+        let (signal_sender, _) = tokio::sync::mpsc::channel(1);
+        let mut notify = FILE_WATCHER_NOTIFY.write().await;
+        *notify = Some(signal_sender);
+    }
     #[tokio::test]
     async fn test_load() {
+        init_filewatcher().await;
         let pm = PipelineOffsetManager::init().await.unwrap();
         pm.load().unwrap();
     }
 
     #[tokio::test]
     async fn test_save() {
+        init_filewatcher().await;
         let mut pm = PipelineOffsetManager::init().await.unwrap();
         let path = "path-to-remote-wal-file-test";
         pm.save(path, 100).await;
@@ -218,6 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_flush() {
+        init_filewatcher().await;
         let mut pm = PipelineOffsetManager::init().await.unwrap();
         let path = "path-to-remote-wal-file-test";
         pm.save(path, 100).await;

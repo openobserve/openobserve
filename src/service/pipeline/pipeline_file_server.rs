@@ -86,29 +86,37 @@ impl PipelineFileServer {
 
         tokio::spawn(async move {
             log::info!("PipelineFileServer running and waiting for shutdown signal");
-            loop {
-                let _ = outside_shutdown_rx.await;
 
-                log::info!("PipelineWatcher begin to shutdown");
-                let _ = stop_pipeline_watcher_sender.send(()).await;
+            let _ = outside_shutdown_rx.await;
 
-                break;
-            }
+            log::info!("PipelineWatcher begin to shutdown");
+            let _ = stop_pipeline_watcher_sender.send(()).await;
+
             log::info!("PipelineFileServer end");
         });
 
-        // debug
         tokio::spawn(async {
-            PipelineFileServer::debug_wal_send().await;
-            // loop {
-            //     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            //     PipelineFileServer::debug_wal_send().await;
-            // }
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(
+                    config::get_config().limit.max_file_retention_time,
+                ))
+                .await;
+
+                let _ = crate::service::pipeline::pipeline_wal_writer::check_ttl().await;
+            }
         });
+
+        // debug
+        // tokio::spawn(async {
+        //     loop {
+        //         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        //         PipelineFileServer::debug_wal_send().await;
+        //     }
+        // });
 
         Ok(())
     }
-
+    #[allow(dead_code)]
     async fn debug_wal_send() {
         use std::sync::Arc;
 
@@ -116,7 +124,8 @@ impl PipelineFileServer {
         let config = &config::get_config();
         let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
             .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer = Writer::new(dir, "org", "logs", 1, 1024_1024, 8 * 1024).unwrap();
+        let mut writer =
+            Writer::new(dir, "org", "logs", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
 
         for i in 0..100 {
             let data = serde_json::json!(

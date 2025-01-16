@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashMap,
     fs::{File, Metadata},
     io::{self, BufReader, Read, Seek},
     path::PathBuf,
@@ -23,11 +24,12 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
 use snafu::{ensure, ResultExt};
 
-use crate::{errors::*, ReadFrom};
+use crate::{errors::*, FileHeader, ReadFrom};
 
 pub struct Reader<R> {
     path: PathBuf,
     f: R,
+    header: FileHeader,
 }
 
 impl Reader<BufReader<File>> {
@@ -46,46 +48,81 @@ impl Reader<BufReader<File>> {
             FileIdentifierMismatchSnafu,
         );
 
-        Ok(Self::new(path, f))
+        // check the file header, and skip header.
+        // if we need to get header, use Reader::header
+        let mut buf = [0; super::WAL_FILE_HEADER_LEN];
+        f.read_exact(&mut buf).context(UnableToReadArraySnafu {
+            length: super::WAL_FILE_HEADER_LEN,
+        })?;
+        let mut buf = std::io::Cursor::new(buf);
+        let header_len = buf
+            .read_u32::<BigEndian>()
+            .context(UnableToReadLengthSnafu)? as usize;
+        let mut bytes = vec![0u8; header_len];
+        f.read_exact(&mut bytes)
+            .context(UnableToReadArraySnafu { length: header_len })?;
+        let header = Self::deserialize_header(&bytes)?;
+
+        Ok(Self::new(path, f, header))
     }
 
     pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {
-        let path = path.into();
-        let f = File::open(&path).context(FileOpenSnafu { path: path.clone() })?;
-        let mut f = BufReader::new(f);
-
-        // check the file type identifier
-        let mut buf = [0; super::FILE_TYPE_IDENTIFIER.len()];
-        f.read_exact(&mut buf).context(UnableToReadArraySnafu {
-            length: super::FILE_TYPE_IDENTIFIER.len(),
-        })?;
-        ensure!(
-            &buf == super::FILE_TYPE_IDENTIFIER,
-            FileIdentifierMismatchSnafu,
-        );
+        let mut reader = Self::from_path(path)?;
 
         match read_from {
-            ReadFrom::Checkpoint(file_position) => {
-                let _ = f.seek(io::SeekFrom::Start(file_position)).unwrap();
+            ReadFrom::Checkpoint(file_position) if file_position > 0 => {
+                let _ = reader.f.seek(io::SeekFrom::Start(file_position)).unwrap();
+            }
+            ReadFrom::Checkpoint(_) => {
+                // do nothing because file_position is start from 0, same as ReadFrom::Beginning
+                // branch
             }
             ReadFrom::Beginning => {
                 // do nothing because the file is already at the beginning
             }
             ReadFrom::End => {
-                let _ = f.seek(io::SeekFrom::End(0)).unwrap();
+                let _ = reader.f.seek(io::SeekFrom::End(0)).unwrap();
             }
         };
 
-        Ok(Self::new(path, f))
+        Ok(reader)
     }
 
     pub fn metadata(&self) -> io::Result<Metadata> {
-        Ok(self.f.get_ref().metadata()?)
+        self.f.get_ref().metadata()
     }
 
     pub fn current_position(&mut self) -> io::Result<u64> {
-        let position = self.f.seek(std::io::SeekFrom::Current(0))?;
+        let position = self.f.stream_position()?;
         Ok(position)
+    }
+
+    fn deserialize_header(bytes: &[u8]) -> Result<FileHeader> {
+        let mut header = HashMap::new();
+        let mut cursor = 0;
+
+        while cursor < bytes.len() {
+            // read key len
+            let key_len = u32::from_be_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
+            cursor += 4;
+
+            // read key value
+            let key = String::from_utf8(bytes[cursor..cursor + key_len as usize].to_vec()).unwrap();
+            cursor += key_len as usize;
+
+            // read value len
+            let value_len = u32::from_be_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
+            cursor += 4;
+
+            // read value value
+            let value =
+                String::from_utf8(bytes[cursor..cursor + value_len as usize].to_vec()).unwrap();
+            cursor += value_len as usize;
+
+            header.insert(key, value);
+        }
+
+        Ok(header)
     }
 }
 
@@ -93,8 +130,8 @@ impl<R> Reader<R>
 where
     R: Read,
 {
-    pub fn new(path: PathBuf, f: R) -> Self {
-        Self { path, f }
+    pub fn new(path: PathBuf, f: R, header: FileHeader) -> Self {
+        Self { path, f, header }
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -157,6 +194,10 @@ where
         }
 
         Ok((Some(data), actual_compressed_len))
+    }
+
+    pub fn header(&self) -> &FileHeader {
+        &self.header
     }
 }
 
