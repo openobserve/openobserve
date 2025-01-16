@@ -18,7 +18,9 @@ mod extractor;
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 use base64::Engine;
-pub use extractor::{extract_auth_str, AuthExtractor};
+#[cfg(feature = "enterprise")]
+pub use extractor::extract_auth_str;
+pub use extractor::AuthExtractor;
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
