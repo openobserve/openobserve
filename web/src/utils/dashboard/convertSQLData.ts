@@ -45,6 +45,7 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
+import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -55,6 +56,7 @@ export const convertMultiSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  dashboardId: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     return { options: null };
@@ -108,6 +110,7 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  dashboardId: any,
 ) => {
   // if no data than return it
   if (
@@ -264,22 +267,11 @@ export const convertSQLData = async (
     return resultArray;
   };
 
-  const getMarkLineData = (panelSchema: any) => {
-    return (
-      panelSchema?.config?.mark_line?.map((markLine: any) => {
-        return {
-          name: markLine.name,
-          type: markLine.type,
-          xAxis: markLine.type == "xAxis" ? markLine.value : null,
-          yAxis: markLine.type == "yAxis" ? markLine.value : null,
-          label: {
-            formatter: markLine.name ? "{b}:{c}" : "{c}",
-            position: "insideEndTop",
-          },
-        };
-      }) ?? []
-    );
-  };
+  const { getCombinedMarkLines } = useAnnotationsData(
+    panelSchema.id,
+    store.state.selectedOrganization?.identifier,
+    dashboardId,
+  );
 
   const noValueConfigOption = panelSchema?.config?.no_value_replacement ?? "";
 
@@ -1123,7 +1115,7 @@ export const convertSQLData = async (
     return {
       silent: true,
       animation: false,
-      data: getMarkLineData(panelSchema),
+      data: getCombinedMarkLines(panelSchema),
     };
   };
 

@@ -164,6 +164,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      <div
+        v-if="showAnnotationButton"
+        class="annotation-button-container"
+        @click.stop
+      >
+        <q-btn
+          label="Add Annotation"
+          color="primary"
+          @click="handleAddAnnotationClick"
+        />
+      </div>
+
+      <!-- Annotation Dialog -->
+      <AddAnnotation
+        v-if="showAddAnnotation"
+        :timestamp="selectedTimestamp"
+        @save="handleSave"
+        @remove="handleRemove"
+        @close="closeAddAnnotation"
+      />
     </div>
   </div>
 </template>
@@ -190,6 +210,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -215,6 +236,10 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AddAnnotation = defineAsyncComponent(() => {
+  return import("./addPanel/addAnnotation.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -224,6 +249,7 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AddAnnotation,
   },
   props: {
     selectedTimeObj: {
@@ -412,6 +438,7 @@ export default defineComponent({
               resultMetaData,
               metadata.value,
               chartPanelStyle.value,
+              dashboardId,
             );
 
             errorDetail.value = "";
@@ -612,8 +639,51 @@ export default defineComponent({
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
 
+    const dashboardIdFromProps = computed(() => props.dashboardId);
+    const organizationId = computed(
+      () => store.state.selectedOrganization?.identifier,
+    );
+    const {
+      showAnnotationButton,
+      showAddAnnotation,
+      selectedTimestamp,
+      handleChartClick,
+      handleAddAnnotation,
+      handleSaveAnnotation,
+      handleDeleteAnnotation,
+      closeAddAnnotation,
+    } = useAnnotationsData(
+      panelSchema.value.id,
+      organizationId.value,
+      dashboardIdFromProps.value,
+    );
+
+    const handleSave = async (formData: any) => {
+      try {
+        await handleSaveAnnotation(formData);
+      } catch (error) {
+        console.error("Failed to save annotation:", error);
+      }
+    };
+
+    const handleRemove = async (annotationId: string) => {
+      try {
+        await handleDeleteAnnotation(annotationId);
+      } catch (error) {
+        console.error("Failed to delete annotation:", error);
+      }
+    };
+
+    const handleAddAnnotationClick = () => {
+      handleAddAnnotation();
+    };
+
     const onChartClick = async (params: any, ...args: any) => {
-      // check if drilldown data exists
+      console.log("Chart clicked with params:", params);
+
+      if (params?.data) {
+        handleChartClick(params.data);
+      }
       if (
         !panelSchema.value.config.drilldown ||
         panelSchema.value.config.drilldown.length == 0
@@ -1178,6 +1248,13 @@ export default defineComponent({
       hideDrilldownPopUp,
       chartPanelClass,
       chartPanelHeight,
+      showAddAnnotation,
+      handleSave,
+      handleRemove,
+      closeAddAnnotation,
+      showAnnotationButton,
+      handleAddAnnotationClick,
+      selectedTimestamp,
     };
   },
 });

@@ -44,6 +44,7 @@ import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import { useAnnotationsData } from "./useAnnotationsData";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -778,6 +779,12 @@ export const usePanelDataLoader = (
     }
   };
 
+  const { refreshAnnotations, updateTimeRange } = useAnnotationsData(
+    panelSchema.value.id,
+    store.state.selectedOrganization?.identifier,
+    dashboardId.value,
+  );
+
   const loadData = async () => {
     try {
       log("loadData: entering...");
@@ -839,6 +846,11 @@ export const usePanelDataLoader = (
         return;
       }
 
+      console.log("loadData: entering...", startISOTimestamp, endISOTimestamp);
+
+      updateTimeRange(startISOTimestamp, endISOTimestamp);
+
+      await refreshAnnotations(startISOTimestamp, endISOTimestamp);
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
