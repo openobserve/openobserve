@@ -619,7 +619,7 @@ pub fn generate_presigned_url(
     )
 }
 
-/// Retrns Some if Auth fails
+/// Returns false if Auth fails
 #[cfg(feature = "enterprise")]
 pub async fn check_permissions(
     object_id: Option<String>,
@@ -629,7 +629,11 @@ pub async fn check_permissions(
     method: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: meta::user::User = USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+            Some(user) => user.clone(),
+            None => return false,
+        }
+        .clone();
 
         let object_id = match object_id {
             Some(id) => id,

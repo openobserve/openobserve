@@ -527,7 +527,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(actions::action::get_action_from_id)
         .service(actions::action::list_actions)
         .service(actions::action::upload_zipped_action)
-        .service(actions::action::update_action)
+        .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
         .service(actions::action::delete_action);
 

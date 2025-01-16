@@ -247,17 +247,10 @@ pub async fn contains(id: &str) -> Result<bool, errors::Error> {
     Ok(record.is_some())
 }
 
-pub async fn len() -> usize {
+pub async fn len() -> Result<usize, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let len = Entity::find().count(client).await;
-
-    match len {
-        Ok(len) => len as usize,
-        Err(e) => {
-            log::error!("short_urls len error: {}", e);
-            0
-        }
-    }
+    let len = Entity::find().count(client).await?;
+    Ok(len as usize)
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
@@ -270,6 +263,6 @@ pub async fn clear() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn is_empty() -> bool {
-    len().await == 0
+pub async fn is_empty() -> Result<bool, errors::Error> {
+    Ok(len().await? == 0)
 }

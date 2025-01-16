@@ -123,6 +123,8 @@ pub struct DeployActionRequest {
     pub environment_variables: HashMap<String, String>,
     #[serde(default)]
     pub ksuid: String,
+    #[serde(default)]
+    pub runtime: String,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -142,12 +144,14 @@ impl Display for ActionType {
         write!(f, "{}", str)
     }
 }
-impl From<&str> for ActionType {
-    fn from(s: &str) -> Self {
+impl TryFrom<&str> for ActionType {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
-            "job" => ActionType::Job,
-            "cronjob" => ActionType::CronJob,
-            _ => ActionType::Job,
+            "job" => Ok(ActionType::Job),
+            "cronjob" => Ok(ActionType::CronJob),
+            _ => Err(anyhow::anyhow!("Invalid action type: {}", s)),
         }
     }
 }

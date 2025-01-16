@@ -114,15 +114,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_4 = version_compare::Version::from("0.0.4").unwrap();
         let v0_0_5 = version_compare::Version::from("0.0.5").unwrap();
         let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
+        let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
         let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
-        let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
-        if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
+        if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
             need_action_scripts_migration = true;
         }
     }

@@ -126,7 +126,7 @@ HttpResponse),         (status = 400, description = "Error",   content_type = "a
 body = HttpResponse),     )
 )]
 #[put("/{org_id}/actions/{action_id}")]
-pub async fn update_action(
+pub async fn update_action_details(
     path: web::Path<(String, Ksuid)>,
     req: web::Json<UpdateActionDetailsRequest>,
 ) -> Result<HttpResponse, Error> {
@@ -208,11 +208,6 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
-
-// fn to_err_message(error: &str) -> serde_json::Value {
-//     serde_json::json!({"message": error})
-// }
-
 /// Upload a zipped action file and process it.
 /// This endpoint allows uploading a ZIP file containing an action, which will be extracted,
 /// processed, and executed.
@@ -248,12 +243,15 @@ pub async fn upload_zipped_action(
 
     // Validate Content-Type
     if let Some(content_type) = req.headers().get("Content-Type") {
-        if !content_type
-            .to_str()
-            .unwrap_or("")
-            .contains("multipart/form-data")
-        {
-            return Ok(HttpResponse::BadRequest().body("Invalid Content-Type"));
+        match content_type.to_str() {
+            Ok(content_type_str) => {
+                if !content_type_str.contains("multipart/form-data") {
+                    return Ok(HttpResponse::BadRequest().body("Invalid Content-Type"));
+                }
+            }
+            Err(_) => {
+                return Ok(HttpResponse::BadRequest().body("Invalid Content-Type header value"));
+            }
         }
     }
 
