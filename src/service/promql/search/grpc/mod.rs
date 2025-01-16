@@ -208,12 +208,12 @@ pub async fn search_inner(
 }
 
 /// generate search group
-/// if the group_interval is less than 10 steps, it will be set to 10 * step
+/// if the group_interval is less than 5 steps, it will be set to 5 * step
 /// if the last group is less than group_interval * 25%, it will be merged into the previous group
 fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -> Vec<(i64, i64)> {
     let mut group_interval = group_interval - group_interval % step;
-    if group_interval < step * 10 {
-        group_interval = step * 10;
+    if group_interval < step * 5 {
+        group_interval = step * 5;
     }
     let mut resp = Vec::new();
     let mut start = start;
@@ -338,10 +338,10 @@ mod tests {
         let group_interval = hour_micros(1);
         let resp = generate_search_group(start, end, step, group_interval);
         let mut expected = Vec::new();
-        for i in 0..24 {
+        for i in 0..43 {
             expected.push((
-                start + i * step * 10 + i * step,
-                start + (i + 1) * step * 10 + i * step,
+                start + i * step * 5 + i * step,
+                start + (i + 1) * step * 5 + i * step,
             ));
         }
         expected.last_mut().unwrap().1 = end;
