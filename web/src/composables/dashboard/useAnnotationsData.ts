@@ -11,7 +11,7 @@ export const useAnnotationsData = (
 ) => {
   const showAnnotationButton = ref(false);
   const showAddAnnotation = ref(false);
-  const selectedTimestamp = ref<string | null>(null);
+  const selectedTimestamp = ref<any>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
