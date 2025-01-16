@@ -17,7 +17,7 @@ use aes_siv::{siv::Aes256Siv, KeyInit};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use config::get_config;
 use once_cell::sync::Lazy;
-use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::cipher_keys::*, get_lock};
@@ -79,7 +79,15 @@ impl Algorithm {
         match self {
             Self::Aes256Siv(k) => {
                 let mut c = Aes256Siv::new_from_slice(k).unwrap();
-                let v = BASE64_STANDARD.decode(encrypted).unwrap();
+                let v = match BASE64_STANDARD.decode(encrypted) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::warn!("error in decoding encrypted key {e}");
+                        return Err(errors::Error::Message(
+                            "failed to decode encrypted key".into(),
+                        ));
+                    }
+                };
                 c.decrypt([&[]], &v)
                     .map_err(|e| {
                         errors::Error::Message(format!(
@@ -155,7 +163,23 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record).exec(client).await?;
+    match Entity::insert(record).exec(client).await {
+        Ok(_) => {}
+        Err(e) => {
+            log::info!("error while saving cipher key to db : {}", e);
+            match e.sql_err() {
+                Some(SqlErr::UniqueConstraintViolation(_)) => {
+                    return Err(errors::Error::Message(
+                        "key with given name already exists".into(),
+                    ));
+                }
+                _ => {
+                    drop(_lock);
+                    return Err(e.into());
+                }
+            }
+        }
+    }
     drop(_lock);
 
     Ok(())
