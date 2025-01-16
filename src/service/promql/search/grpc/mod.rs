@@ -189,9 +189,9 @@ pub async fn search_inner(
     );
 
     let (value, result_type, mut scan_stats) = if query.query_exemplars {
-        ctx.query_exemplars(eval_stmt).await?
+        ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
-        ctx.exec(eval_stmt).await?
+        ctx.exec(&trace_id, eval_stmt).await?
     };
     let result_type = match result_type {
         Some(v) => v,
@@ -208,12 +208,12 @@ pub async fn search_inner(
 }
 
 /// generate search group
-/// if the group_interval is less than 10 steps, it will be set to 10 * step
+/// if the group_interval is less than 5 steps, it will be set to 5 * step
 /// if the last group is less than group_interval * 25%, it will be merged into the previous group
 fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -> Vec<(i64, i64)> {
     let mut group_interval = group_interval - group_interval % step;
-    if group_interval < step * 10 {
-        group_interval = step * 10;
+    if group_interval < step * 5 {
+        group_interval = step * 5;
     }
     let mut resp = Vec::new();
     let mut start = start;
@@ -233,14 +233,14 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
     match value {
         value::Value::None => {}
         value::Value::Instant(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 sample: Some((&v.sample).into()),
                 ..Default::default()
             });
         }
         value::Value::Range(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                 samples: v.samples.iter().map(|x| x.into()).collect(),
                 ..Default::default()
@@ -248,7 +248,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
         }
         value::Value::Vector(v) => {
             v.iter().for_each(|v| {
-                resp.result.push(cluster_rpc::Series {
+                resp.series.push(cluster_rpc::Series {
                     metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                     sample: Some((&v.sample).into()),
                     ..Default::default()
@@ -267,7 +267,7 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
                     cluster_rpc::Exemplars { exemplars }
                 });
                 if !samples.is_empty() || exemplars.is_some() {
-                    resp.result.push(cluster_rpc::Series {
+                    resp.series.push(cluster_rpc::Series {
                         metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
                         samples,
                         exemplars,
@@ -277,19 +277,19 @@ pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Val
             });
         }
         value::Value::Sample(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 sample: Some((&v).into()),
                 ..Default::default()
             });
         }
         value::Value::Float(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 scalar: Some(v),
                 ..Default::default()
             });
         }
         value::Value::String(v) => {
-            resp.result.push(cluster_rpc::Series {
+            resp.series.push(cluster_rpc::Series {
                 stringliteral: Some(v),
                 ..Default::default()
             });
@@ -338,10 +338,10 @@ mod tests {
         let group_interval = hour_micros(1);
         let resp = generate_search_group(start, end, step, group_interval);
         let mut expected = Vec::new();
-        for i in 0..24 {
+        for i in 0..43 {
             expected.push((
-                start + i * step * 10 + i * step,
-                start + (i + 1) * step * 10 + i * step,
+                start + i * step * 5 + i * step,
+                start + (i + 1) * step * 5 + i * step,
             ));
         }
         expected.last_mut().unwrap().1 = end;
