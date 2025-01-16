@@ -189,9 +189,9 @@ pub async fn search_inner(
     );
 
     let (value, result_type, mut scan_stats) = if query.query_exemplars {
-        ctx.query_exemplars(eval_stmt).await?
+        ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
-        ctx.exec(eval_stmt).await?
+        ctx.exec(&trace_id, eval_stmt).await?
     };
     let result_type = match result_type {
         Some(v) => v,
