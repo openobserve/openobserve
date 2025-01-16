@@ -439,7 +439,16 @@ export default defineComponent({
     watch(url, async (newVal) => {
       try {
         if (newVal) {
-          const response = await axios.get(newVal);
+          const urlObj = new URL(newVal);
+        if (!['http:', 'https:'].includes(urlObj.protocol)) {
+          throw new Error('Only HTTP(S) URLs are allowed');
+        }
+        const response = await axios.get(newVal, {
+          timeout: 5000,
+          headers: {
+            'Accept': 'application/json,text/plain'
+          }
+        });
 
           // Check if the response body is valid JSON
           try {
@@ -606,7 +615,7 @@ export default defineComponent({
           showPositiveNotification(`Dashboard Imported Successfully`);
         });
       } catch (error) {
-        showErrorNotification("Please Enter a URL for import");
+        showErrorNotification("Failed to Import Dashboard");
       } finally {
         isLoading.value = false;
       }
@@ -659,7 +668,8 @@ export default defineComponent({
       url.value = "";
     };
     const importDashboard = () => {
-      dashboardErrorsToDisplay.value = [];
+      try{
+        dashboardErrorsToDisplay.value = [];
       const jsonObj = JSON.parse(jsonStr.value);
       if (Array.isArray(jsonObj)) {
         jsonObj.forEach((input, index) => {
@@ -680,6 +690,11 @@ export default defineComponent({
       } else {
         importFromUrl();
       }
+      }
+      catch(e){
+        showErrorNotification("Failed to Import Dashboard");
+      }
+ 
     };
     const validateBasicInputs = (input, index = 0) => {
       if (input.title === "" || typeof input.title !== "string") {
