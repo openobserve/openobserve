@@ -167,7 +167,7 @@ export default defineComponent({
       formData.value.function = e.target.value;
     };
     // Helper to handle success
-    const handleSuccess = (res, dismiss) => {
+    const handleSuccess = (res: any, dismiss: any) => {
       formData.value = defaultValue(); // Clear form data
       emit("update:list"); // Emit event to update the list
       dismiss(); // Dismiss the loading notification
@@ -178,7 +178,7 @@ export default defineComponent({
     };
 
     // Helper to handle errors
-    const handleError = (err, dismiss) => {
+    const handleError = (err: any, dismiss: any) => {
       compilationErr.value = err.response?.data?.message || "Unknown error";
       if (err.response?.status !== 403) {
         q.notify({
