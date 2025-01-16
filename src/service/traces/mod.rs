@@ -695,8 +695,8 @@ pub async fn ingest_json(
 
     let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
-        OtlpRequestType::Grpc => "/grpc/otlp/traces",
-        _ => "/api/otlp/v1/traces",
+        OtlpRequestType::Grpc => "/grpc/traces/json",
+        _ => "/api/traces/json",
     };
 
     if cfg.common.traces_span_metrics_enabled {
