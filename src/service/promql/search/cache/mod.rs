@@ -86,7 +86,6 @@ pub async fn init() -> Result<()> {
 /// This function will return the samples from the cache if the samples are found.
 /// If the samples are not found, it will return None.
 pub async fn get(
-    trace_id: &str,
     query: &str,
     start: i64,
     end: i64,
@@ -129,8 +128,8 @@ pub async fn get(
         return Ok(None);
     }
 
-    // get the data
-    let Ok(data) = infra::cache::file_data::get(trace_id, &best_key, None).await else {
+    // get the data from disk cache
+    let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
         // need to drop the key from index
         let mut w = GLOBAL_CACHE[bucket_id].write().await;
         if let Some(index) = w.cache.get_mut(&key) {
@@ -301,9 +300,9 @@ pub async fn set(
         json::to_vec(&new_range_values)?
     };
 
-    // store the samples
+    // store the series to disk cache
     let cache_key = get_cache_item_key(&key, start, new_end);
-    infra::cache::file_data::set(trace_id, &cache_key, json_data.into())
+    infra::cache::file_data::disk::set(trace_id, &cache_key, json_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
@@ -512,7 +511,7 @@ mod tests {
         assert!(set_result.is_ok());
 
         // Test getting cache
-        let get_result = get(trace_id, query, start, end, step).await;
+        let get_result = get(query, start, end, step).await;
         assert!(get_result.is_ok());
 
         if let Ok(Some((new_start, cached_range_values))) = get_result {
