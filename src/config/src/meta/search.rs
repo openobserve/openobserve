@@ -61,6 +61,9 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_cache: Option<bool>, // used for search job,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -271,6 +274,25 @@ impl Response {
             work_group: None,
             order_by: None,
         }
+    }
+
+    pub fn pagination(&mut self, from: i64, size: i64) {
+        self.from = from;
+        self.size = size;
+        if from >= self.total as i64 {
+            self.hits = Vec::new();
+            self.total = 0;
+            return;
+        }
+
+        self.hits = self
+            .hits
+            .iter()
+            .skip(from as usize)
+            .take(size as usize)
+            .cloned()
+            .collect();
+        // self.total = self.hits.len();
     }
 
     pub fn add_hit(&mut self, hit: &json::Value) {
@@ -486,6 +508,7 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
+            use_cache: None,
         };
         Ok(search_req)
     }
@@ -1016,10 +1039,18 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
+                use_cache: None,
             });
         }
         res
     }
+}
+
+// for search job pagination
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    pub from: Option<i64>,
+    pub size: Option<i64>,
 }
 
 #[cfg(test)]

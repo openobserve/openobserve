@@ -359,6 +359,14 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
+            } else if method.eq("GET") && path_columns[1].starts_with("dashboards") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2] // dashboard id
+                )
             } else {
                 // for things like dashboards and folders etc,
                 // this will take form org:dashboard or org:folders
@@ -397,6 +405,18 @@ impl FromRequest for AuthExtractor {
                         .get(path_columns[2])
                         .map_or(path_columns[2], |model| model.key),
                     path_columns[3]
+                )
+            } else if method.eq("GET")
+                && path_columns[1].eq("folders")
+                && path_columns[2].eq("name")
+            {
+                // To search with folder name, you need GET permission on all folders
+                format!(
+                    "{}:_all_{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
                 )
             } else {
                 // for other get/put requests on any entities such as templates,

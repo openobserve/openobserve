@@ -61,9 +61,6 @@ pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
-// TODO the key name will have to container org,
-// and we have to make sure that is not leaked to the end-user
-
 /// decrypt function
 fn decrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
@@ -117,10 +114,25 @@ fn decrypt() -> ScalarFunctionImplementation {
             }
         };
 
+        let mut err_count = 0;
+        let mut last_error = None;
         let ret = values
             .iter()
-            .map(|v| v.map(|v| cipher.decrypt(v).unwrap()))
+            .map(|v| {
+                v.map(|s| match cipher.decrypt(s) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        err_count += 1;
+                        last_error = Some(e);
+                        s.to_owned()
+                    }
+                })
+            })
             .collect::<StringArray>();
+
+        if let Some(e) = last_error {
+            log::info!("encountered some errors while decrypting, total count {err_count}, last error : {e}");
+        }
 
         Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
     })
@@ -179,10 +191,25 @@ fn encrypt() -> ScalarFunctionImplementation {
             }
         };
 
+        let mut err_count = 0;
+        let mut last_error = None;
         let ret = values
             .iter()
-            .map(|v| v.map(|v| cipher.encrypt(v).unwrap()))
+            .map(|v| {
+                v.map(|s| match cipher.encrypt(s) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        err_count += 1;
+                        last_error = Some(e);
+                        s.to_owned()
+                    }
+                })
+            })
             .collect::<StringArray>();
+
+        if let Some(e) = last_error {
+            log::info!("encountered some errors while decrypting, total count {err_count}, last error : {e}");
+        }
 
         Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
     })

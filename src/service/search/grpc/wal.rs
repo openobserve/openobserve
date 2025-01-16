@@ -120,7 +120,7 @@ pub async fn search_parquet(
         if let Some((min_ts, max_ts)) = query.time_range {
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
                     query.trace_id,
                     &file.key,
                     file.meta.min_ts,
@@ -171,7 +171,7 @@ pub async fn search_parquet(
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
-    if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
+    if schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
@@ -261,7 +261,7 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let session = config::meta::search::Session {
-            id: format!("{}-{}-wal-{ver}", query.trace_id, query.job_id),
+            id: format!("{}-wal-{ver}", query.trace_id),
             storage_type: StorageType::Wal,
             work_group: query.work_group.clone(),
             target_partitions: cfg.limit.cpu_num,
@@ -486,7 +486,7 @@ async fn get_file_list_inner(
                 && ((max_ts > 0 && file_min_ts > max_ts) || (min_ts > 0 && file_max_ts < min_ts))
             {
                 log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
                     query.trace_id,
                     &file,
                     file_min_ts,

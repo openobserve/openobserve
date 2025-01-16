@@ -17,23 +17,28 @@ use config::{
     ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         stream::{DistinctField, StreamType},
     },
 };
 use hashbrown::HashMap;
 use infra::table::{
     self,
-    distinct_values::{self, DistinctFieldRecord, OriginType},
-    folders::FolderType,
+    distinct_values::{DistinctFieldRecord, OriginType},
 };
 
-use super::{folders, stream::save_stream_settings};
+use super::{db::distinct_values, folders, stream::save_stream_settings};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
 };
 pub mod reports;
+
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+};
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -68,6 +73,11 @@ pub enum DashboardError {
     /// or destination folder is not specified.
     #[error("missing source or destination folder for dashboard move")]
     MoveMissingFolderParam,
+
+    /// Error that occurs when trying to move a dashboard but either the source
+    /// or destination folder is not specified.
+    #[error("error deleting the dashboard {0} from old folder {1} : {2}")]
+    MoveDashboardDeleteOld(String, String, String),
 
     /// Error that occurs when trying to move a dashboard to a destination
     /// folder that cannot be found.
@@ -269,7 +279,7 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
+    let dashboard = if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
         set_ownership(
@@ -307,7 +317,19 @@ pub async fn create_dashboard(
         Ok(saved)
     } else {
         Err(DashboardError::CreateFolderNotFound)
+    }?;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id,
+            folder_id,
+            dashboard.clone(),
+        )
+        .await;
     }
+
+    Ok(dashboard)
 }
 
 #[tracing::instrument(skip(dashboard))]
@@ -318,7 +340,19 @@ pub async fn update_dashboard(
     dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    put(org_id, dashboard_id, folder_id, dashboard, hash).await
+    let dashboard = put(org_id, dashboard_id, folder_id, dashboard, hash).await?;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id,
+            folder_id,
+            dashboard.clone(),
+        )
+        .await;
+    }
+
+    Ok(dashboard)
 }
 
 #[tracing::instrument]
@@ -351,10 +385,21 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         Authz {
             obj_id: dashboard_id.to_owned(),
             parent_type: "folders".to_owned(),
-            parent: folder.folder_id,
+            parent: folder.folder_id.clone(),
         },
     )
     .await;
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_delete(
+            org_id,
+            &folder.folder_id,
+            dashboard_id,
+        )
+        .await;
+    }
+
     Ok(())
 }
 
@@ -382,10 +427,39 @@ pub async fn move_dashboard(
 
     // add the dashboard to the destination folder
     put(org_id, dashboard_id, to_folder, dashboard, None).await?;
+    // OFGA ownership
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().openfga.enabled {
+        set_parent_relation(
+            dashboard_id,
+            &get_ofga_type("dashboards"),
+            to_folder,
+            &get_ofga_type("folders"),
+        )
+        .await;
+    }
 
     // delete the dashboard from the source folder
-    let _ = table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id).await;
+    table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id)
+        .await
+        .map_err(|e| {
+            DashboardError::MoveDashboardDeleteOld(
+                dashboard_id.to_string(),
+                from_folder.to_string(),
+                e.to_string(),
+            )
+        })?;
 
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().openfga.enabled {
+        remove_parent_relation(
+            dashboard_id,
+            &get_ofga_type("dashboards"),
+            from_folder,
+            &get_ofga_type("folders"),
+        )
+        .await;
+    }
     Ok(())
 }
 

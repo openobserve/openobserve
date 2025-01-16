@@ -15,13 +15,124 @@
 
 use std::sync::Arc;
 
-use infra::db::Event;
+use infra::{
+    cluster_coordinator::get_coordinator,
+    db::Event,
+    errors,
+    table::cipher::{CipherEntry, EntryKind},
+};
 use o2_enterprise::enterprise::cipher::CipherData;
 
 use crate::{cipher::registry::REGISTRY, service::db};
 
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
+
+pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
+    infra::table::cipher::add(entry.clone()).await?;
+    // specifically for cipher keys, we need to notify of this addition
+    if entry.kind == EntryKind::CipherKey {
+        // trigger watch event by putting value to cluster coordinator
+        let cluster_coordinator = get_coordinator().await;
+        cluster_coordinator
+            .put(
+                &format!("{CIPHER_KEY_PREFIX}{}/{}", entry.org, entry.name),
+                bytes::Bytes::new(), // no actual data, the receiver can query the db
+                true,
+                None,
+            )
+            .await?;
+
+        #[cfg(feature = "enterprise")]
+        {
+            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            if config.super_cluster.enabled {
+                match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
+                {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!(
+                "error in sending cipher key add notification to super cluster queue for {}/{} : {e}", entry.org,entry.name
+            );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
+    infra::table::cipher::update(entry.clone()).await?;
+
+    // specifically for cipher keys, we need to notify of this addition
+    if entry.kind == EntryKind::CipherKey {
+        // trigger watch event by putting value to cluster coordinator
+        let cluster_coordinator = get_coordinator().await;
+        cluster_coordinator
+            .put(
+                &format!("{CIPHER_KEY_PREFIX}{}/{}", entry.org, entry.name),
+                bytes::Bytes::new(), // no actual data, the receiver can query the db
+                true,
+                None,
+            )
+            .await?;
+        #[cfg(feature = "enterprise")]
+        {
+            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            if config.super_cluster.enabled {
+                match o2_enterprise::enterprise::super_cluster::queue::keys_update(entry.clone())
+                    .await
+                {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!(
+                "error in sending cipher key update notification to super cluster queue for {}/{} : {e}",entry.org,entry.name
+            );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors::Error> {
+    infra::table::cipher::remove(org, kind, name).await?;
+    // specifically for cipher keys, we need to notify of this deletion
+    if kind == EntryKind::CipherKey {
+        // trigger watch event by putting value to cluster coordinator
+        let cluster_coordinator = get_coordinator().await;
+        cluster_coordinator
+            .delete(
+                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
+                false,
+                true,
+                None,
+            )
+            .await?;
+
+        #[cfg(feature = "enterprise")]
+        {
+            let config = o2_enterprise::enterprise::common::infra::config::get_config();
+            if config.super_cluster.enabled {
+                match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await
+                {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!(
+                "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
+            );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = CIPHER_KEY_PREFIX;

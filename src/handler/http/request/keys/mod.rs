@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use infra::table::cipher::CipherEntry;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::CipherData;
+use o2_enterprise::enterprise::cipher::{Cipher, CipherData};
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
@@ -67,14 +67,36 @@ pub async fn save(
             Some(id) => id,
         };
 
-        // TODO: validate cipher data by actually encrypting here
+        if req.name.contains(":") {
+            return Ok(MetaHttpResponse::bad_request(
+                "key name cannot have ':' in it",
+            ));
+        }
 
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        match infra::table::cipher::add(CipherEntry {
+        match cd.get_key().await {
+            // here we are just checking that the key can encrypt a string, i.e.
+            // it is set up correctly. We don't care what the actual entrypted string is.
+            Ok(mut k) => match k.encrypt("hello world") {
+                Ok(_) => {}
+                Err(e) => {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "error creating key from request : {e}"
+                    )))
+                }
+            },
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error creating key from request : {e}"
+                )))
+            }
+        }
+
+        match crate::service::db::keys::add(CipherEntry {
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),
@@ -186,7 +208,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
         let org_id = path.into_inner();
 
         let filter = infra::table::cipher::ListFilter {
-            org: Some(org_id.into()),
+            org: Some(org_id),
             kind: Some(infra::table::cipher::EntryKind::CipherKey),
         };
 
@@ -245,7 +267,7 @@ pub async fn delete(
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path.into_inner();
-        match infra::table::cipher::remove(
+        match crate::service::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             &key_name,
@@ -308,14 +330,36 @@ pub async fn update(
             Some(id) => id,
         };
 
-        // TODO: validate cipher data by actually encrypting here
+        if req.name.contains(":") {
+            return Ok(MetaHttpResponse::bad_request(
+                "key name cannot have ':' in it",
+            ));
+        }
 
         let cd: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        match infra::table::cipher::update(CipherEntry {
+        match cd.get_key().await {
+            // here we are just checking that the key can encrypt a string, i.e.
+            // it is set up correctly. We don't care what the actual entrypted string is.
+            Ok(mut k) => match k.encrypt("hello world") {
+                Ok(_) => {}
+                Err(e) => {
+                    return Ok(MetaHttpResponse::bad_request(format!(
+                        "error creating key from request : {e}"
+                    )))
+                }
+            },
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "error creating key from request : {e}"
+                )))
+            }
+        }
+
+        match crate::service::db::keys::update(CipherEntry {
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),

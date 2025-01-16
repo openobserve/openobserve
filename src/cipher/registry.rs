@@ -8,6 +8,12 @@ pub struct Registry {
     keys: HashMap<String, Box<dyn Cipher>>,
 }
 
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Registry {
     pub fn new() -> Self {
         Self {

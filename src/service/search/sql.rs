@@ -112,6 +112,11 @@ impl Sql {
         // 1. get table name
         let stream_names =
             resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
+            return Err(Error::Message(
+                "Index stream is not supported in multi-stream query".to_string(),
+            ));
+        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();
@@ -1481,53 +1486,51 @@ impl VisitorMut for ExtractKeyNamesVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        match expr {
-            Expr::Function(Function {
-                name: ObjectName(names),
-                args,
-                ..
-            }) => {
-                // cipher functions will always be 1-part names
-                if names.len() != 1 {
-                    return ControlFlow::Continue(());
-                }
-                let fname = names.first().unwrap();
-                if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
-                    let list = match args {
-                        FunctionArguments::List(list) => list,
-                        _ => {
-                            self.error = Some(Error::Message(
-                                "invalid arguments to cipher function".to_string(),
-                            ));
-                            return ControlFlow::Continue(());
-                        }
-                    };
-                    if list.args.len() != 2 {
+        if let Expr::Function(Function {
+            name: ObjectName(names),
+            args,
+            ..
+        }) = expr
+        {
+            // cipher functions will always be 1-part names
+            if names.len() != 1 {
+                return ControlFlow::Continue(());
+            }
+            let fname = names.first().unwrap();
+            if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
+                let list = match args {
+                    FunctionArguments::List(list) => list,
+                    _ => {
                         self.error = Some(Error::Message(
-                            "invalid number of arguments to cipher function".to_string(),
+                            "invalid arguments to cipher function".to_string(),
                         ));
                         return ControlFlow::Continue(());
                     }
-                    let arg = match &list.args[1] {
-                        FunctionArg::Named { arg, .. } => arg,
-                        FunctionArg::Unnamed(arg) => arg,
-                    };
-                    match arg {
-                        FunctionArgExpr::Expr(Expr::Value(
-                            sqlparser::ast::Value::SingleQuotedString(s),
-                        )) => {
-                            self.keys.push(s.to_owned());
-                        }
-                        _ => {
-                            self.error = Some(Error::Message(
-                                "key name must be a static string in cipher function".to_string(),
-                            ));
-                            return ControlFlow::Continue(());
-                        }
+                };
+                if list.args.len() != 2 {
+                    self.error = Some(Error::Message(
+                        "invalid number of arguments to cipher function".to_string(),
+                    ));
+                    return ControlFlow::Continue(());
+                }
+                let arg = match &list.args[1] {
+                    FunctionArg::Named { arg, .. } => arg,
+                    FunctionArg::Unnamed(arg) => arg,
+                };
+                match arg {
+                    FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(s),
+                    )) => {
+                        self.keys.push(s.to_owned());
+                    }
+                    _ => {
+                        self.error = Some(Error::Message(
+                            "key name must be a static string in cipher function".to_string(),
+                        ));
+                        return ControlFlow::Continue(());
                     }
                 }
             }
-            _ => {}
         }
         ControlFlow::Continue(())
     }

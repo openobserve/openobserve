@@ -28,6 +28,7 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
+        promql::*,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -46,7 +47,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords},
+    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
@@ -66,7 +67,11 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Invalid proto: {}", e);
+            log::error!(
+                "[METRICS:OTLP] Invalid proto: org_id: {}, error: {}",
+                org_id,
+                e
+            );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid proto: {}", e),
@@ -77,7 +82,8 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[METRICS:OTLP] Error while handling grpc trace request: {}",
+                "[METRICS:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
+                org_id,
                 e
             );
             Err(Error::new(ErrorKind::Other, e))
@@ -938,7 +944,7 @@ fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
 
         exemplar_coll.push(exemplar_rec)
     }
-    rec["exemplars"] = exemplar_coll.into();
+    rec[EXEMPLARS_LABEL] = exemplar_coll.into();
 }
 
 fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {

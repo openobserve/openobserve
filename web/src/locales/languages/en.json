@@ -65,7 +65,18 @@
     "horizontal": "Horizontal",
     "custom": "Custom",
     "none": "None",
-    "auto": "Auto"
+    "auto": "Auto",
+    "duration": "Duration",
+    "fullscreen": "Go Full Screen",
+    "query": "Query",
+    "output": "Output",
+    "selectStream": "Select Stream",
+    "unsavedTitle": "Unsaved Changes",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "cancelTitle": "Cancel Changes",
+    "cancelMessage": "Are you sure you want to cancel the changes?",
+    "back": "Back",
+    "save": "Save"
   },
   "search": {
     "metrics": "Metrics",
@@ -414,6 +425,7 @@
     "timezone": "Timezone",
     "deleteActionLabel": "Delete",
     "deleteActionMessage": "Are you sure you want to delete the selected fields? This action cannot be undone.",
+    "deleteDatesMessage": "Are you sure you want to delete the selected dates? This action cannot be undone.",
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
@@ -430,7 +442,9 @@
     "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
-    "indexSize": "Index Size"
+    "indexSize": "Index Size",
+    "extendedStartDate":"Start Date",
+    "extendedEndDate":"End Date"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -458,7 +472,7 @@
     "search": "Search Function",
     "name": "Name",
     "function": "Function Detail",
-    "save": "Save",
+    "save": "Save Function",
     "jsfunction": "Function",
     "stream_name": "Stream Name",
     "order": "Order",
@@ -487,7 +501,9 @@
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
     "streamPipeline": "Pipelines",
-    "streamRouting": "Stream Routing"
+    "streamRouting": "Stream Routing",
+    "testFunction": "Test Function",
+    "errorDetails": "Error"
   },
   "confirmDialog": {
     "cancel": "Cancel",
@@ -966,7 +982,8 @@
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
-    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "cipherKeys": "Cipher Keys"
   },
   "reports": {
     "header": "Reports",
@@ -1014,5 +1031,32 @@
   "traces": {
     "viewLogs": "View Logs",
     "backToLogs": "Back to Logs"
+  },
+  "cipherKey": {
+    "header": "Cipher Keys",
+    "add": "Add Cipher Key",
+    "search": "Search Cipher Key",
+    "update": "Update Cipher Key",
+    "name": "Name",
+    "type": "Type",
+    "step1": "Key Store Details",
+    "step2": "Encryption Mechanism",
+    "secret": "Secret",
+    "baseURL": "Base URL",
+    "accessId": "Access ID",
+    "authenticationType": "Authentication",
+    "accessKey": "Access Key",
+    "ldapUsername": "LDAP Username",
+    "ldapPassword": "LDAP Password",
+    "secretType": "Secret Type",
+    "staticSecretName": "Name",
+    "dfcName": "DFC Name",
+    "dfcIV": "DFC IV",
+    "dfcEncryptedData": "DFC Encrypted Data",
+    "providerType": "Type",
+    "algorithm": "Algorithm",
+    "storeType": "Store Type",
+    "mechanismType": "Mechanism Type",
+    "actions": "Actions"
   }
 }
