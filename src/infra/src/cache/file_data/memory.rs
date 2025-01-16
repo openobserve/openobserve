@@ -125,10 +125,6 @@ impl FileData {
             metrics::QUERY_MEMORY_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
                 .add(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_MEMORY_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[])
-                .add(data_size as i64);
         }
         Ok(())
     }
@@ -163,10 +159,6 @@ impl FileData {
                     .dec();
                 metrics::QUERY_MEMORY_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "metrics_results" {
-                metrics::QUERY_MEMORY_METRICS_CACHE_USED_BYTES
-                    .with_label_values(&[])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -210,10 +202,6 @@ impl FileData {
                 .dec();
             metrics::QUERY_MEMORY_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
-                .sub(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_MEMORY_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[])
                 .sub(data_size as i64);
         }
 
