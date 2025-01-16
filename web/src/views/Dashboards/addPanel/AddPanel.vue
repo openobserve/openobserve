@@ -247,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :folder-id="queryParams?.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
                           :variablesData="updatedVariablesData"
+                          :allowAnnotationsAdd="editMode"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"

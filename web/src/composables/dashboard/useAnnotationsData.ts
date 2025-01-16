@@ -1,26 +1,99 @@
 import { ref, watch } from "vue";
 import { annotationService } from "../../services/dashboard_annotations";
-const annotations = ref<any[]>([]);
-const annotationMarkLines = ref<any[]>([]);
-const currentStartTime = ref<number>(0);
-const currentEndTime = ref<number>(0);
+
 export const useAnnotationsData = (
-  panelId: string,
   organization: any,
   dashboardId: any,
+  panelId: string,
 ) => {
-  const showAnnotationButton = ref(false);
-  const showAddAnnotation = ref(false);
+  // show annotation button
+  const isAddAnnotationButtonVisible = ref(false);
+
+  // show add annotation dialog
+  const isAddAnnotationDialogVisible = ref(false);
+
+  // selected timestamp
   const selectedTimestamp = ref<any>(null);
+
+  // loading state
   const loading = ref(false);
   const error = ref<string | null>(null);
+
+  // Add annotation button styles
+  const addAnnotationbuttonStyle = ref<any>({});
+
+  // Function
+
+  // show add annotation button
+  const showAddAnnotationButton = () => {
+    isAddAnnotationButtonVisible.value = true;
+  };
+
+  // hide add annotation button
+  const hideAddAnnotationButton = () => {
+    isAddAnnotationButtonVisible.value = false;
+  };
+
+  // show annoation dialog
+  const showAddAnnotationDialog = () => {
+    isAddAnnotationDialogVisible.value = true;
+  };
+
+  // hide annotation dialog
+  const hideAddAnnotationDialog = () => {
+    isAddAnnotationDialogVisible.value = false;
+  };
+
+  const handleAddAnnotationButtonClick = () => {
+    hideAddAnnotationButton();
+    showAddAnnotationDialog();
+  };
+
+  const handleChartClickForAnnotation = (params: any) => {
+    if (params) {
+      const clickX = params?.event?.offsetX || 0;
+      const clickY = params?.event?.offsetY || 0;
+      console.log("Click X:", clickX, "Click Y:", clickY);
+
+      const BUTTON_HEIGHT = 20;
+      const MARGIN = 50;
+      addAnnotationbuttonStyle.value = {
+        position: "absolute",
+        left: `${clickX}px`,
+        top: `-${BUTTON_HEIGHT}px`,
+        transform: "translateX(-50%)",
+        zIndex: 9999998,
+      };
+
+      const clickedTimestamp =
+        params?.data?.[0] || params?.data?.time || params?.data?.name;
+
+      if (clickedTimestamp) {
+        // TODO: convert from timezone selected
+        const date = new Date(clickedTimestamp);
+        selectedTimestamp.value = date
+          .toLocaleString("sv-SE")
+          .replace("T", " ");
+
+        //TODO: only show a button if it is a valid timestamp
+        showAddAnnotationButton();
+      }
+    }
+  };
+
+  /// =========================================================================================
+
+  const annotations = ref<any[]>([]);
+  const annotationMarkLines = ref<any[]>([]);
+  const currentStartTime = ref<number>(0);
+  const currentEndTime = ref<number>(0);
 
   const updateTimeRange = (start: number, end: number) => {
     currentStartTime.value = start;
     currentEndTime.value = end;
   };
 
-  const handleChartClick = (params: any) => {
+  const handleChartClickForAnnotationOld = (params: any) => {
     if (params) {
       const clickedTimestamp = params[0] || params.time || params.name;
 
@@ -29,14 +102,9 @@ export const useAnnotationsData = (
         selectedTimestamp.value = date
           .toLocaleString("sv-SE")
           .replace("T", " ");
-        showAnnotationButton.value = true;
+        isAddAnnotationButtonVisible.value = true;
       }
     }
-  };
-
-  const handleAddAnnotation = () => {
-    showAddAnnotation.value = true;
-    showAnnotationButton.value = false;
   };
 
   const handleSaveAnnotation = async (annotationData: any) => {
@@ -90,8 +158,8 @@ export const useAnnotationsData = (
   };
 
   const closeAddAnnotation = () => {
-    showAddAnnotation.value = false;
-    showAnnotationButton.value = false;
+    isAddAnnotationDialogVisible.value = false;
+    isAddAnnotationButtonVisible.value = false;
   };
 
   const getLabelFormatter = (name: string) => ({
@@ -199,14 +267,19 @@ export const useAnnotationsData = (
   };
 
   return {
-    showAnnotationButton,
-    showAddAnnotation,
+    isAddAnnotationButtonVisible,
+    isAddAnnotationDialogVisible,
     selectedTimestamp,
     annotations,
     loading,
     error,
-    handleChartClick,
-    handleAddAnnotation,
+    addAnnotationbuttonStyle,
+    showAddAnnotationButton,
+    hideAddAnnotationButton,
+    showAddAnnotationDialog,
+    hideAddAnnotationDialog,
+    handleChartClickForAnnotation,
+    handleAddAnnotationButtonClick,
     handleSaveAnnotation,
     handleDeleteAnnotation,
     closeAddAnnotation,

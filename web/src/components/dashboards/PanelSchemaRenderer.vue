@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
+  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays">
     <div
       ref="chartPanelRef"
       style="height: 100%; position: relative"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
-          @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
         />
@@ -129,15 +129,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
-        v-if="showAnnotationButton"
+        v-if="isAddAnnotationButtonVisible"
         class="annotation-button-container"
-        :style="buttonStyle"
+        :style="addAnnotationbuttonStyle"
         @click.stop
       >
         <q-btn
           label="Add Annotation"
           color="primary"
-          @click="handleAddAnnotationClick"
+          @click="handleAddAnnotationButtonClick"
         />
       </div>
       <div
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         ref="drilldownPopUpRef"
-        @mouseleave="hideDrilldownPopUp"
+        @mouseleave="hidePopupsAndOverlays"
       >
         <div
           v-for="(drilldown, index) in drilldownArray"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Annotation Dialog -->
       <AddAnnotation
-        v-if="showAddAnnotation"
+        v-if="isAddAnnotationDialogVisible"
         :timestamp="selectedTimestamp"
         @save="handleSave"
         @remove="handleRemove"
@@ -212,6 +212,7 @@ import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { event } from "quasar";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -289,6 +290,11 @@ export default defineComponent({
       required: false,
       type: String,
     },
+    allowAnnotationsAdd: {
+      default: false,
+      required: false,
+      type: Boolean,
+    }
   },
   emits: [
     "updated:data-zoom",
@@ -315,12 +321,6 @@ export default defineComponent({
       width: "100%",
     });
 
-    const buttonStyle: any = ref({
-      position: "absolute",
-      left: "0px",
-      top: "0px",
-      zIndex: 9999998,
-    });
     // get refs from props
     const {
       panelSchema,
@@ -331,6 +331,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      allowAnnotationsAdd
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -353,6 +354,24 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+    );
+
+    const {
+      addAnnotationbuttonStyle,
+      isAddAnnotationButtonVisible,
+      isAddAnnotationDialogVisible,
+      selectedTimestamp,
+      hideAddAnnotationButton,
+      showAddAnnotationButton,
+      handleChartClickForAnnotation,
+      handleAddAnnotationButtonClick,
+      handleSaveAnnotation,
+      handleDeleteAnnotation,
+      closeAddAnnotation,
+    } = useAnnotationsData(
+      store.state.selectedOrganization?.identifier,
+      dashboardId,
+      panelSchema.value.id,
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -493,6 +512,20 @@ export default defineComponent({
       );
     });
 
+    const dataZoomEventDataTempStorage = ref(null);
+    const onDataZoom = (event: any) => {
+      if (!allowAnnotationsAdd.value) {
+        // default behavior
+        emit("updated:data-zoom", event);
+        dataZoomEventDataTempStorage.value = null;
+      } else {
+        // looks like zoom not needed
+        // handle add annotation
+        console.log("onDataZoom", event);
+        // TODO: HANDLE annotations
+      }
+    };
+
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
         (it: any) => it.alias || [],
@@ -601,9 +634,13 @@ export default defineComponent({
       emit("error", errorDetail);
     });
 
-    const hideDrilldownPopUp = () => {
+    const hidePopupsAndOverlays = () => {
       if (drilldownPopUpRef.value) {
         drilldownPopUpRef.value.style.display = "none";
+      }
+
+      if(isAddAnnotationButtonVisible.value) {
+        hideAddAnnotationButton();
       }
     };
 
@@ -647,25 +684,6 @@ export default defineComponent({
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
 
-    const dashboardIdFromProps = computed(() => props.dashboardId);
-    const organizationId = computed(
-      () => store.state.selectedOrganization?.identifier,
-    );
-    const {
-      showAnnotationButton,
-      showAddAnnotation,
-      selectedTimestamp,
-      handleChartClick,
-      handleAddAnnotation,
-      handleSaveAnnotation,
-      handleDeleteAnnotation,
-      closeAddAnnotation,
-    } = useAnnotationsData(
-      panelSchema.value.id,
-      organizationId.value,
-      dashboardIdFromProps.value,
-    );
-
     const handleSave = async (formData: any) => {
       try {
         await handleSaveAnnotation(formData);
@@ -682,29 +700,13 @@ export default defineComponent({
       }
     };
 
-    const handleAddAnnotationClick = () => {
-      handleAddAnnotation();
-    };
-
     const onChartClick = async (params: any, ...args: any) => {
       console.log("Chart clicked with params:", params);
 
-      if (params?.data) {
-        const clickX = params?.event?.offsetX || 0;
-        const clickY = params?.event?.offsetY || 0;
-        console.log("Click X:", clickX, "Click Y:", clickY);
-
-        const BUTTON_HEIGHT = 20;
-        const MARGIN = 50;
-        buttonStyle.value = {
-          position: "absolute",
-          left: `${clickX - MARGIN}px`,
-          top: `${clickY - BUTTON_HEIGHT - MARGIN}px`,
-          zIndex: 9999998,
-        };
-
-        handleChartClick(params.data);
+      if(allowAnnotationsAdd.value) {
+        handleChartClickForAnnotation(params);
       }
+
       if (
         !panelSchema.value.config.drilldown ||
         panelSchema.value.config.drilldown.length == 0
@@ -765,7 +767,7 @@ export default defineComponent({
         drilldownPopUpRef.value.style.display = "block";
       } else {
         // hide the popup if there's no drilldown
-        hideDrilldownPopUp();
+        hidePopupsAndOverlays();
       }
     };
     
@@ -888,7 +890,7 @@ export default defineComponent({
     };
     const openDrilldown = async (index: any) => {
       // hide the drilldown pop up
-      hideDrilldownPopUp();
+      hidePopupsAndOverlays();
 
       // if panelSchema exists
       if (panelSchema.value) {
@@ -1263,19 +1265,20 @@ export default defineComponent({
       metadata,
       tableRendererRef,
       onChartClick,
-      buttonStyle,
+      onDataZoom,
+      addAnnotationbuttonStyle,
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
-      hideDrilldownPopUp,
+      hidePopupsAndOverlays,
       chartPanelClass,
       chartPanelHeight,
-      showAddAnnotation,
+      isAddAnnotationDialogVisible,
       handleSave,
       handleRemove,
       closeAddAnnotation,
-      showAnnotationButton,
-      handleAddAnnotationClick,
+      isAddAnnotationButtonVisible,
+      handleAddAnnotationButtonClick,
       selectedTimestamp,
     };
   },
