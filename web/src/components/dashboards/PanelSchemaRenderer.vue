@@ -129,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-if="allowAnnotationsAdd"
         class="annotation-button-container"
         style="position: absolute; top: 0px; right: 0px; z-index: 9999999;"
         @click.stop
