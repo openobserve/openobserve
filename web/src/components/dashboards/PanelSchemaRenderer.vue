@@ -237,7 +237,7 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 });
 
 const AddAnnotation = defineAsyncComponent(() => {
-  return import("./addPanel/addAnnotation.vue");
+  return import("./addPanel/AddAnnotation.vue");
 });
 
 export default defineComponent({
