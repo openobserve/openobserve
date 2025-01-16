@@ -498,29 +498,29 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
+        let table_name = selector.name.as_ref().unwrap();
         let mut data_loaded = self.ctx.data_loading.lock().await;
-        if *data_loaded {
+        if data_loaded.contains(table_name) {
             return Ok(()); // data is already loading
         }
 
-        let table_name = selector.name.as_ref().unwrap();
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
-                *data_loaded = true;
+                data_loaded.insert(table_name.to_string());
                 return Err(e);
             }
         };
 
         // no data, return immediately
         if metrics.is_empty() {
-            *data_loaded = true;
             self.ctx
                 .data_cache
                 .write()
                 .await
                 .insert(table_name.to_string(), Value::None);
+            data_loaded.insert(table_name.to_string());
             return Ok(());
         }
 
@@ -546,7 +546,7 @@ impl Engine {
             .write()
             .await
             .insert(table_name.to_string(), values);
-        *data_loaded = true;
+        data_loaded.insert(table_name.to_string());
         Ok(())
     }
 

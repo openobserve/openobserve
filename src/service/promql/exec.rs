@@ -20,7 +20,7 @@ use std::{
 
 use config::meta::search::ScanStats;
 use datafusion::error::{DataFusionError, Result};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use promql_parser::parser::EvalStmt;
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
@@ -47,7 +47,7 @@ pub struct PromqlContext {
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
     pub timeout: u64, // seconds, query timeout
-    pub data_loading: Arc<Mutex<bool>>,
+    pub data_loading: Arc<Mutex<HashSet<String>>>,
 }
 
 impl PromqlContext {
@@ -66,7 +66,7 @@ impl PromqlContext {
             query_exemplars,
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
-            data_loading: Arc::new(Mutex::new(false)),
+            data_loading: Arc::new(Mutex::new(HashSet::default())),
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
             timeout,
         }
