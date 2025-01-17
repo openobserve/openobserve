@@ -18,7 +18,6 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationReq {
-    pub dashboard_id: String,
     pub timed_annotations: Vec<TimedAnnotation>,
 }
 
@@ -40,6 +39,5 @@ pub struct TimedAnnotation {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationDelete {
-    pub dashboard_id: String,
     pub annotation_ids: Vec<String>,
 }

@@ -28,7 +28,7 @@ use crate::{
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateAnnotations",
-    path = "/{org_id}/annotations",
+    path = "/{org_id}/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -47,15 +47,15 @@ use crate::{
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
 )]
-#[post("/{org_id}/annotations")]
+#[post("/{org_id}/{dashboard_id}/annotations")]
 pub async fn create_annotations(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    let (org_id, dashboard_id) = path.into_inner();
     let req = serde_json::from_slice::<TimedAnnotationReq>(&body)?;
 
-    match timed_annotations::create_timed_annotations(&org_id, req).await {
+    match timed_annotations::create_timed_annotations(&org_id, &dashboard_id, req).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
             log::error!("Error creating timed annotations: {}", e);
@@ -75,7 +75,7 @@ pub async fn create_annotations(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetAnnotations",
-    path = "/{org_id}/annotations",
+    path = "/{org_id}/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -97,13 +97,13 @@ pub async fn create_annotations(
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
 )]
-#[get("/{org_id}/annotations")]
+#[get("/{org_id}/{dashboard_id}/annotations")]
 pub async fn get_annotations(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     query: web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
-    let _org_id = path.into_inner();
-    let (dashboard_id, panels, start_time, end_time) = match get_query_params(query) {
+    let (_org_id, dashboard_id) = path.into_inner();
+    let (panels, start_time, end_time) = match get_query_params(query) {
         Ok(params) => params,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e.to_string())),
     };
@@ -130,7 +130,7 @@ pub async fn get_annotations(
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "DeleteAnnotations",
-    path = "/{org_id}/annotations",
+    path = "/{org_id}/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -147,14 +147,14 @@ pub async fn get_annotations(
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
 )]
-#[delete("/{org_id}/annotations")]
+#[delete("/{org_id}/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let _org_id = path.into_inner();
+    let (_org_id, dashboard_id) = path.into_inner();
     let req: TimedAnnotationDelete = serde_json::from_slice(&body)?;
-    match timed_annotations::delete_timed_annotations(req).await {
+    match timed_annotations::delete_timed_annotations(&dashboard_id, req).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
             log::error!("Error deleting timed annotations: {}", e);
@@ -170,14 +170,7 @@ pub async fn delete_annotations(
 
 fn get_query_params(
     query: web::Query<HashMap<String, String>>,
-) -> anyhow::Result<(String, Option<Vec<String>>, i64, i64)> {
-    let dashboard_id = query
-        .get("dashboard_id")
-        .ok_or_else(|| anyhow::anyhow!("dashboard_id is required"))?
-        .to_string();
-    if dashboard_id.is_empty() {
-        return Err(anyhow::anyhow!("dashboard_id cannot be empty"));
-    }
+) -> anyhow::Result<(Option<Vec<String>>, i64, i64)> {
     let panels = query
         .get("panels")
         .map(|p| p.split(',').map(|s| s.to_string()).collect());
@@ -191,5 +184,5 @@ fn get_query_params(
         .ok_or_else(|| anyhow::anyhow!("end_time is required"))?
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid end_time"))?;
-    Ok((dashboard_id, panels, start_time, end_time))
+    Ok((panels, start_time, end_time))
 }
