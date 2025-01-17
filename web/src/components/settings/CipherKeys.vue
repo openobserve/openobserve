@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="row full-width">
             <QTablePagination
+              v-if="resultTotal > 0"
               :scope="scope"
               :pageTitle="t('cipherKey.header')"
               :resultTotal="resultTotal"
