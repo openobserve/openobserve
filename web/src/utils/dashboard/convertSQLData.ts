@@ -46,6 +46,7 @@ import {
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
+import { getAnnotationsData } from "@/composables/dashboard/useAnnotationMarkline";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -1166,11 +1167,22 @@ export const convertSQLData = async (
     );
   };
 
+  const { markLines, markAreas } = getAnnotationsData(annotations);
+
   const getSeriesMarkLine = () => {
     return {
       silent: true,
       animation: false,
-      data: [...getMarkLineData(panelSchema), ...getAnnotationsMarklines()],
+      data: [...getMarkLineData(panelSchema), ...markLines],
+    };
+  };
+
+  const getSeriesMarkArea = () => {
+    return {
+      itemStyle: {
+        color: "rgba(255, 173, 177, 0.4)",
+      },
+      data: markAreas,
     };
   };
 
@@ -1205,6 +1217,7 @@ export const convertSQLData = async (
       label: getSeriesLabel(),
       // markLine if exist
       markLine: getSeriesMarkLine(),
+      markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
       large: true,
@@ -1419,6 +1432,7 @@ export const convertSQLData = async (
     }
     case "bar": {
       options.series = getSeries({ barMinHeight: 1 });
+      console.log("options.series", options.series);
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
