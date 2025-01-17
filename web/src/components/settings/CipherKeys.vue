@@ -110,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             position="bottom"
             @update:changeRecordPerPage="changePagination"
-            @update:maxRecordToReturn="changeMaxRecordToReturn"
           />
         </template>
       </q-table>
@@ -129,11 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-// @ts-nocheck
-import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, watch, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -147,7 +145,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
-  name: "PageOrganization",
+  name: "PageCipherKeys",
   components: {
     QTablePagination,
     NoData,
@@ -159,7 +157,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const tabledata = ref([]);
+    const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const qTable: any = ref(null);
     const loading = ref(false);
@@ -252,12 +250,8 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-      getOrganizations();
-    };
 
-    const addCipherKey = (evt) => {
+    const addCipherKey = (evt: any) => {
       router.push({
         query: {
           action: "add",
@@ -392,7 +386,6 @@ export default defineComponent({
       selectedPerPage,
       changePagination,
       maxRecordToReturn,
-      changeMaxRecordToReturn,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];

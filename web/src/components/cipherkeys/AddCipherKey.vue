@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="openCancelDialog"
         />
         <q-btn
-          :disable="step === 1 && isUpdatingCipherKey == false"
+          :disable="(step === 1 && isUpdatingCipherKey == false) || isSubmitting"
           data-test="add-cipher-key-save-btn"
           :label="t('common.save')"
           class="text-bold no-border q-ml-md"
@@ -215,6 +215,7 @@ const store = useStore();
 const addCipherKeyFormRef: any = ref();
 const isUpdatingCipherKey: any = ref(false);
 const step = ref(1);
+const isSubmitting = ref(false);
 const formData: any = ref({
   name: "",
   key: {
@@ -274,7 +275,7 @@ const getTypeLabel = (type: string) => {
   return cipherKeyTypes.value.find((t) => t.value === type)?.label;
 };
 
-function mergeObjects(base, updates) {
+function mergeObjects(base: any, updates: any) {
   for (const key in updates) {
     if (
       updates[key] !== null &&
@@ -315,7 +316,7 @@ const setupTemplateData = () => {
         .catch((error) => {
           $q.notify({
             type: "negative",
-            message: error.response.data.message,
+            message: error.response.data.message || "Error fetching cipher key.",
           });
         });
     }
@@ -323,9 +324,11 @@ const setupTemplateData = () => {
 };
 
 const onSubmit = () => {
+  isSubmitting.value = true;
   addCipherKeyFormRef.value
     .validate()
     .then((valid: any) => {
+      isSubmitting.value = false;
       if (isUpdatingCipherKey.value) {
         updateCipherKey();
       } else {
@@ -333,6 +336,7 @@ const onSubmit = () => {
       }
     })
     .catch((error: any) => {
+      isSubmitting.value = false;
       $q.notify({
         type: "negative",
         message: "Please fill all the required fields",
@@ -367,6 +371,7 @@ const createCipherKey = () => {
 };
 
 const updateCipherKey = () => {
+  isSubmitting.value = true;
   const dismiss = $q.notify({
     spinner: true,
     message: "Please wait while processing your request...",
@@ -376,6 +381,7 @@ const updateCipherKey = () => {
     formData.value,
   )
     .then((response) => {
+      isSubmitting.value = false;
       dismiss();
       $q.notify({
         type: "positive",
@@ -384,6 +390,7 @@ const updateCipherKey = () => {
       emit("cancel:hideform");
     })
     .catch((error) => {
+      isSubmitting.value = false;
       dismiss();
       $q.notify({
         type: "negative",

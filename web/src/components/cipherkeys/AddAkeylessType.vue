@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rules="[
         (val: any) => !!val || 'Base URL is required',
         (val: any) => validateUrl(val) || 'Please provide correct URL.',
+        (val: any) => !/<[^>]*>/.test(val) || 'HTML tags are not allowed',
       ]"
     />
     <!-- Add input filed for access id with URL validation from q-input -->
@@ -104,7 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val: any) => !!val || 'LDAP Username is required']"
+          :rules="[
+            (val: any) => !!val || 'LDAP Username is required',
+            (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
+          ]"
         />
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
           <q-input
