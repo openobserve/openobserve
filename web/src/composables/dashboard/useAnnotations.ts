@@ -22,13 +22,8 @@ export const useAnnotations = (
         },
       );
 
-      return response.data.map((item: any) => ({
-        id: item.annotation_id,
-        name: item.title,
-        description: item.text || "",
-        value: item.start_time,
-        type: "xAxis",
-      }));
+      return response.data;
+
     } catch (err: any) {
       console.error("Error fetching annotations:", err);
       return null;
