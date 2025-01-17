@@ -613,11 +613,15 @@ pub async fn ingest_json(
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     for mut value in json_values {
-        let timestamp = value["start_time"].as_i64().unwrap() / 1000;
+        let timestamp = value["start_time"]
+            .as_i64()
+            .map(|ts| ts / 1000)
+            .unwrap_or(min_ts);
+        let trace_id = value["trace_id"].to_string();
         if timestamp < min_ts {
             log::error!(
                     "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                    &value["trace_id"]
+                    &trace_id
                 );
             partial_success.rejected_spans += 1;
             continue;
@@ -633,7 +637,7 @@ pub async fn ingest_json(
             _ => {
                 log::error!(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
-                    &value["trace_id"]
+                    &trace_id
                 );
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(

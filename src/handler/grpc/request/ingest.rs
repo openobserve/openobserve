@@ -87,7 +87,7 @@ impl Ingest for Ingester {
                     .unwrap_or(IngestionType::Multi); // multi is just place holder
                 if log_ingestion_type != IngestionType::Json {
                     Err(anyhow::anyhow!(
-                        "Internal gPRC trace ingestion only supports json type data, got {:?}",
+                        "Internal gRPC trace ingestion only supports json type data, got {:?}",
                         log_ingestion_type
                     ))
                 } else {
