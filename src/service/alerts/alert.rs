@@ -286,7 +286,9 @@ async fn prepare_alert(
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
                 if d.is_remote_pipeline() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(d.destination_type))
+                    return Err(AlertError::NotSupportedAlertDestinationType(
+                        d.destination_type,
+                    ));
                 }
             }
             Err(_) => {

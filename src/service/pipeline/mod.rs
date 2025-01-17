@@ -30,8 +30,8 @@ mod pipeline_entry;
 mod pipeline_exporter;
 pub mod pipeline_file_server;
 mod pipeline_http_exporter_client;
-mod pipeline_offset_manager;
-mod pipeline_receiver;
+pub mod pipeline_offset_manager;
+pub(crate) mod pipeline_receiver;
 mod pipeline_wal_writer;
 mod pipeline_watcher;
 

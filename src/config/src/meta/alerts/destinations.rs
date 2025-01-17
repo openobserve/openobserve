@@ -77,7 +77,6 @@ impl fmt::Display for DestinationType {
     }
 }
 
-
 impl From<&str> for DestinationType {
     fn from(s: &str) -> Self {
         match s {
