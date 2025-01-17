@@ -17,6 +17,7 @@ mod alerts;
 mod cipher_keys;
 mod dashboards;
 mod distinct_values;
+mod folders;
 mod meta;
 mod pipelines;
 mod scheduler;
@@ -26,8 +27,8 @@ mod short_urls;
 
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertsQueue, DashboardsQueue, MetaQueue, PipelinesQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait,
+    AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue, SchemasQueue,
+    SearchJobsQueue, SuperClusterQueueTrait,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -61,6 +62,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let pipelines_queue = PipelinesQueue {
         on_pipeline_msg: pipelines::process,
     };
+    let folders_queue = FoldersQueue {
+        on_folder_msg: folders::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -69,6 +73,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(search_jobs_queue),
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
+        Box::new(folders_queue),
     ];
 
     for queue in queues {
