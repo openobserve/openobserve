@@ -329,7 +329,7 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: props.isAlerts ? "http" : "external_destination",
+  type: props.isAlerts ? "http" : "remote_pipeline",
 });
 const isUpdatingDestination = ref(false);
 
@@ -454,7 +454,7 @@ const saveDestination = () => {
   }
 
   if (!props.isAlerts) {
-    payload["type"] = "external_destination";
+    payload["type"] = "remote_pipeline";
   }
 
   if (isUpdatingDestination.value) {
