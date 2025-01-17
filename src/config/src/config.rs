@@ -544,8 +544,6 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
-    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
-    pub connection_pool_disabled: bool,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -913,6 +911,12 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(
+        name = "ZO_METRICS_CACHE_ENABLED",
+        default = true,
+        help = "Enable result cache for PromQL metrics queries"
+    )]
+    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
@@ -1029,6 +1033,8 @@ pub struct Limit {
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 100000)]
+    pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -1701,11 +1707,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_search_interval_per_group == 0 {
         cfg.limit.metrics_max_search_interval_per_group = 24;
     }
+    if cfg.limit.metrics_max_search_interval_per_group < 3600 {
+        // convert hours to microseconds
+        cfg.limit.metrics_max_search_interval_per_group *= 3_600_000_000;
+    }
     if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30000;
+        cfg.limit.metrics_max_series_per_query = 30_000;
     }
     if cfg.limit.metrics_max_points_per_series == 0 {
-        cfg.limit.metrics_max_points_per_series = 30000;
+        cfg.limit.metrics_max_points_per_series = 30_000;
+    }
+    if cfg.limit.metrics_cache_max_entries == 0 {
+        cfg.limit.metrics_cache_max_entries = 100_000;
     }
 
     // check search job retention
