@@ -57,38 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
-          <div v-if="!createNewDestination" class="flex ">
-            <span
-              class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center q-mr-xl"
-              >Retries
-                <q-icon
-                  name="info"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-                  "
-                >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                  >
-                    <span style="font-size: 14px">
-                      Number of retries should be greater or equal to 0</span
-                    >
-                  </q-tooltip>
-                </q-icon>
-            </span>
-            <q-input
-                v-model="retries"
-                type="number"
-                dense
-                filled
-                min="0"
-                style="background: none"
-            />
-          </div>
           <div class="col-12 q-pb-md"></div>
           <div v-if="createNewDestination" class="col-12 q-py-xs">
             <q-input
@@ -423,6 +391,7 @@ const getDestinations = () => {
       sort_by: "name",
       desc: false,
       org_identifier: store.state.selectedOrganization.identifier,
+      dst_type: "remote_pipeline",
     })
     .then((res) => {
       destinations.value = res.data.filter(
