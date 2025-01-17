@@ -352,11 +352,11 @@ impl PipelineWatcher {
                     .entry(entry)
                     .build();
 
-                let max_retry_attempts = pr.get_stream_export_retry_attempts().await;
+                let max_retry_time = pr.get_stream_export_retry_time().await;
 
                 if let Err(e) = pr
                     .pipeline_exporter
-                    .export_entry(data, max_retry_attempts)
+                    .export_entry(data, max_retry_time)
                     .await
                 {
                     log::error!(

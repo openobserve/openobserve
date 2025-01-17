@@ -1556,11 +1556,11 @@ pub struct Pipeline {
     )]
     pub remote_request_timeout: u64,
     #[env_config(
-        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY",
-        default = 3,
-        help = "pipeline exporter client request retry"
+        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY_TIME",
+        default = 1440,
+        help = "pipeline exporter client request retry times, default 1440 min"
     )]
-    pub remote_request_retry: usize,
+    pub remote_request_retry_time: u64,
     #[env_config(
         name = "ZO_PIPELINE_MAX_CONNECTIONS",
         default = 1024,

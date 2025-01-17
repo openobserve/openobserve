@@ -70,14 +70,10 @@ impl PipelineExporter {
         Ok(Self::new(client))
     }
 
-    pub async fn export_entry(
-        &self,
-        entry: PipelineEntry,
-        max_retry_attempts: usize,
-    ) -> Result<()> {
+    pub async fn export_entry(&self, entry: PipelineEntry, max_retry_time: u64) -> Result<()> {
         let mut attempts = 0;
         let mut delay = INITIAL_RETRY_DELAY_MS;
-        while attempts < max_retry_attempts {
+        loop {
             // todo: if endpoint reponse partial success, we need to resovle the issue?
             // we assume that all the data is received successfully when the endpoint response 200.
             match self.router.export(entry.clone()).await {
@@ -102,10 +98,9 @@ impl PipelineExporter {
                 }
                 Err(e) => {
                     attempts += 1;
-                    if attempts == max_retry_attempts {
+                    if delay >= max_retry_time {
                         log::error!(
-                            "Failed to export pipeline entry after {} attempts, giving up: {:?}",
-                            max_retry_attempts,
+                            "Failed to export pipeline entry after {max_retry_time} hours , giving up: {:?}",
                             e
                         );
 

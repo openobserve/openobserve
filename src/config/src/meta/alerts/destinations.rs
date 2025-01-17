@@ -32,7 +32,7 @@ pub struct Destination {
     #[serde(default)]
     pub method: HTTPType,
     #[serde(default)]
-    pub remote_pipeline_retry_attemps: usize,
+    pub remote_pipeline_max_retry_time: u64,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -64,6 +64,19 @@ pub enum DestinationType {
     #[serde(rename = "remote_pipeline")]
     RemotePipeline,
 }
+
+impl fmt::Display for DestinationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            DestinationType::Http => "http",
+            DestinationType::Email => "email",
+            DestinationType::Sns => "sns",
+            DestinationType::RemotePipeline => "remote_pipeline",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 
 impl From<&str> for DestinationType {
     fn from(s: &str) -> Self {

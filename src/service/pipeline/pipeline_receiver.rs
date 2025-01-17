@@ -181,15 +181,15 @@ impl PipelineReceiver {
         }
     }
 
-    pub async fn get_stream_export_retry_attempts(&self) -> usize {
+    pub async fn get_stream_export_retry_time(&self) -> u64 {
         let destination_name = self.get_stream_destination_name();
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name).await {
-            Ok(data) => match data.remote_pipeline_retry_attemps {
-                0 => config::get_config().pipeline.remote_request_retry,
+            Ok(data) => match data.remote_pipeline_max_retry_time {
+                0 => config::get_config().pipeline.remote_request_retry_time,
                 other => other,
             },
-            Err(_) => config::get_config().pipeline.remote_request_retry,
+            Err(_) => config::get_config().pipeline.remote_request_retry_time,
         }
     }
 
