@@ -45,11 +45,6 @@ fn create_table_stmt() -> TableCreateStatement {
                 .not_null()
         )
         .col(
-            ColumnDef::new(TimedAnnotations::OrgId)
-                .string_len(256)
-                .not_null(),
-        )
-        .col(
             ColumnDef::new(TimedAnnotations::StartTime)
                 .big_integer()
                 .not_null(),
@@ -101,7 +96,6 @@ enum TimedAnnotations {
     Table,
     Id,
     DashboardId,
-    OrgId,
     StartTime,
     EndTime,
     Title,

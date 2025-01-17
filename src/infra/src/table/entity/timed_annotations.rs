@@ -8,7 +8,6 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub dashboard_id: String,
-    pub org_id: String,
     pub start_time: i64,
     pub end_time: Option<i64>,
     pub title: String,
@@ -23,7 +22,7 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "super::dashboards::Entity",
         from = "Column::DashboardId",
-        to = "super::dashboards::Column::Id",
+        to = "super::dashboards::Column::DashboardId",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]

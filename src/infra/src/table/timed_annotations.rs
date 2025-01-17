@@ -159,7 +159,6 @@ pub async fn get(
 
 pub async fn add(
     dashboard_id: &str,
-    org_id: &str,
     timed_annotation: TimedAnnotation,
 ) -> Result<String, errors::Error> {
     let record = ActiveModel {
@@ -171,7 +170,6 @@ pub async fn add(
         text: Set(timed_annotation.text),
         tags: Set(timed_annotation.tags.into()),
         created_at: Set(Utc::now().timestamp_micros()),
-        org_id: Set(org_id.to_string()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -199,7 +197,6 @@ pub async fn add(
 
 pub async fn add_many(
     dashboard_id: &str,
-    org_id: &str,
     timed_annotations: Vec<TimedAnnotation>,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
@@ -225,7 +222,6 @@ pub async fn add_many(
             text: Set(timed_annotation.text.clone()),
             tags: Set(timed_annotation.tags.clone().into()),
             created_at: Set(Utc::now().timestamp_micros()),
-            org_id: Set(org_id.to_string()),
         };
 
         timed_annotations::Entity::insert(record)

@@ -18,12 +18,10 @@ use infra::table;
 
 #[tracing::instrument]
 pub async fn create_timed_annotations(
-    org_id: &str,
     dashboard_id: &str,
     req: TimedAnnotationReq,
 ) -> Result<Vec<TimedAnnotation>, anyhow::Error> {
-    let res =
-        table::timed_annotations::add_many(&dashboard_id, org_id, req.timed_annotations).await?;
+    let res = table::timed_annotations::add_many(&dashboard_id, req.timed_annotations).await?;
     // TODO: send WATCH for super cluster
     Ok(res)
 }

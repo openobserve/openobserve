@@ -52,10 +52,10 @@ pub async fn create_annotations(
     path: web::Path<(String, String)>,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, dashboard_id) = path.into_inner();
+    let (_org_id, dashboard_id) = path.into_inner();
     let req = serde_json::from_slice::<TimedAnnotationReq>(&body)?;
 
-    match timed_annotations::create_timed_annotations(&org_id, &dashboard_id, req).await {
+    match timed_annotations::create_timed_annotations(&dashboard_id, req).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => {
             log::error!("Error creating timed annotations: {}", e);
