@@ -368,7 +368,7 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     ]
 )
  
-def test_pipeline_creation_and_action_realtime(create_session, base_url, pipeline_name, stream_name, action, expected_status):
+def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline_name, stream_name, action, expected_status):
     """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
@@ -1101,6 +1101,4 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
     print("Create pipeline response:", resp_create_pipeline.json())
 
-    assert resp_create_pipeline.status_code == 400, {
-    "message": "Invalid pipeline After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
-}
+    assert resp_create_pipeline.status_code == 400, "Invalid pipeline: After Flatten must be checked if a previous FunctionNode already checked it in the same branch."
