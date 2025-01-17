@@ -610,18 +610,14 @@ pub async fn ingest_json(
     .timestamp_micros();
 
     let json_values: Vec<json::Value> = json::from_slice(&body)?;
-    let mut span_metrics = Vec::with_capacity(json_values.len());
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     for mut value in json_values {
-        let span: Span = json::from_value(value.clone())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
-
-        let timestamp = (span.start_time / 1000) as i64;
+        let timestamp = value["start_time"].as_i64().unwrap() / 1000;
         if timestamp < min_ts {
             log::error!(
                     "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                    &span.trace_id
+                    &value["trace_id"]
                 );
             partial_success.rejected_spans += 1;
             continue;
@@ -633,29 +629,11 @@ pub async fn ingest_json(
 
         // get json object
         let mut record_val = match value.take() {
-            json::Value::Object(mut v) => {
-                // build span metrics item
-                let sm = crate::job::metrics::TraceMetricsItem {
-                    organization: org_id.to_string(),
-                    traces_stream_name: traces_stream_name.to_string(),
-                    service_name: span.service_name,
-                    span_name: v
-                        .remove("o2_span_metrics_name")
-                        .map_or(span.operation_name, |name| {
-                            name.as_str().unwrap().to_string()
-                        }),
-                    span_status: span.span_status,
-                    span_kind: span.span_kind,
-                    duration: ((span.end_time - span.start_time) / 1_000_000) as f64, /* milliseconds */
-                    span_id: span.span_id,
-                };
-                span_metrics.push(sm);
-                v
-            }
+            json::Value::Object(v) => v,
             _ => {
                 log::error!(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
-                    &span.trace_id
+                    &value["trace_id"]
                 );
                 return Ok(
                     HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -698,16 +676,6 @@ pub async fn ingest_json(
         OtlpRequestType::Grpc => "/grpc/traces/json",
         _ => "/api/traces/json",
     };
-
-    if cfg.common.traces_span_metrics_enabled {
-        // record span metrics
-        for m in span_metrics {
-            // send to metrics job
-            if let Err(e) = crate::job::metrics::TRACE_METRICS_CHAN.0.try_send(m) {
-                log::error!("traces metrics item send to job fail: {e}")
-            }
-        }
-    }
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
