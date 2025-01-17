@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mb-md text-bold no-border q-ml-md"
           color="secondary"
           padding="sm xl"
-          @click="saveDestination"
+          @click="createNewDestination ? createDestination() : saveDestination()"
           no-caps
         />
       </div>
@@ -248,6 +248,8 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
+
 const props = defineProps<{}>();
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
@@ -262,12 +264,15 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "external_destination",
+  type: "remote_pipeline",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
+const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
-const selectedDestination = ref("");
+const selectedDestination = ref(
+  pipelineObj.currentSelectedNodeData.data.destination_name || "",
+);
 const destinations = ref([]);
 
 const router = useRouter();
@@ -293,7 +298,7 @@ onBeforeMount(() => {
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
-const saveDestination = () => {
+const createDestination = () => {
   if (!isValidDestination.value) {
     q.notify({
       type: "negative",
@@ -319,7 +324,7 @@ const saveDestination = () => {
     template: formData.value.template,
     headers: headers,
     name: formData.value.name,
-    type: "external_destination",
+    type: "remote_pipeline",
   };
 
   destinationService
@@ -394,9 +399,7 @@ const getDestinations = () => {
       dst_type: "remote_pipeline",
     })
     .then((res) => {
-      destinations.value = res.data.filter(
-        (destination: any) => destination.type === "http",
-      );
+      destinations.value = res.data;
     })
     .catch((err) => {
       if (err.response.status != 403) {
@@ -409,6 +412,25 @@ const getDestinations = () => {
       dismiss();
     })
     .finally(() => dismiss());
+};
+
+const saveDestination = () => {
+  const destinationData = {
+    destination_name: selectedDestination.value.value,
+    node_type: "remote_output",
+    io_type: "output",
+  };
+  if (!selectedDestination.value) {
+    q.notify({
+      message: "Please select Stream from the list",
+      color: "negative",
+      position: "bottom",
+      timeout: 2000,
+    });
+    return;
+  }
+  addNode(destinationData);
+  emit("cancel:hideform");
 };
 </script>
 <style lang="scss" scoped>

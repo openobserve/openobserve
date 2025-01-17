@@ -505,6 +505,8 @@ const editPipeline = (pipeline: any) => {
     node.type = node.io_type;
   });
 
+  console.log(pipeline,'pipeline')
+
   pipelineObj.currentSelectedPipeline = pipeline;
   pipelineObj.pipelineWithoutChange = pipeline;
   router.push({

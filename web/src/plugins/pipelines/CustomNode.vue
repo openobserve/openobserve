@@ -29,6 +29,8 @@ const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
+const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
+
 
 const props = defineProps({
   id: {
@@ -90,8 +92,6 @@ const onConditionClick = (data,event,id) =>{
 }
 
 const onStreamOutputClick = (data,event,id) =>{
-  console.log(data,"data")
-  console.log(id,"id")
   pipelineObj.userSelectedNode = data;
 
   if(!id){
@@ -114,6 +114,29 @@ const onStreamOutputClick = (data,event,id) =>{
   onDrop(event,{x:100,y:100});
   menu.value = false
 }
+const onExternalDestinationClick = (data,event,id) =>{
+  pipelineObj.userSelectedNode = data;
+
+  if(!id){
+    pipelineObj.userClickedNode = data.label;
+  }
+  else{
+    pipelineObj.userClickedNode = id;
+  }
+  const dataToOpen  =    
+  {
+    label: "Remote",
+    subtype: "remote_output",
+    io_type: "output",
+    icon: "img:" + externalOutputImage,
+    tooltip: "Destination: Remote Node",
+    isSectionHeader: false,
+  }
+  // pipelineObj.userClickedNode = id
+  onDragStart(event,dataToOpen)
+  onDrop(event,{x:100,y:100});
+  menu.value = false
+}
 
 const { t } = useI18n();
 
@@ -123,6 +146,7 @@ const editNode = (id) => {
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
     (node) => node.id === id
   );
+  console.log(fullNode,'full node')
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
   pipelineObj.currentSelectedNodeID = id;
@@ -219,6 +243,16 @@ function getIcon(data, ioType) {
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
           <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+          <q-item
+            clickable
+            @click="(event) => onExternalDestinationClick(data, event, id)"
+          >
+        <q-item-section avatar>
+          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
 
         </q-item-section>
       </q-item>
@@ -332,6 +366,16 @@ function getIcon(data, ioType) {
 
         </q-item-section>
       </q-item>
+      <q-item
+            clickable
+            @click="(event) => onExternalDestinationClick(data, event, id)"
+          >
+        <q-item-section avatar>
+          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
+
+        </q-item-section>
+      </q-item>
       <!-- Add more items similarly for other images -->
     </q-list>
   </q-menu>
@@ -396,6 +440,108 @@ function getIcon(data, ioType) {
         />
       </div>
     </div>
+    <div
+      v-if="data.node_type == 'remote_output'"
+      :class="`o2vf_node_${io_type}`"
+      class="custom-btn q-pa-none btn-fixed-width"
+      style="
+        width: fit-content;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+        padding: 5px 2px;
+
+      "
+       @mouseover="menu = true"
+      @mouseleave="menu = false"
+    >
+
+       <q-menu v-if="io_type == 'input'" @mouseover="menu = true" @mouseleave="menu = false"   v-model="menu" name="myMenu" class="menu-list" anchor="top right" self="top left">
+    <q-list >
+      <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="top middle" self="bottom right">Function</q-tooltip>
+        </q-item-section>
+      
+
+      </q-item>
+      <q-item clickable @click="(event) => onConditionClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Condition</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+      <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
+        <q-item-section avatar>
+          <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+      <q-item
+            clickable
+            @click="(event) => onExternalDestinationClick(data, event, id)"
+          >
+        <q-item-section avatar>
+          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+      <!-- Add more items similarly for other images -->
+    </q-list>
+  </q-menu>
+
+  
+
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon
+          :name="getIcon(data, io_type)"
+          size="1em"
+          class="q-ma-sm"
+        />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="row"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ data.destination_name }}
+        </div>
+      </div>
+      <div class="float-right tw-pl-2">
+        <q-btn
+          flat
+          round
+          dense
+          icon="edit"
+          size="0.8em"
+          @click="editNode(id)"
+        />
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.8em"
+          @click="deleteNode(id)"
+        />
+      </div>
+    </div>
 
     <div
       v-if="data.node_type == 'query'"
@@ -434,6 +580,16 @@ function getIcon(data, ioType) {
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
           <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+      <q-item
+            clickable
+            @click="(event) => onExternalDestinationClick(data, event, id)"
+          >
+        <q-item-section avatar>
+          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
 
         </q-item-section>
       </q-item>
@@ -535,6 +691,16 @@ function getIcon(data, ioType) {
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
           <q-tooltip anchor="top middle" self="bottom right">Output</q-tooltip>
+
+        </q-item-section>
+      </q-item>
+      <q-item
+            clickable
+            @click="(event) => onExternalDestinationClick(data, event, id)"
+          >
+        <q-item-section avatar>
+          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
 
         </q-item-section>
       </q-item>
