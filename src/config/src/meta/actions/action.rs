@@ -127,6 +127,19 @@ pub struct DeployActionRequest {
     pub runtime: String,
 }
 
+/// Request send to Action Deployer, to deploy an action
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UpdateActionRequest {
+    #[serde(default)]
+    pub job_name: Option<String>,
+    #[serde(default)]
+    pub label_name: Option<String>,
+    #[serde(default)]
+    pub cron_expr: Option<String>,
+    #[serde(default)]
+    pub environment_variables: Option<HashMap<String, String>>,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ActionType {

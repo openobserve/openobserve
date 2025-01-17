@@ -209,37 +209,6 @@ pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, error
     Ok(records)
 }
 
-pub async fn update(action: &Action) -> Result<(), errors::Error> {
-    let id = action.id.ok_or(Error::Message("id not set".to_string()))?;
-    let record = ActiveModel {
-        id: Set(id.to_string()),
-        name: Set(action.name.clone()),
-        org_id: Set(action.org_id.to_string()),
-        file_path: Set(action
-            .zip_file_path
-            .clone()
-            .ok_or(Error::Message("file path not set".to_string()))?),
-        env: Set(serde_json::json!(action.environment_variables.clone())),
-        execution_details: Set(action.execution_details.clone()),
-        cron_expr: Set(action.cron_expr.clone()),
-        created_at: Set(action.created_at),
-        last_modified_at: Set(action.last_modified_at),
-        last_executed_at: Set(action.last_executed_at),
-        last_successful_at: Set(action.last_successful_at),
-        description: Set(action.description.clone()),
-        file_name: Set(action.zip_file_name.clone()),
-        created_by: Set(action.created_by.clone()),
-        status: Set(action.status.clone()),
-    };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update(record).exec(client).await?;
-
-    Ok(())
-}
 pub async fn contains(id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
