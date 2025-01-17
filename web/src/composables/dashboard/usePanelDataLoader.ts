@@ -1968,6 +1968,7 @@ export const usePanelDataLoader = (
       state.errorDetail = tempPanelCacheValue.errorDetail;
       state.metadata = tempPanelCacheValue.metadata;
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
+      state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
 
       // set that the cache is restored

@@ -26,6 +26,7 @@ import {
   getMetricMinMaxValue,
   getSeriesColor,
 } from "./colorPalette";
+import { getAnnotationsData } from "@/composables/dashboard/useAnnotationMarkline";
 
 let moment: any;
 let momentInitialized = false;
@@ -71,6 +72,7 @@ export const convertPromQLData = async (
   store: any,
   chartPanelRef: any,
   hoveredSeriesState: any,
+  annotations: any,
 ) => {
   // console.time("convertPromQLData");
 
@@ -162,6 +164,20 @@ export const convertPromQLData = async (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
+
+  const { markLines, markAreas } = getAnnotationsData(
+    annotations,
+    store.state.timezone,
+  );
+
+  const getSeriesMarkArea = () => {
+    return {
+      // itemStyle: {
+      //   color: "rgba(255, 173, 177, 0.4)",
+      // },
+      data: markAreas,
+    };
+  };
 
   const options: any = {
     backgroundColor: "transparent",
@@ -444,10 +460,11 @@ export const convertPromQLData = async (
                 ...seriesPropsBasedOnChartType,
                 // markLine if exist
                 markLine: {
-                  silent: true,
+                  silent: false,
                   animation: false,
-                  data: getMarkLineData(panelSchema),
+                  data: [...getMarkLineData(panelSchema), ...markLines],
                 },
+                markArea: getSeriesMarkArea(),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });

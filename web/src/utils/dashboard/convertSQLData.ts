@@ -1148,7 +1148,7 @@ export const convertSQLData = async (
 
   const getSeriesMarkLine = () => {
     return {
-      // silent: true,
+      silent: false,
       animation: false,
       data: [...getMarkLineData(panelSchema), ...markLines],
     };
