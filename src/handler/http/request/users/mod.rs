@@ -46,7 +46,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::{generate_presigned_url, UserEmail},
+        utils::auth::{generate_presigned_url, is_root_user, UserEmail},
     },
     service::users,
 };
@@ -336,6 +336,10 @@ pub async fn authentication(
         Err(_e) => {
             #[cfg(feature = "enterprise")]
             audit_unauthorized_error(audit_message).await;
+            // add check to lock root user
+            if is_root_user(&auth.name) {
+                // lock root user
+            }
             return unauthorized_error(resp);
         }
     };
