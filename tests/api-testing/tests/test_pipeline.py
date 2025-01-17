@@ -80,11 +80,11 @@ def test_pipeline_creation_and_action_realtime(create_session, base_url, pipelin
 
     # Enable or disable the pipeline based on the action parameter
     if action == "enable":
-        resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=True")
+        resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=true")
         assert resp_enable_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_enable_pipeline.status_code}"
         print(f"Pipeline {pipeline_id} enabled successfully.")
     elif action == "disable":
-        resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=False")
+        resp_enable_pipeline = session.put(f"{url}api/{org_id}/pipelines/{pipeline_id}/enable?value=false")
         assert resp_enable_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_enable_pipeline.status_code}"
         print(f"Pipeline {pipeline_id} disabled successfully.")
 
@@ -342,22 +342,6 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     resp_create_pipeline = session.post(f"{url}api/{org_id}/pipelines", json=pipeline_payload)
     assert resp_create_pipeline.status_code == expected_status, f"Expected status code {expected_status} but got {resp_create_pipeline.status_code}"
     print("Create pipeline response:", resp_create_pipeline.json())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 @pytest.mark.parametrize(
