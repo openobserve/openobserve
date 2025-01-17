@@ -1,21 +1,40 @@
 import { computed, ref, watch } from "vue";
 import { annotationService } from "../../services/dashboard_annotations";
 import useNotifications from "../useNotifications";
+import { useAnnotations } from "./useAnnotations";
 
 export const useAnnotationsData = (
   organization: any,
   dashboardId: any,
   panelId: string,
 ) => {
+  console.log("useAnnotationsData", organization, dashboardId, panelId);
+
+  // const { refreshAnnotations } = useAnnotations(
+  //   organization,
+  //   dashboardId,
+  //   panelId,
+  // );
   // show annotation button
   const isAddAnnotationMode = ref(false);
 
   // show add annotation dialog
   const isAddAnnotationDialogVisible = ref(false);
 
+  const isEditMode = ref(false);
+  const annotationToEdit = ref<any>(null);
+
   // selected timestamp
   const annotationStartTimestamp = ref<any>(null);
   const annotationEndTimestamp = ref<any>(null);
+
+  const annotations = ref<any[]>([]);
+
+  const {
+    showInfoNotification,
+    showPositiveNotification,
+    showErrorNotification,
+  } = useNotifications();
 
   const annotationDateString = computed<string>(() => {
     let timestampString = "";
@@ -30,6 +49,7 @@ export const useAnnotationsData = (
       timestampString +=
         " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
     }
+    console.log("timestampString", timestampString);
 
     return timestampString;
   });
@@ -65,76 +85,121 @@ export const useAnnotationsData = (
   // hide annotation dialog
   const hideAddAnnotationDialog = () => {
     isAddAnnotationDialogVisible.value = false;
+    isEditMode.value = false;
+    annotationToEdit.value = null;
   };
 
   const handleAddAnnotationButtonClick = () => {
     disableAddAnnotationMode();
+    isEditMode.value = false;
+    annotationToEdit.value = null;
     showAddAnnotationDialog();
   };
 
+  // Handle adding or editing annotation
   const handleAddAnnotation = (start: any, end: any) => {
+    console.log("handleAddAnnotation", start, end, annotations);
+    // Check for existing annotations at this timestamp
+    const existingAnnotation = annotations.value.find(
+      (a) => new Date(a.value).getTime() === new Date(start).getTime(),
+    );
+    console.log("existingAnnotation", existingAnnotation);
+
     annotationStartTimestamp.value = start;
     annotationEndTimestamp.value = end;
+    // check
+    if (existingAnnotation) {
+      // Open in edit mode
+      isEditMode.value = true;
+      annotationToEdit.value = existingAnnotation;
+    } else {
+      // Open in create mode
+      isEditMode.value = false;
+      annotationToEdit.value = null;
+    }
 
     showAddAnnotationDialog();
-  };
-
-  const { showInfoNotification } = useNotifications();
-
-  watch(isAddAnnotationMode, () => {
-    if (isAddAnnotationMode.value) {
-      // show a notification
-      showInfoNotification(
-        "Click on the chart data or select a range to add an annotation",
-        {},
-      );
-    }
-  });
-
-  /// =========================================================================================
-
-  const annotations = ref<any[]>([]);
-  const annotationMarkLines = ref<any[]>([]);
-  const currentStartTime = ref<number>(0);
-  const currentEndTime = ref<number>(0);
-
-  const updateTimeRange = (start: number, end: number) => {
-    currentStartTime.value = start;
-    currentEndTime.value = end;
   };
 
   const handleSaveAnnotation = async (annotationData: any) => {
+    console.log("Saving annotation:", annotationData);
     loading.value = true;
     error.value = null;
 
     try {
       const payload = {
-        annotation_id: annotationData.id || crypto.randomUUID(),
+        annotation_id: annotationData.id || crypto.randomUUID(), // Generate a temporary ID
         start_time: new Date(annotationData.value).getTime() * 1000,
-        end_time: null,
+        end_time: annotationData.endTime
+          ? new Date(annotationData.endTime).getTime() * 1000
+          : null,
         title: annotationData.name,
         text: annotationData.description || null,
         tags: annotationData.tags || [],
         panels: [panelId],
       };
 
-      await annotationService.create_timed_annotations(
+      // Save annotation and get the response
+      const response: any = await annotationService.create_timed_annotations(
         organization,
         dashboardId,
         [payload],
       );
 
+      console.log("Annotation created successfully", response);
+
+      showPositiveNotification("Annotation created successfully");
       closeAddAnnotation();
-      await refreshAnnotations(currentStartTime.value, currentEndTime.value);
+    } catch (err: any) {
+      console.error("Error saving annotation:", err);
+      error.value = err.message;
+      showErrorNotification("Failed to create annotation: " + err.message);
+    } finally {
+      loading.value = false;
+    }
+  };
+  // Update existing annotation
+  const handleUpdateAnnotation = async (annotationData: any) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const payload = {
+        annotation_id: annotationData.id,
+        start_time: new Date(annotationData.value).getTime() * 1000,
+        end_time: annotationData.endTime
+          ? new Date(annotationData.endTime).getTime() * 1000
+          : null,
+        title: annotationData.name,
+        text: annotationData.description || null,
+        tags: annotationData.tags || [],
+        panels: [panelId],
+      };
+
+      await annotationService.update_timed_annotations(
+        organization,
+        dashboardId,
+        [payload],
+      );
+
+      showPositiveNotification("Annotation updated successfully");
+      closeAddAnnotation();
+      // await refreshAnnotations(
+      //   new Date(annotationStartTimestamp.value).getTime() * 1000,
+      //   new Date(annotationEndTimestamp.value).getTime() * 1000,
+      // );
     } catch (err: any) {
       error.value = err.message;
-      console.error("Error saving annotation:", err);
+      showErrorNotification("Failed to update annotation: " + err.message);
+      console.error("Error updating annotation:", err);
     } finally {
       loading.value = false;
     }
   };
 
+  // Delete annotation
   const handleDeleteAnnotation = async (annotationId: string) => {
+    console.log("Deleting annotation:", annotationId);
     loading.value = true;
     error.value = null;
 
@@ -144,127 +209,45 @@ export const useAnnotationsData = (
         dashboardId,
         [annotationId],
       );
-      await refreshAnnotations(currentStartTime.value, currentEndTime.value);
+      console.log("Annotation deleted successfully");
+      showPositiveNotification("Annotation deleted successfully");
+      // await refreshAnnotations(
+      //   new Date(annotationStartTimestamp.value).getTime() * 1000,
+      //   new Date(annotationEndTimestamp.value).getTime() * 1000,
+      // );
     } catch (err: any) {
-      error.value = err.message;
       console.error("Error removing annotation:", err);
+      error.value = err.message;
+      showErrorNotification("Failed to delete annotation: " + err.message);
     } finally {
       loading.value = false;
+      console.log("Loading state set to false after delete annotation");
     }
   };
 
+  // Dialog close handler
   const closeAddAnnotation = () => {
     isAddAnnotationDialogVisible.value = false;
     isAddAnnotationMode.value = false;
+    isEditMode.value = false;
+    annotationToEdit.value = null;
   };
 
-  const getLabelFormatter = (name: string) => ({
-    formatter: name ? "{b}:{c}" : "{c}",
-    position: "insideEndTop",
-  });
-
-  const getConfigMarkLines = (config: any) => {
-    if (!config?.mark_line?.length) return [];
-    return config.mark_line.map((markLine: any) => ({
-      symbol: ["none", "none"],
-      name: markLine.name,
-      type: markLine.type,
-      xAxis: markLine.type === "xAxis" ? markLine.value : null,
-      yAxis: markLine.type === "yAxis" ? markLine.value : null,
-      label: getLabelFormatter(markLine.name),
-    }));
-  };
-
-  const changeFormatOfDateTime = (timestamp: any) => {
-    const date = new Date(timestamp / 1000);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
-
-  watch(
-    () => annotations.value,
-    () => {
-      annotationMarkLines.value =
-        annotations?.value?.map((annotation) => ({
-          symbol: ["none", "none"],
-          name: annotation.name,
-          type: annotation.type,
-          xAxis:
-            annotation.type === "xAxis"
-              ? changeFormatOfDateTime(annotation.value)
-              : null,
-          yAxis:
-            annotation.type === "yAxis"
-              ? changeFormatOfDateTime(annotation.value)
-              : null,
-          label: getLabelFormatter(annotation.name),
-        })) ?? [];
-    },
-    {
-      deep: true,
-    },
-  );
-
-  const getCombinedMarkLines = (panelSchema: any) => {
-    try {
-      const configMarkLines = getConfigMarkLines(panelSchema?.config || {});
-      const uniqueLines = new Set<string>();
-      const combinedMarkLines = [...configMarkLines];
-
-      annotationMarkLines.value.forEach((annotationLine) => {
-        const key = `${annotationLine.name}-${annotationLine.xAxis}-${annotationLine.yAxis}`;
-        if (!uniqueLines.has(key)) {
-          uniqueLines.add(key);
-          combinedMarkLines.push(annotationLine);
-        }
-      });
-
-      return combinedMarkLines;
-    } catch (error) {
-      console.error("Error combining mark lines:", error);
-      return [];
-    }
-  };
-
-  const refreshAnnotations = async (start_time: number, end_time: number) => {
-    loading.value = true;
-    error.value = null;
-
-    try {
-      const response = await annotationService.get_timed_annotations(
-        organization,
-        dashboardId,
-        {
-          panels: [panelId],
-          start_time,
-          end_time,
-        },
+  // Watch for annotation mode to show notification
+  watch(isAddAnnotationMode, () => {
+    if (isAddAnnotationMode.value) {
+      showInfoNotification(
+        "Click on the chart data or select a range to add an annotation",
+        {},
       );
-
-      annotations.value = response.data.map((item: any) => ({
-        id: item.annotation_id,
-        name: item.title,
-        description: item.text || "",
-        value: item.start_time,
-        type: "xAxis",
-      }));
-    } catch (err: any) {
-      error.value = err.message;
-      console.error("Error fetching annotations:", err);
-    } finally {
-      loading.value = false;
     }
-  };
+  });
 
   return {
     isAddAnnotationMode,
     isAddAnnotationDialogVisible,
+    isEditMode,
+    annotationToEdit,
     annotationStartTimestamp,
     annotationEndTimestamp,
     annotationDateString,
@@ -280,10 +263,8 @@ export const useAnnotationsData = (
     handleAddAnnotation,
     handleAddAnnotationButtonClick,
     handleSaveAnnotation,
+    handleUpdateAnnotation,
     handleDeleteAnnotation,
     closeAddAnnotation,
-    refreshAnnotations,
-    updateTimeRange,
-    getCombinedMarkLines,
   };
 };

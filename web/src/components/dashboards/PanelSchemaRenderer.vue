@@ -130,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="allowAnnotationsAdd"
-        class="annotation-button-container"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9999999;"
+        style="position: absolute; top: 0px; right: 0px; z-index: 9999999"
         @click.stop
       >
         <q-btn
@@ -143,7 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleAddAnnotationMode"
         >
           <q-tooltip anchor="top middle" self="bottom right">
-            {{ isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations" }}
+            {{
+              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
+            }}
           </q-tooltip>
         </q-btn>
       </div>
@@ -303,7 +304,7 @@ export default defineComponent({
       default: false,
       required: false,
       type: Boolean,
-    }
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -340,7 +341,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
-      allowAnnotationsAdd
+      allowAnnotationsAdd,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -375,11 +376,12 @@ export default defineComponent({
       toggleAddAnnotationMode,
       handleAddAnnotation,
       handleSaveAnnotation,
+      handleUpdateAnnotation,
       handleDeleteAnnotation,
       closeAddAnnotation,
     } = useAnnotationsData(
       store.state.selectedOrganization?.identifier,
-      dashboardId,
+      dashboardId.value,
       panelSchema.value.id,
     );
 
@@ -692,14 +694,24 @@ export default defineComponent({
     let drilldownParams: any = [];
 
     const handleSave = async (formData: any) => {
+      console.log("Saving/updating annotation with form data:", formData);
       try {
-        await handleSaveAnnotation(formData);
+        if (formData.id) {
+          console.log("Updating annotation with id:", formData.id);
+          await handleUpdateAnnotation(formData);
+        } else {
+          console.log("Saving a new annotation");
+          await handleSaveAnnotation(formData);
+        }
+        console.log("Annotation saved/updated successfully");
       } catch (error) {
-        console.error("Failed to save annotation:", error);
+        console.error("Failed to save/update annotation:", error);
       }
     };
 
     const handleRemove = async (annotationId: string) => {
+      console.log("Deleting annotation with id:", annotationId);
+
       try {
         await handleDeleteAnnotation(annotationId);
       } catch (error) {
@@ -710,8 +722,11 @@ export default defineComponent({
     const onChartClick = async (params: any, ...args: any) => {
       console.log("Chart clicked with params:", params);
 
-      if(allowAnnotationsAdd.value && isAddAnnotationMode.value) {
-        handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
+      if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
+        handleAddAnnotation(
+          params?.data?.[0] || params?.data?.time || params?.data?.name,
+          null,
+        );
       }
 
       if (
@@ -1324,8 +1339,5 @@ export default defineComponent({
   top: 20%;
   width: 100%;
   text-align: center;
-}
-.annotation-button-container {
-  
 }
 </style>

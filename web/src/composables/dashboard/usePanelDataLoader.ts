@@ -1147,6 +1147,7 @@ export const usePanelDataLoader = (
                     endISOTimestamp,
                   );
                   state.annotations = annotationList;
+                  console.log("loadData: annotations---", annotationList);
 
                   // need to break the loop, save the cache
                   saveCurrentStateToCache();
@@ -1191,7 +1192,12 @@ export const usePanelDataLoader = (
               };
 
               state.metadata.queries[panelQueryIndex] = metadata;
-
+              const annotations = await refreshAnnotations(
+                Number(startISOTimestamp),
+                Number(endISOTimestamp),
+              );
+              state.annotations = annotations;
+              console.log("loadData: annotations", annotations);
               if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,
@@ -1214,11 +1220,12 @@ export const usePanelDataLoader = (
                 );
               }
 
-              const annotations = await refreshAnnotations(
-                Number(startISOTimestamp),
-                Number(endISOTimestamp),
-              );
-              state.annotations = annotations;
+              // const annotations = await refreshAnnotations(
+              //   Number(startISOTimestamp),
+              //   Number(endISOTimestamp),
+              // );
+              // state.annotations = annotations;
+              // console.log("loadData: annotations", annotations);
               saveCurrentStateToCache();
             }
           }
