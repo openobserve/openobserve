@@ -126,7 +126,7 @@ const onExternalDestinationClick = (data,event,id) =>{
   const dataToOpen  =    
   {
     label: "Remote",
-    subtype: "remote_output",
+    subtype: "remote_stream",
     io_type: "output",
     icon: "img:" + externalOutputImage,
     tooltip: "Destination: Remote Node",
@@ -441,7 +441,7 @@ function getIcon(data, ioType) {
       </div>
     </div>
     <div
-      v-if="data.node_type == 'remote_output'"
+      v-if="data.node_type == 'remote_stream'"
       :class="`o2vf_node_${io_type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="

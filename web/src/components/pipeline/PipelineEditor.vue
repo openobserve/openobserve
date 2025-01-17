@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @cancel:hideform="resetDialog"
       />
       <ExternalDestination
-        v-if="pipelineObj.dialog.name === 'remote_output'"
+        v-if="pipelineObj.dialog.name === 'remote_stream'"
         @cancel:hideform="resetDialog"
        />
       
@@ -348,7 +348,7 @@ const nodeTypes: any = [
   },
   {
     label: "Remote",
-    subtype: "remote_output",
+    subtype: "remote_stream",
     io_type: "output",
     icon: "img:" + externalOutputImage,
     tooltip: "Destination: External Destination Node",

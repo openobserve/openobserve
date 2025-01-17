@@ -417,7 +417,7 @@ const getDestinations = () => {
 const saveDestination = () => {
   const destinationData = {
     destination_name: selectedDestination.value.value,
-    node_type: "remote_output",
+    node_type: "remote_stream",
     io_type: "output",
   };
   if (!selectedDestination.value) {
