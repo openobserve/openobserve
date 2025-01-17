@@ -134,6 +134,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
       >
         <q-btn
+          v-if="
+            [
+              'area',
+              'area-stacked',
+              'bar',
+              'h-bar',
+              'line',
+              'scatter',
+              'stacked',
+              'h-stacked',
+            ].includes(panelSchema.type)
+          "
           color="primary"
           :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
           round
@@ -186,8 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Annotation Dialog -->
-      <AddAnnotation v-if="isAddAnnotationDialogVisible" :dashboardId="dashboardId" :annotation="annotationToAddEdit"
-        @close="closeAddAnnotation" />
+      <AddAnnotation
+        v-if="isAddAnnotationDialogVisible"
+        :dashboardId="dashboardId"
+        :annotation="annotationToAddEdit"
+        @close="closeAddAnnotation"
+      />
     </div>
   </div>
 </template>
@@ -726,14 +742,20 @@ export default defineComponent({
         }
 
         // check if it is markline or markarea component click, than handle it differently
-        if (allowAnnotationsAdd.value && (params?.componentType == "markLine" || params?.componentType == "markArea")) {
-          console.log('markline or markarea click', params?.data?.annotationDetails);
+        if (
+          allowAnnotationsAdd.value &&
+          (params?.componentType == "markLine" ||
+            params?.componentType == "markArea")
+        ) {
+          console.log(
+            "markline or markarea click",
+            params?.data?.annotationDetails,
+          );
 
           editAnnotation(params?.data?.annotationDetails);
           return;
         }
       }
-
 
       if (
         !panelSchema.value.config.drilldown ||
