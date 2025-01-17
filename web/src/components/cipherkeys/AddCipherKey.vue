@@ -171,7 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="openCancelDialog"
         />
         <q-btn
-          :disable="(step === 1 && isUpdatingCipherKey == false) || isSubmitting"
+          :disable="
+            (step === 1 && isUpdatingCipherKey == false) || isSubmitting
+          "
           data-test="add-cipher-key-save-btn"
           :label="t('common.save')"
           class="text-bold no-border q-ml-md"
@@ -316,7 +318,8 @@ const setupTemplateData = () => {
         .catch((error) => {
           $q.notify({
             type: "negative",
-            message: error.response.data.message || "Error fetching cipher key.",
+            message:
+              error.response.data.message || "Error fetching cipher key.",
           });
         });
     }
@@ -370,12 +373,57 @@ const createCipherKey = () => {
     });
 };
 
+function filterEditedAttributes(formdata: any, originalData: any) {
+  const result = {};
+
+  for (const key in formdata) {
+    const formValue = formdata[key];
+    const originalValue = originalData[key];
+
+    if (originalValue === undefined) {
+      // New attribute in formdata, keep it
+      result[key] = formValue;
+    } else if (
+      typeof formValue === "object" &&
+      formValue !== null &&
+      !Array.isArray(formValue)
+    ) {
+      // Recursively process nested objects
+      const nestedResult = filterEditedAttributes(formValue, originalValue);
+      if (Object.keys(nestedResult).length > 0) {
+        result[key] = nestedResult;
+      }
+    } else if (formValue !== originalValue) {
+      // Edited attribute, keep it
+      result[key] = formValue;
+    }
+  }
+
+  return result;
+}
+
 const updateCipherKey = () => {
   isSubmitting.value = true;
   const dismiss = $q.notify({
     spinner: true,
     message: "Please wait while processing your request...",
   });
+
+  if (JSON.stringify(formData.value) == originalData.value) {
+    dismiss();
+    $q.notify({
+      type: "positive",
+      message: "No changes detected",
+    });
+    emit("cancel:hideform");
+    return;
+  }
+
+  const editedData = filterEditedAttributes(
+    formData.value,
+    JSON.parse(originalData.value),
+  );
+
   CipherKeysService.update(
     store.state.selectedOrganization.identifier,
     formData.value,
