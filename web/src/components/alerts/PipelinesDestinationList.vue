@@ -253,12 +253,12 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
+          dst_type: "remote_pipeline",
         })
         .then((res) => {
-          res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "external_destination"
-          );
+          // res.data = res.data.filter(
+          //   (destination: any) => destination.type == "external_destination",
+          // );
           resultTotal.value = res.data.length;
           destinations.value = res.data.map((data: any, index: number) => ({
             ...data,
