@@ -8,7 +8,6 @@ export const annotationService = {
   ) => {
     // Construct the request payload
     const data: any = {
-      dashboard_id,
       timed_annotations: annotations.map((annotation) => ({
         annotation_id: crypto.randomUUID(),
         ...annotation,
@@ -16,7 +15,7 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().post(`/api/${org_id}/annotations`, data, {
+    return http().post(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
       headers: {
         "Content-Type": "application/json; charset=UTF-8",
       },
@@ -30,7 +29,6 @@ export const annotationService = {
   ) => {
     // Construct the request payload
     const data: any = {
-      dashboard_id,
       timed_annotations: annotations.map((annotation) => ({
         ...annotation,
         // Ensure annotation_id is preserved and not regenerated
@@ -39,7 +37,7 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().put(`/api/${org_id}/annotations`, data, {
+    return http().put(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
       headers: {
         "Content-Type": "application/json; charset=UTF-8",
       },
@@ -51,10 +49,9 @@ export const annotationService = {
     dashboardId: string,
     annotationIds: string[],
   ) => {
-    return http().delete(`/api/${organization}/annotations`, {
+    return http().delete(`/api/${organization}/dashboards/${dashboardId}/annotations`, {
       data: {
         annotation_ids: annotationIds,
-        dashboard_id: dashboardId,
       },
     });
   },
@@ -75,13 +72,12 @@ export const annotationService = {
 
     // Construct query parameters
     const queryParams = {
-      dashboard_id,
       panels: formattedPanels,
       start_time: params.start_time,
       end_time: params.end_time,
     };
 
     // Make the API call
-    return http().get(`/api/${org_id}/annotations`, { params: queryParams });
+    return http().get(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, { params: queryParams });
   },
 };
