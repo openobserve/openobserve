@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="openCancelDialog"
         />
         <q-btn
-          :disable="step === 1"
+          :disable="step === 1 || !isUpdatingCipherKey"
           data-test="add-cipher-key-save-btn"
           :label="t('common.save')"
           class="text-bold no-border q-ml-md"
@@ -265,6 +265,8 @@ const dialog = ref({
 
 onActivated(() => setupTemplateData());
 onBeforeMount(() => {
+  formData.value["isUpdate"] = isUpdatingCipherKey;
+  originalData.value = JSON.stringify(formData.value);
   setupTemplateData();
 });
 
@@ -388,7 +390,7 @@ const goToCipherList = () => {
   emit("cancel:hideform");
 };
 
-const validateForm = async (stepNumber) => {
+const validateForm = async (stepNumber: number) => {
   // Validate form and expand steps with errors
   let isValid = await addCipherKeyFormRef.value.validate();
 
