@@ -1141,7 +1141,7 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let (timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
+    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
         .iter()
         .flat_map(|batch| {
             let ts = batch
@@ -1158,9 +1158,12 @@ async fn selector_load_data_from_datafusion(
                 .unwrap();
             ts.iter()
                 .zip(hash.iter())
-                .map(|(t, h)| (lit(t.unwrap()), h.unwrap().to_string()))
+                .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").to_string()))
         })
         .unzip();
+    timestamp_values.sort();
+    timestamp_values.dedup();
+    let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
 
     let series = df_group
         .clone()
