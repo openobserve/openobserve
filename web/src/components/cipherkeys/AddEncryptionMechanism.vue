@@ -63,21 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 
-interface FormData {
-  key: {
-    mechanism: {
-      type: string;
-      simple_algorithm?: string;
-    };
-  };
-}
 export default defineComponent({
   name: "PageAddEncryptionMechanism",
   props: {
-    formData: {
-      type: Object as PropType<FormData>,
-      required: true,
-    },
+    formData: Object,
   },
   setup(props: any) {
     const { t } = useI18n();
