@@ -84,7 +84,10 @@ export const useAnnotationsData = (
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
       // show a notification
-      showInfoNotification("Click on the chart data or select a range to add an annotation", {});
+      showInfoNotification(
+        "Click on the chart data or select a range to add an annotation",
+        {},
+      );
     }
   });
 
@@ -98,20 +101,6 @@ export const useAnnotationsData = (
   const updateTimeRange = (start: number, end: number) => {
     currentStartTime.value = start;
     currentEndTime.value = end;
-  };
-
-  const handleChartClickForAnnotationOld = (params: any) => {
-    if (params) {
-      const clickedTimestamp = params[0] || params.time || params.name;
-
-      if (clickedTimestamp) {
-        const date = new Date(clickedTimestamp);
-        selectedTimestamp.value = date
-          .toLocaleString("sv-SE")
-          .replace("T", " ");
-        isAddAnnotationMode.value = true;
-      }
-    }
   };
 
   const handleSaveAnnotation = async (annotationData: any) => {
