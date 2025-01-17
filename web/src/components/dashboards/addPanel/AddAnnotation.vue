@@ -3,51 +3,23 @@
     <q-card style="min-width: 500px">
       <q-card-section class="q-pa-md">
         <div class="text-h6">
-          {{ annotationData.id ? "Edit" : "Add" }} Annotation
+          {{ isEditMode ? "Edit" : "Add" }} Annotation
         </div>
       </q-card-section>
       <q-card-section class="q-pa-md">
-        <q-input
-          v-model="annotationData.name"
-          label="Title"
-          dense
-          outlined
-          clearable
-          style="margin-bottom: 16px"
-          :rules="[(val) => !!val || 'Field is required!']"
-        />
-        <q-input
-          v-model="annotationData.description"
-          label="Description"
-          dense
-          outlined
-          clearable
-          type="textarea"
-          :rows="3"
-        />
-        <div class="text-caption q-mt-sm">Timestamp: {{ dateString }}</div>
-        <div
-          v-if="duplicateAnnotations.length > 0"
-          class="text-caption text-warning q-mt-sm"
-        >
-          Note: There are existing annotations at this timestamp
-        </div>
+        <q-input v-model="annotationData.title" label="Title" dense outlined clearable style="margin-bottom: 16px"
+          :rules="[(val) => !!val || 'Field is required!']" />
+        <q-input v-model="annotationData.text" label="Description" dense outlined clearable type="textarea" :rows="3" />
+        <div class="text-caption q-mt-sm">Timestamp: {{ annotationDateString }}</div>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat label="Cancel" @click="handleClose" />
-        <q-btn
-          v-if="annotationData.id"
-          color="negative"
-          label="Delete"
-          @click="handleDeleteWithConfirm"
-        />
-        <q-btn
-          color="primary"
-          :label="annotationData.id ? 'Update' : 'Save'"
-          @click="handleSave"
-          :loading="saving"
-          :disable="saving || !annotationData.name"
-        />
+        <div class="tw-w-full tw-flex">
+          <q-btn v-if="annotationData.annotation_id" color="negative" label="Delete" @click="handleDeleteWithConfirm" />
+          <div class="tw-flex-1"></div>
+          <q-btn flat label="Cancel" @click="handleClose" />
+          <q-btn color="primary" :label="annotationData.id ? 'Update' : 'Save'" @click="saveAnnotation.execute()"
+            :loading="saveAnnotation.isLoading?.value" :disable="!annotationData.title" />
+        </div>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -61,101 +33,127 @@
         Are you sure you want to delete this annotation?
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat label="Cancel" v-close-popup />
-        <q-btn color="negative" label="Delete" @click="confirmDelete" />
+        <q-btn flat label="Cancel" v-close-popup :loading="deleteAnnotation.isLoading.value" />
+        <q-btn color="negative" label="Delete" :loading="deleteAnnotation.isLoading.value"
+          @click="deleteAnnotation.execute()" />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup>
+import { useLoading } from "@/composables/useLoading";
+import { annotationService } from "@/services/dashboard_annotations";
 import { ref, onMounted, computed, watch } from "vue";
+import { useStore } from "vuex";
 
 const props = defineProps({
-  startTime: {
-    type: Date,
-    required: true,
-  },
-  endTime: {
-    type: Date,
-    required: false,
-  },
-  dateString: {
+  dashboardId: {
     type: String,
-    required: false,
+    required: true
   },
-  existingAnnotation: {
-    type: String,
+  annotation: {
+    type: Object,
     default: null,
+    required: false
   },
 });
-console.log("props", props.existingAnnotation);
+console.log("props", props.annotation);
 
 const emit = defineEmits(["save", "remove", "close", "update"]);
 
+const store = useStore()
+
 const isOpen = ref(true);
-const saving = ref(false);
 const showDeleteConfirm = ref(false);
 
-const annotationData = ref({
-  id: null,
-  name: "",
-  description: "",
-  type: "xAxis",
-  value: props.startTime,
+const annotationData = ref(props.annotation || {
+  annotation_id: null,
+  title: "",
+  text: "",
+  start_time: null,
+  end_time: null,
+  tags: [],
+  panels: [],
 });
 
-watch(
-  () => props.existingAnnotation,
-  (newVal) => {
-    if (newVal) {
-      annotationData.value = {
-        ...annotationData.value,
-        id: newVal.id,
-        name: newVal.name,
-        description: newVal.description,
-        value: newVal.value,
-      };
-    }
-  },
-  { immediate: true },
-);
+watch(() => props.annotation, (newVal) => {
+  if (newVal) {
+    annotationData.value = newVal;
+  }
+});
 
-const duplicateAnnotations = computed(() => []);
+console.log("annotationData", props.annotation);
+
+const isEditMode = computed(() => !!annotationData?.value?.annotation_id);
+
+const annotationDateString = computed(() => {
+  let timestampString = "";
+
+  const start = annotationData?.value?.start_time;
+  const end = annotationData?.value?.end_time;
+
+  if (start) {
+    const startDate = new Date(start / 1000);
+    timestampString += startDate.toLocaleString("sv-SE").replace("T", " ");
+  }
+
+  if (end) {
+    const endDate = new Date(end / 1000);
+    timestampString += " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
+  }
+
+  console.log("timestampString", timestampString);
+
+  return timestampString;
+});
 
 const handleClose = () => {
   isOpen.value = false;
   emit("close");
 };
 
+const organization = store.state.selectedOrganization.identifier
+
 const handleSave = async () => {
-  if (annotationData?.value?.name?.trim()) {
-    saving.value = true;
-    try {
-      if (annotationData.value.id) {
-        emit("update", {
-          ...annotationData.value,
-          endTime: props.endTime,
-        });
-      } else {
-        emit("save", {
-          ...annotationData.value,
-          endTime: props.endTime,
-        });
-      }
-    } finally {
-      saving.value = false;
+  if (annotationData?.value?.title?.trim()) {
+
+    if (isEditMode.value) {
+      // update annotation
+      const response = await annotationService.update_timed_annotations(
+        organization,
+        props.dashboardId,
+        [annotationData.value],
+      );
+    } else {
+      // create annotation
+      const response = await annotationService.create_timed_annotations(
+        organization,
+        props.dashboardId,
+        [annotationData.value],
+      );
     }
+
+    handleClose()
   }
 };
+
 
 const handleDeleteWithConfirm = () => {
   showDeleteConfirm.value = true;
 };
 
-const confirmDelete = () => {
-  emit("remove", annotationData.value.id);
-  showDeleteConfirm.value = false;
-  handleClose();
+const confirmDelete = async () => {
+  await annotationService.delete_timed_annotations(
+    organization,
+    props.dashboardId,
+    [annotationData.value.annotation_id],
+  );
+
+  handleClose()
 };
+
+const saveAnnotation = useLoading(handleSave);
+const deleteAnnotation = useLoading(confirmDelete);
+
 </script>

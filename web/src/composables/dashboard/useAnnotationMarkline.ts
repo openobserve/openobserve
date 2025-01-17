@@ -1,3 +1,5 @@
+import { toZonedTime } from "date-fns-tz";
+
 const changeFormatOfDateTime = (timestamp: any) => {
   const date = new Date(timestamp / 1000);
   const year = date.getFullYear();
@@ -10,7 +12,7 @@ const changeFormatOfDateTime = (timestamp: any) => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-export const getAnnotationsData = (annotations: any) => {
+export const getAnnotationsData = (annotations: any, timezone: string) => {
   const markLines: any = [];
   const markAreas: any = [];
 
@@ -19,10 +21,10 @@ export const getAnnotationsData = (annotations: any) => {
       markAreas.push([
         {
           name: annotation.title,
-          xAxis: changeFormatOfDateTime(annotation.start_time),
+          xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
         },
         {
-          xAxis: changeFormatOfDateTime(annotation.end_time),
+          xAxis: toZonedTime(new Date(annotation.end_time / 1000), timezone),
         },
       ]);
     } else if (annotation.start_time) {
@@ -35,6 +37,7 @@ export const getAnnotationsData = (annotations: any) => {
           formatter: annotation.title ? "{b}:{c}" : "{c}",
           position: "insideEndTop",
         },
+        annotationDetails: annotation,
       });
     }
   });

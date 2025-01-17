@@ -1143,35 +1143,12 @@ export const convertSQLData = async (
 
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
-  const getAnnotationsMarklines = () => {
-    console.log("annotations", annotations.value);
 
-    return (
-      annotations?.value?.map((annotation: any) => ({
-        symbol: ["none", "none"],
-        name: annotation.name,
-        type: annotation.type,
-        xAxis:
-          annotation.type === "xAxis"
-            ? changeFormatOfDateTime(annotation.value)
-            : null,
-        yAxis:
-          annotation.type === "yAxis"
-            ? changeFormatOfDateTime(annotation.value)
-            : null,
-        label: {
-          formatter: annotation.name ? "{b}:{c}" : "{c}",
-          position: "insideEndTop",
-        },
-      })) ?? []
-    );
-  };
-
-  const { markLines, markAreas } = getAnnotationsData(annotations);
+  const { markLines, markAreas } = getAnnotationsData(annotations, store.state.timezone);
 
   const getSeriesMarkLine = () => {
     return {
-      silent: true,
+      // silent: true,
       animation: false,
       data: [...getMarkLineData(panelSchema), ...markLines],
     };
@@ -1179,9 +1156,9 @@ export const convertSQLData = async (
 
   const getSeriesMarkArea = () => {
     return {
-      itemStyle: {
-        color: "rgba(255, 173, 177, 0.4)",
-      },
+      // itemStyle: {
+      //   color: "rgba(255, 173, 177, 0.4)",
+      // },
       data: markAreas,
     };
   };
@@ -2162,6 +2139,8 @@ export const convertSQLData = async (
           });
         }
       });
+
+      console.log("options.series", options?.series)
 
       // Trellis has multiple x axis
       if (panelSchema.config.trellis?.layout) {

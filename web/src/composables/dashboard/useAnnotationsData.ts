@@ -22,7 +22,7 @@ export const useAnnotationsData = (
   const isAddAnnotationDialogVisible = ref(false);
 
   const isEditMode = ref(false);
-  const annotationToEdit = ref<any>(null);
+  const annotationToAddEdit = ref<any>(null);
 
   // selected timestamp
   const annotationStartTimestamp = ref<any>(null);
@@ -35,24 +35,6 @@ export const useAnnotationsData = (
     showPositiveNotification,
     showErrorNotification,
   } = useNotifications();
-
-  const annotationDateString = computed<string>(() => {
-    let timestampString = "";
-
-    if (annotationStartTimestamp.value) {
-      const startDate = new Date(annotationStartTimestamp.value);
-      timestampString += startDate.toLocaleString("sv-SE").replace("T", " ");
-    }
-
-    if (annotationEndTimestamp.value) {
-      const endDate = new Date(annotationEndTimestamp.value);
-      timestampString +=
-        " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
-    }
-    console.log("timestampString", timestampString);
-
-    return timestampString;
-  });
 
   // loading state
   const loading = ref(false);
@@ -86,37 +68,28 @@ export const useAnnotationsData = (
   const hideAddAnnotationDialog = () => {
     isAddAnnotationDialogVisible.value = false;
     isEditMode.value = false;
-    annotationToEdit.value = null;
+    annotationToAddEdit.value = null;
   };
 
   const handleAddAnnotationButtonClick = () => {
     disableAddAnnotationMode();
     isEditMode.value = false;
-    annotationToEdit.value = null;
+    annotationToAddEdit.value = null;
     showAddAnnotationDialog();
   };
 
   // Handle adding or editing annotation
   const handleAddAnnotation = (start: any, end: any) => {
     console.log("handleAddAnnotation", start, end, annotations);
-    // Check for existing annotations at this timestamp
-    const existingAnnotation = annotations.value.find(
-      (a) => new Date(a.value).getTime() === new Date(start).getTime(),
-    );
-    console.log("existingAnnotation", existingAnnotation);
 
-    annotationStartTimestamp.value = start;
-    annotationEndTimestamp.value = end;
-    // check
-    if (existingAnnotation) {
-      // Open in edit mode
-      isEditMode.value = true;
-      annotationToEdit.value = existingAnnotation;
-    } else {
-      // Open in create mode
-      isEditMode.value = false;
-      annotationToEdit.value = null;
-    }
+    annotationToAddEdit.value = {
+      start_time: start ? Math.trunc(start * 1000) : null,
+      end_time: end ? Math.trunc(end * 1000) : null,
+      title: "",
+      text: "",
+      tags: [],
+      panels: [panelId],
+    };
 
     showAddAnnotationDialog();
   };
@@ -158,6 +131,12 @@ export const useAnnotationsData = (
       loading.value = false;
     }
   };
+
+  const editAnnotation = (annotation: any) => {
+    annotationToAddEdit.value = annotation;
+    showAddAnnotationDialog();
+  };
+
   // Update existing annotation
   const handleUpdateAnnotation = async (annotationData: any) => {
     loading.value = true;
@@ -230,7 +209,7 @@ export const useAnnotationsData = (
     isAddAnnotationDialogVisible.value = false;
     isAddAnnotationMode.value = false;
     isEditMode.value = false;
-    annotationToEdit.value = null;
+    annotationToAddEdit.value = null;
   };
 
   // Watch for annotation mode to show notification
@@ -247,14 +226,12 @@ export const useAnnotationsData = (
     isAddAnnotationMode,
     isAddAnnotationDialogVisible,
     isEditMode,
-    annotationToEdit,
-    annotationStartTimestamp,
-    annotationEndTimestamp,
-    annotationDateString,
+    annotationToAddEdit,
     annotations,
     loading,
     error,
     addAnnotationbuttonStyle,
+    editAnnotation,
     enableAddAnnotationMode,
     disableAddAnnotationMode,
     toggleAddAnnotationMode,

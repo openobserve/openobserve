@@ -186,15 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Annotation Dialog -->
-      <AddAnnotation
-        v-if="isAddAnnotationDialogVisible"
-        :startTime="annotationStartTimestamp"
-        :endTime="annotationEndTimestamp"
-        :dateString="annotationDateString"
-        @save="handleSave"
-        @remove="handleRemove"
-        @close="closeAddAnnotation"
-      />
+      <AddAnnotation v-if="isAddAnnotationDialogVisible" :dashboardId="dashboardId" :annotation="annotationToAddEdit"
+        @close="closeAddAnnotation" />
     </div>
   </div>
 </template>
@@ -367,12 +360,11 @@ export default defineComponent({
     );
 
     const {
-      annotationStartTimestamp,
-      annotationEndTimestamp,
-      annotationDateString,
       addAnnotationbuttonStyle,
       isAddAnnotationMode,
       isAddAnnotationDialogVisible,
+      annotationToAddEdit,
+      editAnnotation,
       toggleAddAnnotationMode,
       handleAddAnnotation,
       handleSaveAnnotation,
@@ -482,7 +474,7 @@ export default defineComponent({
             errorDetail.value = "";
           } catch (error: any) {
             console.error("error", error);
-            
+
             errorDetail.value = error.message;
           }
         } else {
@@ -535,7 +527,7 @@ export default defineComponent({
         // default behavior
         emit("updated:data-zoom", event);
         dataZoomEventDataTempStorage.value = null;
-        
+
       }
     };
 
@@ -641,7 +633,7 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {      
+    watch(errorDetail, () => {
       //check if there is an error message or not
       if (!errorDetail.value) return;
       emit("error", errorDetail);
@@ -722,12 +714,26 @@ export default defineComponent({
     const onChartClick = async (params: any, ...args: any) => {
       console.log("Chart clicked with params:", params);
 
-      if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
-        handleAddAnnotation(
-          params?.data?.[0] || params?.data?.time || params?.data?.name,
-          null,
-        );
+      // check for annotations add mode
+      if (allowAnnotationsAdd.value) {
+
+        if (isAddAnnotationMode.value) {
+          handleAddAnnotation(
+            params?.data?.[0] || params?.data?.time || params?.data?.name,
+            null,
+          );
+          return;
+        }
+
+        // check if it is markline or markarea component click, than handle it differently
+        if (allowAnnotationsAdd.value && (params?.componentType == "markLine" || params?.componentType == "markArea")) {
+          console.log('markline or markarea click', params?.data?.annotationDetails);
+
+          editAnnotation(params?.data?.annotationDetails);
+          return;
+        }
       }
+
 
       if (
         !panelSchema.value.config.drilldown ||
@@ -792,7 +798,7 @@ export default defineComponent({
         hidePopupsAndOverlays();
       }
     };
-    
+
     const { showErrorNotification } = useNotifications();
 
     let parser: any;
@@ -867,8 +873,8 @@ export default defineComponent({
     ): string => {
       let whereClause = ast?.where
         ? parser
-            .sqlify({ type: "select", where: ast.where })
-            .slice("SELECT".length)
+          .sqlify({ type: "select", where: ast.where })
+          .slice("SELECT".length)
         : "";
 
       if (breakdownColumn && breakdownValue) {
@@ -952,10 +958,10 @@ export default defineComponent({
           if (!parser) {
             await importSqlParser();
           }
-          
+
           const ast = await parseQuery(originalQuery, parser);
           if (!ast) return;
-          
+
           const tableAliases = ast.from
             ?.filter((fromEntry: any) => fromEntry.as)
             .map((fromEntry: any) => fromEntry.as);
@@ -963,7 +969,7 @@ export default defineComponent({
           const aliasClause = tableAliases?.length
             ? ` AS ${tableAliases.join(", ")}`
             : "";
-            
+
           const breakdownColumn = breakdown[0]?.column;
           const breakdownValue = drilldownParams[0]?.seriesName;
           const whereClause = buildWhereClause(
@@ -985,8 +991,8 @@ export default defineComponent({
           const currentUrl =
             pos > -1
               ? window.location.origin +
-                window.location.pathname.slice(0, pos) +
-                "/web"
+              window.location.pathname.slice(0, pos) +
+              "/web"
               : window.location.origin;
 
           const logsUrl = constructLogsUrl(
@@ -1043,8 +1049,8 @@ export default defineComponent({
           "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
           metadata?.value?.queries[0]?.query ??
-            panelSchema?.value?.queries[0]?.query ??
-            "",
+          panelSchema?.value?.queries[0]?.query ??
+          "",
         );
 
         // if chart type is 'table' then we need to pass the table name
@@ -1110,7 +1116,7 @@ export default defineComponent({
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
               drilldownData.targetBlank ? "_blank" : "_self",
             );
-          } catch (error) {}
+          } catch (error) { }
         } else if (drilldownData.type == "logs") {
           try {
             navigateToLogs();
@@ -1174,8 +1180,8 @@ export default defineComponent({
             let currentUrl: any =
               pos > -1
                 ? window.location.origin +
-                  window.location.pathname.slice(0, pos) +
-                  "/web"
+                window.location.pathname.slice(0, pos) +
+                "/web"
                 : window.location.origin;
 
             // always, go to view dashboard page
@@ -1193,7 +1199,7 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 url.searchParams.set(
                   "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables),
+                  replacePlaceholders(variable.name, drilldownVariables),
                   replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
@@ -1217,7 +1223,7 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 oldParams[
                   "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables)
+                  replacePlaceholders(variable.name, drilldownVariables)
                 ] = replacePlaceholders(variable.value, drilldownVariables);
               }
             });
@@ -1289,9 +1295,6 @@ export default defineComponent({
       onChartClick,
       onDataZoom,
       addAnnotationbuttonStyle,
-      annotationStartTimestamp,
-      annotationEndTimestamp,
-      annotationDateString,
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
@@ -1304,6 +1307,7 @@ export default defineComponent({
       closeAddAnnotation,
       isAddAnnotationMode,
       toggleAddAnnotationMode,
+      annotationToAddEdit
     };
   },
 });
@@ -1313,6 +1317,7 @@ export default defineComponent({
 .drilldown-item:hover {
   background-color: rgba(202, 201, 201, 0.908);
 }
+
 .errorMessage {
   position: absolute;
   top: 20%;
