@@ -163,9 +163,22 @@ impl PipelineOffsetManager {
                 // No normal pipeline offset file, This is expected, so no warning needed
                 Ok(HashMap::new())
             }
+            Err(Error::SerdeJsonError(e)) => {
+                log::error!(
+                    "Unable to read json file {}, error: {}. move it to back file and create a new one",
+                    self.offset_persist_file.display(),
+                    e
+                );
+                fs::rename(
+                    &self.offset_persist_file,
+                    PathBuf::from(format!("{}.bak", &self.offset_persist_file.display())),
+                )?;
+                Ok(HashMap::new())
+            }
             Err(error) => {
                 log::error!(
-                    "Unable to recover pipeline offset data from interrupted process, error: {}.",
+                    "Unable to read file {}, error: {}.",
+                    self.offset_persist_file.display(),
                     error
                 );
                 Err(error)

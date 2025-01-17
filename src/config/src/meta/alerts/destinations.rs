@@ -32,9 +32,12 @@ pub struct Destination {
     #[serde(default)]
     pub method: HTTPType,
     #[serde(default)]
+    pub remote_pipeline_retry_attemps: usize,
+    #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
+    #[serde(default)]
     pub template: String,
     /// Required when `destination_type` is `Email`
     #[serde(default)]
@@ -58,6 +61,20 @@ pub enum DestinationType {
     Email,
     #[serde(rename = "sns")]
     Sns,
+    #[serde(rename = "remote_pipeline")]
+    RemotePipeline,
+}
+
+impl From<&str> for DestinationType {
+    fn from(s: &str) -> Self {
+        match s {
+            "http" => DestinationType::Http,
+            "email" => DestinationType::Email,
+            "sns" => DestinationType::Sns,
+            "remote_pipeline" => DestinationType::RemotePipeline,
+            _ => DestinationType::Http,
+        }
+    }
 }
 
 impl Destination {
@@ -74,6 +91,10 @@ impl Destination {
             sns_topic_arn: self.sns_topic_arn.clone(),
             aws_region: self.aws_region.clone(),
         }
+    }
+
+    pub fn is_remote_pipeline(&self) -> bool {
+        self.destination_type == DestinationType::RemotePipeline
     }
 }
 

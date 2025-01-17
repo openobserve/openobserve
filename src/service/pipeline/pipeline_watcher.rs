@@ -303,6 +303,7 @@ impl PipelineWatcher {
                         Err(e) => {
                             log::error!("Error reading entry from file: {:?}, error: {:?}, will stop watch this file", path, e);
                             PipelineWatcher::stop_watch_file(&path, false).await?;
+                            // todo: mark this destination cannot export, and reread the wal-file next time
                             break
                         }
                     }
@@ -324,9 +325,10 @@ impl PipelineWatcher {
         match entry {
             Ok((Some(entry), file_position)) => {
                 log::debug!(
-                    "Read entry from file, stream: {}, stream_key: {}, stream_data: {:?}, stream_path: {}",
-                    entry.stream,
-                    entry.schema_key,
+                    "Read entry from file, stream_name: {}, get_stream_endpoint: {}, get_stream_endpoint_header: {:?}, stream_data: {:?}, stream_path: {}",
+                    pr.get_stream_name(),
+                    pr.get_stream_endpoint().await,
+                    pr.get_stream_endpoint_header().await,
                     entry.data,
                     pr.path.display(),
                 );
@@ -338,7 +340,7 @@ impl PipelineWatcher {
                     .stream_path(pr.path.clone())
                     .stream_endpoint(format!(
                         "{}/api/{}/{}/_json",
-                        endpoint.strip_suffix("/").unwrap(),
+                        endpoint,
                         pr.get_org_id(),
                         stream_name
                     ))
@@ -350,8 +352,18 @@ impl PipelineWatcher {
                     .entry(entry)
                     .build();
 
-                if let Err(e) = pr.pipeline_exporter.export_entry(data).await {
-                    log::error!("Failed to send entry to exporter: {}", e.to_string());
+                let max_retry_attempts = pr.get_stream_export_retry_attempts().await;
+
+                if let Err(e) = pr
+                    .pipeline_exporter
+                    .export_entry(data, max_retry_attempts)
+                    .await
+                {
+                    log::error!(
+                        "Failed to send entry to exporter: {}, data from file : {}",
+                        e.to_string(),
+                        pr.path.display()
+                    );
                     return Err(e);
                 }
 

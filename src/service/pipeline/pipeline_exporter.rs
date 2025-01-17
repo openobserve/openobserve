@@ -70,10 +70,13 @@ impl PipelineExporter {
         Ok(Self::new(client))
     }
 
-    pub async fn export_entry(&self, entry: PipelineEntry) -> Result<()> {
+    pub async fn export_entry(
+        &self,
+        entry: PipelineEntry,
+        max_retry_attempts: usize,
+    ) -> Result<()> {
         let mut attempts = 0;
         let mut delay = INITIAL_RETRY_DELAY_MS;
-        let max_retry_attempts = config::get_config().pipeline.remote_request_retry;
         while attempts < max_retry_attempts {
             // todo: if endpoint reponse partial success, we need to resovle the issue?
             // we assume that all the data is received successfully when the endpoint response 200.

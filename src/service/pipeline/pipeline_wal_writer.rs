@@ -89,7 +89,7 @@ pub async fn check_ttl() -> ingester::errors::Result<()> {
             "pipeline_wal_writer exec check_ttl, motified elapsed: {:?}",
             ts.elapsed().as_millis()
         );
-        w.check_wal_threshold((0, 0), 0, ts);
+        let _ = w.rotate(0).await;
     }
 
     Ok(())
@@ -105,11 +105,33 @@ pub struct PipelineWalWriter {
 impl PipelineWalWriter {
     pub fn new(pipeline_id: String, remote_stream_params: RemoteStreamParams) -> Result<Self> {
         let cfg = &get_config();
-        let dir =
+        let wal_file_dir =
             path::PathBuf::from(&cfg.pipeline.remote_stream_wal_dir).join(WAL_DIR_DEFAULT_PREFIX);
         let now = Utc::now().timestamp_micros();
         let next_seq = AtomicU64::new(now as u64);
+        let wal_id = next_seq.fetch_add(1, Ordering::SeqCst).to_string();
+        let writer = Self::wal_writer_build(
+            wal_file_dir,
+            remote_stream_params.clone(),
+            wal_id,
+            cfg.limit.wal_write_buffer_size,
+        )?;
+        let wal_writer = Arc::new(RwLock::new(writer));
 
+        Ok(Self {
+            pipeline_id,
+            remote_stream_params,
+            wal_writer,
+            next_seq,
+        })
+    }
+
+    pub fn wal_writer_build(
+        wal_file_dir: PathBuf,
+        remote_stream_params: RemoteStreamParams,
+        wal_id: String,
+        wal_write_buffer_size: usize,
+    ) -> Result<wal::Writer> {
         let mut header = wal::FileHeader::new();
         header.insert(
             "org_id".to_string(),
@@ -128,28 +150,19 @@ impl PipelineWalWriter {
             remote_stream_params.destination_name.to_string(),
         );
 
-        let writer = wal::Writer::build(
-            dir,
+        wal::Writer::build(
+            wal_file_dir,
             remote_stream_params.org_id.as_str(),
             remote_stream_params.stream_type.as_str(),
-            next_seq.fetch_add(1, Ordering::SeqCst).to_string(),
-            0, // warn: it must be zero, because reader will read init_size with buf, result reader can not read the latest real-time data
-            cfg.limit.wal_write_buffer_size,
+            wal_id,
+            0, /* warn: it must be zero, because reader will read init_size with buf, result
+                * reader can not read the latest real-time data */
+            wal_write_buffer_size,
             Some(header),
         )
-        .map_err(|e| Error::WalFileError(e.to_string()))?;
-        let wal_writer = Arc::new(RwLock::new(writer));
-
-        Ok(Self {
-            pipeline_id,
-            remote_stream_params,
-            wal_writer,
-            next_seq,
-        })
+        .map_err(|e| Error::WalFileError(e.to_string()))
     }
-
     pub async fn write_wal(&self, data: Vec<json::Value>) -> Result<()> {
-
         // write data to wal
         if data.is_empty() {
             return Err(Error::Message("No data to write to WAL".to_string()));
@@ -177,7 +190,6 @@ impl PipelineWalWriter {
         let res = writer
             .sync()
             .map_err(|e| Error::WalFileError(e.to_string()));
-
 
         log::debug!(
             "Writing WAL for pipeline: {}, wal_file_path: {}, wal_file_postion:{:?}, data: {:?}",
@@ -209,7 +221,7 @@ impl PipelineWalWriter {
 
     async fn rotate(&self, entry_bytes_size: usize) -> Result<()> {
         let wal_writer = self.wal_writer.read().await;
-        let metadata = wal_writer.metadata().unwrap();
+        let metadata = wal_writer.metadata()?;
         let ts = get_metadata_motified(&metadata);
 
         if !self.check_wal_threshold(wal_writer.size(), entry_bytes_size, ts) {
@@ -230,15 +242,12 @@ impl PipelineWalWriter {
             wal_id
         );
 
-        let new_wal_writer = wal::Writer::new(
+        let new_wal_writer = Self::wal_writer_build(
             wal_dir,
-            self.remote_stream_params.org_id.as_str(),
-            self.remote_stream_params.stream_type.as_str(),
+            self.remote_stream_params.clone(),
             self.next_seq.fetch_add(1, Ordering::SeqCst).to_string(),
-            cfg.limit.max_file_size_on_disk as u64,
             cfg.limit.wal_write_buffer_size,
-        )
-        .unwrap();
+        )?;
 
         let path = new_wal_writer.path().clone();
         let mut wal = self.wal_writer.write().await;

@@ -161,7 +161,13 @@ impl PipelineReceiver {
         let destination_name = self.get_stream_destination_name();
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name).await {
-            Ok(data) => data.url,
+            Ok(data) => {
+                if data.url.ends_with('/') {
+                    data.url.trim_end_matches('/').to_string()
+                } else {
+                    data.url
+                }
+            }
             Err(_) => "".to_string(),
         }
     }
@@ -172,6 +178,18 @@ impl PipelineReceiver {
         match destinations::get(org_id, destination_name).await {
             Ok(data) => data.headers,
             Err(_) => None,
+        }
+    }
+
+    pub async fn get_stream_export_retry_attempts(&self) -> usize {
+        let destination_name = self.get_stream_destination_name();
+        let org_id = self.get_org_id();
+        match destinations::get(org_id, destination_name).await {
+            Ok(data) => match data.remote_pipeline_retry_attemps {
+                0 => config::get_config().pipeline.remote_request_retry,
+                other => other,
+            },
+            Err(_) => config::get_config().pipeline.remote_request_retry,
         }
     }
 
@@ -203,6 +221,12 @@ impl PipelineReceiver {
         if let Ok(metadata) = self.reader.metadata() {
             let modified = get_metadata_motified(&metadata);
             let cfg = &config::get_config();
+            log::debug!(
+                "PipelineReceiver shuold_delete file {} modified time: {:?}, elapsed: {} ",
+                self.reader.path().display(),
+                modified,
+                modified.elapsed().as_secs()
+            );
             modified.elapsed().as_secs() > cfg.limit.max_file_retention_time
         } else {
             true

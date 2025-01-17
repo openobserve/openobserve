@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    fs::File,
+    io::{BufRead, BufReader, Seek},
+    path::PathBuf,
     thread::sleep,
     time::{Duration, Instant},
 };
-use std::fs::File;
-use std::io::{BufRead, BufReader, Seek};
-use std::path::PathBuf;
+
 use tempfile::tempdir;
 use wal::{build_file_path, FileOpenSnafu, Reader, Writer};
 
@@ -132,7 +133,6 @@ fn test_metadata() {
     writer.close().unwrap();
 }
 
-
 #[test]
 fn test_realtime_write_and_read() {
     let entry_num = 10;
@@ -151,14 +151,19 @@ fn test_realtime_write_and_read() {
         8 * 1024,
         Some(header),
     )
-        .unwrap();
+    .unwrap();
 
     std::thread::spawn(move || {
         for i in 0..entry_num {
             let data = format!("hello world {}", i);
             writer.write(data.as_bytes()).unwrap();
             writer.sync().unwrap();
-            println!("write data: {}, pos:{:?}, file_path: {}", data, writer.current_position(), writer.path().display());
+            println!(
+                "write data: {}, pos:{:?}, file_path: {}",
+                data,
+                writer.current_position(),
+                writer.path().display()
+            );
             sleep(Duration::from_secs(1));
         }
         writer.close().unwrap();
@@ -175,42 +180,52 @@ fn test_realtime_write_and_read() {
     loop {
         sleep(Duration::from_secs(1));
         match reader.read_entry() {
-            Ok(entry) => {
-                match entry {
-                    Some(entry) => {
-                        println!("read position: {:?}, data : {:?}", reader.current_position(), String::from_utf8(entry));
-                    }
-                    None => {
-                        println!("read option none");
-                        break
-                    }
+            Ok(entry) => match entry {
+                Some(entry) => {
+                    println!(
+                        "read position: {:?}, data : {:?}",
+                        reader.current_position(),
+                        String::from_utf8(entry)
+                    );
                 }
-            }
+                None => {
+                    println!("read option none");
+                    break;
+                }
+            },
             Err(e) => {
                 println!("read err : {e}");
-                break
+                break;
             }
         }
-
     }
 }
 
 // #[test]
 // fn test_realtime_read() {
-//     let path = PathBuf::from("/Users/weizhao/Downloads/wal/org/stream/1.wal");
-//     let f = File::open(&path).unwrap();
-//     let mut reader = BufReader::new(f);
+//     let path = PathBuf::from("/Users/weizhao/Downloads/wal/org/stream/1737036099154575.wal");
+//     let mut reader = Reader::from_path(path).unwrap();
 //
-//     println!("begin to read file:{}", path.display());
+//     println!("begin to read file:{}", reader.path().display());
 //     loop {
 //         sleep(Duration::from_secs(1));
-//         let mut lines = String::new();
-//         match reader.read_line(&mut lines) {
-//             Ok(entry) => {
-//                 println!("read position: {:?}, data : {:?}", reader.stream_position(), lines);
-//             }
+//         match reader.read_entry() {
+//             Ok(entry) => match entry {
+//                 Some(entry) => {
+//                     println!(
+//                         "read position: {:?}, data : {:?}",
+//                         reader.current_position(),
+//                         String::from_utf8(entry)
+//                     );
+//                 }
+//                 None => {
+//                     println!("read option none");
+//                     break;
+//                 }
+//             },
 //             Err(e) => {
-//                 println!("read err : {e}")
+//                 println!("read err : {e}");
+//                 break;
 //             }
 //         }
 //     }
