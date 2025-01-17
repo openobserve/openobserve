@@ -394,7 +394,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
-        sql.index_optimize_mode,
+        sql.index_optimize_mode.clone(),
         false, // for super cluster
         context,
     );

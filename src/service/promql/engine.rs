@@ -30,7 +30,7 @@ use datafusion::{
     functions_aggregate::min_max::max,
     prelude::{col, lit, DataFrame, SessionContext},
 };
-use futures::future::try_join_all;
+use futures::{future::try_join_all, TryStreamExt};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
@@ -40,6 +40,7 @@ use promql_parser::{
         StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
     },
 };
+use rayon::slice::ParallelSliceMut;
 
 use super::{
     utils::{apply_label_selector, apply_matchers},
@@ -262,7 +263,7 @@ impl Engine {
                         .iter()
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
+                            samples: vec![v.sample.clone()],
                             exemplars: None,
                             time_window: time_window.clone(),
                         })
@@ -270,7 +271,7 @@ impl Engine {
                     Value::Instant(v) => {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
+                            samples: vec![v.sample.clone()],
                             exemplars: None,
                             time_window,
                         }]
@@ -527,13 +528,15 @@ impl Engine {
         // cache data
         let mut metric_values = metrics.into_values().collect::<Vec<_>>();
         for metric in metric_values.iter_mut() {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            metric
+                .samples
+                .par_sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
             if self.ctx.query_exemplars && metric.exemplars.is_some() {
                 metric
                     .exemplars
                     .as_mut()
                     .unwrap()
-                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+                    .par_sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
             }
         }
         let values = if metric_values.is_empty() {
@@ -1131,6 +1134,8 @@ async fn selector_load_data_from_datafusion(
         DEFAULT_MAX_SERIES_PER_QUERY
     };
 
+    // get hash & timestamp
+    let start_time = std::time::Instant::now();
     let sub_batch = df_group
         .clone()
         .aggregate(
@@ -1141,7 +1146,7 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let (timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
+    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
         .iter()
         .flat_map(|batch| {
             let ts = batch
@@ -1158,10 +1163,16 @@ async fn selector_load_data_from_datafusion(
                 .unwrap();
             ts.iter()
                 .zip(hash.iter())
-                .map(|(t, h)| (lit(t.unwrap()), h.unwrap().to_string()))
+                .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").to_string()))
         })
         .unzip();
+    timestamp_values.sort();
+    timestamp_values.dedup();
+    let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
 
+    log::info!("load hashing took: {:?}", start_time.elapsed());
+
+    // get series
     let series = df_group
         .clone()
         .filter(col(&cfg.common.column_timestamp).in_list(timestamp_values, false))?
@@ -1182,10 +1193,16 @@ async fn selector_load_data_from_datafusion(
             if !hash_value_set.contains(hash) {
                 continue;
             }
+            if metrics.contains_key(hash) {
+                continue;
+            }
             let mut labels = Vec::with_capacity(batch.num_columns());
             for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                 let name = k.name();
                 if name == HASH_LABEL {
+                    continue;
+                }
+                if v.is_null(i) {
                     continue;
                 }
                 let value = v.as_any().downcast_ref::<StringArray>().unwrap();
@@ -1197,16 +1214,21 @@ async fn selector_load_data_from_datafusion(
             labels.sort_by(|a, b| a.name.cmp(&b.name));
             metrics.insert(
                 hash.to_string(),
-                RangeValue::new(labels, Vec::with_capacity(32)),
+                RangeValue::new(labels, Vec::new()),
             );
         }
     }
 
+    log::info!("load series took: {:?}", start_time.elapsed());
+
+    // get values
     if query_exemplars {
         load_exemplars_from_datafusion(&mut metrics, df_group).await?;
     } else {
         load_samples_from_datafusion(&mut metrics, df_group).await?;
     }
+
+    log::info!("load samples took: {:?}", start_time.elapsed());
 
     Ok(metrics)
 }
@@ -1215,41 +1237,81 @@ async fn load_samples_from_datafusion(
     metrics: &mut HashMap<String, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
+    let start_time = std::time::Instant::now();
     let cfg = get_config();
-    let batches = df
+    let streams = df
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
-        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
-        .collect()
+        .execute_stream_partitioned()
         .await?;
 
-    for batch in &batches {
-        let hash_values = batch
-            .column_by_name(HASH_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let time_values = batch
-            .column_by_name(&cfg.common.column_timestamp)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .unwrap();
-        let value_values = batch
-            .column_by_name(VALUE_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .unwrap();
-        for i in 0..batch.num_rows() {
-            let hash = hash_values.value(i);
-            if let Some(range_val) = metrics.get_mut(hash) {
-                range_val
-                    .samples
-                    .push(Sample::new(time_values.value(i), value_values.value(i)));
+    log::info!(
+        "load_samples_from_datafusion took: {:?}",
+        start_time.elapsed()
+    );
+    tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+
+    let mut tasks = Vec::new();
+    for mut stream in streams {
+        let mut series = metrics.clone();
+        let task: tokio::task::JoinHandle<Result<HashMap<String, RangeValue>>> =
+            tokio::task::spawn(async move {
+                let cfg = get_config();
+                loop {
+                    match stream.try_next().await {
+                        Ok(Some(batch)) => {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            let time_values = batch
+                                .column_by_name(&cfg.common.column_timestamp)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<Int64Array>()
+                                .unwrap();
+                            let value_values = batch
+                                .column_by_name(VALUE_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<Float64Array>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash = hash_values.value(i);
+                                if let Some(range_val) = series.get_mut(hash) {
+                                    range_val.samples.push(Sample::new(
+                                        time_values.value(i),
+                                        value_values.value(i),
+                                    ));
+                                }
+                            }
+                        }
+                        Ok(None) => break,
+                        Err(e) => {
+                            log::error!("load samples from datafusion execute stream Error: {}", e);
+                            return Err(e);
+                        }
+                    }
+                }
+                Ok(series)
+            });
+        tasks.push(task);
+    }
+
+    // collect results
+    for task in tasks {
+        let m = task
+            .await
+            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
+        for (hash, value) in m {
+            if let Some(range_val) = metrics.get_mut(&hash) {
+                range_val.samples.extend(value.samples);
             }
         }
     }
+
+    log::info!("post group batches took: {:?}", start_time.elapsed());
 
     Ok(())
 }
@@ -1258,11 +1320,9 @@ async fn load_exemplars_from_datafusion(
     metrics: &mut HashMap<String, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
-    let cfg = get_config();
     let batches = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
 

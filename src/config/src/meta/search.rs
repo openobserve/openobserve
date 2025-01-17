@@ -647,7 +647,7 @@ pub struct CancelQueryResponse {
     pub is_success: bool,
 }
 
-#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct ScanStats {
     pub files: i64,
     pub records: i64,
