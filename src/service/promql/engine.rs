@@ -30,7 +30,7 @@ use datafusion::{
     functions_aggregate::min_max::max,
     prelude::{col, lit, DataFrame, SessionContext},
 };
-use futures::future::try_join_all;
+use futures::{future::try_join_all, TryStreamExt};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
@@ -1215,41 +1215,74 @@ async fn load_samples_from_datafusion(
     metrics: &mut HashMap<String, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
+    let time = std::time::Instant::now();
     let cfg = get_config();
-    let batches = df
+    let streams = df
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
-        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
-        .collect()
+        .execute_stream_partitioned()
         .await?;
 
-    for batch in &batches {
-        let hash_values = batch
-            .column_by_name(HASH_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let time_values = batch
-            .column_by_name(&cfg.common.column_timestamp)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .unwrap();
-        let value_values = batch
-            .column_by_name(VALUE_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .unwrap();
-        for i in 0..batch.num_rows() {
-            let hash = hash_values.value(i);
-            if let Some(range_val) = metrics.get_mut(hash) {
-                range_val
-                    .samples
-                    .push(Sample::new(time_values.value(i), value_values.value(i)));
+    let mut tasks = Vec::new();
+    for mut stream in streams {
+        let mut series = metrics.clone();
+        let task: tokio::task::JoinHandle<Result<HashMap<String, RangeValue>>> =
+            tokio::task::spawn(async move {
+                let cfg = get_config();
+                loop {
+                    match stream.try_next().await {
+                        Ok(Some(batch)) => {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            let time_values = batch
+                                .column_by_name(&cfg.common.column_timestamp)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<Int64Array>()
+                                .unwrap();
+                            let value_values = batch
+                                .column_by_name(VALUE_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<Float64Array>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash = hash_values.value(i);
+                                if let Some(range_val) = series.get_mut(hash) {
+                                    range_val.samples.push(Sample::new(
+                                        time_values.value(i),
+                                        value_values.value(i),
+                                    ));
+                                }
+                            }
+                        }
+                        Ok(None) => break,
+                        Err(e) => {
+                            log::error!("load samples from datafusion execute stream Error: {}", e);
+                            return Err(e);
+                        }
+                    }
+                }
+                Ok(series)
+            });
+        tasks.push(task);
+    }
+
+    // collect results
+    for task in tasks {
+        let m = task
+            .await
+            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
+        for (hash, value) in m {
+            if let Some(range_val) = metrics.get_mut(&hash) {
+                range_val.samples.extend(value.samples);
             }
         }
     }
+    println!("load samples from datafusion cost: {:?}", time.elapsed());
 
     Ok(())
 }
