@@ -28,7 +28,7 @@ use crate::{
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "CreateAnnotations",
-    path = "/{org_id}/{dashboard_id}/annotations",
+    path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -47,7 +47,7 @@ use crate::{
         (status = 500, description = "Failed to create timed annotations", content_type = "application/json")
     ),
 )]
-#[post("/{org_id}/{dashboard_id}/annotations")]
+#[post("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn create_annotations(
     path: web::Path<(String, String)>,
     body: web::Bytes,
@@ -75,7 +75,7 @@ pub async fn create_annotations(
     context_path = "/api",
     tag = "Dashboards",
     operation_id = "GetAnnotations",
-    path = "/{org_id}/{dashboard_id}/annotations",
+    path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -97,7 +97,7 @@ pub async fn create_annotations(
         (status = 500, description = "Failed to get timed annotations", content_type = "application/json")
     ),
 )]
-#[get("/{org_id}/{dashboard_id}/annotations")]
+#[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn get_annotations(
     path: web::Path<(String, String)>,
     query: web::Query<HashMap<String, String>>,
@@ -130,7 +130,7 @@ pub async fn get_annotations(
     tag = "Dashboards",
     context_path = "/api",
     operation_id = "DeleteAnnotations",
-    path = "/{org_id}/{dashboard_id}/annotations",
+    path = "/{org_id}/dashboards/{dashboard_id}/annotations",
     security(
         ("Authorization" = [])
     ),
@@ -147,7 +147,7 @@ pub async fn get_annotations(
         (status = 500, description = "Failed to delete timed annotations", content_type = "application/json")
     ),
 )]
-#[delete("/{org_id}/{dashboard_id}/annotations")]
+#[delete("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn delete_annotations(
     path: web::Path<(String, String)>,
     body: web::Bytes,

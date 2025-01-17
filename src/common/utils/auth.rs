@@ -353,7 +353,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || method.eq("DELETE") && path_columns[3] != "annotations"
             {
                 format!(
                     "{}:{}",
