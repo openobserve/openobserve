@@ -49,7 +49,7 @@ pub async fn get_pipeline_offset_manager() -> &'static Arc<RwLock<PipelineOffset
 }
 
 #[derive(Debug)]
-pub(crate) struct PipelineOffsetManager {
+pub struct PipelineOffsetManager {
     offset_persist_file: PathBuf,
     offset_persist_tmp_file: PathBuf,
     offset_data: RwLock<OffsetData>,
@@ -186,13 +186,10 @@ impl PipelineOffsetManager {
         }
     }
 
-    async fn recover_wal_file_not_in_offset_json(
-        &self,
-        offset_data: &mut OffsetData,
-    ) -> Result<()> {
+    pub async fn get_all_remote_wal_file() -> Vec<PathBuf> {
         let cfg = config::get_config();
         let wal_dir = Path::new(cfg.pipeline.remote_stream_wal_dir.as_str());
-        let wal_file_iter = WalkDir::new(wal_dir)
+        WalkDir::new(wal_dir)
             .filter_map(|entry| async {
                 match entry {
                     Ok(entry) => {
@@ -212,7 +209,13 @@ impl PipelineOffsetManager {
                 }
             })
             .collect::<Vec<PathBuf>>()
-            .await;
+            .await
+    }
+    async fn recover_wal_file_not_in_offset_json(
+        &self,
+        offset_data: &mut OffsetData,
+    ) -> Result<()> {
+        let wal_file_iter = Self::get_all_remote_wal_file().await;
 
         for wal_file in wal_file_iter.iter() {
             let wal_file_str = wal_file.to_str().unwrap();

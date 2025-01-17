@@ -194,7 +194,7 @@ impl PipelineReceiver {
     }
 
     /// Read a entry from the wal file
-    pub(super) fn read_entry(&mut self) -> Result<(Option<Entry>, FilePosition)> {
+    pub fn read_entry(&mut self) -> Result<(Option<Entry>, FilePosition)> {
         let (entry_bytes, len) = match self.read_entry_vecu8()? {
             (Some(bytes), len) => (bytes, len),
             (None, _) => return Ok((None, 0)), // read to the end of the file
@@ -211,23 +211,40 @@ impl PipelineReceiver {
         Ok((Some(entry), self.get_file_position()))
     }
 
-    pub(super) fn read_entry_vecu8(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
+    pub fn read_entry_vecu8(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
         self.reader
             .read_entry_with_length()
             .map_err(|e| Error::Message(e.to_string()))
     }
 
-    pub(super) fn should_delete(&self) -> bool {
+    /// delete file when receiver read to the end and wal file modified time over
+    /// max_file_retention_time
+    pub fn should_delete_on_file_retention(&self) -> bool {
         if let Ok(metadata) = self.reader.metadata() {
             let modified = get_metadata_motified(&metadata);
             let cfg = &config::get_config();
             log::debug!(
-                "PipelineReceiver shuold_delete file {} modified time: {:?}, elapsed: {} ",
+                "PipelineReceiver should_delete_on_file_retention file {} modified elapsed: {} ",
                 self.reader.path().display(),
-                modified,
                 modified.elapsed().as_secs()
             );
             modified.elapsed().as_secs() > cfg.limit.max_file_retention_time
+        } else {
+            true
+        }
+    }
+
+    /// delete file when wal file modified time over max data retention
+    pub fn should_delete_on_data_retention(&self) -> bool {
+        if let Ok(metadata) = self.reader.metadata() {
+            let modified = get_metadata_motified(&metadata);
+            let cfg = &config::get_config();
+            log::debug!(
+                "PipelineReceiver should_delete_on_data_retention file {} modified elapsed: {} ",
+                self.reader.path().display(),
+                modified.elapsed().as_secs()
+            );
+            modified.elapsed().as_secs() > (cfg.compact.data_retention_days * 24 * 3600) as u64
         } else {
             true
         }

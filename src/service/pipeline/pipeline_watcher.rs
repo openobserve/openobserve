@@ -290,7 +290,7 @@ impl PipelineWatcher {
                             // read to the end of the file, but can`t sure that real-time ingest is stop write data to the file.
                             // so we need to keep the file, and wait for the next
                             // we only delete file when receiver read to the end and wal file modified time over max_file_retention_time
-                            if pr.should_delete() {
+                            if pr.should_delete_on_file_retention() {
                                 log::info!("File: {:?} reached EOF, and modified time over max_file_retention_time, will remove it", pr.path.display());
                                 PipelineWatcher::stop_watch_file(&path, true).await?;
                                 break

@@ -124,8 +124,7 @@ impl PipelineFileServer {
         let config = &config::get_config();
         let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
             .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer =
-            Writer::new(dir, "org", "logs", "1".to_string(), 1024_1024, 8 * 1024).unwrap();
+        let mut writer = Writer::new(dir, "org", "logs", "1".to_string(), 0, 8 * 1024).unwrap();
 
         for i in 0..100 {
             let data = serde_json::json!(

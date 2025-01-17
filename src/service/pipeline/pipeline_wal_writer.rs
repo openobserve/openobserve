@@ -111,6 +111,7 @@ impl PipelineWalWriter {
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst).to_string();
         let writer = Self::wal_writer_build(
+            pipeline_id.to_string(),
             wal_file_dir,
             remote_stream_params.clone(),
             wal_id,
@@ -127,12 +128,14 @@ impl PipelineWalWriter {
     }
 
     pub fn wal_writer_build(
+        pipeline_id: String,
         wal_file_dir: PathBuf,
         remote_stream_params: RemoteStreamParams,
         wal_id: String,
         wal_write_buffer_size: usize,
     ) -> Result<wal::Writer> {
         let mut header = wal::FileHeader::new();
+        header.insert("pipeline_id".to_string(), pipeline_id);
         header.insert(
             "org_id".to_string(),
             remote_stream_params.org_id.to_string(),
@@ -243,6 +246,7 @@ impl PipelineWalWriter {
         );
 
         let new_wal_writer = Self::wal_writer_build(
+            self.pipeline_id.clone(),
             wal_dir,
             self.remote_stream_params.clone(),
             self.next_seq.fetch_add(1, Ordering::SeqCst).to_string(),

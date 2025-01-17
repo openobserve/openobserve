@@ -33,6 +33,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
