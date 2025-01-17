@@ -242,6 +242,8 @@ export default defineComponent({
         router.currentRoute.value.query.action == "edit"
       ) {
         showAddDialog.value = true;
+      } else {
+        showAddDialog.value = false;
       }
     });
 

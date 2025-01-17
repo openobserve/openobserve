@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="openCancelDialog"
         />
         <q-btn
-          :disable="step === 1 || !isUpdatingCipherKey"
+          :disable="step === 1 && isUpdatingCipherKey == false"
           data-test="add-cipher-key-save-btn"
           :label="t('common.save')"
           class="text-bold no-border q-ml-md"
@@ -274,6 +274,23 @@ const getTypeLabel = (type: string) => {
   return cipherKeyTypes.value.find((t) => t.value === type)?.label;
 };
 
+function mergeObjects(base, updates) {
+  for (const key in updates) {
+    if (
+      updates[key] !== null &&
+      typeof updates[key] === "object" &&
+      !Array.isArray(updates[key])
+    ) {
+      // If the value is an object, recursively merge
+      base[key] = mergeObjects(base[key] || {}, updates[key]);
+    } else {
+      // Otherwise, replace or add the value from updates
+      base[key] = updates[key];
+    }
+  }
+  return base;
+}
+
 const setupTemplateData = () => {
   if (router.currentRoute.value.query.action === "edit") {
     isUpdatingCipherKey.value = true;
@@ -292,7 +309,7 @@ const setupTemplateData = () => {
         name,
       )
         .then((response) => {
-          formData.value = { ...formData.value, ...response.data };
+          formData.value = mergeObjects({ ...formData.value }, response.data);
           originalData.value = JSON.stringify(formData.value);
         })
         .catch((error) => {

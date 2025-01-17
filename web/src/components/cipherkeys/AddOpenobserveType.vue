@@ -15,20 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div>
-    <q-input
-      data-test="add-cipher-key-openobserve-secret-input"
-      v-model="formData.key.store.local"
-      :label="t('cipherKey.secret') + ' *'"
-      color="input-border"
-      bg-color="input-bg"
-      class="showLabelOnTop q-w-lg q-pb-xs"
-      type="textarea"
-      stack-label
-      outlined
-      filled
-      dense
-      :rules="[(val: any) => !!val || 'Secret is required']"
-    />
+    <div v-if="!formData.isUpdate || isUpdate || formData.key.store.local === ''">
+      <q-input
+        data-test="add-cipher-key-openobserve-secret-input"
+        v-model="formData.key.store.local"
+        :label="t('cipherKey.secret') + ' *'"
+        color="input-border"
+        bg-color="input-bg"
+        class="showLabelOnTop q-w-lg q-pb-xs"
+        type="textarea"
+        stack-label
+        outlined
+        filled
+        dense
+        :rules="[(val: any) => !!val || 'Secret is required']"
+      />
+      <q-btn v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false" size="sm" color="primary" :label="t('common.cancel')" />
+    </div>
+    <div v-else>
+      <label class="row q-field q-mb-md">
+        <b>{{ t('cipherKey.secret') }}</b>
+      </label>
+      {{ formData.key.store.local.slice(0, 5) }}{{ formData.key.store.local.replace(/./g, '*').slice(5, 20) }}
+      <q-btn @click="isUpdate = true" size="sm" color="primary" :label="t('common.update')" />
+    </div>
   </div>
 </template>
 
@@ -79,8 +89,10 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
+    const isUpdate = ref(false);
     return {
       t,
+      isUpdate,
     };
   },
 });

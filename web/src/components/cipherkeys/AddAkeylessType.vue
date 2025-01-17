@@ -106,21 +106,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val: any) => !!val || 'LDAP Username is required']"
         />
-        <q-input
-          data-test="add-cipher-key-akeyless-ldap-password-input"
-          v-model="formData.key.store.akeyless.auth.ldap.password"
-          :label="t('cipherKey.ldapPassword') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop q-w-lg"
-          stack-label
-          outlined
-          filled
-          dense
-          type="password"
-          autocomplete="new-password"
-          :rules="[(val: any) => !!val || 'LDAP Password is required']"
-        />
+        <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
+          <q-input
+            data-test="add-cipher-key-akeyless-ldap-password-input"
+            v-model="formData.key.store.akeyless.auth.ldap.password"
+            :label="t('cipherKey.ldapPassword') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop q-w-lg"
+            stack-label
+            outlined
+            filled
+            dense
+            type="password"
+            autocomplete="new-password"
+            :rules="[(val: any) => !!val || 'LDAP Password is required']"
+          />
+          <q-btn v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
+        </div>
+        <div v-else>
+          <label class="row q-field q-mb-md">
+            <b>{{ t('cipherKey.ldapPassword') }}</b>
+          </label>
+          {{ formData.key.store.akeyless.auth.ldap.password.slice(0, 5) }}{{ formData.key.store.akeyless.auth.ldap.password.replace(/./g, '*').slice(5, 20) }}
+          <q-btn @click="isUpdateLDAPPass = true" size="sm" color="primary" :label="t('common.update')" />
+        </div>
       </div>
     </fieldset>
     <q-select
@@ -289,6 +299,7 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();
+    const isUpdateLDAPPass = ref(false);
 
     const authenticationTypeOptions = ref([
       { label: "Access Key", value: "access_key" },
@@ -320,6 +331,7 @@ export default defineComponent({
       getSecretOptionLabel,
       getAuthenticationTypeLabel,
       validateUrl,
+      isUpdateLDAPPass,
     };
   },
 });
