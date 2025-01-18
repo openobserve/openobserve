@@ -354,7 +354,7 @@ impl PipelineWatcher {
                     .build();
 
                 let max_retry_time = pr.get_stream_export_retry_time().await;
-
+                // if entry.data just has one record, it will be a performance issue for exporter
                 if let Err(e) = pr
                     .pipeline_exporter
                     .export_entry(data, max_retry_time)
