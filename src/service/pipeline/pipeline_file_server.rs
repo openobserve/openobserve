@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster::LOCAL_NODE;
 use infra::errors::Result;
 use tokio::sync::{mpsc, oneshot};
-use config::cluster::LOCAL_NODE;
 
 use crate::service::pipeline::pipeline_watcher::PipelineWatcher;
 
@@ -69,7 +69,6 @@ impl PipelineFileServer {
     }
 
     pub async fn run(outside_shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
-
         if !LOCAL_NODE.is_ingester() || !LOCAL_NODE.is_alert_manager() {
             return Ok(());
         }
