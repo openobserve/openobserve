@@ -175,8 +175,8 @@ mod legacy_folders {
 
         while let Some(folders) = pages.fetch_and_next().await? {
             for folder in folders {
+                let ksuid = ksuid_from_hash(&folder).to_string();
                 let mut am = folder.into_active_model();
-                let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
                 println!("folder ksuid: {}", ksuid);
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
@@ -192,6 +192,26 @@ mod legacy_folders {
     /// `folders` to `legacy_folders`.
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
+    }
+
+    /// Generates a KSUID from a hash of the folder's `org` and `folder_id`.
+    ///
+    /// To generate a KSUID this function generates the 160-bit SHA-1 hash of
+    /// the folder's `org` and `folder_id` and interprets that 160-bit hash as
+    /// a 160-bit KSUID. Therefore two KSUIDs generated in this manner will
+    /// always be equal if the folders have the same `org` and `folder_id`.
+    ///
+    /// It is important to note that KSUIDs generated in this manner will have
+    /// timestamp bits which are effectively random, meaning that the timestamp
+    /// in any KSUID generated with this function will be random.
+    fn ksuid_from_hash(folder: &legacy_entities::legacy_folders::Model) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(folder.org.clone());
+        hasher.update(folder.r#type.to_string());
+        hasher.update(folder.folder_id.clone());
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
     }
 }
 
@@ -240,8 +260,8 @@ mod legacy_dashboards {
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
             for dashboard in dashboards {
+                let ksuid = ksuid_from_hash(&dashboard).to_string();
                 let mut am = dashboard.into_active_model();
-                let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
@@ -256,6 +276,24 @@ mod legacy_dashboards {
     /// `dashboards` to `legacy_dashboards`.
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
+    }
+
+    /// Generates a KSUID from a hash of the dashboards's `dashboard_id`.
+    ///
+    /// To generate a KSUID this function generates the 160-bit SHA-1 hash of
+    /// the dashboard's `dashboard_id` and interprets that 160-bit hash as a
+    /// 160-bit KSUID. Therefore two KSUIDs generated in this manner will always
+    /// be equal if the dashboard's have the same `dashboard_id`.
+    ///
+    /// It is important to note that KSUIDs generated in this manner will have
+    /// timestamp bits which are effectively random, meaning that the timestamp
+    /// in any KSUID generated with this function will be random.
+    fn ksuid_from_hash(dashboard: &legacy_entities::legacy_dashboards::Model) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(dashboard.dashboard_id.clone());
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
     }
 }
 

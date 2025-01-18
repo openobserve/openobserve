@@ -28,7 +28,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -40,10 +40,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use infra::{
-    schema::unwrap_stream_settings,
-    table::{self, folders::FolderType},
-};
+use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{message::MultiPart, AsyncTransport, Message};
 use sea_orm::{ConnectionTrait, TransactionTrait};
