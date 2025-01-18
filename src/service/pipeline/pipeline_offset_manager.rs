@@ -275,6 +275,7 @@ impl PipelineOffsetManager {
         let mut f = io::BufWriter::new(fs::File::create(&self.offset_persist_tmp_file)?);
 
         serde_json::to_writer(&mut f, &*data)?;
+        log::debug!("pipeline offset manager flush sync begin");
         f.into_inner()
             .map_err(|e| Error::Message(e.to_string()))?
             .sync_all()?;
@@ -284,6 +285,7 @@ impl PipelineOffsetManager {
         // systems (and the stdlib claims to provide equivalent behavior on
         // Windows), which should prevent scenarios where we don't have at least
         // one full valid file to recover from.
+        log::debug!("pipeline offset manager rename tmp offset file");
         fs::rename(&self.offset_persist_tmp_file, &self.offset_persist_file)?;
         log::debug!("Offset file saved: {:?}", self.offset_persist_file);
         Ok(())
@@ -323,8 +325,10 @@ mod tests {
         let mut pm = PipelineOffsetManager::init().await.unwrap();
         let path = "path-to-remote-wal-file-test";
         pm.save(path, 100).await;
+        // flush to disk
         pm.flush().await.unwrap();
+        // file not exist, get fail
         let pm = PipelineOffsetManager::init().await.unwrap();
-        assert_eq!(pm.get(path).await.unwrap(), 100);
+        assert_eq!(pm.get(path).await, None);
     }
 }

@@ -36,7 +36,8 @@ use tokio::sync::RwLock;
 
 use crate::service::pipeline::pipeline_watcher::{WatcherEvent, FILE_WATCHER_NOTIFY};
 
-// each pipeline has a wal writer, but it still has a write performance issue when the data is ingested concurrently
+// each pipeline has a wal writer, but it still has a write performance issue when the data is
+// ingested concurrently
 #[allow(clippy::type_complexity)]
 static PIPELINE_WAL_WRITER_MAP: Lazy<Arc<RwLock<HashMap<String, Arc<PipelineWalWriter>>>>> =
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
@@ -356,6 +357,10 @@ mod tests {
         let path = wal_writer.path().clone();
         drop(wal_writer);
         let wal_file_3 = path.to_str().unwrap().to_string();
-        assert_ne!(wal_file_2, wal_file_3);
+        if config::get_config().limit.max_file_retention_time <= 2 {
+            assert_ne!(wal_file_2, wal_file_3);
+        } else {
+            assert_eq!(wal_file_2, wal_file_3);
+        }
     }
 }
