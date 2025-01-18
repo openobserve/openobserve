@@ -18,7 +18,7 @@ use std::{
     fs,
     ops::Range,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use async_recursion::async_recursion;
@@ -83,6 +83,7 @@ pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
+pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
 pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 pub struct FileData {
@@ -390,8 +391,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("load disk cache error: {}", e);
         }
         log::info!(
-            "Loading disk cache done, total files: {} ",
-            len(FileType::DATA).await
+            "Loading disk cache done, total files: {}",
+            LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
         );
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
@@ -540,16 +541,16 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // write into cache
                     let idx = get_bucket_idx(&file_key);
+                    let total = LOADING_FROM_DISK_NUM.fetch_add(1, Ordering::Relaxed);
+                    // print progress
+                    if total % 1000 == 0 {
+                        log::info!("Loading disk cache {}", total);
+                    }
                     if file_key.starts_with("files") {
                         let mut w = FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
-                        let total = w.len();
                         drop(w);
-                        // print progress
-                        if total % 1000 == 0 {
-                            log::info!("Loading disk cache {}", total);
-                        }
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
 
@@ -563,12 +564,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         let mut w = RESULT_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
-                        let total = w.len();
                         drop(w);
-                        // print progress
-                        if total % 1000 == 0 {
-                            log::info!("Loading disk cache {}", total);
-                        }
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
 
@@ -577,29 +573,22 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             .add(data_size as i64);
 
                         let columns = file_key.split('/').collect::<Vec<&str>>();
-                        if columns[0] == "results" {
-                            let query_key = format!(
-                                "{}_{}_{}_{}",
-                                columns[1], columns[2], columns[3], columns[4]
-                            );
-                            let meta = columns[5].split('_').collect::<Vec<&str>>();
-                            let is_aggregate = meta[2] == "1";
-                            let is_descending = meta[3] == "1";
-                            result_cache.entry(query_key).or_insert_with(Vec::new).push(
-                                ResultCacheMeta {
-                                    start_time: meta[0].parse().unwrap(),
-                                    end_time: meta[1].parse().unwrap(),
-                                    is_aggregate,
-                                    is_descending,
-                                },
-                            );
-                        };
+                        let query_key = format!(
+                            "{}_{}_{}_{}",
+                            columns[1], columns[2], columns[3], columns[4]
+                        );
+                        let meta = columns[5].split('_').collect::<Vec<&str>>();
+                        let is_aggregate = meta[2] == "1";
+                        let is_descending = meta[3] == "1";
+                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
+                            ResultCacheMeta {
+                                start_time: meta[0].parse().unwrap(),
+                                end_time: meta[1].parse().unwrap(),
+                                is_aggregate,
+                                is_descending,
+                            },
+                        );
                     } else if file_key.starts_with("metrics_results") {
-                        // print progress
-                        let total = metrics_cache.len();
-                        if total % 1000 == 0 {
-                            log::info!("Loading disk cache {}", total);
-                        }
                         // metrics
                         metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
                             .with_label_values(&[])
