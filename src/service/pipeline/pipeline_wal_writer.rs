@@ -134,6 +134,7 @@ impl PipelineWalWriter {
         wal_id: String,
         wal_write_buffer_size: usize,
     ) -> Result<wal::Writer> {
+        // query org_id stream_name stream_type from destination_name
         let mut header = wal::FileHeader::new();
         header.insert("pipeline_id".to_string(), pipeline_id);
         header.insert(
@@ -184,7 +185,10 @@ impl PipelineWalWriter {
             .map_err(|e| Error::Message(format!("write_wal entry into bytes error : {}", e)))?;
 
         // check rotation
-        self.rotate(bytes_entries.len()).await?;
+        if let Err(err) = self.rotate(bytes_entries.len()).await {
+            log::error!("rotate error : {err}");
+            return Err(err);
+        }
 
         let mut writer = self.wal_writer.write().await;
         writer
@@ -213,13 +217,15 @@ impl PipelineWalWriter {
     ) -> bool {
         let cfg = get_config();
         let (compressed_size, _uncompressed_size) = written_size;
-
-        // 1. compressed_size > wal::FILE_TYPE_IDENTIFIER_LEN
-        // 2. compressed_size + data_size > cfg.limit.max_file_size_on_disk
-        // 3. wal-file modified of metadata is bigger than cfg.limit.max_file_retention_time
-        compressed_size > wal::FILE_TYPE_IDENTIFIER_LEN
-            && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
-                || modified.elapsed().as_secs() > cfg.limit.max_file_retention_time)
+        log::debug!(
+                "PipelineWalWriter check_wal_threshold file modified elapsed: {}, cfg.limit.max_file_retention_time: {}, compressed_size: {compressed_size}, data_size: {data_size}",
+                modified.elapsed().as_secs(),
+                cfg.limit.max_file_retention_time
+            );
+        // 1. compressed_size + data_size > cfg.limit.max_file_size_on_disk
+        // 2. wal-file modified of metadata is bigger than cfg.limit.max_file_retention_time
+        compressed_size + data_size > cfg.limit.max_file_size_on_disk
+            || modified.elapsed().as_secs() > cfg.limit.max_file_retention_time
     }
 
     async fn rotate(&self, entry_bytes_size: usize) -> Result<()> {
@@ -249,7 +255,7 @@ impl PipelineWalWriter {
             self.pipeline_id.clone(),
             wal_dir,
             self.remote_stream_params.clone(),
-            self.next_seq.fetch_add(1, Ordering::SeqCst).to_string(),
+            wal_id.to_string(),
             cfg.limit.wal_write_buffer_size,
         )?;
 

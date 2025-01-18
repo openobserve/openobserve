@@ -55,6 +55,12 @@ pub struct PipelineOffsetManager {
     offset_data: RwLock<OffsetData>,
 }
 
+impl Default for PipelineOffsetManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PipelineOffsetManager {
     pub fn new() -> Self {
         let config = config::get_config();

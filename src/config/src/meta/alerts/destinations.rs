@@ -20,19 +20,30 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::templates::Template;
+use crate::meta::stream::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
     #[serde(default)]
     pub name: String,
-    /// Required for `Http` destination_type
+    /// Required for `Http` or `RemotePipeline` destination_type
     #[serde(default)]
     pub url: String,
-    /// Required for `Http` destination_type
+    /// Required for `Http` or `RemotePipeline` destination_type
     #[serde(default)]
     pub method: HTTPType,
+    /// Required for `RemotePipeline` destination_type
     #[serde(default)]
     pub remote_pipeline_max_retry_time: u64,
+    /// Required for `RemotePipeline` destination_type
+    #[serde(default)]
+    pub org_id: String,
+    /// Required for `RemotePipeline` destination_type
+    #[serde(default)]
+    pub stream_name: String,
+    /// Required for `RemotePipeline` destination_type
+    #[serde(default)]
+    pub stream_type: StreamType,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

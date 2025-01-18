@@ -261,9 +261,16 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
+            let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
+            let Ok(_) = PipelineFileServer::run(fileserver_stop_rx).await else {
+                job_init_tx.send(false).ok();
+                panic!("pipeline file server run failed");
+            };
+
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
+            fileserver_stopped_tx.send(()).ok();
 
             // shutdown meter provider
             let _ = meter_provider.shutdown();
@@ -563,7 +570,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .timeout(Duration::from_secs(cfg.route.timeout))
                 .disable_redirects();
             if cfg.http.tls_enabled {
-                let config = awc_client_tls_config().unwrap();
+                let config = client_tls_config().unwrap();
                 client_builder =
                     client_builder.connector(awc::Connector::new().rustls_0_23(config));
             }

@@ -283,20 +283,21 @@ impl PipelineWatcher {
                     log::info!("Received stop signal for file: {:?}", path);
                     break
                 }
-                res = Self::read_entry_and_hanlde(pr)  => {
+                res = Self::read_entry_and_export(pr)  => {
                     match res {
                         Ok(None) => {
                             log::debug!("No more entries to read from file: {:?}, file_position: {}", path, pr.get_file_position());
                             // read to the end of the file, but can`t sure that real-time ingest is stop write data to the file.
                             // so we need to keep the file, and wait for the next
                             // we only delete file when receiver read to the end and wal file modified time over max_file_retention_time
+                            //
                             if pr.should_delete_on_file_retention() {
                                 log::info!("File: {:?} reached EOF, and modified time over max_file_retention_time, will remove it", pr.path.display());
                                 PipelineWatcher::stop_watch_file(&path, true).await?;
                                 break
                             }
                             // let`s wait for a while
-                            tokio::time::sleep(Duration::from_secs(1)).await;
+                            tokio::time::sleep(Duration::from_secs(2)).await;
                             continue
                         }
                         Ok(Some(())) => {continue} // continue read next entry
@@ -313,7 +314,7 @@ impl PipelineWatcher {
 
         Ok(())
     }
-    async fn read_entry_and_hanlde(pr: &mut PipelineReceiver) -> Result<Option<()>> {
+    async fn read_entry_and_export(pr: &mut PipelineReceiver) -> Result<Option<()>> {
         let entry = pr.read_entry();
         PipelineWatcher::handle_entry(entry, pr).await
     }

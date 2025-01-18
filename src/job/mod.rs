@@ -204,6 +204,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
+    // start pipeline data retention
+    tokio::task::spawn(async move { pipeline::run().await });
 
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
