@@ -23,10 +23,7 @@ use ::config::{
     },
     utils::rand::get_rand_element,
 };
-use actix_web::{
-    http::{uri::Scheme, Error},
-    route, web, FromRequest, HttpRequest, HttpResponse,
-};
+use actix_web::{http::Error, route, web, FromRequest, HttpRequest, HttpResponse};
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -179,20 +176,13 @@ async fn dispatch(
     let cfg = get_config();
 
     // get online nodes
-    let uri = req.uri();
-    let path = uri
+    let path = req
+        .uri()
         .path_and_query()
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
-    let full_path = format!(
-        "{}://{}:{}{}",
-        uri.scheme().unwrap_or(&Scheme::HTTP),
-        uri.host().unwrap_or("localhost"),
-        uri.port_u16().unwrap_or(80),
-        path
-    );
-    let new_url = get_url(full_path).await;
+    let new_url = get_url(req.full_url().to_string()).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable()
             .body(new_url.error.unwrap_or("internal server error".to_string())));
@@ -249,15 +239,22 @@ async fn get_url(path: String) -> URLDetails {
 
     let nodes = nodes.unwrap();
     let node = get_rand_element(&nodes);
+    let (path, node) = if node.http_addr.contains("https://") {
+        (
+            path.replace("http://", "https://"),
+            node.http_addr.replace("https://", ""),
+        )
+    } else {
+        (
+            path.replace("https://", "http://"),
+            node.http_addr.replace("http://", ""),
+        )
+    };
     URLDetails {
         is_error: false,
         error: None,
         path,
-        node: node
-            .http_addr
-            .replace("http://", "")
-            .replace("https://", "")
-            .to_string(),
+        node,
     }
 }
 
@@ -354,10 +351,19 @@ async fn proxy_querier_by_body(
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
     };
-    new_url.node = node
-        .http_addr
-        .replace("http://", "")
-        .replace("https://", "");
+    let (path, node) = if node.http_addr.contains("https://") {
+        (
+            new_url.path.replace("http://", "https://"),
+            node.http_addr.replace("https://", ""),
+        )
+    } else {
+        (
+            new_url.path.replace("https://", "http://"),
+            node.http_addr.replace("http://", ""),
+        )
+    };
+    new_url.path = path;
+    new_url.node = node;
 
     // send query
     let resp = if let Some(payload) = payload {

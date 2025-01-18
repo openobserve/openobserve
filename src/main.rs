@@ -555,7 +555,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = create_http_client();
+            let http_client = create_http_client();
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -569,7 +569,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -654,7 +654,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = create_http_client();
+            let http_client = create_http_client();
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -668,7 +668,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -714,22 +714,17 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn create_http_client() -> Result<awc::Client, anyhow::Error> {
+fn create_http_client() -> awc::Client {
     let cfg = get_config();
     let mut client_builder = awc::Client::builder()
         .connector(awc::Connector::new().limit(cfg.route.max_connections))
         .timeout(Duration::from_secs(cfg.route.timeout))
         .disable_redirects();
-
     if cfg.http.tls_enabled {
-        let config = client_tls_config().map_err(|e| {
-            log::error!("Failed to initialize TLS config: {}", e);
-            e
-        })?;
+        let config = client_tls_config().unwrap();
         client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(config));
     }
-
-    Ok(client_builder.finish())
+    client_builder.finish()
 }
 
 async fn graceful_shutdown(handle: ServerHandle) {
