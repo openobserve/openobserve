@@ -91,7 +91,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use openobserve::service::{
     pipeline::pipeline_file_server::PipelineFileServer,
-    tls::{awc_client_tls_config, http_tls_config},
+    tls::{client_tls_config, http_tls_config},
 };
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -261,16 +261,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
-            let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
-            let Ok(_) = PipelineFileServer::run(fileserver_stop_rx).await else {
-                job_init_tx.send(false).ok();
-                panic!("pipeline file server run failed");
-            };
-
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
-            fileserver_stopped_tx.send(()).ok();
 
             // shutdown meter provider
             let _ = meter_provider.shutdown();

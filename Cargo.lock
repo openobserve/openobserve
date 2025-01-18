@@ -4804,6 +4804,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "sha1",
  "sqlx",
  "svix-ksuid",
  "thiserror 1.0.69",
