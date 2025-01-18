@@ -13,16 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::path;
-
 use infra::errors::Result;
-use ingester::{Entry, WAL_DIR_DEFAULT_PREFIX};
 use tokio::sync::{mpsc, oneshot};
-use wal::Writer;
+use config::cluster::LOCAL_NODE;
 
-use crate::service::pipeline::pipeline_watcher::{
-    PipelineWatcher, WatcherEvent, FILE_WATCHER_NOTIFY,
-};
+use crate::service::pipeline::pipeline_watcher::PipelineWatcher;
 
 pub struct PipelineFileServerBuilder {}
 
@@ -74,6 +69,11 @@ impl PipelineFileServer {
     }
 
     pub async fn run(outside_shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
+
+        if !LOCAL_NODE.is_ingester() || !LOCAL_NODE.is_alert_manager() {
+            return Ok(());
+        }
+
         log::info!("PipelineFileServer started");
         let (mut pipeline_watcher, stop_pipeline_watcher_sender, stop_pipeline_watcher_rx) =
             PipelineFileServerBuilder::build().await.destructure();
@@ -106,63 +106,7 @@ impl PipelineFileServer {
             }
         });
 
-        // debug
-        // tokio::spawn(async {
-        //     loop {
-        //         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        //         PipelineFileServer::debug_wal_send().await;
-        //     }
-        // });
-
         Ok(())
-    }
-    #[allow(dead_code)]
-    async fn debug_wal_send() {
-        use std::sync::Arc;
-
-        use parquet::data_type::AsBytes;
-        let config = &config::get_config();
-        let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
-            .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer = Writer::new(dir, "org", "logs", "1".to_string(), 0, 8 * 1024).unwrap();
-
-        for i in 0..100 {
-            let data = serde_json::json!(
-              {
-                "Athlete": "Alfred",
-                "City": "Athens",
-                "Country": "HUN",
-                "Discipline": "Swimming",
-                "Sport": "Aquatics",
-                "Year": 1896,
-                "order" : i,
-              }
-            );
-
-            let mut entry = Entry {
-                stream: Arc::from("example_stream"),
-                schema: None, // empty Schema
-                schema_key: Arc::from("example_schema_key"),
-                partition_key: Arc::from("2023/12/18/00/country=US/state=CA"),
-                data: vec![Arc::new(data.clone())],
-                data_size: 1,
-            };
-            let bytes_entries = entry.into_bytes().unwrap();
-            writer.write(bytes_entries.as_bytes()).unwrap();
-        }
-        writer.close().unwrap();
-
-        // notify file watcher to load a new wal file
-        log::info!(
-            "notify file watcher to load a new wal file: {}",
-            writer.path().display()
-        );
-        let watcher = FILE_WATCHER_NOTIFY.write().await;
-        let _ = watcher
-            .clone()
-            .unwrap()
-            .send(WatcherEvent::NewFile(writer.path().clone()))
-            .await;
     }
 }
 
