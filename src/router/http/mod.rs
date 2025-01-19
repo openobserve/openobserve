@@ -350,7 +350,6 @@ async fn proxy_querier_by_body(
     else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
     };
-    log::info!("forward for key: {}, node_name: {}", key, node_name);
 
     // get node by name
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
