@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{net::SocketAddr, str::FromStr};
 
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
@@ -27,7 +27,7 @@ use url::Url;
 pub async fn ws_proxy(
     req: HttpRequest,
     payload: web::Payload,
-    ws_base_url: String,
+    ws_base_url: &str,
 ) -> Result<HttpResponse, Error> {
     // log node role
     let cfg = get_config();
@@ -36,7 +36,7 @@ pub async fn ws_proxy(
     // Upgrade the client connection to a WebSocket
     let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
 
-    let ws_req = match convert_actix_to_tungstenite_request(&req, &ws_base_url) {
+    let ws_req = match convert_actix_to_tungstenite_request(&req, ws_base_url) {
         Ok(req) => req,
         Err(e) => {
             log::error!(
@@ -173,7 +173,7 @@ fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Mes
 }
 
 /// Helper function to convert an HTTP/HTTPS URL to a WebSocket URL
-pub fn convert_to_websocket_url(url_str: &str) -> Result<String, String> {
+pub fn convert_to_websocket_url(url_str: &str, node: &str) -> Result<String, String> {
     let mut parsed_url = match Url::parse(url_str) {
         Ok(url) => url,
         Err(e) => {
@@ -197,6 +197,17 @@ pub fn convert_to_websocket_url(url_str: &str) -> Result<String, String> {
             return Err(format!("Unsupported URL scheme: {}", parsed_url.scheme()));
         }
     }
+
+    // set host and port
+    let parse_node = node
+        .parse::<SocketAddr>()
+        .map_err(|_| "Failed to parse node".to_string())?;
+    parsed_url
+        .set_host(Some(parse_node.ip().to_string().as_str()))
+        .map_err(|_| "Failed to set host".to_string())?;
+    parsed_url
+        .set_port(Some(parse_node.port()))
+        .map_err(|_| "Failed to set port".to_string())?;
 
     Ok(parsed_url.to_string())
 }

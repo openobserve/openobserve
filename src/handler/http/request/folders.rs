@@ -43,6 +43,9 @@ impl From<FolderError> for HttpResponse {
             FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
             FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
             FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
+            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
+                "Folder with this name already exists in this organization",
+            ),
         }
     }
 }

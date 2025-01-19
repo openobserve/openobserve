@@ -58,7 +58,7 @@ pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     Ok(tls_config)
 }
 
-pub fn awc_client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
+pub fn client_tls_config() -> Result<Arc<ClientConfig>, anyhow::Error> {
     let cfg = config::get_config();
     let cert_store = if cfg.http.tls_root_certificates.as_str().to_lowercase() == "native" {
         native_roots_cert_store()?
