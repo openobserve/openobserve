@@ -23,7 +23,10 @@ use ::config::{
     },
     utils::rand::get_rand_element,
 };
-use actix_web::{http::Error, route, web, FromRequest, HttpRequest, HttpResponse};
+use actix_web::{
+    http::{Error, Method},
+    route, web, FromRequest, HttpRequest, HttpResponse,
+};
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -188,15 +191,15 @@ async fn dispatch(
             .body(new_url.error.unwrap_or("internal server error".to_string())));
     }
 
+    // check if the request need to be proxied by body
+    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
+        return proxy_querier_by_body(req, payload, client, new_url, start).await;
+    }
+
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
     if *path_columns.get(3).unwrap_or(&"") == "ws" {
         return proxy_ws(req, payload, new_url, start).await;
-    }
-
-    // check if the request need to be proxied by body
-    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
-        return proxy_querier_by_body(req, payload, client, new_url, start).await;
     }
 
     // send query
@@ -239,17 +242,7 @@ async fn get_url(path: String) -> URLDetails {
 
     let nodes = nodes.unwrap();
     let node = get_rand_element(&nodes);
-    let (path, node) = if node.http_addr.contains("https://") {
-        (
-            path.replace("http://", "https://"),
-            node.http_addr.replace("https://", ""),
-        )
-    } else {
-        (
-            path.replace("https://", "http://"),
-            node.http_addr.replace("http://", ""),
-        )
-    };
+    let (path, node) = format_path_node(path, node.http_addr.clone());
     URLDetails {
         is_error: false,
         error: None,
@@ -324,7 +317,7 @@ async fn proxy_querier_by_body(
     let (key, payload) = if new_url.path.contains("/prometheus/api/v1/query_range")
         || new_url.path.contains("/prometheus/api/v1/query_exemplars")
     {
-        if req.method() == "GET" {
+        if req.method() == Method::GET {
             let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
                 return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
             };
@@ -346,24 +339,16 @@ async fn proxy_querier_by_body(
     else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
     };
+    log::info!("forward for key: {}, node_name: {}", key, node_name);
 
     // get node by name
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
     };
-    let (path, node) = if node.http_addr.contains("https://") {
-        (
-            new_url.path.replace("http://", "https://"),
-            node.http_addr.replace("https://", ""),
-        )
-    } else {
-        (
-            new_url.path.replace("https://", "http://"),
-            node.http_addr.replace("http://", ""),
-        )
-    };
+    let (path, node) = format_path_node(new_url.path, node.http_addr);
     new_url.path = path;
     new_url.node = node;
+    log::info!("forward for path: {}, node: {}", new_url.path, new_url.node);
 
     // send query
     let resp = if let Some(payload) = payload {
@@ -462,6 +447,21 @@ async fn proxy_ws(
     }
 }
 
+fn format_path_node(path: String, node: String) -> (String, String) {
+    let (path, node) = if node.contains("https://") {
+        (
+            path.replace("http://", "https://"),
+            node.replace("https://", ""),
+        )
+    } else {
+        (
+            path.replace("https://", "http://"),
+            node.replace("http://", ""),
+        )
+    };
+    (path, node)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,6 +471,9 @@ mod tests {
         assert!(is_querier_route("/api/_search"));
         assert!(is_querier_route("/api/_around"));
         assert!(!is_querier_route("/api/_bulk"));
+        assert!(is_querier_route(
+            "https://test.com/api/default/prometheus/api/v1/query_range"
+        ));
     }
 
     #[test]
