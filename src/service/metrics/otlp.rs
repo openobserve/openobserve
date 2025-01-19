@@ -625,7 +625,7 @@ fn process_gauge(
         process_data_point(rec, data_point);
         let val_map = rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-        val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(rec.clone());
     }
     records
@@ -652,7 +652,7 @@ fn process_sum(
         process_data_point(&mut dp_rec, data_point);
         let val_map = dp_rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-        val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec.clone());
     }
     records
@@ -678,7 +678,7 @@ fn process_histogram(
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
@@ -704,7 +704,7 @@ fn process_exponential_histogram(
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
@@ -730,7 +730,7 @@ fn process_summary(
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }

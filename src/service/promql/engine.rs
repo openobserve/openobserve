@@ -18,13 +18,13 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use async_recursion::async_recursion;
 use config::{
     get_config,
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    meta::promql::{HashLabelValue, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     utils::json,
 };
 use datafusion::{
     arrow::{
-        array::{Float64Array, Int64Array, StringArray},
-        datatypes::Schema,
+        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Schema},
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
@@ -558,7 +558,7 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
-    ) -> Result<HashMap<String, RangeValue>> {
+    ) -> Result<HashMap<HashLabelValue, RangeValue>> {
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
@@ -638,7 +638,7 @@ impl Engine {
             .await
             .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
 
-        let mut metrics: HashMap<String, RangeValue> = HashMap::default();
+        let mut metrics: HashMap<HashLabelValue, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
         for task_result in task_results {
             if task_results_len == 1 {
@@ -1090,7 +1090,7 @@ async fn selector_load_data_from_datafusion(
     end: i64,
     label_selector: &Option<HashSet<String>>,
     query_exemplars: bool,
-) -> Result<HashMap<String, RangeValue>> {
+) -> Result<HashMap<HashLabelValue, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
@@ -1146,26 +1146,51 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
-        .iter()
-        .flat_map(|batch| {
-            let ts = batch
-                .column_by_name(&cfg.common.column_timestamp)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap();
-            let hash = batch
-                .column_by_name(HASH_LABEL)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .unwrap();
-            ts.iter()
-                .zip(hash.iter())
-                .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").to_string()))
-        })
-        .unzip();
+    let hash_field_type = schema.field_with_name(HASH_LABEL).unwrap().data_type();
+    let (mut timestamp_values, hash_value_set): (Vec<_>, HashSet<HashLabelValue>) =
+        if hash_field_type == &DataType::UInt64 {
+            sub_batch
+                .iter()
+                .flat_map(|batch| {
+                    let ts = batch
+                        .column_by_name(&cfg.common.column_timestamp)
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap();
+                    let hash = batch
+                        .column_by_name(HASH_LABEL)
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<UInt64Array>()
+                        .unwrap();
+                    ts.iter()
+                        .zip(hash.iter())
+                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or(0).into()))
+                })
+                .unzip()
+        } else {
+            sub_batch
+                .iter()
+                .flat_map(|batch| {
+                    let ts = batch
+                        .column_by_name(&cfg.common.column_timestamp)
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<Int64Array>()
+                        .unwrap();
+                    let hash = batch
+                        .column_by_name(HASH_LABEL)
+                        .unwrap()
+                        .as_any()
+                        .downcast_ref::<StringArray>()
+                        .unwrap();
+                    ts.iter()
+                        .zip(hash.iter())
+                        .map(|(t, h)| (t.unwrap_or_default(), h.unwrap_or("").into()))
+                })
+                .unzip()
+        };
     timestamp_values.sort();
     timestamp_values.dedup();
     let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
@@ -1180,39 +1205,75 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let mut metrics: HashMap<String, RangeValue> = HashMap::with_capacity(hash_value_set.len());
+    let mut metrics: HashMap<HashLabelValue, RangeValue> =
+        HashMap::with_capacity(hash_value_set.len());
     for batch in series {
-        let hash_values = batch
-            .column_by_name(HASH_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        for i in 0..batch.num_rows() {
-            let hash = hash_values.value(i);
-            if !hash_value_set.contains(hash) {
-                continue;
-            }
-            if metrics.contains_key(hash) {
-                continue;
-            }
-            let mut labels = Vec::with_capacity(batch.num_columns());
-            for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                let name = k.name();
-                if name == HASH_LABEL {
+        if hash_field_type == &DataType::UInt64 {
+            let hash_values = batch
+                .column_by_name(HASH_LABEL)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .unwrap();
+            for i in 0..batch.num_rows() {
+                let hash = hash_values.value(i).into();
+                if !hash_value_set.contains(&hash) {
                     continue;
                 }
-                if v.is_null(i) {
+                if metrics.contains_key(&hash) {
                     continue;
                 }
-                let value = v.as_any().downcast_ref::<StringArray>().unwrap();
-                labels.push(Arc::new(Label {
-                    name: name.to_string(),
-                    value: value.value(i).to_string(),
-                }));
+                let mut labels = Vec::with_capacity(batch.num_columns());
+                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
+                    let name = k.name();
+                    if name == HASH_LABEL {
+                        continue;
+                    }
+                    if v.is_null(i) {
+                        continue;
+                    }
+                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
+                    labels.push(Arc::new(Label {
+                        name: name.to_string(),
+                        value: value.value(i).to_string(),
+                    }));
+                }
+                labels.sort_by(|a, b| a.name.cmp(&b.name));
+                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
             }
-            labels.sort_by(|a, b| a.name.cmp(&b.name));
-            metrics.insert(hash.to_string(), RangeValue::new(labels, Vec::new()));
+        } else {
+            let hash_values = batch
+                .column_by_name(HASH_LABEL)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            for i in 0..batch.num_rows() {
+                let hash = hash_values.value(i).into();
+                if !hash_value_set.contains(&hash) {
+                    continue;
+                }
+                if metrics.contains_key(&hash) {
+                    continue;
+                }
+                let mut labels = Vec::with_capacity(batch.num_columns());
+                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
+                    let name = k.name();
+                    if name == HASH_LABEL {
+                        continue;
+                    }
+                    if v.is_null(i) {
+                        continue;
+                    }
+                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
+                    labels.push(Arc::new(Label {
+                        name: name.to_string(),
+                        value: value.value(i).to_string(),
+                    }));
+                }
+                labels.sort_by(|a, b| a.name.cmp(&b.name));
+                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
+            }
         }
     }
 
@@ -1220,9 +1281,9 @@ async fn selector_load_data_from_datafusion(
 
     // get values
     if query_exemplars {
-        load_exemplars_from_datafusion(&mut metrics, df_group).await?;
+        load_exemplars_from_datafusion(hash_field_type, &mut metrics, df_group).await?;
     } else {
-        load_samples_from_datafusion(&mut metrics, df_group).await?;
+        load_samples_from_datafusion(hash_field_type, &mut metrics, df_group).await?;
     }
 
     log::info!("load samples took: {:?}", start_time.elapsed());
@@ -1231,7 +1292,8 @@ async fn selector_load_data_from_datafusion(
 }
 
 async fn load_samples_from_datafusion(
-    metrics: &mut HashMap<String, RangeValue>,
+    hash_field_type: &DataType,
+    metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
@@ -1248,19 +1310,14 @@ async fn load_samples_from_datafusion(
 
     let mut tasks = Vec::new();
     for mut stream in streams {
+        let hash_field_type = hash_field_type.clone();
         let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<String, RangeValue>>> =
+        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
                 let cfg = get_config();
                 loop {
                     match stream.try_next().await {
                         Ok(Some(batch)) => {
-                            let hash_values = batch
-                                .column_by_name(HASH_LABEL)
-                                .unwrap()
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .unwrap();
                             let time_values = batch
                                 .column_by_name(&cfg.common.column_timestamp)
                                 .unwrap()
@@ -1273,13 +1330,37 @@ async fn load_samples_from_datafusion(
                                 .as_any()
                                 .downcast_ref::<Float64Array>()
                                 .unwrap();
-                            for i in 0..batch.num_rows() {
-                                let hash = hash_values.value(i);
-                                if let Some(range_val) = series.get_mut(hash) {
-                                    range_val.samples.push(Sample::new(
-                                        time_values.value(i),
-                                        value_values.value(i),
-                                    ));
+                            if hash_field_type == DataType::UInt64 {
+                                let hash_values = batch
+                                    .column_by_name(HASH_LABEL)
+                                    .unwrap()
+                                    .as_any()
+                                    .downcast_ref::<UInt64Array>()
+                                    .unwrap();
+                                for i in 0..batch.num_rows() {
+                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    if let Some(range_val) = series.get_mut(&hash) {
+                                        range_val.samples.push(Sample::new(
+                                            time_values.value(i),
+                                            value_values.value(i),
+                                        ));
+                                    }
+                                }
+                            } else {
+                                let hash_values = batch
+                                    .column_by_name(HASH_LABEL)
+                                    .unwrap()
+                                    .as_any()
+                                    .downcast_ref::<StringArray>()
+                                    .unwrap();
+                                for i in 0..batch.num_rows() {
+                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    if let Some(range_val) = series.get_mut(&hash) {
+                                        range_val.samples.push(Sample::new(
+                                            time_values.value(i),
+                                            value_values.value(i),
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -1313,7 +1394,8 @@ async fn load_samples_from_datafusion(
 }
 
 async fn load_exemplars_from_datafusion(
-    metrics: &mut HashMap<String, RangeValue>,
+    hash_field_type: &DataType,
+    metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
     let streams = df
@@ -1324,41 +1406,73 @@ async fn load_exemplars_from_datafusion(
 
     let mut tasks = Vec::new();
     for mut stream in streams {
+        let hash_field_type = hash_field_type.clone();
         let mut series = metrics.clone();
-        let task: tokio::task::JoinHandle<Result<HashMap<String, RangeValue>>> =
+        let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
                 loop {
                     match stream.try_next().await {
                         Ok(Some(batch)) => {
-                            let hash_values = batch
-                                .column_by_name(HASH_LABEL)
-                                .unwrap()
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .unwrap();
                             let exemplars_values = batch
                                 .column_by_name(EXEMPLARS_LABEL)
                                 .unwrap()
                                 .as_any()
                                 .downcast_ref::<StringArray>()
                                 .unwrap();
-                            for i in 0..batch.num_rows() {
-                                let hash = hash_values.value(i);
-                                let exemplar = exemplars_values.value(i);
-                                if let Some(range_val) = series.get_mut(hash) {
-                                    if let Ok(exemplars) =
-                                        json::from_str::<Vec<json::Value>>(exemplar)
-                                    {
-                                        for exemplar in exemplars {
-                                            if let Some(exemplar) = exemplar.as_object() {
-                                                if range_val.exemplars.is_none() {
-                                                    range_val.exemplars = Some(vec![]);
+                            if hash_field_type == DataType::UInt64 {
+                                let hash_values = batch
+                                    .column_by_name(HASH_LABEL)
+                                    .unwrap()
+                                    .as_any()
+                                    .downcast_ref::<UInt64Array>()
+                                    .unwrap();
+                                for i in 0..batch.num_rows() {
+                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    let exemplar = exemplars_values.value(i);
+                                    if let Some(range_val) = series.get_mut(&hash) {
+                                        if let Ok(exemplars) =
+                                            json::from_str::<Vec<json::Value>>(exemplar)
+                                        {
+                                            for exemplar in exemplars {
+                                                if let Some(exemplar) = exemplar.as_object() {
+                                                    if range_val.exemplars.is_none() {
+                                                        range_val.exemplars = Some(vec![]);
+                                                    }
+                                                    range_val
+                                                        .exemplars
+                                                        .as_mut()
+                                                        .unwrap()
+                                                        .push(Exemplar::from(exemplar));
                                                 }
-                                                range_val
-                                                    .exemplars
-                                                    .as_mut()
-                                                    .unwrap()
-                                                    .push(Exemplar::from(exemplar));
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                let hash_values = batch
+                                    .column_by_name(HASH_LABEL)
+                                    .unwrap()
+                                    .as_any()
+                                    .downcast_ref::<StringArray>()
+                                    .unwrap();
+                                for i in 0..batch.num_rows() {
+                                    let hash: HashLabelValue = hash_values.value(i).into();
+                                    let exemplar = exemplars_values.value(i);
+                                    if let Some(range_val) = series.get_mut(&hash) {
+                                        if let Ok(exemplars) =
+                                            json::from_str::<Vec<json::Value>>(exemplar)
+                                        {
+                                            for exemplar in exemplars {
+                                                if let Some(exemplar) = exemplar.as_object() {
+                                                    if range_val.exemplars.is_none() {
+                                                        range_val.exemplars = Some(vec![]);
+                                                    }
+                                                    range_val
+                                                        .exemplars
+                                                        .as_mut()
+                                                        .unwrap()
+                                                        .push(Exemplar::from(exemplar));
+                                                }
                                             }
                                         }
                                     }
