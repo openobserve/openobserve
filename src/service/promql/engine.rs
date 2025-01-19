@@ -1212,10 +1212,7 @@ async fn selector_load_data_from_datafusion(
                 }));
             }
             labels.sort_by(|a, b| a.name.cmp(&b.name));
-            metrics.insert(
-                hash.to_string(),
-                RangeValue::new(labels, Vec::new()),
-            );
+            metrics.insert(hash.to_string(), RangeValue::new(labels, Vec::new()));
         }
     }
 
@@ -1248,7 +1245,6 @@ async fn load_samples_from_datafusion(
         "load_samples_from_datafusion took: {:?}",
         start_time.elapsed()
     );
-    tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
 
     let mut tasks = Vec::new();
     for mut stream in streams {
@@ -1320,43 +1316,84 @@ async fn load_exemplars_from_datafusion(
     metrics: &mut HashMap<String, RangeValue>,
     df: DataFrame,
 ) -> Result<()> {
-    let batches = df
+    let streams = df
         .filter(col(EXEMPLARS_LABEL).is_not_null())?
         .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
-        .collect()
+        .execute_stream_partitioned()
         .await?;
 
-    for batch in &batches {
-        let hash_values = batch
-            .column_by_name(HASH_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let exemplars_values = batch
-            .column_by_name(EXEMPLARS_LABEL)
-            .unwrap()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        for i in 0..batch.num_rows() {
-            let hash = hash_values.value(i);
-            let exemplar = exemplars_values.value(i);
-            if let Some(range_val) = metrics.get_mut(hash) {
-                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
-                    for exemplar in exemplars {
-                        if let Some(exemplar) = exemplar.as_object() {
-                            if range_val.exemplars.is_none() {
-                                range_val.exemplars = Some(vec![]);
-                            }
-                            range_val
-                                .exemplars
-                                .as_mut()
+    let mut tasks = Vec::new();
+    for mut stream in streams {
+        let mut series = metrics.clone();
+        let task: tokio::task::JoinHandle<Result<HashMap<String, RangeValue>>> =
+            tokio::task::spawn(async move {
+                loop {
+                    match stream.try_next().await {
+                        Ok(Some(batch)) => {
+                            let hash_values = batch
+                                .column_by_name(HASH_LABEL)
                                 .unwrap()
-                                .push(Exemplar::from(exemplar));
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            let exemplars_values = batch
+                                .column_by_name(EXEMPLARS_LABEL)
+                                .unwrap()
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap();
+                            for i in 0..batch.num_rows() {
+                                let hash = hash_values.value(i);
+                                let exemplar = exemplars_values.value(i);
+                                if let Some(range_val) = series.get_mut(hash) {
+                                    if let Ok(exemplars) =
+                                        json::from_str::<Vec<json::Value>>(exemplar)
+                                    {
+                                        for exemplar in exemplars {
+                                            if let Some(exemplar) = exemplar.as_object() {
+                                                if range_val.exemplars.is_none() {
+                                                    range_val.exemplars = Some(vec![]);
+                                                }
+                                                range_val
+                                                    .exemplars
+                                                    .as_mut()
+                                                    .unwrap()
+                                                    .push(Exemplar::from(exemplar));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Ok(None) => break,
+                        Err(e) => {
+                            log::error!(
+                                "load exemplars from datafusion execute stream Error: {}",
+                                e
+                            );
+                            return Err(e);
                         }
                     }
                 }
+                Ok(series)
+            });
+        tasks.push(task);
+    }
+
+    // collect results
+    for task in tasks {
+        let m = task
+            .await
+            .map_err(|e| DataFusionError::Execution(e.to_string()))??;
+        for (hash, value) in m {
+            let Some(exemplars) = value.exemplars else {
+                continue;
+            };
+            if let Some(range_val) = metrics.get_mut(&hash) {
+                if range_val.exemplars.is_none() {
+                    range_val.exemplars = Some(vec![]);
+                }
+                range_val.exemplars.as_mut().unwrap().extend(exemplars);
             }
         }
     }
