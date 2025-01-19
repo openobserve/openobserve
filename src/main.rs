@@ -555,7 +555,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client = router::http::create_http_client();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -654,7 +655,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client = router::http::create_http_client();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.

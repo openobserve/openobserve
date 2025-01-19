@@ -264,6 +264,7 @@ async fn default_proxy(
     // send query
     let req = if new_url.full_url.starts_with("https://") {
         create_http_client()
+            .unwrap()
             .request_from(req.full_url().to_string(), req.head())
             .address(new_url.node_addr.parse().unwrap())
     } else {
@@ -360,6 +361,7 @@ async fn proxy_querier_by_body(
     // send query
     let req = if new_url.full_url.starts_with("https://") {
         create_http_client()
+            .unwrap()
             .request_from(req.full_url().to_string(), req.head())
             .address(new_url.node_addr.parse().unwrap())
     } else {
@@ -455,17 +457,17 @@ async fn proxy_ws(
     }
 }
 
-pub fn create_http_client() -> awc::Client {
+pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
     let cfg = get_config();
     let mut client_builder = awc::Client::builder()
         .connector(awc::Connector::new().limit(cfg.route.max_connections))
         .timeout(std::time::Duration::from_secs(cfg.route.timeout))
         .disable_redirects();
     if cfg.http.tls_enabled {
-        let tls_config = crate::service::tls::client_tls_config().unwrap();
+        let tls_config = crate::service::tls::client_tls_config()?;
         client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(tls_config));
     }
-    client_builder.finish()
+    Ok(client_builder.finish())
 }
 
 #[cfg(test)]
