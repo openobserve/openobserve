@@ -15,8 +15,8 @@
 
 use std::{
     collections::HashMap,
+    fs,
     fs::Metadata,
-    path,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -26,7 +26,12 @@ use std::{
 };
 
 use chrono::Utc;
-use config::{get_config, meta::stream::RemoteStreamParams, utils::json};
+use config::{
+    get_config,
+    meta::{pipeline::components::PipelineSource, stream::RemoteStreamParams},
+    utils::json,
+    Config,
+};
 use infra::errors::{Error, Result};
 use ingester::{errors::WalSnafu, Entry, WAL_DIR_DEFAULT_PREFIX};
 use once_cell::sync::Lazy;
@@ -34,7 +39,13 @@ use parquet::data_type::AsBytes;
 use snafu::ResultExt;
 use tokio::sync::RwLock;
 
-use crate::service::pipeline::pipeline_watcher::{WatcherEvent, FILE_WATCHER_NOTIFY};
+use crate::service::{
+    db,
+    pipeline::pipeline_watcher::{WatcherEvent, FILE_WATCHER_NOTIFY},
+};
+
+const REMOTE_REALTIME_STREAM_WAL_DIR: &str = "remote_stream_wal";
+const REMOTE_QUERY_STREAM_TMP_WAL_DIR: &str = "remote_stream_wal_tmp";
 
 // each pipeline has a wal writer, but it still has a write performance issue when the data is
 // ingested concurrently
@@ -50,15 +61,26 @@ pub async fn get_pipeline_wal_writer(
     if let Some(writer) = map.get(&pipeline_id) {
         Ok(writer.clone())
     } else {
-        let writer = PipelineWalWriter::new(pipeline_id.clone(), remote_stream_params)?;
+        let pipeline = db::pipeline::get_by_id(pipeline_id.as_str())
+            .await
+            .map_err(|e| Error::Message(format!("get_pipeline_wal_writer fail: {e}")))?;
 
+        let pipeline_source = pipeline.source.clone();
+        let writer =
+            PipelineWalWriter::new(pipeline_id.clone(), pipeline.source, remote_stream_params)?;
         let writer = Arc::new(writer);
         map.insert(pipeline_id, writer.clone());
-        // notify the pipeline_file_watcher begin to read entry.
-        let wal_writer = writer.wal_writer.write().await;
-        let path = wal_writer.path();
-        notify_file_watcher(path.clone()).await;
-        drop(wal_writer);
+
+        // only realtime wal-file must notify file wather
+        // because scheduled pipeline will not write to real wal file
+        // we only notify file watcher when rename the tmp file to real file successfully
+        if let PipelineSource::Realtime(_) = pipeline_source {
+            // notify the pipeline_file_watcher begin to read entry.
+            let wal_writer = writer.wal_writer.write().await;
+            let path = wal_writer.path();
+            notify_file_watcher(path.clone()).await;
+            drop(wal_writer);
+        }
 
         Ok(writer)
     }
@@ -84,7 +106,11 @@ pub fn get_metadata_motified(metadata: &Metadata) -> Instant {
 
 pub async fn check_ttl() -> ingester::errors::Result<()> {
     let map = PIPELINE_WAL_WRITER_MAP.read().await;
-    for (_, w) in map.iter() {
+    // only for realtime ingest writer
+    for (_, w) in map
+        .iter()
+        .filter(|(_, w)| matches!(w.pipeline_source_type, PipelineSource::Realtime(_)))
+    {
         let metadata = w.wal_writer.read().await.metadata().unwrap();
         let ts = get_metadata_motified(&metadata);
         log::debug!(
@@ -99,16 +125,22 @@ pub async fn check_ttl() -> ingester::errors::Result<()> {
 
 pub struct PipelineWalWriter {
     pub pipeline_id: String,
+    pub pipeline_source_type: PipelineSource,
     pub remote_stream_params: RemoteStreamParams,
     pub wal_writer: Arc<RwLock<wal::Writer>>,
     next_seq: AtomicU64,
 }
 
 impl PipelineWalWriter {
-    pub fn new(pipeline_id: String, remote_stream_params: RemoteStreamParams) -> Result<Self> {
+    pub fn new(
+        pipeline_id: String,
+        pipeline_source_type: PipelineSource,
+        remote_stream_params: RemoteStreamParams,
+    ) -> Result<Self> {
         let cfg = &get_config();
-        let wal_file_dir =
-            path::PathBuf::from(&cfg.pipeline.remote_stream_wal_dir).join(WAL_DIR_DEFAULT_PREFIX);
+
+        let wal_file_dir = Self::build_wal_dir(&pipeline_source_type, cfg);
+
         let now = Utc::now().timestamp_micros();
         let next_seq = AtomicU64::new(now as u64);
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst).to_string();
@@ -123,6 +155,7 @@ impl PipelineWalWriter {
 
         Ok(Self {
             pipeline_id,
+            pipeline_source_type,
             remote_stream_params,
             wal_writer,
             next_seq,
@@ -200,6 +233,24 @@ impl PipelineWalWriter {
             .sync()
             .map_err(|e| Error::WalFileError(e.to_string()));
 
+        if let PipelineSource::Scheduled(_) = self.pipeline_source_type {
+            // rename tmp remote wal file to remote wal file
+            // scheduled pipeline will not write to real wal file, so rename the tmp file to remote
+            // file
+            let path = writer.path().clone();
+            let path_str = path.to_str().unwrap_or_default();
+            // Replace the segment
+            let new_path_str = path_str.replace(
+                REMOTE_QUERY_STREAM_TMP_WAL_DIR,
+                REMOTE_REALTIME_STREAM_WAL_DIR,
+            );
+            // Convert the String back to a PathBuf
+            let persist_path = PathBuf::from(new_path_str);
+            fs::rename(writer.path(), persist_path.clone())?;
+            // notify file watcher
+            notify_file_watcher(persist_path).await;
+        }
+
         log::debug!(
             "Writing WAL for pipeline: {}, wal_file_path: {}, wal_file_postion:{:?}, data: {:?}",
             self.pipeline_id,
@@ -230,6 +281,18 @@ impl PipelineWalWriter {
             || modified.elapsed().as_secs() > cfg.limit.max_file_retention_time
     }
 
+    fn build_wal_dir(pipeline_source_type: &PipelineSource, cfg: &Arc<Config>) -> PathBuf {
+        let path = match pipeline_source_type {
+            PipelineSource::Scheduled(_) => &cfg.pipeline.remote_stream_wal_dir.replace(
+                REMOTE_REALTIME_STREAM_WAL_DIR,
+                REMOTE_QUERY_STREAM_TMP_WAL_DIR,
+            ),
+            PipelineSource::Realtime(_) => &cfg.pipeline.remote_stream_wal_dir,
+        };
+
+        PathBuf::from(path).join(WAL_DIR_DEFAULT_PREFIX)
+    }
+
     async fn rotate(&self, entry_bytes_size: usize) -> Result<()> {
         let wal_writer = self.wal_writer.read().await;
         let metadata = wal_writer.metadata()?;
@@ -242,8 +305,7 @@ impl PipelineWalWriter {
 
         // rotation wal
         let cfg = get_config();
-        let wal_dir =
-            path::PathBuf::from(&cfg.pipeline.remote_stream_wal_dir).join(WAL_DIR_DEFAULT_PREFIX);
+        let wal_dir = Self::build_wal_dir(&self.pipeline_source_type, &config::get_config());
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         log::info!(
             "[PIPELINE:WAL] create file: {}/{}/{}/{}.wal",
@@ -269,8 +331,10 @@ impl PipelineWalWriter {
         let _old_wal = std::mem::replace(&mut *wal, new_wal_writer);
         drop(wal);
 
-        // notify the pipeline_file_watcher begin to read entry.
-        notify_file_watcher(path.clone()).await;
+        if let PipelineSource::Realtime(_) = self.pipeline_source_type {
+            // notify the pipeline_file_watcher begin to read entry.
+            notify_file_watcher(path.clone()).await;
+        }
 
         Ok(())
     }
