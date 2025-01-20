@@ -130,6 +130,6 @@ mod tests {
 
     #[test]
     fn test_pipeline_exporter_client_builder() {
-        PipelineExporterClientBuilder::build().unwrap();
+        PipelineExporterClientBuilder::build(false).unwrap();
     }
 }

@@ -1555,7 +1555,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY_TIME",
         default = 1440,
-        help = "pipeline exporter client request retry times, default 1440 min"
+        help = "pipeline exporter client request retry times, default 1440 minutes(24 hours)"
     )]
     pub remote_request_retry_time: u64,
     #[env_config(
@@ -1564,12 +1564,6 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
-    #[env_config(
-        name = "ZO_PIPELINE_EXPORTER_TLS_ENABLE",
-        default = "false",
-        help = "enable exporter tls"
-    )]
-    pub tls_enable: bool,
 }
 pub fn init() -> Config {
     dotenv_override().ok();
@@ -1950,8 +1944,11 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.pipeline.remote_stream_wal_dir.is_empty() {
         cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
     }
-    if !cfg.pipeline.remote_stream_wal_dir.ends_with('/') {
-        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.common.data_dir);
+
+    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
+        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
+    {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
     }
     Ok(())
 }
