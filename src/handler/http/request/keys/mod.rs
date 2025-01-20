@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use infra::table::cipher::CipherEntry;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::cipher::{Cipher, CipherData};
+use o2_enterprise::enterprise::cipher::{http_repr::merge_updates, Cipher, CipherData};
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
@@ -351,10 +351,35 @@ pub async fn update(
             ));
         }
 
-        let cd: CipherData = match req.key.try_into() {
+        let incoming: CipherData = match req.key.try_into() {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
+
+        let kdata = match infra::table::cipher::get_data(
+            &org_id,
+            infra::table::cipher::EntryKind::CipherKey,
+            &key_name,
+        )
+        .await
+        {
+            Ok(Some(k)) => k,
+            Ok(None) => {
+                return Ok(MetaHttpResponse::not_found(format!(
+                    "key {key_name} not found"
+                )))
+            }
+            Err(e) => {
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "error in updating key {e}"
+                )))
+            }
+        };
+
+        // we can be fairly certain that in db we have proper json
+        let existing: CipherData = serde_json::from_str(&kdata).unwrap();
+
+        let cd = merge_updates(existing, incoming);
 
         match cd.get_key().await {
             // here we are just checking that the key can encrypt a string, i.e.

@@ -50,8 +50,8 @@ const cipherKeys = {
   create: (org_identifier: string, data: CipherKeyData) => {
     return http().post(`/api/${org_identifier}/cipher_keys`, data);
   },
-  update: (org_identifier: string, data: CipherKeyData) => {
-    return http().put(`/api/${org_identifier}/cipher_keys/${data.name}`, data);
+  update: (org_identifier: string, data: CipherKeyData, name: String) => {
+    return http().put(`/api/${org_identifier}/cipher_keys/${name}`, data);
   },
   list: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/cipher_keys`);

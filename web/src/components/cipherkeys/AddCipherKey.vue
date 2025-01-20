@@ -427,6 +427,7 @@ const updateCipherKey = () => {
   CipherKeysService.update(
     store.state.selectedOrganization.identifier,
     formData.value,
+    formData.value.name,
   )
     .then((response) => {
       isSubmitting.value = false;
