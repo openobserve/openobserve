@@ -346,12 +346,7 @@ impl PipelineWatcher {
                 let header = pr.get_stream_endpoint_header().await;
                 let data = PipelineEntryBuilder::new()
                     .stream_path(pr.path.clone())
-                    .stream_endpoint(format!(
-                        "{}/api/{}/{}/_json",
-                        endpoint,
-                        pr.get_org_id(),
-                        stream_name
-                    ))
+                    .stream_endpoint(endpoint.to_string())
                     .stream_org_id(pr.get_org_id().to_string())
                     .stream_type(pr.get_stream_type().to_string())
                     .stream_name(stream_name.to_string())
