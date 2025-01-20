@@ -209,6 +209,18 @@ impl PipelineReceiver {
         }
     }
 
+    pub async fn get_stream_data_retention_days(&self) -> i64 {
+        let destination_name = self.get_stream_destination_name();
+        let org_id = self.get_org_id();
+        match destinations::get(org_id, destination_name).await {
+            Ok(data) => match data.data_retention_days {
+                0 => config::get_config().compact.data_retention_days,
+                other => other,
+            },
+            Err(_) => config::get_config().compact.data_retention_days,
+        }
+    }
+
     /// Read a entry from the wal file
     pub fn read_entry(&mut self) -> Result<(Option<Entry>, FilePosition)> {
         let (entry_bytes, len) = match self.read_entry_vecu8()? {
@@ -251,16 +263,17 @@ impl PipelineReceiver {
     }
 
     /// delete file when wal file modified time over max data retention
-    pub fn should_delete_on_data_retention(&self) -> bool {
+    pub async fn should_delete_on_data_retention(&self) -> bool {
         if let Ok(metadata) = self.reader.metadata() {
             let modified = get_metadata_motified(&metadata);
-            let cfg = &config::get_config();
             log::debug!(
                 "PipelineReceiver should_delete_on_data_retention file {} modified elapsed: {} ",
                 self.reader.path().display(),
                 modified.elapsed().as_secs()
             );
-            modified.elapsed().as_secs() > (cfg.compact.data_retention_days * 24 * 3600) as u64
+
+            let retention_time = self.get_stream_data_retention_days().await;
+            modified.elapsed().as_secs() > (retention_time * 24 * 3600) as u64
         } else {
             true
         }

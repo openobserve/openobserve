@@ -44,6 +44,9 @@ pub struct Destination {
     /// Required for `RemotePipeline` destination_type
     #[serde(default)]
     pub stream_type: StreamType,
+    /// Required for `RemotePipeline` destination_type
+    #[serde(default)]
+    pub data_retention_days: i64,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]

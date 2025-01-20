@@ -46,7 +46,7 @@ async fn cleanup() -> Result<(), anyhow::Error> {
         match PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
             Ok(fw) => {
                 // todo: every stream has its own retention policy, cache it or select every time?
-                if fw.should_delete_on_data_retention() {
+                if fw.should_delete_on_data_retention().await {
                     log::debug!("[PIPELINE] Deleting wal file: {:?}", wal_file);
                     if let Err(e) = tokio::fs::remove_file(wal_file).await {
                         log::error!(
