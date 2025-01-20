@@ -374,7 +374,7 @@ const createCipherKey = () => {
 };
 
 function filterEditedAttributes(formdata: any, originalData: any) {
-  const result = {};
+  const result: any = {};
 
   for (const key in formdata) {
     const formValue = formdata[key];
