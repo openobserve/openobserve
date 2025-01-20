@@ -22,7 +22,10 @@ use o2_enterprise::enterprise::cipher::{Cipher, CipherData};
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+use crate::common::{
+    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    utils::auth::{remove_ownership, set_ownership},
+};
 
 /// Store a key credential in db
 #[utoipa::path(
@@ -100,16 +103,19 @@ pub async fn save(
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),
-            name: req.name,
+            name: req.name.clone(),
             data: serde_json::to_string(&cd).unwrap(),
             kind: infra::table::cipher::EntryKind::CipherKey,
         })
         .await
         {
-            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "key created successfully".to_string(),
-            ))),
+            Ok(_) => {
+                set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "key created successfully".to_string(),
+                )))
+            }
             Err(e) => Ok(MetaHttpResponse::bad_request(format!(
                 "error in saving : {e}"
             ))),
@@ -274,10 +280,13 @@ pub async fn delete(
         )
         .await
         {
-            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "cipher key removed successfully".to_string(),
-            ))),
+            Ok(_) => {
+                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "cipher key removed successfully".to_string(),
+                )))
+            }
             Err(e) => Ok(MetaHttpResponse::internal_error(format!(
                 "error in removing key {e}"
             ))),
@@ -312,18 +321,24 @@ pub async fn delete(
     ),
     tag = "Key"
 )]
-#[put("/{org_id}/cipher_keys")]
+#[put("/{org_id}/cipher_keys/{name}")]
 pub async fn update(
-    org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        let (org_id, key_name) = path.into_inner();
         let req: KeyAddRequest = match serde_json::from_slice(&body) {
             Ok(v) => v,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
+        if key_name != req.name {
+            return Ok(MetaHttpResponse::bad_request(
+                "key name from req does not match path",
+            ));
+        }
 
         let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
             None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
