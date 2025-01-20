@@ -97,6 +97,8 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::timed_annotations::create_annotations,
         request::dashboards::timed_annotations::get_annotations,
         request::dashboards::timed_annotations::delete_annotations,
+        request::dashboards::timed_annotations::update_annotations,
+        request::dashboards::timed_annotations::delete_annotation_panels,
         request::alerts::deprecated::save_alert,
         request::alerts::deprecated::update_alert,
         request::alerts::deprecated::list_stream_alerts,
@@ -189,6 +191,7 @@ use crate::{common::meta, handler::http::request};
             config::meta::timed_annotations::TimedAnnotation,
             config::meta::timed_annotations::TimedAnnotationReq,
             config::meta::timed_annotations::TimedAnnotationDelete,
+            config::meta::timed_annotations::TimedAnnotationUpdate,
             // Alerts
             crate::handler::http::models::alerts::requests::CreateAlertRequestBody,
             crate::handler::http::models::alerts::requests::UpdateAlertRequestBody,
