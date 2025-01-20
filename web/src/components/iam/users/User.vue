@@ -395,9 +395,9 @@ export default defineComponent({
                 // org_member_id: data.org_member_id,
                 // isLoggedinUser: store.state.userInfo.email == data.email,
                 // isExternal: !!data.is_external,
-                enableEdit: false,
+                enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
-                enableDelete: false,
+                enableDelete: config.isCloud ? true : false,
                 // status: data.status,
               };
             });
