@@ -155,7 +155,7 @@ def test_new_alert_create(create_session, base_url):
         "operator": "=",
         "value": "200",
         "type": None,  # Set it to None or remove it
-        "id": "95eb852b-b93b-4cb6-ab17-b7608b4fc741"
+        "id": str(uuid.uuid4())
         } ],
         "search_event_type": "ui",
         "sql": "",
@@ -178,7 +178,6 @@ def test_new_alert_create(create_session, base_url):
     },
     "org_id": "default",
     "destinations": [destination_alert],
-    "context_attributes": {},
     "enabled": True,
     "description": "test",
     "folderId": folder_id
@@ -366,7 +365,7 @@ def test_put_alertnew_update(create_session, base_url):
         "operator": "=",
         "value": "200",
         "type": None,  # Set it to None or remove it
-        "id": "95eb852b-b93b-4cb6-ab17-b7608b4fc741"
+        "id": str(uuid.uuid4())
         } ],
         "search_event_type": "ui",
         "sql": "",
@@ -389,7 +388,6 @@ def test_put_alertnew_update(create_session, base_url):
     },
     "org_id": "default",
     "destinations": [destination_alert],
-    "context_attributes": {},
     "enabled": True,
     "description": "test",
     "folderId": folder_id
@@ -402,6 +400,8 @@ def test_put_alertnew_update(create_session, base_url):
     print(resp_post_alertnew.content)
     assert resp_post_alertnew.status_code == 200
 
+    # After creating the alert, wait a moment to ensure it's fully created
+    time.sleep(10)  # Increase this time if necessary
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -423,14 +423,14 @@ def test_put_alertnew_update(create_session, base_url):
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        print(f"Extracted alert_id: {alert_id}")
+        print(f"Extracted alert_id for update: {alert_id}")
 
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
-        print(f"Alert {alert_id} exists and is retrievable.")
-
-    # Update the alert
+        print(f"Alert {alert_id} exists and is retrievable for update.")
+       
+    # # Update the alert
         payload_alert_update = {
         "id": alert_id,
         "name": alert_name,
@@ -446,7 +446,7 @@ def test_put_alertnew_update(create_session, base_url):
         "operator": "=",
         "value": "test",
         "ignore_case": False,
-        "id": "aba20f7f-8006-40c5-9123-e880ecda1c95"
+        "id": str(uuid.uuid4())
         }
         ],
         "sql": None,
@@ -487,17 +487,27 @@ def test_put_alertnew_update(create_session, base_url):
         headers=headers,
          )
         print(resp_put_alertnew.content)
-
         assert ( resp_put_alertnew.status_code == 200  
         ), f"Post alert expected 200, but got {resp_put_alertnew.status_code} {resp_put_alertnew.content}"
 
         print(f"Alert {alert_name} updated successfully")
 
-        # Get  request using the extracted alert_id after update
+        # Get details for the updated alert
         resp_get_updated_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_get_updated_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
         print(f"Successfully fetched details for updated alert {alert_id}")
 
+        # Parse the response JSON
+        response_json_updated = resp_get_updated_alertnew.json()
+
+        # Check if the response is a dictionary (which it seems to be)
+        if isinstance(response_json_updated, dict):
+            alert_description = response_json_updated.get("description", None)
+        else:
+            raise ValueError("Unexpected response format: Expected a dictionary")
+
+        # Now you can assert or further handle the 'alert_description'
+            assert alert_description == "Test Updated", f"Expected 'Test Updated', but got {alert_description}"
 
 def test_put_alertnew_disable(create_session, base_url):
     """Running an E2E test for getting the new alert disable."""
@@ -532,7 +542,6 @@ def test_put_alertnew_disable(create_session, base_url):
         resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
-
     
     # Proceed to disable the alert
         resp_alertnew_disable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
@@ -540,10 +549,22 @@ def test_put_alertnew_disable(create_session, base_url):
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
         print(f"Successfully disabled alert {alert_id}")
 
-        # Get  request using the extracted alert_id after disabled
+        # Get details for the disabled alert
         resp_get_disabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
-        print(f"Successfully fetched details for updated alert {alert_id}")
+        assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for disabled alert {alert_id}"
+        print(f"Successfully fetched details for disabled alert {alert_id}")
+
+        # Parse the response JSON
+        response_json_disabled = resp_get_disabled_alertnew.json()
+
+        # Check if the response is a dictionary (which it seems to be)
+        if isinstance(response_json_disabled, dict):
+            alert_disabled = response_json_disabled.get("enabled", None)
+        else:
+            raise ValueError("Unexpected response format: Expected a dictionary")
+
+        # Now you can assert or further handle the 'alert_disabled'
+            assert alert_disabled == "False", f"Expected 'False', but got {alert_description}"
 
 def test_put_alertnew_enable(create_session, base_url):
     """Running an E2E test for getting the new alert enable."""
@@ -585,12 +606,23 @@ def test_put_alertnew_enable(create_session, base_url):
         print(f"Enable Alert Response: {resp_alertnew_enable.text}")
         assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
         print(f"Successfully enabled alert {alert_id}")
-        # Get  request using the extracted alert_id after enabled
-     
+        
+        # Get details for the enabled alert
         resp_get_enabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
-        assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
-        print(f"Successfully fetched details for updated alert {alert_id}")
+        assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for enabled alert {alert_id}"
+        print(f"Successfully fetched details for enabled alert {alert_id}")
 
+        # Parse the response JSON
+        response_json_enabled = resp_get_enabled_alertnew.json()
+
+        # Check if the response is a dictionary (which it seems to be)
+        if isinstance(response_json_enabled, dict):
+            alert_enabled = response_json_enabled.get("enabled", None)
+        else:
+            raise ValueError("Unexpected response format: Expected a dictionary")
+
+        # Now you can assert or further handle the 'alert_enabled'
+            assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
 
 def test_put_alertnew_trigger(create_session, base_url):
     """Running an E2E test for getting the new alert trigger."""
