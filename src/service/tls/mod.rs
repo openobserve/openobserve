@@ -19,6 +19,7 @@ use actix_tls::connect::rustls_0_23::{native_roots_cert_store, webpki_roots_cert
 use itertools::Itertools as _;
 use rustls::{ClientConfig, ServerConfig};
 use rustls_pemfile::{certs, private_key};
+
 pub fn http_tls_config() -> Result<ServerConfig, anyhow::Error> {
     let cfg = config::get_config();
     let cert_file =

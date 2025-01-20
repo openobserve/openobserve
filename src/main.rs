@@ -91,7 +91,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use openobserve::service::{
     pipeline::pipeline_file_server::PipelineFileServer,
-    tls::{client_tls_config, http_tls_config},
+    tls::http_tls_config,
 };
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -261,16 +261,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
-            let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
-            let Ok(_) = PipelineFileServer::run(fileserver_stop_rx).await else {
-                job_init_tx.send(false).ok();
-                panic!("pipeline file server run failed");
-            };
-
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
-            fileserver_stopped_tx.send(()).ok();
 
             // shutdown meter provider
             let _ = meter_provider.shutdown();
@@ -565,16 +558,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let mut client_builder = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects();
-            if cfg.http.tls_enabled {
-                let config = client_tls_config().unwrap();
-                client_builder =
-                    client_builder.connector(awc::Connector::new().rustls_0_23(config));
-            }
-            let client = client_builder.finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -588,7 +573,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -673,11 +658,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects()
-                .finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -691,7 +673,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -735,6 +717,19 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     });
     server.await?;
     Ok(())
+}
+
+fn create_http_client() -> awc::Client {
+    let cfg = get_config();
+    let mut client_builder = awc::Client::builder()
+        .connector(awc::Connector::new().limit(cfg.route.max_connections))
+        .timeout(Duration::from_secs(cfg.route.timeout))
+        .disable_redirects();
+    if cfg.http.tls_enabled {
+        let config = client_tls_config().unwrap();
+        client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(config));
+    }
+    client_builder.finish()
 }
 
 async fn graceful_shutdown(handle: ServerHandle) {
