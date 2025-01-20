@@ -120,6 +120,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
+        <template v-if="!isAlerts">
+          <div class="col-6 q-py-xs">
+            <q-select
+              v-model="formData.stream_type"
+              :options="streamTypes"
+              :label="t('alerts.streamType') + ' *'"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop no-case"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdatingDestination"
+              v-bind:disable="isUpdatingDestination"
+              @update:model-value="updateStreams()"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              style="min-width: 220px"
+            />
+          </div>
+          <div class="col-6 q-py-xs ">
+            <q-select
+              v-model="formData.stream_name"
+              :options="filteredStreams"
+              :label="t('alerts.stream_name') + ' *'"
+              :loading="isFetchingStreams"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop no-case"
+              filled
+              stack-label
+              dense
+              use-input
+              hide-selected
+              fill-input
+              :input-debounce="400"
+              v-bind:readonly="isUpdatingDestination"
+              v-bind:disable="isUpdatingDestination"
+              @filter="filterStreams"
+              @update:model-value="updateStreamFields(formData.stream_name)"
+              behavior="menu"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+                  />
+          </div>
+        </template>
 
         <template
           v-if="
@@ -310,11 +357,12 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import useStreams from "@/composables/useStreams";
 
 const props = defineProps<{
   templates: Template[] | [];
   destination: DestinationPayload | null;
-  isAlerts: boolean | true;
+  isAlerts: true;
 }>();
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
@@ -330,8 +378,23 @@ const formData: Ref<DestinationData> = ref({
   headers: {},
   emails: "",
   type: props.isAlerts ? "http" : "remote_pipeline",
+  stream_name: "",
+  stream_type: "logs",
 });
 const isUpdatingDestination = ref(false);
+const isFetchingStreams = ref(false);
+const streamTypes = ["logs", "metrics", "traces"];
+const filteredStreams: Ref<string[]> = ref([]);
+const indexOptions = ref([]);
+
+const originalStreamFields = ref([]);
+const filteredColumns = ref([]);
+const schemaList = ref([]);
+const streams: any = ref({});
+
+const { getStreams, getStream } = useStreams();
+
+
 
 const router = useRouter();
 
@@ -376,6 +439,7 @@ const tabs = computed(() => [
 onActivated(() => setupDestinationData());
 onBeforeMount(() => {
   setupDestinationData();
+  updateStreams();
 });
 
 const setupDestinationData = () => {
@@ -385,7 +449,7 @@ const setupDestinationData = () => {
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
-    formData.value.template = props.destination.template;
+    formData.value.template = props.destination.template | "";
     formData.value.headers = props.destination.headers;
     formData.value.emails = (props.destination.emails || []).join(", ");
     formData.value.type = props.destination.type || "http";
@@ -395,6 +459,10 @@ const setupDestinationData = () => {
       Object.entries(formData.value.headers).forEach(([key, value]) => {
         addApiHeader(key, value);
       });
+    }
+    if (!props.isAlerts) {
+      formData.value.stream_name = props.destination.stream_name || "";
+      formData.value.stream_type = props.destination.stream_type || "logs";
     }
   }
 };
@@ -455,6 +523,10 @@ const saveDestination = () => {
 
   if (!props.isAlerts) {
     payload["type"] = "remote_pipeline";
+    payload["stream_name"] = formData.value.stream_name;
+    payload["stream_type"] = formData.value.stream_type;
+    payload["org_id"] = store.state.selectedOrganization.identifier;
+    delete payload.template;
   }
 
   if (isUpdatingDestination.value) {
@@ -533,6 +605,76 @@ const createEmailTemplate = () => {
     },
   });
 };
+    const updateStreamFields = async (stream_name: any) => {
+          let streamCols: any = [];
+          const streams: any = await getStream(
+            stream_name,
+            formData.value.stream_type,
+            true,
+          );
+
+          if (streams && Array.isArray(streams.schema)) {
+            streamCols = streams.schema.map((column: any) => ({
+              label: column.name,
+              value: column.name,
+              type: column.type,
+            }));
+          }
+
+          // originalStreamFields.value = [...streamCols];
+          // filteredColumns.value = [...streamCols];
+
+          };
+          const updateStreams = (resetStream = true) => {
+                if (resetStream) formData.value.stream_name = "";
+              if (formData.value.stream_type && streams.value[formData.value.stream_type]) {
+                  schemaList.value = streams.value[formData.value.stream_type];
+                  indexOptions.value = streams.value[formData.value.stream_type].map(
+                    (data: any) => {
+                      return data.name;
+                    },
+                  );
+                  return;
+                }
+
+                if (!formData.value.stream_type) return Promise.resolve();
+
+                isFetchingStreams.value = true;
+                return getStreams(formData.value.stream_type, false)
+                  .then((res: any) => {
+                    streams.value[formData.value.stream_type] = res.list;
+                    schemaList.value = res.list;
+                    indexOptions.value = res.list.map((data: any) => {
+                      return data.name;
+                    });
+
+                    if (formData.value.stream_name)
+                      updateStreamFields(formData.value.stream_name);
+                    return Promise.resolve();
+                  })
+                  .catch(() => Promise.reject())
+                  .finally(() => (isFetchingStreams.value = false));
+              };
+          const filterColumns = (options: any[], val: String, update: Function) => {
+            let filteredOptions: any[] = [];
+            if (val === "") {
+              update(() => {
+                filteredOptions = [...options];
+              });
+              return filteredOptions;
+            }
+            update(() => {
+              const value = val.toLowerCase();
+              filteredOptions = options.filter(
+                (column: any) => column.toLowerCase().indexOf(value) > -1,
+              );
+            });
+            return filteredOptions;
+          };
+    const filterStreams = (val: string, update: any) => {
+      filteredStreams.value = filterColumns(indexOptions.value, val, update);
+    };
+
 </script>
 <style lang="scss" scoped>
 #editor {
