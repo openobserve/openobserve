@@ -231,7 +231,7 @@ const defaultObject = {
     searchRequestTraceIds: <string[]>[],
     searchWebSocketRequestIdsAndTraceIds: <
       { requestId: string; traceId: string }[]
-      >[],
+    >[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
   },
@@ -697,7 +697,7 @@ const useLogs = () => {
           end_time: new Date().getTime() * 1000,
           from:
             searchObj.meta.resultGrid.rowsPerPage *
-            (searchObj.data.resultGrid.currentPage - 1) || 0,
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           quick_mode: searchObj.meta.quickMode,
         },
@@ -759,8 +759,8 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-            searchObj.data.datetime.relativeTimePeriod,
-          )
+              searchObj.data.datetime.relativeTimePeriod,
+            )
           : cloneDeep(searchObj.data.datetime);
 
       if (searchObj.data.datetime.type === "relative") {
@@ -1980,7 +1980,7 @@ const useLogs = () => {
                 index
               ] == -1 ||
                 searchObj.data.queryResults.partitionDetail.partitionTotal[
-                index
+                  index
                 ] < res.data.total) &&
               queryReq.query.start_time == item[0]
             ) {
@@ -2163,7 +2163,7 @@ const useLogs = () => {
           ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
             if (
               searchObj.data.queryResults.partitionDetail.partitionTotal[
-              index
+                index
               ] == -1 &&
               queryReq.query.start_time == item[0]
             ) {
@@ -2224,7 +2224,7 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = res.data.aggs;
               const lastRecordTimeStamp = parseInt(
                 searchObj.data.queryResults.hits[0][
-                store.state.zoConfig.timestamp_column
+                  store.state.zoConfig.timestamp_column
                 ],
               );
               searchObj.data.queryResults.hits = res.data.hits;
@@ -2246,8 +2246,8 @@ const useLogs = () => {
               searchObj.data.resultGrid.currentPage - 1
             ].length > searchObj.data.queryResults.subpage &&
             searchObj.data.queryResults.hits.length <
-            searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.stream.selectedStream.length
+              searchObj.meta.resultGrid.rowsPerPage *
+                searchObj.data.stream.selectedStream.length
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -2396,7 +2396,7 @@ const useLogs = () => {
         return;
       }
 
-      const dismiss = () => { };
+      const dismiss = () => {};
       try {
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
@@ -2679,7 +2679,7 @@ const useLogs = () => {
               .map((stream: any) => [
                 stream,
                 searchObj.data.stream.expandGroupRows[stream] &&
-                  selectedStreamValues.length > 1
+                selectedStreamValues.length > 1
                   ? searchObj.data.stream.expandGroupRows[stream]
                   : selectedStreamValues.length > 1
                     ? false
@@ -2749,9 +2749,9 @@ const useLogs = () => {
                   range:
                     searchObj.data.datetime.queryRangeRestrictionInHour > 1
                       ? searchObj.data.datetime.queryRangeRestrictionInHour +
-                      " hours"
+                        " hours"
                       : searchObj.data.datetime.queryRangeRestrictionInHour +
-                      " hour",
+                        " hour",
                 },
               );
             }
@@ -2788,15 +2788,15 @@ const useLogs = () => {
 
             streamInterestingFieldsLocal =
               localInterestingFields.value != null &&
-                localInterestingFields.value[
+              localInterestingFields.value[
                 searchObj.organizationIdentifier + "_" + stream.name
-                ] !== undefined &&
-                localInterestingFields.value[
-                  searchObj.organizationIdentifier + "_" + stream.name
-                ].length > 0
+              ] !== undefined &&
+              localInterestingFields.value[
+                searchObj.organizationIdentifier + "_" + stream.name
+              ].length > 0
                 ? localInterestingFields.value[
-                searchObj.organizationIdentifier + "_" + stream.name
-                ]
+                    searchObj.organizationIdentifier + "_" + stream.name
+                  ]
                 : environmentInterestingFields.length > 0
                   ? [...environmentInterestingFields]
                   : [...schemaInterestingFields];
@@ -2815,12 +2815,12 @@ const useLogs = () => {
             let UDSFieldCount = 0;
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
-                searchObj.meta.useUserDefinedSchemas != "all_fields"
+              searchObj.meta.useUserDefinedSchemas != "all_fields"
                 ? [
-                  store.state.zoConfig?.timestamp_column,
-                  ...stream.settings?.defined_schema_fields,
-                  store.state.zoConfig?.all_fields_name,
-                ]
+                    store.state.zoConfig?.timestamp_column,
+                    ...stream.settings?.defined_schema_fields,
+                    store.state.zoConfig?.all_fields_name,
+                  ]
                 : stream.schema.map((obj: any) => obj.name);
             for (const field of fields) {
               fieldObj = {
@@ -2861,7 +2861,7 @@ const useLogs = () => {
                         schemaMaps[schemaFieldsIndex].streams[0]
                       ] =
                         searchObj.data.stream.expandGroupRowsFieldCount[
-                        schemaMaps[schemaFieldsIndex].streams[0]
+                          schemaMaps[schemaFieldsIndex].streams[0]
                         ] - 1;
                     }
 
@@ -2869,7 +2869,7 @@ const useLogs = () => {
                     commonSchemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
-                      "common"
+                        "common"
                       ] + 1;
 
                     //remove the element from the index
@@ -2890,7 +2890,7 @@ const useLogs = () => {
                       stream.name
                     ] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
-                      stream.name
+                        stream.name
                       ] + 1;
                   }
 
@@ -2920,7 +2920,7 @@ const useLogs = () => {
                       schemaMaps[schemaFieldsIndex].streams[0]
                     ] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
-                      schemaMaps[schemaFieldsIndex].streams[0]
+                        schemaMaps[schemaFieldsIndex].streams[0]
                       ] - 1;
                   }
 
@@ -2945,7 +2945,7 @@ const useLogs = () => {
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
                     searchObj.data.stream.expandGroupRowsFieldCount[
-                    stream.name
+                      stream.name
                     ] + 1;
                 }
               }
@@ -3081,12 +3081,12 @@ const useLogs = () => {
       if (
         logFilterField.length > 0 &&
         logFilterField[
-        `${store.state.selectedOrganization.identifier}_${stream}`
+          `${store.state.selectedOrganization.identifier}_${stream}`
         ] != undefined
       ) {
         logFieldSelectedValue.push(
           ...logFilterField[
-          `${store.state.selectedOrganization.identifier}_${stream}`
+            `${store.state.selectedOrganization.identifier}_${stream}`
           ],
         );
       }
@@ -3214,7 +3214,7 @@ const useLogs = () => {
         ) {
           sizes =
             searchObj.data.resultGrid.colSizes[
-            searchObj.data.stream.selectedStream
+              searchObj.data.stream.selectedStream
             ];
         }
 
@@ -3324,8 +3324,8 @@ const useLogs = () => {
           (searchObj.communicationMethod === "ws"
             ? searchObj.data.queryResults?.pagination?.length
             : searchObj.data.queryResults.partitionDetail?.paginations
-              ?.length || 0) -
-          1
+                ?.length || 0) -
+            1
         ) {
           endCount = Math.min(
             startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
@@ -3357,7 +3357,7 @@ const useLogs = () => {
       }
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
-          searchObj.data.queryResults.result_cache_ratio > 0
+        searchObj.data.queryResults.result_cache_ratio > 0
           ? "Delta Scan Size"
           : "Scan Size";
 
@@ -3720,7 +3720,7 @@ const useLogs = () => {
       console.log("Error while loading logs data");
     }
   };
-  const saveColumnSizes = () => { };
+  const saveColumnSizes = () => {};
 
   const handleRunQuery = async () => {
     try {
@@ -4522,7 +4522,7 @@ const useLogs = () => {
         searchObj.loading = false;
         throw new Error(
           notificationMsg.value ||
-          "Something went wrong while creating Search Request.",
+            "Something went wrong while creating Search Request.",
         );
       }
 
@@ -4711,7 +4711,7 @@ const useLogs = () => {
           payload.traceId,
           response,
           !response.content?.streaming_aggs &&
-          searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
+            searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
         );
       }
 
@@ -4826,6 +4826,7 @@ const useLogs = () => {
             searchObj.data.queryResults.scan_size =
               response.content.results.scan_size;
             searchObj.data.queryResults.took = response.content.results.took;
+            searchObj.data.queryResults.total = response.content.results.total;
           } else {
             searchObj.data.queryResults = response.content.results;
           }
