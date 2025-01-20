@@ -211,8 +211,25 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     let _ = put_into_db_coordinator(&key, json::to_vec(entry).unwrap().into(), true, None).await;
 
     #[cfg(feature = "enterprise")]
-    super_cluster::organization_put(&key, entry).await?;
+    super_cluster::organization_add(&key, entry).await?;
     Ok(())
+}
+
+pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, anyhow::Error> {
+    if new_name.trim().is_empty() {
+        return Err(anyhow::anyhow!("Organization name cannot be empty"));
+    }
+    if let Err(e) = organizations::rename(org_id, new_name).await {
+        log::error!("Error updating org: {}", e);
+        return Err(anyhow::anyhow!("Error updating org: {}", e));
+    }
+    let org = get_org(org_id).await?;
+    let key = format!("{}{}", ORG_KEY_PREFIX, org_id);
+    let _ = put_into_db_coordinator(&key, json::to_vec(&org).unwrap().into(), true, None).await;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_rename(&key, &org).await?;
+    Ok(org)
 }
 
 pub async fn get_org_from_db(org_id: &str) -> Result<Organization, anyhow::Error> {
@@ -270,13 +287,31 @@ mod super_cluster {
 
     use crate::common::meta::organization::Organization;
 
-    pub async fn organization_put(
+    pub async fn organization_add(
         key: &str,
         org: &Organization,
     ) -> Result<(), infra::errors::Error> {
         let value = config::utils::json::to_vec(org)?.into();
         if get_o2_config().super_cluster.enabled {
-            o2_enterprise::enterprise::super_cluster::queue::organization_put(
+            o2_enterprise::enterprise::super_cluster::queue::organization_add(
+                key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub async fn organization_rename(
+        key: &str,
+        org: &Organization,
+    ) -> Result<(), infra::errors::Error> {
+        let value = config::utils::json::to_vec(org)?.into();
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::organization_rename(
                 key,
                 value,
                 infra::db::NEED_WATCH,

@@ -36,6 +36,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::OrganizationAdd => {
             add(msg).await?;
         }
+        MessageType::OrganizationRename => {
+            rename(msg).await?;
+        }
         MessageType::OrganizationDelete => {
             delete(msg).await?;
         }
@@ -62,6 +65,20 @@ async fn add(msg: Message) -> Result<()> {
     {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to add organization: {}, error: {}",
+            org.name,
+            e
+        );
+        return Err(e);
+    }
+    let _ = put_into_db_coordinator(&msg.key, json::to_vec(&org).unwrap().into(), true, None).await;
+    Ok(())
+}
+
+async fn rename(msg: Message) -> Result<()> {
+    let org: Organization = json::from_slice(&msg.value.unwrap())?;
+    if let Err(e) = organizations::rename(&org.identifier, &org.name).await {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to rename organization: {}, error: {}",
             org.name,
             e
         );

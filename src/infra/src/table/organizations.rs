@@ -15,8 +15,8 @@
 
 use config::meta::organization::OrganizationType;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::Expr, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 
 use super::{
@@ -97,6 +97,25 @@ pub async fn add(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(record)
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
+pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update_many()
+        .col_expr(Column::OrgName, Expr::value(new_name.to_string()))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(chrono::Utc::now().timestamp_micros()),
+        )
+        .filter(Column::Identifier.eq(org_id))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
