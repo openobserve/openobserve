@@ -4,6 +4,7 @@ import uuid
 import pytest
 import json
 import requests
+import logging
 
 
 def test_get_alertsnew(create_session, base_url):
@@ -564,7 +565,7 @@ def test_put_alertnew_disable(create_session, base_url):
             raise ValueError("Unexpected response format: Expected a dictionary")
 
         # Now you can assert or further handle the 'alert_disabled'
-            assert alert_disabled == "False", f"Expected 'False', but got {alert_description}"
+            assert alert_disabled == "False", f"Expected 'False', but got {alert_disabled}"
 
 def test_put_alertnew_enable(create_session, base_url):
     """Running an E2E test for getting the new alert enable."""
@@ -624,12 +625,15 @@ def test_put_alertnew_enable(create_session, base_url):
         # Now you can assert or further handle the 'alert_enabled'
             assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
 
-def test_put_alertnew_trigger(create_session, base_url):
+def test_put_alertnew_trigger(create_session, base_url, caplog):
     """Running an E2E test for getting the new alert trigger."""
-
+    caplog.set_level('INFO')
     session = create_session
     url = base_url
     org_id = "default"
+
+    # Create a logger
+    logger = logging.getLogger(__name__)
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
@@ -661,7 +665,8 @@ def test_put_alertnew_trigger(create_session, base_url):
         time.sleep(5)  # Brief wait for status update
 
     # Trigger the alert
-        print(f"Attempting to trigger alert with ID: {alert_id}")
+        # Trigger the alert
+        logger.info(f"Attempting to trigger alert with ID: {alert_id}")
 
         resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
 
@@ -676,6 +681,13 @@ def test_put_alertnew_trigger(create_session, base_url):
     # Check if the response was successful
         assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
         print(f"Successfully triggered alert {alert_id}")
+
+        # Verify trigger effects
+        time.sleep(2)  # Wait for trigger processing
+        resp_check = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check.status_code == 200
+        alert_data = resp_check.json()
+        # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
     
 def test_delete_alertnew(create_session, base_url):
     """Running an E2E test for deleting the new alert."""
