@@ -127,7 +127,7 @@ pub async fn get(
     for panel in panels {
         panels_map
             .entry(panel.timed_annotation_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(panel.panel_id.clone());
     }
 
