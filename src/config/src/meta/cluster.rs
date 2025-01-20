@@ -61,6 +61,9 @@ impl Node {
     pub fn is_single_node(&self) -> bool {
         self.role.len() == 1 && self.role.contains(&Role::All)
     }
+    pub fn is_single_role(&self) -> bool {
+        self.role.len() == 1
+    }
     pub fn is_router(&self) -> bool {
         self.role.contains(&Role::Router)
     }
