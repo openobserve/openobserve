@@ -137,7 +137,9 @@ pub async fn submit_job(
     .await;
 
     match res {
-        Ok(job_id) => Ok(MetaHttpResponse::ok(format!("job_id: {job_id}"))),
+        Ok(job_id) => Ok(MetaHttpResponse::ok(format!(
+            "[Job_Id: {job_id}] Search Job submitted successfully."
+        ))),
         Err(err) => {
             log::error!("[trace_id {trace_id}] sumbit query error: {}", err);
             Ok(MetaHttpResponse::internal_error(err.to_string()))
@@ -204,7 +206,7 @@ pub async fn cancel_job(
         Ok(res) if res.status() != StatusCode::OK => Ok(res),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         Ok(_) => Ok(MetaHttpResponse::ok(format!(
-            "job_id: {job_id} cancel success"
+            "[Job_Id: {job_id}] Running Search Job cancelled successfully."
         ))),
     }
 }
@@ -249,7 +251,7 @@ pub async fn get_job_result(
         Ok(response)
     } else if model.result_path.is_none() || model.cluster.is_none() {
         Ok(MetaHttpResponse::not_found(format!(
-            "job_id: {job_id} don't have result_path or cluster"
+            "[Job_Id: {job_id}] don't have result_path or cluster"
         )))
     } else {
         let path = model.result_path.clone().unwrap();
@@ -290,10 +292,10 @@ pub async fn delete_job(
     // 2. make the job_id in search_job table delete
     match set_job_deleted(job_id.as_str()).await {
         Ok(true) => Ok(MetaHttpResponse::ok(format!(
-            "job_id: {job_id} delete success"
+            "[Job_Id: {job_id}] Running Search Job deleted successfully."
         ))),
         Ok(false) => Ok(MetaHttpResponse::not_found(format!(
-            "job_id: {job_id} not found"
+            "[Job_Id: {job_id}] Search Job not found"
         ))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -328,16 +330,16 @@ pub async fn retry_job(
     }
 
     if model.status != 2 && model.status != 3 {
-        return Ok(MetaHttpResponse::forbidden(
-            "Only canceled, finished job can be retry",
-        ));
+        return Ok(MetaHttpResponse::forbidden(format!(
+            "[Job_Id: {job_id}] Only canceled, finished search job can be retry"
+        )));
     }
 
     // 2. make the job_id as pending in search_job table
     let res = retry_search_job(&job_id).await;
     match res {
         Ok(_) => Ok(MetaHttpResponse::ok(format!(
-            "job_id: {job_id} retry success"
+            "[Job_Id: {job_id}] Search Job retry successfully."
         ))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -352,7 +354,7 @@ async fn cancel_job_inner(
     let job = get(job_id, org_id).await;
     if job.is_err() {
         return Ok(MetaHttpResponse::not_found(format!(
-            "job_id: {job_id} not found"
+            "[Job_Id: {job_id}] Search Job not found"
         )));
     }
     let job = job.unwrap();
