@@ -192,8 +192,6 @@ def test_new_alert_create(create_session, base_url):
 
     assert ( resp_post_alertnew.status_code == 200  
     ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
-    # assert (resp_post_alertnew.json()['id'] == alert_id), f"Alert id
-    # mismatch {resp_post_alertnew.json()['id']} {alert_id}"
     print(f"Alert {alert_name} created successfully")
 
 
@@ -327,6 +325,7 @@ def test_put_alertnew_update(create_session, base_url):
     payload_logs = [
         {
             "Athlete": "newtemp",
+            "log": "200",  # Match the query condition
             "City": "Athens",
             "Country": "HUN",
             "Discipline": "Swimming",
@@ -335,6 +334,7 @@ def test_put_alertnew_update(create_session, base_url):
         },
         {
             "Athlete": "HERSCHMANN",
+            "log": "404",  # Add a non-matching record for negative testing
             "City": "Athens",
             "Country": "CHN",
             "Discipline": "Swimming",
@@ -480,6 +480,7 @@ def test_put_alertnew_update(create_session, base_url):
         "createdAt": int(time.time() * 1000),
         "lastTriggeredAt": int(time.time() * 1000),
         } 
+        # Update the alert for description with "Test Updated"
         resp_put_alertnew = session.put(
         f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs",
         json=payload_alert_update,
@@ -489,6 +490,14 @@ def test_put_alertnew_update(create_session, base_url):
 
         assert ( resp_put_alertnew.status_code == 200  
         ), f"Post alert expected 200, but got {resp_put_alertnew.status_code} {resp_put_alertnew.content}"
+
+        print(f"Alert {alert_name} updated successfully")
+
+        # Get  request using the extracted alert_id after update
+        resp_get_updated_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_updated_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
+        print(f"Successfully fetched details for updated alert {alert_id}")
+
 
 def test_put_alertnew_disable(create_session, base_url):
     """Running an E2E test for getting the new alert disable."""
@@ -531,6 +540,11 @@ def test_put_alertnew_disable(create_session, base_url):
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
         print(f"Successfully disabled alert {alert_id}")
 
+        # Get  request using the extracted alert_id after disabled
+        resp_get_disabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
+        print(f"Successfully fetched details for updated alert {alert_id}")
+
 def test_put_alertnew_enable(create_session, base_url):
     """Running an E2E test for getting the new alert enable."""
 
@@ -571,6 +585,12 @@ def test_put_alertnew_enable(create_session, base_url):
         print(f"Enable Alert Response: {resp_alertnew_enable.text}")
         assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
         print(f"Successfully enabled alert {alert_id}")
+        # Get  request using the extracted alert_id after enabled
+     
+        resp_get_enabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
+        print(f"Successfully fetched details for updated alert {alert_id}")
+
 
 def test_put_alertnew_trigger(create_session, base_url):
     """Running an E2E test for getting the new alert trigger."""
@@ -610,6 +630,7 @@ def test_put_alertnew_trigger(create_session, base_url):
 
     # Trigger the alert
         print(f"Attempting to trigger alert with ID: {alert_id}")
+
         resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
 
     # Log response details for debugging
@@ -663,3 +684,8 @@ def test_delete_alertnew(create_session, base_url):
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
+
+    # Verify alert is deleted
+        resp_verify = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
+
