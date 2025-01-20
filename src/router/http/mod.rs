@@ -429,7 +429,7 @@ async fn proxy_ws(
     let cfg = get_config();
     if cfg.common.websocket_enabled {
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
-        let ws_url = match ws::convert_to_websocket_url(&new_url.path) {
+        let ws_url = match ws::convert_to_websocket_url(&new_url.full_url) {
             Ok(url) => url,
             Err(e) => {
                 log::error!("Error converting URL to WebSocket: {}", e);
