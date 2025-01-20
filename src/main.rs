@@ -89,7 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::tls::{client_tls_config, http_tls_config};
+use openobserve::service::tls::http_tls_config;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -563,7 +563,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client = create_http_client();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -662,7 +663,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let http_client = create_http_client();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -720,19 +722,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     });
     server.await?;
     Ok(())
-}
-
-fn create_http_client() -> awc::Client {
-    let cfg = get_config();
-    let mut client_builder = awc::Client::builder()
-        .connector(awc::Connector::new().limit(cfg.route.max_connections))
-        .timeout(Duration::from_secs(cfg.route.timeout))
-        .disable_redirects();
-    if cfg.http.tls_enabled {
-        let config = client_tls_config().unwrap();
-        client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(config));
-    }
-    client_builder.finish()
 }
 
 async fn graceful_shutdown(handle: ServerHandle) {
