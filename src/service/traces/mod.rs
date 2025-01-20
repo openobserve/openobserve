@@ -613,10 +613,12 @@ pub async fn ingest_json(
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     for mut value in json_values {
-        let timestamp = value["start_time"]
-            .as_i64()
-            .map(|ts| ts / 1000)
-            .unwrap_or(min_ts);
+        let timestamp = value[&cfg.common.column_timestamp].as_i64().unwrap_or(
+            value["start_time"]
+                .as_i64()
+                .map(|ts| ts / 1000)
+                .unwrap_or(min_ts),
+        );
         let trace_id = value["trace_id"].to_string();
         if timestamp < min_ts {
             log::error!(
