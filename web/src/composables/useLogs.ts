@@ -2235,7 +2235,6 @@ const useLogs = () => {
       }
 
       const { traceparent, traceId } = generateTraceContext();
-      console.log(queryReq,'query req')
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
         ? "get_scheduled_search_result"
@@ -2426,7 +2425,7 @@ const useLogs = () => {
           }
           if (searchObj.meta.jobId != ""){
             searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
-            console.log(searchObj.meta.resultGrid.rowsPerPage,'rows per age')
+            searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
           }
 
@@ -3470,7 +3469,6 @@ const useLogs = () => {
         searchObj.data.queryResults.hits?.length,
         searchObj.data.queryResults.total,
       );
-      console.log(totalCount,'total count')
 
       if (!searchObj.meta.resultGrid.showPagination) {
         endCount = searchObj.data.queryResults.hits?.length;
@@ -3479,7 +3477,7 @@ const useLogs = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          (searchObj.communicationMethod === "ws"
+          (searchObj.communicationMethod === "ws" || searchObj.meta.jobId != ""
             ? searchObj.data.queryResults?.pagination?.length
             : searchObj.data.queryResults.partitionDetail?.paginations
                 ?.length || 0) -
@@ -3883,7 +3881,11 @@ const useLogs = () => {
         await getQueryData();
       }
       else{
+        console.log('here it running refreshed 2')
+
         await getJobData();
+
+        console.log(searchObj.data.queryResults.pagination,'pagination refreshed')
       }
       refreshData();
     } catch (e: any) {
@@ -5544,9 +5546,10 @@ const useLogs = () => {
           size: rowsPerPage,
         });
       }
+      // console.log("searchObj.data.queryResults.pagination", searchObj.data.queryResults.pagination);
     } catch (e: any) {
-      console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
+      console.log("Error while refreshing pagination", e);
+      notificationMsg.value = "Error while refreshing pagination.";
       return false;
     }
   };
