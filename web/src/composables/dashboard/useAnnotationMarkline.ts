@@ -1,17 +1,5 @@
 import { toZonedTime } from "date-fns-tz";
 
-const changeFormatOfDateTime = (timestamp: any) => {
-  const date = new Date(timestamp / 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
-
 export const getAnnotationsData = (annotations: any, timezone: string) => {
   const markLines: any = [];
   const markAreas: any = [];
@@ -22,9 +10,11 @@ export const getAnnotationsData = (annotations: any, timezone: string) => {
         {
           name: annotation.title,
           xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
+          annotationDetails: annotation,
         },
         {
           xAxis: toZonedTime(new Date(annotation.end_time / 1000), timezone),
+          annotationDetails: annotation,
         },
       ]);
     } else if (annotation.start_time) {
@@ -32,11 +22,8 @@ export const getAnnotationsData = (annotations: any, timezone: string) => {
         symbol: ["none", "none"],
         name: annotation.title,
         type: "xAxis",
-        xAxis: changeFormatOfDateTime(annotation.start_time),
-        label: {
-          formatter: annotation.title ? "{b}:{c}" : "{c}",
-          position: "insideEndTop",
-        },
+        xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
+        label: { show: true, formatter: annotation.title },
         annotationDetails: annotation,
       });
     }

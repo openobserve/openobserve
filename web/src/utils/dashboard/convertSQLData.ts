@@ -1144,10 +1144,16 @@ export const convertSQLData = async (
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
-  const { markLines, markAreas } = getAnnotationsData(annotations, store.state.timezone);
+  const { markLines, markAreas } = getAnnotationsData(
+    annotations,
+    store.state.timezone,
+  );
 
   const getSeriesMarkLine = () => {
     return {
+      itemStyle: {
+        color: "rgba(255, 173, 177, 0.4)",
+      },
       silent: false,
       animation: false,
       data: [...getMarkLineData(panelSchema), ...markLines],
@@ -1156,9 +1162,9 @@ export const convertSQLData = async (
 
   const getSeriesMarkArea = () => {
     return {
-      // itemStyle: {
-      //   color: "rgba(255, 173, 177, 0.4)",
-      // },
+      itemStyle: {
+        color: "rgba(255, 173, 177, 0.4)",
+      },
       data: markAreas,
     };
   };
@@ -1193,8 +1199,8 @@ export const convertSQLData = async (
       ...defaultSeriesProps,
       label: getSeriesLabel(),
       // markLine if exist
-      markLine: getSeriesMarkLine(),
-      markArea: getSeriesMarkArea(),
+      // markLine: getSeriesMarkLine(),
+      // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
       large: true,
@@ -2140,7 +2146,7 @@ export const convertSQLData = async (
         }
       });
 
-      console.log("options.series", options?.series)
+      console.log("options.series", options?.series);
 
       // Trellis has multiple x axis
       if (panelSchema.config.trellis?.layout) {
@@ -2514,6 +2520,19 @@ export const convertSQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  console.log("after", annotations?.value?.[0]?.start_time);
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+  console.log("convertedTimeStampToDataFormat", convertedTimeStampToDataFormat);
+
+  options.series.push({
+    type: "line",
+    data: [[convertedTimeStampToDataFormat, null]],
+    markLine: getSeriesMarkLine(),
+    markArea: getSeriesMarkArea(),
+  });
+  console.log("options", options);
 
   return {
     options,
