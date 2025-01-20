@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{ider, utils::json};
+use config::utils::json;
 use hashbrown::HashSet;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
@@ -86,19 +86,21 @@ impl MigrationTrait for Migration {
                     user_type: Set(json_user.is_external as i16),
                     created_at: Set(now),
                     updated_at: Set(now),
-                    id: Set(ider::uuid()),
+                    id: Set(users::ksuid_from_hash(json_user.email.clone()).to_string()),
                 });
 
                 for org_user in all_org_users {
                     org_users.push(org_users::ActiveModel {
-                        org_id: Set(org_user.org),
-                        email: Set(org_user.email),
+                        org_id: Set(org_user.org.clone()),
+                        email: Set(org_user.email.clone()),
                         role: Set(org_user.role.into()),
                         token: Set(org_user.token),
                         rum_token: Set(org_user.rum_token),
                         created_at: Set(now),
                         updated_at: Set(now),
-                        id: Set(ider::uuid()),
+                        id: Set(
+                            org_users::ksuid_from_hash(org_user.org, org_user.email).to_string()
+                        ),
                     });
                 }
             }
@@ -306,6 +308,7 @@ mod meta {
 /// Representation of the users table at the time this migration executes.
 mod users {
     use sea_orm::entity::prelude::*;
+    use svix_ksuid::KsuidLike;
 
     // define the organizations table
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
@@ -339,11 +342,20 @@ mod users {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    pub fn ksuid_from_hash(user_email: String) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(user_email);
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
+    }
 }
 
 /// Representation of the org_users table at the time this migration executes.
 mod org_users {
     use sea_orm::entity::prelude::*;
+    use svix_ksuid::KsuidLike;
 
     // define the organizations table
     #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
@@ -366,6 +378,15 @@ mod org_users {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+
+    pub fn ksuid_from_hash(org_id: String, user_email: String) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(org_id);
+        hasher.update(user_email);
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
+    }
 }
 
 mod organization {

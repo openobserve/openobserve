@@ -34,6 +34,11 @@ pub struct Organization {
     pub org_type: String,
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgRenameBody {
+    pub new_name: String,
+}
+
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrganizationInvites {

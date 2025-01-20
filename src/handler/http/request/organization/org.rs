@@ -29,8 +29,8 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, THRESHOLD,
+                OrgDetails, OrgRenameBody, OrgUser, Organization, OrganizationResponse,
+                PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{is_root_user, UserEmail},
@@ -364,19 +364,20 @@ async fn create_org(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("new_name" = String, Path, description = "New organization name"),
-      ),
+    ),
+    request_body(content = OrgRenameBody, description = "Organization new name", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Organization),
     )
 )]
-#[put("/{org_id}/rename/{new_name}")]
+#[put("/{org_id}/rename")]
 async fn rename_org(
     user_email: UserEmail,
-    path: web::Path<(String, String)>,
+    path: web::Path<String>,
+    new_name: web::Json<OrgRenameBody>,
 ) -> Result<HttpResponse, Error> {
-    let (org, new_name) = path.into_inner();
-    let new_name = new_name.trim();
+    let org = path.into_inner();
+    let new_name = new_name.into_inner().new_name;
     if new_name.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
@@ -384,7 +385,7 @@ async fn rename_org(
         )));
     }
 
-    let result = organization::rename_org(&org, new_name, &user_email.user_id).await;
+    let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
