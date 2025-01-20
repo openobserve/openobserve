@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'scatter',
               'stacked',
               'h-stacked',
-            ].includes(panelSchema.type)
+            ].includes(panelSchema.type) && checkIfPanelIsTimeSeries === true
           "
           color="primary"
           :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
@@ -510,6 +510,10 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    const checkIfPanelIsTimeSeries = computed(() => {
+      return panelData.value?.extras?.isTimeSeries;
+    });
 
     // when we get the new metadata from the apis, emit the metadata update
     watch(
@@ -1329,7 +1333,8 @@ export default defineComponent({
       closeAddAnnotation,
       isAddAnnotationMode,
       toggleAddAnnotationMode,
-      annotationToAddEdit
+      annotationToAddEdit,
+      checkIfPanelIsTimeSeries,
     };
   },
 });
