@@ -712,7 +712,6 @@ async fn get_partitions(
         clusters: search_payload.clusters.clone(),
         // vrl is not required for _search_partition
         query_fn: Default::default(),
-        // TODO: push a fix for this as an update
         streaming_output: true,
     };
 
