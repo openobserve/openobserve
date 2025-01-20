@@ -76,7 +76,8 @@ export const deepKeys = (o: any) => {
   }
   const results = [];
   const keys = Object.keys(o);
-  for (var i in keys) {
+  for (const i in keys) {
+    // Check if we can use === instead of ==
     if (o[keys[i]] == undefined || o[keys[i]].length) {
       results.push(keys[i]);
     } else {
