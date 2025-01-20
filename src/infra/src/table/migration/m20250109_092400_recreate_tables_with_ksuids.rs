@@ -81,9 +81,9 @@ impl MigrationTrait for Migration {
         legacy_dashboards::populate_ksuid_column(&txn, 100).await?;
         txn.commit().await?;
 
-        // Create the new `folders`, `dashboards`, and `alerts` tables which use
-        // KSUIDs as their primary keys and foreign keys. And create the new
-        // indices for the tables.
+        // Create the new `new_folders`, `new_dashboards`, and `new_alerts`
+        // tables which use KSUIDs as their primary keys and foreign keys. And
+        // create the new indices for the tables.
         manager
             .create_table(new_folders::create_folders_table_statement())
             .await?;
@@ -116,6 +116,16 @@ impl MigrationTrait for Migration {
         new_dashboards::populate(&txn).await?;
         new_alerts::populate(&txn).await?;
         txn.commit().await?;
+
+        // Rename each of the new tables from its temporary name to the original
+        // table name.
+        manager
+            .rename_table(new_dashboards::rename_to_dashboards())
+            .await?;
+        manager.rename_table(new_alerts::rename_to_alerts()).await?;
+        manager
+            .rename_table(new_folders::rename_to_folders())
+            .await?;
 
         // Delete each of the legacy tables.
         manager.drop_table(legacy_dashboards::drop_table()).await?;
@@ -326,9 +336,12 @@ mod new_folders {
     const FOLDERS_ORG_IDX: &str = "folders_org_idx_2";
     const FOLDERS_ORG_TYPE_FOLDER_ID_IDX: &str = "folders_org_type_folder_id_idx_2";
 
+    const OLD_TABLE_NAME: &str = "new_folders";
+    const NEW_TABLE_NAME: &str = "folders";
+
     /// Identifiers used in queries on the new folders table.
     #[derive(DeriveIden)]
-    pub enum Folders {
+    pub enum NewFolders {
         Table,
         Id,
         Org,
@@ -341,26 +354,26 @@ mod new_folders {
     /// Statement to create the new folders table.
     pub fn create_folders_table_statement() -> TableCreateStatement {
         Table::create()
-        .table(Folders::Table)
+        .table(NewFolders::Table)
         // The ID is 27-character human readable KSUID.
         .col(
-            ColumnDef::new(Folders::Id)
+            ColumnDef::new(NewFolders::Id)
                 .char_len(27)
                 .not_null()
                 .primary_key(),
         )
-        .col(ColumnDef::new(Folders::Org).string_len(100).not_null())
+        .col(ColumnDef::new(NewFolders::Org).string_len(100).not_null())
         // A user-facing ID for the folder. This value can be a 64-bit signed
         // integer "snowflake" or the string "default" to indicate the
         // organization's special default folder.
-        .col(ColumnDef::new(Folders::FolderId).string_len(256).not_null())
-        .col(ColumnDef::new(Folders::Name).string_len(256).not_null())
-        .col(ColumnDef::new(Folders::Description).text())
+        .col(ColumnDef::new(NewFolders::FolderId).string_len(256).not_null())
+        .col(ColumnDef::new(NewFolders::Name).string_len(256).not_null())
+        .col(ColumnDef::new(NewFolders::Description).text())
         // Folder type where...
         // - 0 is a dashboards folder
         // - 1 is an alerts folder
         // - 2 is a reports folder
-        .col(ColumnDef::new(Folders::Type).small_integer().not_null())
+        .col(ColumnDef::new(NewFolders::Type).small_integer().not_null())
         .to_owned()
     }
 
@@ -369,8 +382,8 @@ mod new_folders {
         sea_query::Index::create()
             .if_not_exists()
             .name(FOLDERS_ORG_IDX)
-            .table(Folders::Table)
-            .col(Folders::Org)
+            .table(NewFolders::Table)
+            .col(NewFolders::Org)
             .to_owned()
     }
 
@@ -379,10 +392,10 @@ mod new_folders {
         sea_query::Index::create()
             .if_not_exists()
             .name(FOLDERS_ORG_TYPE_FOLDER_ID_IDX)
-            .table(Folders::Table)
-            .col(Folders::Org)
-            .col(Folders::Type)
-            .col(Folders::FolderId)
+            .table(NewFolders::Table)
+            .col(NewFolders::Org)
+            .col(NewFolders::Type)
+            .col(NewFolders::FolderId)
             .unique()
             .to_owned()
     }
@@ -407,6 +420,14 @@ mod new_folders {
         }
         Ok(())
     }
+
+    /// Statement to rename the new folders table from `new_folders` to
+    /// `folders`.
+    pub fn rename_to_folders() -> TableRenameStatement {
+        Table::rename()
+            .table(Alias::new(OLD_TABLE_NAME), Alias::new(NEW_TABLE_NAME))
+            .to_owned()
+    }
 }
 
 mod new_dashboards {
@@ -415,9 +436,12 @@ mod new_dashboards {
     const DASHBOARDS_FOLDERS_FK: &str = "dashboards_folders_fk_2";
     const DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX: &str = "dashboards_folder_id_dashboard_id_idx_2";
 
+    const OLD_TABLE_NAME: &str = "new_dashboards";
+    const NEW_TABLE_NAME: &str = "dashboards";
+
     /// Identifiers used in queries on the new dashboards table.
     #[derive(DeriveIden)]
-    enum Dashboards {
+    enum NewDashboards {
         Table,
         Id,
         DashboardId,
@@ -434,37 +458,37 @@ mod new_dashboards {
     /// Statement to create the new dashboards table.
     pub fn create_dashboards_table_statement() -> TableCreateStatement {
         Table::create()
-        .table(Dashboards::Table)
+        .table(NewDashboards::Table)
         // The ID is a 27-character human readable KSUID.
         .col(
-            ColumnDef::new(Dashboards::Id)
+            ColumnDef::new(NewDashboards::Id)
                 .char_len(27)
                 .not_null()
                 .primary_key(),
         )
         // A user-facing ID for the folder. This value can be a 64-bit signed
         // integer "snowflake".
-        .col(ColumnDef::new(Dashboards::DashboardId).string_len(256).not_null())
+        .col(ColumnDef::new(NewDashboards::DashboardId).string_len(256).not_null())
         // Foreign key to the folders table. This is a 27-character human readable
         // KSUID.
-        .col(ColumnDef::new(Dashboards::FolderId).char_len(27).not_null())
+        .col(ColumnDef::new(NewDashboards::FolderId).char_len(27).not_null())
         // Identifier of the user that owns the dashboard.
-        .col(ColumnDef::new(Dashboards::Owner).string_len(256).not_null())
-        .col(ColumnDef::new(Dashboards::Role).string_len(256).null())
-        .col(ColumnDef::new(Dashboards::Title).string_len(256).not_null())
-        .col(ColumnDef::new(Dashboards::Description).text().null())
-        .col(ColumnDef::new(Dashboards::Data).json().not_null())
-        .col(ColumnDef::new(Dashboards::Version).integer().not_null())
+        .col(ColumnDef::new(NewDashboards::Owner).string_len(256).not_null())
+        .col(ColumnDef::new(NewDashboards::Role).string_len(256).null())
+        .col(ColumnDef::new(NewDashboards::Title).string_len(256).not_null())
+        .col(ColumnDef::new(NewDashboards::Description).text().null())
+        .col(ColumnDef::new(NewDashboards::Data).json().not_null())
+        .col(ColumnDef::new(NewDashboards::Version).integer().not_null())
         .col(
-            ColumnDef::new(Dashboards::CreatedAt)
+            ColumnDef::new(NewDashboards::CreatedAt)
                 .big_integer()
                 .not_null(),
         )
         .foreign_key(
             sea_query::ForeignKey::create()
                     .name(DASHBOARDS_FOLDERS_FK)
-                    .from(Dashboards::Table, Dashboards::FolderId)
-                    .to(new_folders::Folders::Table, new_folders::Folders::Id)
+                    .from(NewDashboards::Table, NewDashboards::FolderId)
+                    .to(new_folders::NewFolders::Table, new_folders::NewFolders::Id)
         )
         .to_owned()
     }
@@ -474,9 +498,9 @@ mod new_dashboards {
         sea_query::Index::create()
             .if_not_exists()
             .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
-            .table(Dashboards::Table)
-            .col(Dashboards::FolderId)
-            .col(Dashboards::DashboardId)
+            .table(NewDashboards::Table)
+            .col(NewDashboards::FolderId)
+            .col(NewDashboards::DashboardId)
             .unique()
             .to_owned()
     }
@@ -503,6 +527,14 @@ mod new_dashboards {
         }
         Ok(())
     }
+
+    /// Statement to rename the new dashboards table from `new_dashboards` to
+    /// `dashboards`.
+    pub fn rename_to_dashboards() -> TableRenameStatement {
+        Table::rename()
+            .table(Alias::new(OLD_TABLE_NAME), Alias::new(NEW_TABLE_NAME))
+            .to_owned()
+    }
 }
 
 mod new_alerts {
@@ -514,9 +546,12 @@ mod new_alerts {
         "alerts_org_stream_type_stream_name_name_idx_2";
     const ALERTS_FOLDER_ID_IDX: &str = "alerts_folder_id_idx_2";
 
+    const OLD_TABLE_NAME: &str = "new_alerts";
+    const NEW_TABLE_NAME: &str = "alerts";
+
     /// Identifiers used in queries on the alerts table.
     #[derive(DeriveIden)]
-    enum Alerts {
+    enum NewAlerts {
         Table,
         Id,
         Org,
@@ -561,11 +596,11 @@ mod new_alerts {
     /// Statement to create the alerts table.
     pub fn create_alerts_table_statement() -> TableCreateStatement {
         Table::create()
-        .table(Alerts::Table)
+        .table(NewAlerts::Table)
         .if_not_exists()
         // The ID is a 27-character human readable KSUID.
         .col(
-            ColumnDef::new(Alerts::Id)
+            ColumnDef::new(NewAlerts::Id)
                 .char_len(27)
                 .not_null()
                 .primary_key(),
@@ -574,93 +609,93 @@ mod new_alerts {
         // associated folder. However we need the org column on this table in
         // order to enforce a uniqueness constraint that includeds org but not
         // folder_id.
-        .col(ColumnDef::new(Alerts::Org).string_len(100).not_null())
+        .col(ColumnDef::new(NewAlerts::Org).string_len(100).not_null())
         // Foreign key to the folders table. This is a 27-character human
         // readable KSUID.
-        .col(ColumnDef::new(Alerts::FolderId).char_len(27).not_null())
-        .col(ColumnDef::new(Alerts::Name).string_len(256).not_null())
-        .col(ColumnDef::new(Alerts::StreamType).string_len(50).not_null())
-        .col(ColumnDef::new(Alerts::StreamName).string_len(256).not_null())
-        .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
-        .col(ColumnDef::new(Alerts::Destinations).json().not_null())
-        .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).text().null())
-        .col(ColumnDef::new(Alerts::Description).text().null())
-        .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
-        .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
-        .col(ColumnDef::new(Alerts::LastTriggeredAt).big_integer().null())
-        .col(ColumnDef::new(Alerts::LastSatisfiedAt).big_integer().null())
+        .col(ColumnDef::new(NewAlerts::FolderId).char_len(27).not_null())
+        .col(ColumnDef::new(NewAlerts::Name).string_len(256).not_null())
+        .col(ColumnDef::new(NewAlerts::StreamType).string_len(50).not_null())
+        .col(ColumnDef::new(NewAlerts::StreamName).string_len(256).not_null())
+        .col(ColumnDef::new(NewAlerts::IsRealTime).boolean().not_null())
+        .col(ColumnDef::new(NewAlerts::Destinations).json().not_null())
+        .col(ColumnDef::new(NewAlerts::ContextAttributes).json().null())
+        .col(ColumnDef::new(NewAlerts::RowTemplate).text().null())
+        .col(ColumnDef::new(NewAlerts::Description).text().null())
+        .col(ColumnDef::new(NewAlerts::Enabled).boolean().not_null())
+        .col(ColumnDef::new(NewAlerts::TzOffset).integer().not_null())
+        .col(ColumnDef::new(NewAlerts::LastTriggeredAt).big_integer().null())
+        .col(ColumnDef::new(NewAlerts::LastSatisfiedAt).big_integer().null())
         // Query condition
         .col(
-            ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
+            ColumnDef::new(NewAlerts::QueryType).small_integer().not_null(),
         )
-        .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).text().null())
-        .col(ColumnDef::new(Alerts::QueryPromql).text().null())
+        .col(ColumnDef::new(NewAlerts::QueryConditions).json().null())
+        .col(ColumnDef::new(NewAlerts::QuerySql).text().null())
+        .col(ColumnDef::new(NewAlerts::QueryPromql).text().null())
         .col(
-            ColumnDef::new(Alerts::QueryPromqlCondition)
+            ColumnDef::new(NewAlerts::QueryPromqlCondition)
                 .json()
                 .null(),
         )
-        .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).text().null())
+        .col(ColumnDef::new(NewAlerts::QueryAggregation).json().null())
+        .col(ColumnDef::new(NewAlerts::QueryVrlFunction).text().null())
         .col(
-            ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
+            ColumnDef::new(NewAlerts::QuerySearchEventType).small_integer().null(),
         )
         .col(
-            ColumnDef::new(Alerts::QueryMultiTimeRange)
+            ColumnDef::new(NewAlerts::QueryMultiTimeRange)
                 .json()
                 .null(),
         )
         // Trigger condition
         .col(
-            ColumnDef::new(Alerts::TriggerThresholdOperator)
+            ColumnDef::new(NewAlerts::TriggerThresholdOperator)
                 .string_len(50)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerPeriodSeconds)
+            ColumnDef::new(NewAlerts::TriggerPeriodSeconds)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerThresholdCount)
+            ColumnDef::new(NewAlerts::TriggerThresholdCount)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerFrequencyType).small_integer().not_null(),
+            ColumnDef::new(NewAlerts::TriggerFrequencyType).small_integer().not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerFrequencySeconds)
+            ColumnDef::new(NewAlerts::TriggerFrequencySeconds)
                 .big_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(Alerts::TriggerFrequencyCron).text().null())
+        .col(ColumnDef::new(NewAlerts::TriggerFrequencyCron).text().null())
         .col(
-            ColumnDef::new(Alerts::TriggerFrequencyCronTimezone)
+            ColumnDef::new(NewAlerts::TriggerFrequencyCronTimezone)
                 .string_len(256)
                 .null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerSilenceSeconds)
+            ColumnDef::new(NewAlerts::TriggerSilenceSeconds)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(Alerts::TriggerToleranceSeconds)
+            ColumnDef::new(NewAlerts::TriggerToleranceSeconds)
                 .big_integer()
                 .null(),
         )
         // Ownership and update information.
-        .col(ColumnDef::new(Alerts::Owner).string_len(256).null())
-        .col(ColumnDef::new(Alerts::LastEditedBy).string_len(256).null())
-        .col(ColumnDef::new(Alerts::UpdatedAt).big_integer().null())
+        .col(ColumnDef::new(NewAlerts::Owner).string_len(256).null())
+        .col(ColumnDef::new(NewAlerts::LastEditedBy).string_len(256).null())
+        .col(ColumnDef::new(NewAlerts::UpdatedAt).big_integer().null())
         .foreign_key(
             sea_query::ForeignKey::create()
                     .name(ALERTS_FOLDERS_FK)
-                    .from(Alerts::Table, Alerts::FolderId)
-                    .to(new_folders::Folders::Table, new_folders::Folders::Id)
+                    .from(NewAlerts::Table, NewAlerts::FolderId)
+                    .to(new_folders::NewFolders::Table, new_folders::NewFolders::Id)
         )
         .to_owned()
     }
@@ -671,11 +706,11 @@ mod new_alerts {
         sea_query::Index::create()
             .if_not_exists()
             .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
-            .table(Alerts::Table)
-            .col(Alerts::Org)
-            .col(Alerts::StreamType)
-            .col(Alerts::StreamName)
-            .col(Alerts::Name)
+            .table(NewAlerts::Table)
+            .col(NewAlerts::Org)
+            .col(NewAlerts::StreamType)
+            .col(NewAlerts::StreamName)
+            .col(NewAlerts::Name)
             .unique()
             .to_owned()
     }
@@ -685,8 +720,8 @@ mod new_alerts {
         sea_query::Index::create()
             .if_not_exists()
             .name(ALERTS_FOLDER_ID_IDX)
-            .table(Alerts::Table)
-            .col(Alerts::FolderId)
+            .table(NewAlerts::Table)
+            .col(NewAlerts::FolderId)
             .to_owned()
     }
 
@@ -712,6 +747,14 @@ mod new_alerts {
                 .await?;
         }
         Ok(())
+    }
+
+    /// Statement to rename the new alerts table from `new_alerts` to
+    /// `alerts`.
+    pub fn rename_to_alerts() -> TableRenameStatement {
+        Table::rename()
+            .table(Alias::new(OLD_TABLE_NAME), Alias::new(NEW_TABLE_NAME))
+            .to_owned()
     }
 }
 
@@ -881,7 +924,7 @@ mod new_entities {
         use sea_orm::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-        #[sea_orm(table_name = "folders")]
+        #[sea_orm(table_name = "new_folders")]
         pub struct Model {
             // The new KSUID primary key.
             #[sea_orm(primary_key, auto_increment = false)]
@@ -905,7 +948,7 @@ mod new_entities {
         use sea_orm::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-        #[sea_orm(table_name = "alerts")]
+        #[sea_orm(table_name = "new_alerts")]
         pub struct Model {
             // The ID was a KSUID in the legacy table so this column is
             // unchanged in the new table.
@@ -966,7 +1009,7 @@ mod new_entities {
         use sea_orm::entity::prelude::*;
 
         #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-        #[sea_orm(table_name = "dashboards")]
+        #[sea_orm(table_name = "new_dashboards")]
         pub struct Model {
             // The new KSUID primary key.
             #[sea_orm(primary_key, auto_increment = false)]
