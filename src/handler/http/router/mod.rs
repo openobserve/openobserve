@@ -414,6 +414,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::timed_annotations::create_annotations)
         .service(dashboards::timed_annotations::get_annotations)
         .service(dashboards::timed_annotations::delete_annotations)
+        .service(dashboards::timed_annotations::update_annotations)
+        .service(dashboards::timed_annotations::delete_annotation_panels)
         .service(folders::create_folder)
         .service(folders::list_folders)
         .service(folders::update_folder)

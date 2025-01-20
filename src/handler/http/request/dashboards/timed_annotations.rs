@@ -15,8 +15,10 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, post, web, HttpResponse};
-use config::meta::timed_annotations::{TimedAnnotationDelete, TimedAnnotationReq};
+use actix_web::{delete, get, post, put, web, HttpResponse};
+use config::meta::timed_annotations::{
+    TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
+};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards::timed_annotations,
@@ -162,6 +164,96 @@ pub async fn delete_annotations(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                     500,
                     "Failed to delete timed annotations".to_string(),
+                )),
+            )
+        }
+    }
+}
+
+/// Update Timed Annotations
+#[utoipa::path(
+    put,
+    tag = "Dashboards",
+    context_path = "/api",
+    operation_id = "UpdateAnnotations",
+    path = "/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}",
+    security(
+        ("Authorization" = [])
+    ),
+    request_body(
+        content = TimedAnnotationUpdate,
+        description = "Timed annotation update request payload",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Timed annotations updated successfully"
+        ),
+        (status = 500, description = "Failed to update timed annotations", content_type = "application/json")
+    ),
+)]
+#[put("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}")]
+pub async fn update_annotations(
+    path: web::Path<(String, String, String)>,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
+    let req: TimedAnnotationUpdate = serde_json::from_slice(&body)?;
+    match timed_annotations::update_timed_annotations(&dashboard_id, &timed_annotation_id, &req)
+        .await
+    {
+        Ok(res) => Ok(MetaHttpResponse::json(res)),
+        Err(e) => {
+            log::error!("Error updating timed annotations: {}", e);
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    500,
+                    "Failed to update timed annotations".to_string(),
+                )),
+            )
+        }
+    }
+}
+
+/// Delete Timed Annotation Panels
+#[utoipa::path(
+    delete,
+    tag = "Dashboards",
+    context_path = "/api",
+    operation_id = "DeleteAnnotationPanels",
+    path = "/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}",
+    security(
+        ("Authorization" = [])
+    ),
+    request_body(
+        content = Vec<String>,
+        description = "Timed annotation delete request payload",
+        content_type = "application/json",
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Timed annotation panels deleted successfully"
+        ),
+        (status = 500, description = "Failed to delete timed annotation panels", content_type = "application/json")
+    ),
+)]
+#[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
+pub async fn delete_annotation_panels(
+    path: web::Path<(String, String, String)>,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, _dashboard_id, timed_annotation_id) = path.into_inner();
+    let panels: Vec<String> = serde_json::from_slice(&body)?;
+    match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(e) => {
+            log::error!("Error deleting timed annotation panels: {}", e);
+            Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    500,
+                    "Failed to delete timed annotation panels".to_string(),
                 )),
             )
         }

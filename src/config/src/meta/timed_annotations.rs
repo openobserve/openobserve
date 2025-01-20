@@ -41,3 +41,13 @@ pub struct TimedAnnotation {
 pub struct TimedAnnotationDelete {
     pub annotation_ids: Vec<String>,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TimedAnnotationUpdate {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub title: Option<String>,
+    pub text: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub panels: Option<Vec<String>>,
+}

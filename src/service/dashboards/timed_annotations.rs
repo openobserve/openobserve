@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::timed_annotations::{TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq};
+use config::meta::timed_annotations::{
+    TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
+};
 use infra::table;
 
 #[tracing::instrument]
@@ -49,5 +51,48 @@ pub async fn delete_timed_annotations(
     }
     table::timed_annotations::delete_many(dashboard_id, &req.annotation_ids).await?;
     // TODO: send WATCH for super cluster
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn update_timed_annotations(
+    dashboard_id: &str,
+    timed_annotation_id: &str,
+    req: &TimedAnnotationUpdate,
+) -> Result<TimedAnnotation, anyhow::Error> {
+    table::timed_annotations::update(dashboard_id, timed_annotation_id, req.clone()).await?;
+
+    if let Some(new_panels) = &req.panels {
+        let existing_panels =
+            table::timed_annotation_panels::get_panels(timed_annotation_id).await?;
+        let panels_to_add: Vec<String> = new_panels
+            .iter()
+            .filter(|panel| !existing_panels.contains(panel))
+            .cloned()
+            .collect();
+
+        // Add only new panels
+        if !panels_to_add.is_empty() {
+            table::timed_annotation_panels::insert_many_panels(timed_annotation_id, panels_to_add)
+                .await?;
+        }
+    }
+    let updated_record =
+        table::timed_annotations::get_one(dashboard_id, timed_annotation_id).await?;
+
+    // TODO: send WATCH for super cluster
+    Ok(updated_record)
+}
+
+#[tracing::instrument]
+pub async fn delete_timed_annotation_panels(
+    timed_annotation_id: &str,
+    panels: Vec<String>,
+) -> Result<(), anyhow::Error> {
+    if panels.is_empty() {
+        return Err(anyhow::anyhow!("panels cannot be empty"));
+    }
+    table::timed_annotation_panels::delete_many_panels(timed_annotation_id, panels).await?;
+
     Ok(())
 }
