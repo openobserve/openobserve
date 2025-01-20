@@ -169,9 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template
-          v-if="
-            isAlerts && formData.type === 'http' || isAlerts == false
-          "
+          v-if="(isAlerts && formData.type === 'http') || isAlerts == false"
         >
           <div class="col-6 q-py-xs">
             <q-input
@@ -359,11 +357,17 @@ import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import useStreams from "@/composables/useStreams";
 
-const props = defineProps<{
-  templates: Template[] | [];
-  destination: DestinationPayload | null;
-  isAlerts: true;
-}>();
+const props = withDefaults(
+  defineProps<{
+    templates: Template[] | [];
+    destination: DestinationPayload | null;
+    isAlerts: boolean;
+  }>(),
+  {
+    isAlerts: true,
+  }
+);
+
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
@@ -449,7 +453,7 @@ const setupDestinationData = () => {
     formData.value.url = props.destination.url;
     formData.value.method = props.destination.method;
     formData.value.skip_tls_verify = props.destination.skip_tls_verify;
-    formData.value.template = props.destination.template | "";
+    formData.value.template = props.destination.template || "";
     formData.value.headers = props.destination.headers;
     formData.value.emails = (props.destination.emails || []).join(", ");
     formData.value.type = props.destination.type || "http";
@@ -609,7 +613,7 @@ const createEmailTemplate = () => {
           let streamCols: any = [];
           const streams: any = await getStream(
             stream_name,
-            formData.value.stream_type,
+            formData.value.stream_type || "logs",
             true,
           );
 
@@ -643,7 +647,9 @@ const createEmailTemplate = () => {
                 isFetchingStreams.value = true;
                 return getStreams(formData.value.stream_type, false)
                   .then((res: any) => {
-                    streams.value[formData.value.stream_type] = res.list;
+                    if (formData.value.stream_type) {
+                      streams.value[formData.value.stream_type] = res.list;
+                    }
                     schemaList.value = res.list;
                     indexOptions.value = res.list.map((data: any) => {
                       return data.name;
