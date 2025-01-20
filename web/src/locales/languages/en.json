@@ -245,7 +245,7 @@
     "repassword": "Reconfirm Password",
     "addOrUpdate": "Add/Update User",
     "editUser": "Update User",
-    "add": "Add Basic User",
+    "add": "Add User",
     "search": "Search User",
     "createdAt": "Updated at",
     "updatedAt": "Created at",
@@ -329,7 +329,7 @@
     "object": "Object",
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
-    "basicUsers": "Basic Users"
+    "basicUsers": "Users"
   },
   "ticket": {
     "header": "Support Tickets",
