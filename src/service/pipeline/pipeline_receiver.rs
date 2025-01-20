@@ -57,7 +57,7 @@ pub struct PipelineReceiver {
     reader: Reader<BufReader<File>>,
     file_position: FilePosition,
     stream_destination_name: String,
-    pub pipeline_exporter: PipelineExporter,
+    pub pipeline_exporter: Option<PipelineExporter>,
     pub reader_header: wal::FileHeader,
 }
 
@@ -100,23 +100,25 @@ impl PipelineReceiver {
 
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
-        let pipeline_exporter = PipelineExporter::init()?;
+
         let reader_header = reader.header().clone();
-        let stream_name = reader_header
-            .get("stream_name")
-            .unwrap_or(&"".to_string())
-            .to_string();
         let stream_destination_name = reader_header
             .get("destination_name")
             .unwrap_or(&"".to_string())
             .to_string();
+
+        let stream_name = reader_header
+            .get("stream_name")
+            .unwrap_or(&"".to_string())
+            .to_string();
+
         Ok(PipelineReceiver {
             path,
             org_id: org_id.to_string(),
             stream_type: stream_type.to_string(),
             reader,
             file_position,
-            pipeline_exporter,
+            pipeline_exporter: None,
             reader_header,
             stream_name,
             stream_destination_name,
@@ -176,6 +178,13 @@ impl PipelineReceiver {
                 }
             }
             Err(_) => "".to_string(),
+        }
+    }
+
+    pub async fn get_skip_tls_verify(&self, org_id: &str, destination_name: &str) -> bool {
+        match destinations::get(org_id, destination_name).await {
+            Ok(data) => data.skip_tls_verify,
+            Err(_) => true,
         }
     }
 

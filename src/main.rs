@@ -90,8 +90,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use openobserve::service::{
-    pipeline::pipeline_file_server::PipelineFileServer,
-    tls::http_tls_config,
+    pipeline::pipeline_file_server::PipelineFileServer, tls::http_tls_config,
 };
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -261,9 +260,16 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
+            let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
+            let Ok(_) = PipelineFileServer::run(fileserver_stop_rx).await else {
+                job_init_tx.send(false).ok();
+                panic!("pipeline file server run failed");
+            };
+
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
+            fileserver_stopped_tx.send(()).ok();
 
             // shutdown meter provider
             let _ = meter_provider.shutdown();
@@ -717,19 +723,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     });
     server.await?;
     Ok(())
-}
-
-fn create_http_client() -> awc::Client {
-    let cfg = get_config();
-    let mut client_builder = awc::Client::builder()
-        .connector(awc::Connector::new().limit(cfg.route.max_connections))
-        .timeout(Duration::from_secs(cfg.route.timeout))
-        .disable_redirects();
-    if cfg.http.tls_enabled {
-        let config = client_tls_config().unwrap();
-        client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(config));
-    }
-    client_builder.finish()
 }
 
 async fn graceful_shutdown(handle: ServerHandle) {

@@ -27,8 +27,8 @@ use tokio::{
 use wal::{FilePosition, ReadFrom};
 
 use crate::service::pipeline::{
-    pipeline_entry::PipelineEntryBuilder, pipeline_offset_manager::get_pipeline_offset_manager,
-    pipeline_receiver::PipelineReceiver,
+    pipeline_entry::PipelineEntryBuilder, pipeline_exporter::PipelineExporter,
+    pipeline_offset_manager::get_pipeline_offset_manager, pipeline_receiver::PipelineReceiver,
 };
 
 #[derive(Debug)]
@@ -321,7 +321,7 @@ impl PipelineWatcher {
 
     async fn handle_entry(
         entry: Result<(Option<Entry>, FilePosition)>,
-        pr: &PipelineReceiver,
+        pr: &mut PipelineReceiver,
     ) -> Result<Option<()>> {
         match entry {
             Ok((Some(entry), file_position)) => {
@@ -333,6 +333,13 @@ impl PipelineWatcher {
                     entry.data,
                     pr.path.display(),
                 );
+
+                if pr.pipeline_exporter.is_none() {
+                    let skip_tl_verify = pr
+                        .get_skip_tls_verify(pr.get_org_id(), pr.get_stream_destination_name())
+                        .await;
+                    pr.pipeline_exporter = Some(PipelineExporter::init(skip_tl_verify)?);
+                }
 
                 let endpoint = pr.get_stream_endpoint().await;
                 let stream_name = pr.get_stream_name();
@@ -355,17 +362,15 @@ impl PipelineWatcher {
 
                 let max_retry_time = pr.get_stream_export_retry_time().await;
                 // if entry.data just has one record, it will be a performance issue for exporter
-                if let Err(e) = pr
-                    .pipeline_exporter
-                    .export_entry(data, max_retry_time)
-                    .await
-                {
-                    log::error!(
-                        "Failed to send entry to exporter: {}, data from file : {}",
-                        e.to_string(),
-                        pr.path.display()
-                    );
-                    return Err(e);
+                if let Some(exporter) = &pr.pipeline_exporter {
+                    if let Err(e) = exporter.export_entry(data, max_retry_time).await {
+                        log::error!(
+                            "Failed to send entry to exporter: {}, data from file : {}",
+                            e.to_string(),
+                            pr.path.display()
+                        );
+                        return Err(e);
+                    }
                 }
 
                 Ok(Some(()))

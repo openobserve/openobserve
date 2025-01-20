@@ -36,21 +36,18 @@ pub trait PipelineRouter: Sync + Send {
 pub struct PipelineExporterClientBuilder {}
 
 impl PipelineExporterClientBuilder {
-    pub fn build() -> Result<Box<dyn PipelineRouter>> {
+    pub fn build(skip_tls_verify: bool) -> Result<Box<dyn PipelineRouter>> {
         let cfg = &config::get_config();
         // todo: each stream has own protocal in the futrue, we should use specif base on each
         // stream setting
-        Ok(Self::build_http(cfg))
+        Ok(Self::build_http(cfg, skip_tls_verify))
     }
 
-    fn build_http(cfg: &Arc<Config>) -> Box<PipelineHttpExporterClient> {
+    fn build_http(cfg: &Arc<Config>, skip_tls_verify: bool) -> Box<PipelineHttpExporterClient> {
         let builder = ClientBuilder::new()
             .timeout(Duration::from_secs(cfg.pipeline.remote_request_timeout))
-            .pool_max_idle_per_host(cfg.pipeline.max_connections);
-
-        if cfg.pipeline.tls_enable {
-            // todo
-        }
+            .pool_max_idle_per_host(cfg.pipeline.max_connections)
+            .danger_accept_invalid_certs(skip_tls_verify);
 
         Box::new(PipelineHttpExporterClient::new(builder.build().unwrap()))
     }
@@ -65,8 +62,8 @@ impl PipelineExporter {
         Self { router }
     }
 
-    pub fn init() -> Result<Self> {
-        let client = PipelineExporterClientBuilder::build()?;
+    pub fn init(skip_tls_verify: bool) -> Result<Self> {
+        let client = PipelineExporterClientBuilder::build(skip_tls_verify)?;
         Ok(Self::new(client))
     }
 
