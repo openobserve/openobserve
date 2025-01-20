@@ -460,7 +460,7 @@ const setupDestinationData = () => {
         addApiHeader(key, value);
       });
     }
-    if (!props.isAlerts) {
+    if (!props.isAlerts ) {
       formData.value.stream_name = props.destination.stream_name || "";
       formData.value.stream_type = props.destination.stream_type || "logs";
     }
@@ -626,7 +626,8 @@ const createEmailTemplate = () => {
 
           };
           const updateStreams = (resetStream = true) => {
-                if (resetStream) formData.value.stream_name = "";
+              if (resetStream && !isUpdatingDestination.value)
+                formData.value.stream_name = "";
               if (formData.value.stream_type && streams.value[formData.value.stream_type]) {
                   schemaList.value = streams.value[formData.value.stream_type];
                   indexOptions.value = streams.value[formData.value.stream_type].map(
