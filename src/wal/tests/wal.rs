@@ -14,15 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::File,
-    io::{BufRead, BufReader, Seek},
-    path::PathBuf,
     thread::sleep,
     time::{Duration, Instant},
 };
 
 use tempfile::tempdir;
-use wal::{build_file_path, FileOpenSnafu, Reader, Writer};
+use wal::{build_file_path, Reader, Writer};
 
 #[test]
 fn test_wal_new() {
@@ -200,33 +197,3 @@ fn test_realtime_write_and_read() {
         }
     }
 }
-
-// #[test]
-// fn test_realtime_read() {
-//     let path = PathBuf::from("/Users/weizhao/Downloads/wal/org/stream/1737036099154575.wal");
-//     let mut reader = Reader::from_path(path).unwrap();
-//
-//     println!("begin to read file:{}", reader.path().display());
-//     loop {
-//         sleep(Duration::from_secs(1));
-//         match reader.read_entry() {
-//             Ok(entry) => match entry {
-//                 Some(entry) => {
-//                     println!(
-//                         "read position: {:?}, data : {:?}",
-//                         reader.current_position(),
-//                         String::from_utf8(entry)
-//                     );
-//                 }
-//                 None => {
-//                     println!("read option none");
-//                     break;
-//                 }
-//             },
-//             Err(e) => {
-//                 println!("read err : {e}");
-//                 break;
-//             }
-//         }
-//     }
-// }

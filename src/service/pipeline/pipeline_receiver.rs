@@ -85,7 +85,7 @@ impl PipelineReceiver {
             ReadFrom::Beginning => reader.current_position()?,
             ReadFrom::End => {
                 // impossible
-                unimplemented!();
+                unimplemented!("should not read from end");
             }
         };
 
