@@ -4710,7 +4710,7 @@ const useLogs = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          !response.content?.results?.streaming_aggs &&
+          !response.content?.streaming_aggs &&
             searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
         );
       }
