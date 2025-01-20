@@ -174,7 +174,9 @@ fn convert_data_type(
         | (DataType::Int64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
-        (DataType::Int64, DataType::Boolean) | (DataType::UInt64, DataType::Boolean) => {}
+        (DataType::UInt64, DataType::Int64)
+        | (DataType::UInt64, DataType::Boolean)
+        | (DataType::Int64, DataType::Boolean) => {}
         (DataType::UInt64, DataType::Float64) | (DataType::UInt64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
