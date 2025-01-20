@@ -44,8 +44,8 @@ use crate::service::{
     pipeline::pipeline_watcher::{WatcherEvent, FILE_WATCHER_NOTIFY},
 };
 
-const REMOTE_REALTIME_STREAM_WAL_DIR: &str = "remote_stream_wal";
-const REMOTE_QUERY_STREAM_TMP_WAL_DIR: &str = "remote_stream_wal_tmp";
+pub(crate) const REMOTE_REALTIME_STREAM_WAL_DIR: &str = "remote_stream_wal";
+pub(crate) const REMOTE_QUERY_STREAM_TMP_WAL_DIR: &str = "remote_stream_wal_tmp";
 
 // each pipeline has a wal writer, but it still has a write performance issue when the data is
 // ingested concurrently

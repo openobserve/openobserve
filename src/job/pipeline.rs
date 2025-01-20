@@ -32,14 +32,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn cleanup_expired_remote_wal_files() {
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(600)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(600)).await; // 10 min interval
         log::debug!("[PIPELINE] Running data retention");
         let _ = cleanup().await;
     }
 }
 
 async fn cleanup() -> Result<(), anyhow::Error> {
-    let wal_file_iter = PipelineOffsetManager::get_all_remote_wal_file().await;
+    let mut wal_file_iter = PipelineOffsetManager::get_all_remote_wal_file().await;
+    let tmp_wal_file_iter = PipelineOffsetManager::get_all_remote_tmp_wal_file().await;
+    wal_file_iter.extend(tmp_wal_file_iter);
     for wal_file in wal_file_iter.iter() {
         match PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
             Ok(fw) => {
