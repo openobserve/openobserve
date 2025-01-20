@@ -290,7 +290,11 @@ impl PipelineWalWriter {
             PipelineSource::Realtime(_) => &cfg.pipeline.remote_stream_wal_dir,
         };
 
-        PathBuf::from(path).join(WAL_DIR_DEFAULT_PREFIX)
+        let path = PathBuf::from(path).join(WAL_DIR_DEFAULT_PREFIX);
+        if !path.exists() {
+            fs::create_dir_all(&path).unwrap();
+        }
+        path
     }
 
     async fn rotate(&self, entry_bytes_size: usize) -> Result<()> {

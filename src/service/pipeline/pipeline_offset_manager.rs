@@ -65,6 +65,11 @@ impl PipelineOffsetManager {
     pub fn new() -> Self {
         let config = config::get_config();
         let dir = PathBuf::from(config.pipeline.remote_stream_wal_dir.as_str());
+        if !dir.exists() {
+            // Create the directory and any necessary parent directories
+            fs::create_dir_all(&dir).unwrap();
+        }
+
         let offset_persist_file = dir.join(OFFSET_PERSIST_FILE_NAME);
         let offset_persist_tmp_file = dir.join(OFFSET_PERSIST_TMP_FILE_NAME);
         let offset_data = RwLock::new(HashMap::new());
@@ -96,9 +101,11 @@ impl PipelineOffsetManager {
                 let watcher = FILE_WATCHER_NOTIFY.write().await;
                 for (stream_file, position) in &offset_data {
                     // check the setream file is exist
-                    if !Path::new(stream_file).exists() {
+                    if !Path::new(stream_file).exists()
+                        || Self::wal_file_check(stream_file).is_err()
+                    {
                         log::warn!(
-                            "stream wal file: {:?} not exist, remove offset data",
+                            "stream wal file: {:?} not exist, or file path is wrong, remove offset data",
                             stream_file
                         );
                         p.remove(stream_file).await?;
@@ -242,6 +249,55 @@ impl PipelineOffsetManager {
         serde_json::from_reader(reader).map_err(Error::SerdeJsonError)
     }
 
+    fn wal_file_check(stream_file: &str) -> Result<bool> {
+        let stream_file_path = PathBuf::from(stream_file);
+        let wal_dir = PathBuf::from(&config::get_config().pipeline.remote_stream_wal_dir)
+            .join(ingester::WAL_DIR_DEFAULT_PREFIX);
+
+        let res = stream_file_path
+            .strip_prefix(&wal_dir)
+            .map_err(|_| {
+                Error::Message(format!(
+                    "Path does not start with wal_dir: {}, path: {}",
+                    wal_dir.display(),
+                    stream_file_path.display(),
+                ))
+            })?
+            .to_str()
+            .ok_or_else(|| {
+                Error::Message(format!(
+                    "Invalid UTF-8 in path: {}",
+                    stream_file_path.display()
+                ))
+            })
+            .map(|s| s.replace('\\', "/"));
+
+        match res {
+            Ok(path) => {
+                let file_columns = path.split('/').collect::<Vec<_>>().len();
+                if file_columns < 3 {
+                    log::warn!("stream file: {:?} dir is not correct", stream_file);
+                    return Err(Error::Message(format!(
+                        "stream file: {:?} dir is not correct",
+                        stream_file
+                    )));
+                }
+
+                Ok(true)
+            }
+            Err(e) => {
+                log::warn!(
+                    "stream file: {:?} dir is not correct, err: {e}",
+                    stream_file
+                );
+                Err(Error::Message(format!(
+                    "stream file: {:?} dir is not correct",
+                    stream_file
+                )))
+            }
+        }
+    }
+
     pub async fn save(&mut self, stream_file: &str, position: FilePosition) {
         let mut data = self.offset_data.write().await;
         data.entry(stream_file.to_string())
@@ -267,7 +323,11 @@ impl PipelineOffsetManager {
     pub async fn flush(&self) -> Result<()> {
         // drop util rename tmp file to stable file
         let data = self.offset_data.write().await;
-        log::debug!("Flushing pipeline offset data: {:?}", data);
+        log::debug!(
+            "Flushing pipeline offset data: {:?}, offset_persist_tmp_file: {}",
+            data,
+            self.offset_persist_tmp_file.display()
+        );
         // Write the new offset to a tmp file and flush it fully to
         // disk. If o2 dies anywhere during this section, the existing
         // stable file will still be in its current valid state and we'll be

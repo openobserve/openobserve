@@ -91,6 +91,13 @@ impl PipelineReceiver {
 
         let file_str = Self::strip_and_format_path(&path)?;
         let file_columns = file_str.split('/').collect::<Vec<_>>();
+        if file_columns.len() < 3 {
+            return Err(Error::Message(format!(
+                "Invalid file path: {}",
+                path.display()
+            )));
+        }
+
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
         let pipeline_exporter = PipelineExporter::init()?;

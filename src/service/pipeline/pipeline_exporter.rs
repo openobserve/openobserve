@@ -100,7 +100,7 @@ impl PipelineExporter {
                     attempts += 1;
                     if delay >= max_retry_time {
                         log::error!(
-                            "Failed to export pipeline entry after {max_retry_time} hours , giving up: {:?}",
+                            "Failed to export pipeline entry after {max_retry_time} min , giving up: {:?}",
                             e
                         );
 

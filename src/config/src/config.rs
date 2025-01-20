@@ -1950,6 +1950,9 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.pipeline.remote_stream_wal_dir.is_empty() {
         cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
     }
+    if !cfg.pipeline.remote_stream_wal_dir.ends_with('/') {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.common.data_dir);
+    }
     Ok(())
 }
 

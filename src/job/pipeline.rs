@@ -41,10 +41,26 @@ async fn cleanup_expired_remote_wal_files() {
 async fn cleanup() -> Result<(), anyhow::Error> {
     let wal_file_iter = PipelineOffsetManager::get_all_remote_wal_file().await;
     for wal_file in wal_file_iter.iter() {
-        if let Ok(fw) = PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
-            // todo: every stream has its own retention policy, cache it or select every time?
-            if fw.should_delete_on_data_retention() {
-                log::debug!("[PIPELINE] Deleting wal file: {:?}", wal_file);
+        match PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
+            Ok(fw) => {
+                // todo: every stream has its own retention policy, cache it or select every time?
+                if fw.should_delete_on_data_retention() {
+                    log::debug!("[PIPELINE] Deleting wal file: {:?}", wal_file);
+                    if let Err(e) = tokio::fs::remove_file(wal_file).await {
+                        log::error!(
+                            "[PIPELINE] Failed to delete wal file: {:?}, error: {:?}",
+                            wal_file,
+                            e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[PIPELINE] wal file is incorrect: {:?}, error: {:?}",
+                    wal_file,
+                    e
+                );
                 if let Err(e) = tokio::fs::remove_file(wal_file).await {
                     log::error!(
                         "[PIPELINE] Failed to delete wal file: {:?}, error: {:?}",
