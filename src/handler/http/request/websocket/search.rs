@@ -713,7 +713,7 @@ async fn get_partitions(
         // vrl is not required for _search_partition
         query_fn: Default::default(),
         // TODO: push a fix for this as an update
-        streaming_output: false,
+        streaming_output: true,
     };
 
     let res = SearchService::search_partition(
