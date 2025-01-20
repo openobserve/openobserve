@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod auth;
+mod auth_tests;
 pub mod functions;
 pub mod http;
 pub mod jwt;
