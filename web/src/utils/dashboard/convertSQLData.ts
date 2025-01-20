@@ -468,6 +468,11 @@ export const convertSQLData = async (
     }
   }
 
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+  console.log("convertedTimeStampToDataFormat", convertedTimeStampToDataFormat);
+
   /**
    * Returns the largest label from the stacked chart data.
    * Calculates the largest value for each unique breakdown and sums those values.
@@ -644,8 +649,29 @@ export const convertSQLData = async (
 
       options.title = [];
 
+      // Store original series
+      const originalSeries = [...options.series];
+      options.series = [];
+
       // Configure each series with its corresponding grid index
-      options.series.forEach((series: any, index: number) => {
+      originalSeries.forEach((series: any, index: number) => {
+        // Add the original series
+        const updatedSeries = {
+          ...series,
+          xAxisIndex: index,
+          yAxisIndex: index,
+        };
+        options.series.push(updatedSeries);
+
+        options.series.push({
+          type: "line",
+          xAxisIndex: index,
+          yAxisIndex: index,
+          data: [[convertedTimeStampToDataFormat, null]],
+          markArea: getSeriesMarkArea(),
+          markLine: getSeriesMarkLine(),
+        });
+
         if (index > 0) {
           options.xAxis.push({
             ...deepCopy(options.xAxis[0]),
@@ -2521,10 +2547,6 @@ export const convertSQLData = async (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
   console.log("after", annotations?.value?.[0]?.start_time);
-  const convertedTimeStampToDataFormat = new Date(
-    annotations?.value?.[0]?.start_time / 1000,
-  ).toString();
-  console.log("convertedTimeStampToDataFormat", convertedTimeStampToDataFormat);
 
   options.series.push({
     type: "line",
