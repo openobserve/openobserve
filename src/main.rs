@@ -89,7 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::tls::{awc_client_tls_config, http_tls_config};
+use openobserve::service::tls::http_tls_config;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -555,16 +555,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let mut client_builder = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects();
-            if cfg.http.tls_enabled {
-                let config = awc_client_tls_config().unwrap();
-                client_builder =
-                    client_builder.connector(awc::Connector::new().rustls_0_23(config));
-            }
-            let client = client_builder.finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -578,7 +570,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -663,11 +655,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects()
-                .finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -681,7 +670,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)

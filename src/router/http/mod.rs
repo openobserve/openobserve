@@ -57,6 +57,14 @@ const QUERIER_ROUTES_BY_BODY: [&str; 2] = [
 ];
 const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
 
+struct URLDetails {
+    is_error: bool,
+    error: Option<String>,
+    path: String,
+    full_url: String,
+    node_addr: String,
+}
+
 #[inline]
 fn is_querier_route(path: &str) -> bool {
     QUERIER_ROUTES.iter().any(|x| path.contains(x))
@@ -177,7 +185,8 @@ async fn dispatch(
         .to_string();
     let new_url = get_url(&path).await;
     if new_url.is_error {
-        return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
+        return Ok(HttpResponse::ServiceUnavailable()
+            .body(new_url.error.unwrap_or("internal server error".to_string())));
     }
 
     // check if the request is a websocket request
@@ -188,7 +197,7 @@ async fn dispatch(
 
     // check if the request need to be proxied by body
     if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
-        return proxy_querier_by_body(req, payload, client, new_url, start, &path).await;
+        return proxy_querier_by_body(req, payload, client, new_url, start).await;
     }
 
     // send query
@@ -220,20 +229,14 @@ async fn get_url(path: &str) -> URLDetails {
         node_type = Role::Ingester;
         cluster::get_cached_online_ingester_nodes().await
     };
+
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        let cfg = get_config();
-        if node_type == Role::Ingester && !cfg.route.ingester_srv_url.is_empty() {
-            return URLDetails {
-                is_error: false,
-                value: format!(
-                    "http://{}:{}{}",
-                    cfg.route.ingester_srv_url, cfg.http.port, path
-                ),
-            };
-        }
         return URLDetails {
             is_error: true,
-            value: format!("No online {node_type} nodes"),
+            error: Some(format!("No online {node_type} nodes")),
+            path: path.to_string(),
+            full_url: "".to_string(),
+            node_addr: "".to_string(),
         };
     }
 
@@ -241,7 +244,13 @@ async fn get_url(path: &str) -> URLDetails {
     let node = get_rand_element(&nodes);
     URLDetails {
         is_error: false,
-        value: format!("{}{}", node.http_addr, path),
+        error: None,
+        path: path.to_string(),
+        full_url: format!("{}{}", node.http_addr, path),
+        node_addr: node
+            .http_addr
+            .replace("http://", "")
+            .replace("https://", ""),
     }
 }
 
@@ -253,22 +262,29 @@ async fn default_proxy(
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     // send query
-    let resp = client
-        .request_from(new_url.value.clone(), req.head())
-        .send_stream(payload)
-        .await;
-    if let Err(e) = resp {
-        log::error!(
-            "dispatch: {}, error: {}, took: {} ms",
-            new_url.value,
-            e,
-            start.elapsed().as_millis()
-        );
-        return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
-    }
+    let req = if new_url.full_url.starts_with("https://") {
+        create_http_client()
+            .unwrap()
+            .request_from(req.full_url().to_string(), req.head())
+            .address(new_url.node_addr.parse().unwrap())
+    } else {
+        client.request_from(&new_url.full_url, req.head())
+    };
+    let mut resp = match req.send_stream(payload).await {
+        Ok(resp) => resp,
+        Err(e) => {
+            log::error!(
+                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                new_url.path,
+                new_url.node_addr,
+                e,
+                start.elapsed().as_millis()
+            );
+            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+        }
+    };
 
     // handle response
-    let mut resp = resp.unwrap();
     let mut new_resp = HttpResponse::build(resp.status());
 
     // copy headers
@@ -286,7 +302,13 @@ async fn default_proxy(
     {
         Ok(b) => b,
         Err(e) => {
-            log::error!("{}: {}", new_url.value, e);
+            log::error!(
+                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                new_url.path,
+                new_url.node_addr,
+                e,
+                start.elapsed().as_millis()
+            );
             return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
         }
     };
@@ -297,12 +319,11 @@ async fn proxy_querier_by_body(
     req: HttpRequest,
     payload: web::Payload,
     client: web::Data<awc::Client>,
-    new_url: URLDetails,
+    mut new_url: URLDetails,
     start: std::time::Instant,
-    path: &str,
 ) -> actix_web::Result<HttpResponse, Error> {
-    let (key, payload) = if path.contains("/prometheus/api/v1/query_range")
-        || path.contains("/prometheus/api/v1/query_exemplars")
+    let (key, payload) = if new_url.path.contains("/prometheus/api/v1/query_range")
+        || new_url.path.contains("/prometheus/api/v1/query_exemplars")
     {
         if req.method() == "GET" {
             let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
@@ -331,32 +352,41 @@ async fn proxy_querier_by_body(
     let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
         return Ok(HttpResponse::ServiceUnavailable().body("No online querier nodes"));
     };
-    let new_url = format!("{}{}", node.http_addr, path);
+    new_url.full_url = format!("{}{}", node.http_addr, new_url.path);
+    new_url.node_addr = node
+        .http_addr
+        .replace("http://", "")
+        .replace("https://", "");
 
     // send query
-    let resp = if let Some(payload) = payload {
-        client
-            .request_from(new_url.clone(), req.head())
-            .send_form(&payload)
-            .await
+    let req = if new_url.full_url.starts_with("https://") {
+        create_http_client()
+            .unwrap()
+            .request_from(req.full_url().to_string(), req.head())
+            .address(new_url.node_addr.parse().unwrap())
     } else {
-        client
-            .request_from(new_url.clone(), req.head())
-            .send()
-            .await
+        client.request_from(&new_url.full_url, req.head())
     };
-    if let Err(e) = resp {
-        log::error!(
-            "dispatch: {}, error: {}, took: {} ms",
-            new_url,
-            e,
-            start.elapsed().as_millis()
-        );
-        return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
-    }
+    let resp = if let Some(payload) = payload {
+        req.send_form(&payload).await
+    } else {
+        req.send().await
+    };
+    let mut resp = match resp {
+        Ok(resp) => resp,
+        Err(e) => {
+            log::error!(
+                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                new_url.path,
+                new_url.node_addr,
+                e,
+                start.elapsed().as_millis()
+            );
+            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+        }
+    };
 
     // handle response
-    let mut resp = resp.unwrap();
     let mut new_resp = HttpResponse::build(resp.status());
 
     // copy headers
@@ -374,7 +404,13 @@ async fn proxy_querier_by_body(
     {
         Ok(b) => b,
         Err(e) => {
-            log::error!("{}: {}", new_url, e);
+            log::error!(
+                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                new_url.path,
+                new_url.node_addr,
+                e,
+                start.elapsed().as_millis()
+            );
             return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
         }
     };
@@ -390,7 +426,7 @@ async fn proxy_ws(
     let cfg = get_config();
     if cfg.common.websocket_enabled {
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
-        let ws_url = match ws::convert_to_websocket_url(&new_url.value) {
+        let ws_url = match ws::convert_to_websocket_url(&new_url.full_url) {
             Ok(url) => url,
             Err(e) => {
                 log::error!("Error converting URL to WebSocket: {}", e);
@@ -398,7 +434,7 @@ async fn proxy_ws(
             }
         };
 
-        match ws::ws_proxy(req, payload, ws_url.clone()).await {
+        match ws::ws_proxy(req, payload, &ws_url).await {
             Ok(res) => {
                 log::info!(
                 "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
@@ -421,9 +457,17 @@ async fn proxy_ws(
     }
 }
 
-struct URLDetails {
-    is_error: bool,
-    value: String,
+pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
+    let cfg = get_config();
+    let mut client_builder = awc::Client::builder()
+        .connector(awc::Connector::new().limit(cfg.route.max_connections))
+        .timeout(std::time::Duration::from_secs(cfg.route.timeout))
+        .disable_redirects();
+    if cfg.http.tls_enabled {
+        let tls_config = crate::service::tls::client_tls_config()?;
+        client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(tls_config));
+    }
+    Ok(client_builder.finish())
 }
 
 #[cfg(test)]

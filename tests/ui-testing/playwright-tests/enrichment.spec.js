@@ -14,7 +14,7 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  //  await page.getByText('Login as internal user').click();
+  // await page.getByText('Login as internal user').click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -286,6 +286,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
   
     // Explore the uploaded table
     await page.getByRole("button", { name: "Explore" }).click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await expect(page.getByRole('cell', { name: 'Start time' })).toBeVisible()
     await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page.waitForTimeout(3000);
