@@ -37,7 +37,6 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
-        alerts::destinations,
         ingestion::{apply_vrl_fn, compile_vrl_function},
         pipeline::pipeline_wal_writer::get_pipeline_wal_writer,
         self_reporting::publish_error,
@@ -693,27 +692,22 @@ async fn process_node(
                 records.push(record);
                 count += 1;
             }
-            if let Ok(dest) =
-                destinations::get(org_id.as_str(), remote_stream.destination_name.as_str()).await
-            {
-                let mut remote_stream = remote_stream.clone();
-                remote_stream.org_id = dest.org_id.into();
-                remote_stream.stream_name = dest.stream_name.into();
-                remote_stream.stream_type = dest.stream_type;
-                let writer = get_pipeline_wal_writer(pipeline_id, remote_stream.clone()).await?;
-                if let Err(e) = writer.write_wal(records).await {
-                    let err_msg = format!(
-                        "DestinationNode error persisting data to be ingested externally: {}",
-                        e
-                    );
-                    if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
-                        .await
-                    {
-                        log::error!(
+
+            let mut remote_stream = remote_stream.clone();
+            remote_stream.org_id = org_id.into();
+            let writer = get_pipeline_wal_writer(pipeline_id, remote_stream.clone()).await?;
+            if let Err(e) = writer.write_wal(records).await {
+                let err_msg = format!(
+                    "DestinationNode error persisting data to be ingested externally: {}",
+                    e
+                );
+                if let Err(send_err) = error_sender
+                    .send((node.id.to_string(), node.node_type(), err_msg))
+                    .await
+                {
+                    log::error!(
                         "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
                     );
-                    }
                 }
             }
 

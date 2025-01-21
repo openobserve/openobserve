@@ -210,7 +210,10 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_endpoint_header(&self) -> Option<HashMap<String, String>> {
-        let destination_name = self.get_stream_destination_name().await.unwrap_or("".to_string());
+        let destination_name = self
+            .get_stream_destination_name()
+            .await
+            .unwrap_or("".to_string());
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => data.headers,
