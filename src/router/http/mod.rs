@@ -23,7 +23,10 @@ use ::config::{
     },
     utils::rand::get_rand_element,
 };
-use actix_web::{http::Error, route, web, FromRequest, HttpRequest, HttpResponse};
+use actix_web::{
+    http::{Error, Method},
+    route, web, FromRequest, HttpRequest, HttpResponse,
+};
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -189,15 +192,15 @@ async fn dispatch(
             .body(new_url.error.unwrap_or("internal server error".to_string())));
     }
 
+    // check if the request need to be proxied by body
+    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
+        return proxy_querier_by_body(req, payload, client, new_url, start).await;
+    }
+
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
     if *path_columns.get(3).unwrap_or(&"") == "ws" {
         return proxy_ws(req, payload, new_url, start).await;
-    }
-
-    // check if the request need to be proxied by body
-    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
-        return proxy_querier_by_body(req, payload, client, new_url, start).await;
     }
 
     // send query
@@ -325,7 +328,7 @@ async fn proxy_querier_by_body(
     let (key, payload) = if new_url.path.contains("/prometheus/api/v1/query_range")
         || new_url.path.contains("/prometheus/api/v1/query_exemplars")
     {
-        if req.method() == "GET" {
+        if req.method() == Method::GET {
             let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
                 return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
             };
@@ -479,6 +482,9 @@ mod tests {
         assert!(is_querier_route("/api/_search"));
         assert!(is_querier_route("/api/_around"));
         assert!(!is_querier_route("/api/_bulk"));
+        assert!(is_querier_route(
+            "https://test.com/api/default/prometheus/api/v1/query_range"
+        ));
     }
 
     #[test]

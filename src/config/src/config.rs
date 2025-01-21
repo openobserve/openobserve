@@ -373,6 +373,7 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
+    pub health_check: HealthCheck,
 }
 
 #[derive(EnvConfig)]
@@ -1040,8 +1041,6 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_MAX_SEARCH_INTERVAL_PER_GROUP", default = 24)] // hours
-    pub metrics_max_search_interval_per_group: i64,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
@@ -1136,7 +1135,7 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = true)]
     pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
@@ -1542,6 +1541,24 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
+#[derive(EnvConfig)]
+pub struct HealthCheck {
+    #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_TIMEOUT",
+        default = 10,
+        help = "Health check timeout in seconds"
+    )]
+    pub timeout: u64,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_FAILED_TIMES",
+        default = 5,
+        help = "The node will be removed from consistent hash if health check failed exceed this times"
+    )]
+    pub failed_times: usize,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1692,6 +1709,11 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    // check health check config
+    if let Err(e) = check_health_check_config(&mut cfg) {
+        panic!("health check config error: {e}");
+    }
+
     cfg
 }
 
@@ -1717,13 +1739,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for metrics limit
-    if cfg.limit.metrics_max_search_interval_per_group == 0 {
-        cfg.limit.metrics_max_search_interval_per_group = 24;
-    }
-    if cfg.limit.metrics_max_search_interval_per_group < 3600 {
-        // convert hours to microseconds
-        cfg.limit.metrics_max_search_interval_per_group *= 3_600_000_000;
-    }
     if cfg.limit.metrics_max_series_per_query == 0 {
         cfg.limit.metrics_max_series_per_query = 30_000;
     }
@@ -2228,6 +2243,16 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
+    Ok(())
+}
+
+fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.health_check.timeout == 0 {
+        cfg.health_check.timeout = 10;
+    }
+    if cfg.health_check.failed_times == 0 {
+        cfg.health_check.failed_times = 5;
+    }
     Ok(())
 }
 

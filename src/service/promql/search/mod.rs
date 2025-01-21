@@ -101,7 +101,7 @@ async fn search_in_cluster(
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        req.no_cache,
+        cache_disabled,
         start,end,step,query,
     );
 
