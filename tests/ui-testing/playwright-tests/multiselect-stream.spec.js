@@ -243,7 +243,7 @@ await page.waitForTimeout(1000);
     await page
         .locator('[data-test="log-table-column-0-source"]')
         .click({ force: true });
-    await expect(page.getByText('arrow_drop_downjob:test')).toBeVisible();
+    await expect(page.locator('text=arrow_drop_downjob:test').first()).toBeVisible();
 
     
   });
