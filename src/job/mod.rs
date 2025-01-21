@@ -93,7 +93,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { promql_self_consume::run().await });
     // Router doesn't need to initialize job
-    if LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
 
@@ -126,10 +126,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::ofga::watch().await });
 
     #[cfg(feature = "enterprise")]
-    if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
         tokio::task::spawn(async move { db::session::watch().await });
     }
-    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
