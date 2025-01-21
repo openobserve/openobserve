@@ -392,7 +392,9 @@ export class LogsPage {
     await startTimeInput.type("000000");
   
     // Wait briefly for UI stability
-    await this.page.waitForTimeout(2000);
+    // await this.page.waitForTimeout(2000);
+    await this.page.waitForSelector('.startEndTime td:nth-child(2) input', { state: 'visible' });
+
   
     // Fill the end time
     const endTimeInput = this.page.locator(".startEndTime td:nth-child(2) input");
@@ -400,12 +402,7 @@ export class LogsPage {
     await endTimeInput.fill("");
     await this.page.waitForTimeout(2000);
     await endTimeInput.type("235900");
-  
-    // Wait briefly for UI stability
-    await this.page.waitForTimeout(2000);
-  
-    // Toggle the logs filter and refresh the search
-    await this.page.locator('[data-test="logs-logs-toggle"]').click();
+    await this.page.locator('[data-test="logs-logs-toggle"]',{state: 'visible'}).click();
     await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   
     // Wait briefly for search results to load
@@ -421,12 +418,6 @@ export class LogsPage {
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")} 23:59:59`;
   
     const rows = await this.page.locator('[data-test="logs-search-result-logs-table"] tbody:nth-of-type(2) tr').all();
-    // for (let i = 2; i < rows.length; i++) {
-    //   const dateText = await rows[i].locator('td:first-child div div:nth-child(2) span span').textContent();
-    //   if (dateText) {
-    //     expect(dateText >= startDateStr && dateText <= endDateStr).toBeTruthy();
-    //   }
-    // }
 
     for (let i = 2; i < rows.length; i++) {
       const dateText = await rows[i].locator('td:first-child div div:nth-child(2) span span').textContent();
@@ -446,10 +437,5 @@ export class LogsPage {
     
     await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
   }
-  
-  
-
-    
-  
 
 }
