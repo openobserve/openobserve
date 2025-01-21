@@ -45,7 +45,7 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
-import { getAnnotationsData } from "@/composables/dashboard/useAnnotationMarkline";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 export const convertMultiSQLData = async (
   panelSchema: any,

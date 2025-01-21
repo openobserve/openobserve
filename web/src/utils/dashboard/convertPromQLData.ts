@@ -26,7 +26,7 @@ import {
   getMetricMinMaxValue,
   getSeriesColor,
 } from "./colorPalette";
-import { getAnnotationsData } from "@/composables/dashboard/useAnnotationMarkline";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 let moment: any;
 let momentInitialized = false;
