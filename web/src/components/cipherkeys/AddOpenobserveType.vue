@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      {{ formData.key.store.local.slice(0, 5) }}{{ formData.key.store.local.replace(/./g, '*').slice(5, 20) }}
+      {{ formData.key.store.local }}
       <q-btn @click="isUpdate = true" size="sm" color="primary" :label="t('common.update')" />
     </div>
   </div>
