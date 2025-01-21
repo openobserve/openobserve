@@ -26,8 +26,8 @@ pub async fn create_job(path: web::Path<String>, body: web::Bytes) -> impl Respo
     let req: DeployActionRequest = serde_json::from_slice(&body).unwrap();
 
     if let Some(deployer) = APP_DEPLOYER.get() {
-        return match deployer.create_app(&org_id, dbg!(req)).await {
-            Ok(created_at) => HttpResponse::Ok().json(created_at.to_rfc3339()),
+        return match deployer.create_app(&org_id, req).await {
+            Ok(created_at) => HttpResponse::Ok().body(created_at.to_rfc3339()),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
         };
     }
