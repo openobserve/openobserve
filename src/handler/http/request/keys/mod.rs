@@ -65,9 +65,13 @@ pub async fn save(
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
+        let user_id = match in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+        {
             Some(id) => id,
+            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
         };
 
         if req.name.contains(":") {
@@ -320,9 +324,13 @@ pub async fn update(
             ));
         }
 
-        let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
-            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
+        let user_id = match in_req
+            .headers()
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+        {
             Some(id) => id,
+            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
         };
 
         if req.name.contains(":") {
