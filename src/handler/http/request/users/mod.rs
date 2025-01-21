@@ -238,6 +238,20 @@ pub async fn delete(
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
 }
 
+#[delete("/{org_id}/users/{email_id}/lock")]
+pub async fn unlock_user(
+    path: web::Path<(String, String)>,
+    user_email: UserEmail,
+) -> Result<HttpResponse, Error> {
+    let (org_id, email_id) = path.into_inner();
+    let initiator_id = user_email.user_id;
+    clear_failed_login_count(&email_id).await;
+    Ok(HttpResponse::Ok().json(meta::http::HttpResponse::message(
+        http::StatusCode::OK.into(),
+        "User unlocked successfully".to_string(),
+    )))
+}
+
 /// AuthenticateUser
 #[utoipa::path(
     context_path = "/auth",
@@ -324,6 +338,9 @@ pub async fn authentication(
         }
     }
 
+    if is_user_locked(&auth.name).await {
+        return unauthorized_error(resp, Some(&auth.name)).await;
+    }
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
@@ -342,6 +359,9 @@ pub async fn authentication(
     };
     if resp.status {
         let cfg = get_config();
+
+        // clear the failed login count
+        clear_failed_login_count(&auth.name).await;
 
         let access_token = format!(
             "Basic {}",
@@ -670,10 +690,7 @@ async fn unauthorized_error(
     if let Some(user) = user_email {
         let error = handle_failed_login(user).await.unwrap_or_default();
         if !error.is_empty() {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED.into(),
-                error.to_string(),
-            )));
+            return Ok(HttpResponse::Unauthorized().json(error.to_string()));
         }
     };
 
@@ -717,6 +734,28 @@ async fn handle_failed_login(user_email: &str) -> Option<String> {
         };
     }
     None
+}
+
+async fn is_user_locked(user_email: &str) -> bool {
+    let user_key = format!("user_{}", user_email);
+
+    let exhausted_attempts = match crate::service::kv::get(USER_LOCK_KEY, &user_key).await {
+        Ok(v) => match String::from_utf8(v.to_vec()) {
+            Ok(val) => val.parse::<u16>().unwrap_or(0),
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    };
+    if exhausted_attempts >= get_config().auth.wrong_password_attempts {
+        true
+    } else {
+        false
+    }
+}
+
+async fn clear_failed_login_count(user_email: &str) {
+    let user_key = format!("user_{}", user_email);
+    let _ = crate::service::kv::delete(USER_LOCK_KEY, &user_key).await;
 }
 
 #[cfg(test)]
