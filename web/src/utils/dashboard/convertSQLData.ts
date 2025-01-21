@@ -464,7 +464,6 @@ export const convertSQLData = async (
   const convertedTimeStampToDataFormat = new Date(
     annotations?.value?.[0]?.start_time / 1000,
   ).toString();
-  console.log("convertedTimeStampToDataFormat", convertedTimeStampToDataFormat);
 
   /**
    * Returns the largest label from the stacked chart data.
@@ -1429,7 +1428,6 @@ export const convertSQLData = async (
     }
     case "bar": {
       options.series = getSeries({ barMinHeight: 1 });
-      console.log("options.series", options.series);
 
       if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
         updateTrellisConfig();
@@ -2160,8 +2158,6 @@ export const convertSQLData = async (
         }
       });
 
-      console.log("options.series", options?.series);
-
       // Trellis has multiple x axis
       if (panelSchema.config.trellis?.layout) {
         options.xAxis.forEach((axis: any) => {
@@ -2534,7 +2530,6 @@ export const convertSQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
-  console.log("after", annotations?.value?.[0]?.start_time);
 
   options.series.push({
     type: "line",
@@ -2542,7 +2537,6 @@ export const convertSQLData = async (
     markLine: getAnnotationMarkLine(),
     markArea: getSeriesMarkArea(),
   });
-  console.log("options", options);
 
   return {
     options,

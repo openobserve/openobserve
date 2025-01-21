@@ -7,8 +7,6 @@ export const useAnnotationsData = (
   dashboardId: any,
   panelId: string,
 ) => {
-  console.log("useAnnotationsData", organization, dashboardId, panelId);
-
   // show annotation button
   const isAddAnnotationMode = ref(false);
 
@@ -59,8 +57,6 @@ export const useAnnotationsData = (
 
   // Handle adding or editing annotation
   const handleAddAnnotation = (start: any, end: any) => {
-    console.log("handleAddAnnotation", start, end, annotations);
-
     annotationToAddEdit.value = {
       start_time: start ? Math.trunc(start * 1000) : null,
       end_time: end ? Math.trunc(end * 1000) : null,

@@ -850,8 +850,6 @@ export const usePanelDataLoader = (
         return;
       }
 
-      console.log("loadData: entering...", startISOTimestamp, endISOTimestamp);
-
       if (runCount == 0) {
         log("loadData: panelcache: run count is 0");
         // restore from the cache and return
@@ -1146,7 +1144,6 @@ export const usePanelDataLoader = (
                     endISOTimestamp,
                   );
                   state.annotations = annotationList;
-                  console.log("loadData: annotations---", annotationList);
 
                   // need to break the loop, save the cache
                   saveCurrentStateToCache();
@@ -1196,7 +1193,6 @@ export const usePanelDataLoader = (
                 Number(endISOTimestamp),
               );
               state.annotations = annotations;
-              console.log("loadData: annotations", annotations);
               if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,

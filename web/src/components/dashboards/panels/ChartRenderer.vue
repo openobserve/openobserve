@@ -131,7 +131,7 @@ import type {
   VisualMapComponentOption,
   DataZoomComponentOption,
   MarkLineComponentOption,
-  MarkAreaComponentOption
+  MarkAreaComponentOption,
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -351,7 +351,6 @@ export default defineComponent({
 
       //on dataZoom emit an event of start x and end x
       chart?.on("dataZoom", function (params: any) {
-        console.log("dataZoom", params);
         //if batch then emit dataZoom event
         if (params?.batch) {
           emit("updated:dataZoom", {

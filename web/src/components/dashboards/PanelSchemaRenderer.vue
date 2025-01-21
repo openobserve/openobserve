@@ -540,7 +540,6 @@ export default defineComponent({
       if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
         // looks like zoom not needed
         // handle add annotation
-        console.log("onDataZoom", event);
         // TODO: HANDLE annotations
         handleAddAnnotation(event.start, event.end);
       } else {
@@ -705,8 +704,6 @@ export default defineComponent({
     let drilldownParams: any = [];
 
     const onChartClick = async (params: any, ...args: any) => {
-      console.log("Chart clicked with params:", params);
-
       // check for annotations add mode
       if (allowAnnotationsAdd.value) {
         if (isAddAnnotationMode.value) {
@@ -723,11 +720,6 @@ export default defineComponent({
           (params?.componentType == "markLine" ||
             params?.componentType == "markArea")
         ) {
-          console.log(
-            "markline or markarea click",
-            params?.data?.annotationDetails,
-          );
-
           editAnnotation(params?.data?.annotationDetails);
           return;
         }
