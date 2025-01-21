@@ -27,6 +27,7 @@ use wal::{FilePosition, ReadFrom, Reader, ENTRY_HEADER_LEN};
 
 use crate::service::{
     alerts::destinations,
+    db,
     pipeline::{pipeline_exporter::PipelineExporter, pipeline_wal_writer::get_metadata_motified},
 };
 
@@ -166,18 +167,37 @@ impl PipelineReceiver {
         self.stream_destination_name.as_str()
     }
 
-    pub async fn get_stream_endpoint(&self) -> String {
-        let destination_name = self.get_stream_destination_name();
+    pub async fn get_stream_endpoint(&self) -> Result<String> {
+        let pipeline_id = self.reader_header.get("pipeline_id").ok_or(Error::Message(
+            "get_stream_endpoint get pipeline_id fail".to_string(),
+        ))?;
+
+        let pipeline = db::pipeline::get_by_id(pipeline_id.as_str())
+            .await
+            .map_err(|e| Error::Message(format!("get_stream_endpoint get pipeline fail: {e}")))?;
+
+        let destination_name = pipeline.nodes.iter().find_map(|node| {
+            if let config::meta::pipeline::components::NodeData::RemoteStream(remote) = &node.data {
+                Some(remote.destination_name.to_string())
+            } else {
+                None
+            }
+        });
+
+        if destination_name.is_none() {
+            return Err(Error::Message("destination_name not found".to_string()));
+        }
+
         let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name).await {
+        match destinations::get(org_id, destination_name.unwrap().as_str()).await {
             Ok(data) => {
                 if data.url.ends_with('/') {
-                    data.url.trim_end_matches('/').to_string()
+                    Ok(data.url.trim_end_matches('/').to_string())
                 } else {
-                    data.url
+                    Ok(data.url)
                 }
             }
-            Err(_) => "".to_string(),
+            Err(_) => Ok("".to_string()),
         }
     }
 
