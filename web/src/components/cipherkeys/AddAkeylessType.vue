@@ -52,14 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
         ]"
       />
-      <q-btn v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <q-btn data-test="add-cipher-key-akeyless-access-id-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false" size="sm" color="primary" :label="t('common.cancel')" />
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
       {{ formData.key.store.akeyless.access_id }}
-      <q-btn @click="isUpdateAccessID = true" size="sm" color="primary" :label="t('common.update')" />
+      <q-btn data-test="add-cipher-key-akeyless-access-id-input-update" @click="isUpdateAccessID = true" size="sm" color="primary" :label="t('common.update')" />
     </div>
     <q-select
       data-test="add-cipher-key-auth-method-input"
@@ -103,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val || 'Access Key is required']"
           />
-          <q-btn v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-access-key-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
           {{ formData.key.store.akeyless.auth.access_key }}
-          <q-btn @click="isUpdateAccessKey = true" size="sm" color="primary" :label="t('common.update')" />
+          <q-btn data-test="add-cipher-key-akeyless-access-key-input-update" @click="isUpdateAccessKey = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
       </div>
       <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
@@ -131,14 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
             ]"
           />
-          <q-btn v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
           {{ formData.key.store.akeyless.auth.ldap.username }}
-          <q-btn @click="isUpdateLDAPUsername = true" size="sm" color="primary" :label="t('common.update')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-update" @click="isUpdateLDAPUsername = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
           <q-input
@@ -156,14 +156,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             autocomplete="new-password"
             :rules="[(val: any) => !!val || 'LDAP Password is required']"
           />
-          <q-btn v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
           {{ formData.key.store.akeyless.auth.ldap.password }}
-          <q-btn @click="isUpdateLDAPPass = true" size="sm" color="primary" :label="t('common.update')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-update" @click="isUpdateLDAPPass = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
       </div>
     </fieldset>
