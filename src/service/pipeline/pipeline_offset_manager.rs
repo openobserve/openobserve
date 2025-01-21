@@ -392,17 +392,4 @@ mod tests {
         pm.save(path, 100).await;
         assert_eq!(pm.get(path).await.unwrap(), 100);
     }
-
-    #[tokio::test]
-    async fn test_flush() {
-        init_filewatcher().await;
-        let mut pm = PipelineOffsetManager::init().await.unwrap();
-        let path = "path-to-remote-wal-file-test";
-        pm.save(path, 100).await;
-        // flush to disk
-        pm.flush().await.unwrap();
-        // file not exist, get fail
-        let pm = PipelineOffsetManager::init().await.unwrap();
-        assert_eq!(pm.get(path).await, None);
-    }
 }

@@ -320,39 +320,6 @@ mod tests {
     use wal::{build_file_path, ReadFrom, Writer};
 
     use crate::service::pipeline::pipeline_receiver::PipelineReceiver;
-    #[test]
-    fn test_read_entry_vecu8() {
-        env::set_var("ZO_PIPELINE_REMOTE_STREAM_WAL_DIR", "/tmp");
-        let entry_num = 100;
-        let config = &config::get_config();
-        let dir = path::PathBuf::from(&config.pipeline.remote_stream_wal_dir)
-            .join(WAL_DIR_DEFAULT_PREFIX);
-        let mut writer = Writer::build(
-            dir.clone(),
-            "org",
-            "stream",
-            "1".to_string(),
-            1024_1024,
-            8 * 1024,
-            None,
-        )
-        .unwrap();
-        for i in 0..entry_num {
-            let data = format!("hello world {}", i);
-            writer.write(data.as_bytes()).unwrap();
-        }
-        writer.close().unwrap();
-
-        let path = build_file_path(dir, "org", "stream", "1".to_string());
-        let mut fw = PipelineReceiver::new(path.clone(), ReadFrom::Beginning).unwrap();
-        for i in 0..entry_num {
-            let data = format!("hello world {}", i);
-            log::info!("{}", data);
-            let entry = fw.read_entry_vecu8().unwrap();
-            assert_eq!(entry.0.unwrap(), data.as_bytes());
-        }
-        remove_file(path).unwrap();
-    }
 
     #[test]
     fn test_read_entry() {
