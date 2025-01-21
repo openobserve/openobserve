@@ -169,9 +169,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
             log::info!("error while saving cipher key to db : {}", e);
             match e.sql_err() {
                 Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::Message(
-                        "key with given name already exists".into(),
-                    ));
+                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
                 }
                 _ => {
                     drop(_lock);

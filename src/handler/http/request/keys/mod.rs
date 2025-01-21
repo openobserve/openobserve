@@ -66,13 +66,13 @@ pub async fn save(
         };
 
         let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
-            None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
+            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
             Some(id) => id,
         };
 
         if req.name.contains(":") {
             return Ok(MetaHttpResponse::bad_request(
-                "key name cannot have ':' in it",
+                "Key name cannot have ':' in it",
             ));
         }
 
@@ -86,17 +86,9 @@ pub async fn save(
             // it is set up correctly. We don't care what the actual entrypted string is.
             Ok(mut k) => match k.encrypt("hello world") {
                 Ok(_) => {}
-                Err(e) => {
-                    return Ok(MetaHttpResponse::bad_request(format!(
-                        "error creating key from request : {e}"
-                    )))
-                }
+                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
             },
-            Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "error creating key from request : {e}"
-                )))
-            }
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }
 
         match crate::service::db::keys::add(CipherEntry {
@@ -113,12 +105,10 @@ pub async fn save(
                 set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
-                    "key created successfully".to_string(),
+                    "Key created successfully".to_string(),
                 )))
             }
-            Err(e) => Ok(MetaHttpResponse::bad_request(format!(
-                "error in saving : {e}"
-            ))),
+            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -167,14 +157,10 @@ pub async fn get(
             Ok(Some(k)) => k,
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
-                    "key {key_name} not found"
+                    "Key {key_name} not found"
                 )))
             }
-            Err(e) => {
-                return Ok(MetaHttpResponse::internal_error(format!(
-                    "error in getting key {e}"
-                )))
-            }
+            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
 
         // we can be fairly certain that in db we have proper json
@@ -220,11 +206,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
 
         let kdata = match infra::table::cipher::list_filtered(filter, None).await {
             Ok(list) => list,
-            Err(e) => {
-                return Ok(MetaHttpResponse::internal_error(format!(
-                    "error in listing keys: {e}"
-                )))
-            }
+            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
 
         let kdata = kdata
@@ -287,9 +269,7 @@ pub async fn delete(
                     "cipher key removed successfully".to_string(),
                 )))
             }
-            Err(e) => Ok(MetaHttpResponse::internal_error(format!(
-                "error in removing key {e}"
-            ))),
+            Err(e) => Ok(MetaHttpResponse::internal_error(e)),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -336,18 +316,18 @@ pub async fn update(
         };
         if key_name != req.name {
             return Ok(MetaHttpResponse::bad_request(
-                "key name from req does not match path",
+                "Key name from request does not match path",
             ));
         }
 
         let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
-            None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
+            None => return Ok(MetaHttpResponse::bad_request("Invalid user_id in request")),
             Some(id) => id,
         };
 
         if req.name.contains(":") {
             return Ok(MetaHttpResponse::bad_request(
-                "key name cannot have ':' in it",
+                "Key name cannot have ':' in it",
             ));
         }
 
@@ -366,14 +346,10 @@ pub async fn update(
             Ok(Some(k)) => k,
             Ok(None) => {
                 return Ok(MetaHttpResponse::not_found(format!(
-                    "key {key_name} not found"
+                    "Key {key_name} not found"
                 )))
             }
-            Err(e) => {
-                return Ok(MetaHttpResponse::internal_error(format!(
-                    "error in updating key {e}"
-                )))
-            }
+            Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
 
         // we can be fairly certain that in db we have proper json
@@ -386,17 +362,9 @@ pub async fn update(
             // it is set up correctly. We don't care what the actual entrypted string is.
             Ok(mut k) => match k.encrypt("hello world") {
                 Ok(_) => {}
-                Err(e) => {
-                    return Ok(MetaHttpResponse::bad_request(format!(
-                        "error creating key from request : {e}"
-                    )))
-                }
+                Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
             },
-            Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "error creating key from request : {e}"
-                )))
-            }
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }
 
         match crate::service::db::keys::update(CipherEntry {
@@ -413,9 +381,7 @@ pub async fn update(
                 http::StatusCode::OK.into(),
                 "key updated successfully".to_string(),
             ))),
-            Err(e) => Ok(MetaHttpResponse::bad_request(format!(
-                "error in saving : {e}"
-            ))),
+            Err(e) => Ok(MetaHttpResponse::bad_request(e)),
         }
     }
     #[cfg(not(feature = "enterprise"))]

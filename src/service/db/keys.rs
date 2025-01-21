@@ -18,7 +18,7 @@ use std::sync::Arc;
 use infra::{
     cluster_coordinator::get_coordinator,
     db::Event,
-    errors,
+    errors::{self, DbError},
     table::cipher::{CipherEntry, EntryKind},
 };
 use o2_enterprise::enterprise::cipher::CipherData;
@@ -28,8 +28,17 @@ use crate::{cipher::registry::REGISTRY, service::db};
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 
-pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
-    infra::table::cipher::add(entry.clone()).await?;
+pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
+    match infra::table::cipher::add(entry.clone()).await {
+        Ok(_) => {}
+        Err(errors::Error::DbError(DbError::UniqueViolation)) => {
+            return Err(anyhow::anyhow!("Key with given name already exists"));
+        }
+        Err(e) => {
+            log::info!("error while saving cipher key to db : {}", e);
+            return Err(anyhow::anyhow!(e));
+        }
+    }
     // specifically for cipher keys, we need to notify of this addition
     if entry.kind == EntryKind::CipherKey {
         // trigger watch event by putting value to cluster coordinator
