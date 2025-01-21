@@ -45,7 +45,6 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
-import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { getAnnotationsData } from "@/composables/dashboard/useAnnotationMarkline";
 
 export const convertMultiSQLData = async (
@@ -285,12 +284,6 @@ export const convertSQLData = async (
       }) ?? []
     );
   };
-
-  // const { getCombinedMarkLines } = useAnnotationsData(
-  //   panelSchema.id,
-  //   store.state.selectedOrganization?.identifier,
-  //   dashboardId,
-  // );
 
   annotations;
 
@@ -1156,18 +1149,6 @@ export const convertSQLData = async (
       position: panelSchema.config?.label_option?.position || "None",
       rotate: panelSchema.config?.label_option?.rotate || 0,
     };
-  };
-
-  const changeFormatOfDateTime = (timestamp: any) => {
-    const date = new Date(timestamp / 1000);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
   const { markLines, markAreas } = getAnnotationsData(

@@ -222,7 +222,11 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
+import {
+  getAllDashboardsByFolderId,
+  getDashboard,
+  getFoldersList,
+} from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -376,16 +380,12 @@ export default defineComponent({
     );
 
     const {
-      addAnnotationbuttonStyle,
       isAddAnnotationMode,
       isAddAnnotationDialogVisible,
       annotationToAddEdit,
       editAnnotation,
       toggleAddAnnotationMode,
       handleAddAnnotation,
-      handleSaveAnnotation,
-      handleUpdateAnnotation,
-      handleDeleteAnnotation,
       closeAddAnnotation,
     } = useAnnotationsData(
       store.state.selectedOrganization?.identifier,
@@ -547,7 +547,6 @@ export default defineComponent({
         // default behavior
         emit("updated:data-zoom", event);
         dataZoomEventDataTempStorage.value = null;
-
       }
     };
 
@@ -705,38 +704,11 @@ export default defineComponent({
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
 
-    const handleSave = async (formData: any) => {
-      console.log("Saving/updating annotation with form data:", formData);
-      try {
-        if (formData.id) {
-          console.log("Updating annotation with id:", formData.id);
-          await handleUpdateAnnotation(formData);
-        } else {
-          console.log("Saving a new annotation");
-          await handleSaveAnnotation(formData);
-        }
-        console.log("Annotation saved/updated successfully");
-      } catch (error) {
-        console.error("Failed to save/update annotation:", error);
-      }
-    };
-
-    const handleRemove = async (annotationId: string) => {
-      console.log("Deleting annotation with id:", annotationId);
-
-      try {
-        await handleDeleteAnnotation(annotationId);
-      } catch (error) {
-        console.error("Failed to delete annotation:", error);
-      }
-    };
-
     const onChartClick = async (params: any, ...args: any) => {
       console.log("Chart clicked with params:", params);
 
       // check for annotations add mode
       if (allowAnnotationsAdd.value) {
-
         if (isAddAnnotationMode.value) {
           handleAddAnnotation(
             params?.data?.[0] || params?.data?.time || params?.data?.name,
@@ -899,8 +871,8 @@ export default defineComponent({
     ): string => {
       let whereClause = ast?.where
         ? parser
-          .sqlify({ type: "select", where: ast.where })
-          .slice("SELECT".length)
+            .sqlify({ type: "select", where: ast.where })
+            .slice("SELECT".length)
         : "";
 
       if (breakdownColumn && breakdownValue) {
@@ -1017,8 +989,8 @@ export default defineComponent({
           const currentUrl =
             pos > -1
               ? window.location.origin +
-              window.location.pathname.slice(0, pos) +
-              "/web"
+                window.location.pathname.slice(0, pos) +
+                "/web"
               : window.location.origin;
 
           const logsUrl = constructLogsUrl(
@@ -1075,8 +1047,8 @@ export default defineComponent({
           "";
         drilldownVariables.query_encoded = b64EncodeUnicode(
           metadata?.value?.queries[0]?.query ??
-          panelSchema?.value?.queries[0]?.query ??
-          "",
+            panelSchema?.value?.queries[0]?.query ??
+            "",
         );
 
         // if chart type is 'table' then we need to pass the table name
@@ -1142,12 +1114,12 @@ export default defineComponent({
               replacePlaceholders(drilldownData.data.url, drilldownVariables),
               drilldownData.targetBlank ? "_blank" : "_self",
             );
-          } catch (error) { }
+          } catch (error) {}
         } else if (drilldownData.type == "logs") {
           try {
             navigateToLogs();
           } catch (error) {
-            showErrorNotification("Failed to navigate to logs",)
+            showErrorNotification("Failed to navigate to logs");
           }
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
@@ -1178,10 +1150,14 @@ export default defineComponent({
 
           const dashboardId = allDashboardData?.find(
             (dashboard: any) =>
-              dashboard.title === drilldownData.data.dashboard
+              dashboard.title === drilldownData.data.dashboard,
           )?.dashboardId;
 
-          const dashboardData = await getDashboard(store, dashboardId, folderId);
+          const dashboardData = await getDashboard(
+            store,
+            dashboardId,
+            folderId,
+          );
 
           if (!dashboardData) {
             console.error(
@@ -1206,8 +1182,8 @@ export default defineComponent({
             let currentUrl: any =
               pos > -1
                 ? window.location.origin +
-                window.location.pathname.slice(0, pos) +
-                "/web"
+                  window.location.pathname.slice(0, pos) +
+                  "/web"
                 : window.location.origin;
 
             // always, go to view dashboard page
@@ -1225,7 +1201,7 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 url.searchParams.set(
                   "var-" +
-                  replacePlaceholders(variable.name, drilldownVariables),
+                    replacePlaceholders(variable.name, drilldownVariables),
                   replacePlaceholders(variable.value, drilldownVariables),
                 );
               }
@@ -1249,7 +1225,7 @@ export default defineComponent({
               if (variable?.name?.trim() && variable?.value?.trim()) {
                 oldParams[
                   "var-" +
-                  replacePlaceholders(variable.name, drilldownVariables)
+                    replacePlaceholders(variable.name, drilldownVariables)
                 ] = replacePlaceholders(variable.value, drilldownVariables);
               }
             });
@@ -1320,7 +1296,6 @@ export default defineComponent({
       tableRendererRef,
       onChartClick,
       onDataZoom,
-      addAnnotationbuttonStyle,
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
@@ -1328,8 +1303,6 @@ export default defineComponent({
       chartPanelClass,
       chartPanelHeight,
       isAddAnnotationDialogVisible,
-      handleSave,
-      handleRemove,
       closeAddAnnotation,
       isAddAnnotationMode,
       toggleAddAnnotationMode,

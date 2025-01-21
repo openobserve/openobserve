@@ -32,7 +32,7 @@ export interface TrellisLayout {
 export interface SeriesObject {
   name: string;
   label: Label;
-  // markLine: MarkLine;
+  markLine: MarkLine;
   connectNulls: boolean;
   large: boolean;
   color: string | null;

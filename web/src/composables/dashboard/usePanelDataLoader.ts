@@ -44,7 +44,6 @@ import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import { useAnnotationsData } from "./useAnnotationsData";
 import { useAnnotations } from "./useAnnotations";
 
 /**
@@ -1220,12 +1219,6 @@ export const usePanelDataLoader = (
                 );
               }
 
-              // const annotations = await refreshAnnotations(
-              //   Number(startISOTimestamp),
-              //   Number(endISOTimestamp),
-              // );
-              // state.annotations = annotations;
-              // console.log("loadData: annotations", annotations);
               saveCurrentStateToCache();
             }
           }
