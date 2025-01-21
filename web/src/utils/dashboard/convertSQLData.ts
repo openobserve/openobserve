@@ -285,8 +285,6 @@ export const convertSQLData = async (
     );
   };
 
-  annotations;
-
   const noValueConfigOption = panelSchema?.config?.no_value_replacement ?? "";
 
   const processedData = processData(searchQueryData, panelSchema);
