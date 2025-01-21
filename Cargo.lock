@@ -6310,7 +6310,7 @@ dependencies = [
 
 [[package]]
 name = "openobserve"
-version = "0.14.1"
+version = "0.14.3"
 dependencies = [
  "actix",
  "actix-cors",

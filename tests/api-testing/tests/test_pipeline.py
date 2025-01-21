@@ -356,7 +356,7 @@ def test_pipeline_creation_and_action_flatten(create_session, base_url, pipeline
     """Running an E2E test for pipeline creation and enabling/disabling the pipeline."""
     session = create_session
     url = base_url
-    org_id = "org_pytest_data"
+    org_id = "default"
 
     # Payload for pipeline creation
     pipeline_payload = {

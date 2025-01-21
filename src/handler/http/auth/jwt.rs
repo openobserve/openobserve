@@ -43,7 +43,7 @@ use {
 
 #[cfg(feature = "cloud")]
 use crate::{
-    common::meta::organization::{Organization, USER_DEFAULT},
+    common::meta::organization::{Organization, DEFAULT_ORG, USER_DEFAULT},
     service::organization::{accept_invitation, list_orgs_by_user},
 };
 
@@ -612,7 +612,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
         let org = Organization {
             // id will be overridden by the service function
             identifier: ider::uuid(),
-            name: format!("{}'s Organization", name),
+            name: DEFAULT_ORG.to_string(),
             org_type: USER_DEFAULT.to_owned(),
         };
         match db::organization::save_org(&org).await {

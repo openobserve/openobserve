@@ -345,10 +345,8 @@ pub async fn rename_org(
     if get_org(org_id).await.is_none() {
         return Err(anyhow::anyhow!("Organization doesn't exist"));
     }
-    let mut org = get_org(org_id).await.unwrap();
-    org.name = name.trim().to_owned();
-    match db::organization::save_org(&org).await {
-        Ok(_) => Ok(org),
+    match db::organization::rename_org(org_id, name).await {
+        Ok(org) => Ok(org),
         Err(e) => {
             log::error!("Error creating org: {}", e);
             Err(anyhow::anyhow!("Error creating org: {}", e))

@@ -1229,6 +1229,7 @@ export default defineComponent({
     border: none;
     font-size: 12px;
     padding: 6px 4px;
+    color: black;
   }
 
   .button-left {

@@ -298,6 +298,8 @@ impl FromRequest for AuthExtractor {
             }
             let key = if path_columns[1].eq("invites") {
                 "users"
+            } else if path_columns[1].eq("rename") && method.eq("PUT") {
+                "organizations"
             } else {
                 path_columns[1]
             };
