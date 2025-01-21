@@ -699,7 +699,7 @@ function getIcon(data, ioType) {
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
         <q-item-section avatar>
-          <img :src="externalOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <img :src="externalOutputImage" alt="Remote Destination" style="width: 30px; height: 30px;">
           <q-tooltip anchor="top middle" self="bottom right">Remote</q-tooltip>
 
         </q-item-section>
