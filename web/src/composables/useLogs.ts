@@ -4705,7 +4705,6 @@ const useLogs = () => {
 
     if (response.type === "search_response") {
       if (payload.type === "search") {
-        console.log("handle logs response", payload.traceId);
         handleLogsResponse(
           payload.queryReq,
           payload.isPagination,
@@ -4717,12 +4716,10 @@ const useLogs = () => {
       }
 
       if (payload.type === "histogram") {
-        console.log("handle hist response", payload.traceId);
         handleHistogramResponse(payload.queryReq, payload.traceId, response);
       }
 
       if (payload.type === "pageCount") {
-        console.log("handle count response", payload.traceId);
         handlePageCountResponse(payload.queryReq, payload.traceId, response);
       }
     }
@@ -4783,10 +4780,15 @@ const useLogs = () => {
 
       if (searchObj.meta.sqlMode) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.total =
-            searchAggData.total + response.content?.results?.total;
           searchAggData.hasAggregation = true;
           searchObj.meta.resultGrid.showPagination = false;
+
+          if (response.content?.streaming_aggs) {
+            searchAggData.total = response.content?.results?.total;
+          } else {
+            searchAggData.total =
+              searchAggData.total + response.content?.results?.total;
+          }
         }
       }
 
