@@ -208,6 +208,7 @@ pub async fn get_action_from_id(path: web::Path<(String, String)>) -> Result<Htt
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
+
 /// Upload a zipped action file and process it.
 /// This endpoint allows uploading a ZIP file containing an action, which will be extracted,
 /// processed, and executed.

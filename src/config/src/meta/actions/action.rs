@@ -92,6 +92,7 @@ pub struct Action {
     pub last_modified_at: DateTime<Utc>,
     #[serde(default)]
     pub last_successful_at: Option<DateTime<Utc>>,
+    pub origin_cluster_url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -125,6 +126,8 @@ pub struct DeployActionRequest {
     pub ksuid: String,
     #[serde(default)]
     pub runtime: String,
+    #[serde(default)]
+    pub origin_cluster_url: String,
 }
 
 /// Request send to Action Deployer, to deploy an action

@@ -40,6 +40,9 @@ pub struct Model {
     pub org_id: String,
     #[sea_orm(column_type = "String(StringLen::N(128))")]
     pub created_by: String,
+    // URLs can be long
+    #[sea_orm(column_type = "Text")]
+    pub origin_cluster_url: String,
     #[sea_orm(column_type = "Json")]
     pub env: JsonValue, // Environment variables serialized as JSON
     #[sea_orm(column_type = "Json")]
@@ -79,6 +82,7 @@ impl TryFrom<Model> for Action {
             zip_file_name: model.file_name,
             last_modified_at: model.last_modified_at,
             last_successful_at: model.last_successful_at,
+            origin_cluster_url: model.origin_cluster_url,
         })
     }
 }
@@ -92,26 +96,6 @@ impl RelationTrait for Relation {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-
-// #[derive(FromQueryResult, Debug, Serialize)]
-// pub struct ActionScriptDetails {
-//     pub id: String,
-//     pub name: String,
-//     pub env: JsonValue,
-//     pub execution_details: ExecutionDetailsType,
-//     pub cron_expr: Option<String>,
-// }
-
-// #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
-// pub struct ActionScriptInfo {
-//     pub id: String,
-//     pub name: String,
-//     pub running: bool,
-//     pub created_at: DateTimeUtc,         // Automatically set on insert
-//     pub updated_at: Option<DateTimeUtc>, // Automatically updated
-//     pub last_executed_at: Option<DateTimeUtc>, // Automatically set on insert
-//     pub failure_count: i32,              // Number of times the script has failed
-// }
 
 pub async fn init() -> Result<(), errors::Error> {
     create_table().await?;
@@ -153,6 +137,7 @@ pub async fn add(action: &Action) -> Result<(), errors::Error> {
         file_name: Set(action.zip_file_name.clone()),
         created_by: Set(action.created_by.clone()),
         status: Set(action.status.clone()),
+        origin_cluster_url: Set(action.origin_cluster_url.clone()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
