@@ -687,7 +687,8 @@ async fn unauthorized_error(
     if let Some(user) = user_email {
         let error = handle_failed_login(user).await.unwrap_or_default();
         if !error.is_empty() {
-            return Ok(HttpResponse::Unauthorized().json(error.to_string()));
+            resp.message = error;
+            return Ok(HttpResponse::Unauthorized().json(resp));
         }
     };
 
