@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
         ]"
       />
-      <q-btn data-test="add-cipher-key-akeyless-access-id-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <q-btn data-test="add-cipher-key-akeyless-access-id-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.access_id != ''" @click="isUpdateAccessID = false" size="sm" color="primary" :label="t('common.cancel')" />
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val || 'Access Key is required']"
           />
-          <q-btn data-test="add-cipher-key-akeyless-access-key-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-access-key-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.access_key != ''" @click="isUpdateAccessKey = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (val: any) => /^[a-zA-Z0-9._-]+$/.test(val) || 'Username can only contain alphanumeric characters, dots, underscores, and hyphens',
             ]"
           />
-          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.username != ''" @click="isUpdateLDAPUsername = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             autocomplete="new-password"
             :rules="[(val: any) => !!val || 'LDAP Password is required']"
           />
-          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-cancel" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
+          <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.akeyless.auth.ldap.password != ''" @click="isUpdateLDAPPass = false" size="sm" color="primary" :label="t('common.cancel')" />
         </div>
         <div v-else>
           <label class="row q-field q-mb-md">

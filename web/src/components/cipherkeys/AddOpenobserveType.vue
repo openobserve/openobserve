@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :rules="[(val: any) => !!val || 'Secret is required']"
       />
-      <q-btn data-test="add-cipher-key-openobserve-secret-input-cancel" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <q-btn data-test="add-cipher-key-openobserve-secret-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false" size="sm" color="primary" :label="t('common.cancel')" />
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
