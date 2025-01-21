@@ -410,16 +410,14 @@ pub async fn update(
         update_query = update_query.col_expr(timed_annotations::Column::Text, Expr::value(text));
     }
     if let Some(tags) = timed_annotation.tags {
-        // Serialize tags into a JSON string
-        let tags_json = serde_json::to_string(&tags).map_err(|e| {
+        // Serialize tags into a JSON value
+        let tags_json = serde_json::to_value(&tags).map_err(|e| {
             let err_msg = format!("Failed to serialize tags: {}", e);
             log::error!("{}", err_msg);
             errors::Error::Message(err_msg)
         })?;
-        update_query = update_query.col_expr(
-            timed_annotations::Column::Tags,
-            Expr::cust(format!("CAST('{}' AS JSON)", tags_json)),
-        );
+        update_query =
+            update_query.col_expr(timed_annotations::Column::Tags, Expr::value(tags_json));
     }
 
     // Step 3: Execute the update query
