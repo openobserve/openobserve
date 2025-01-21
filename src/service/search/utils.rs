@@ -74,12 +74,12 @@ impl ExecutionPlanVisitor for ScanStatsVisitor {
         if let Some(remote_scan_exec) = mayby_remote_scan_exec {
             {
                 let guard = remote_scan_exec.scan_stats.lock();
-                let stats = guard.clone();
+                let stats = (*guard).clone();
                 self.scan_stats.add(&stats);
             }
             {
                 let guard = remote_scan_exec.partial_err.lock();
-                let err = guard.clone();
+                let err = (*guard).clone();
                 self.partial_err.push_str(&err);
             }
         }
