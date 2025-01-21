@@ -236,11 +236,7 @@ export default defineComponent({
     });
 
     const showInternalLogin = computed(() => {
-      return (
-        store.state.zoConfig.native_login_enabled ||
-        (config.isCloud == "true" &&
-          router.currentRoute.value.query.action == "o2login")
-      );
+      return store.state.zoConfig.native_login_enabled;
     });
 
     const loginWithSSo = async () => {
