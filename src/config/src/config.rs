@@ -1119,7 +1119,7 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = true)]
     pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
@@ -1531,7 +1531,7 @@ pub struct HealthCheck {
     pub enabled: bool,
     #[env_config(
         name = "ZO_HEALTH_CHECK_TIMEOUT",
-        default = 3,
+        default = 10,
         help = "Health check timeout in seconds"
     )]
     pub timeout: u64,
@@ -2232,7 +2232,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
-        cfg.health_check.timeout = 3;
+        cfg.health_check.timeout = 10;
     }
     if cfg.health_check.failed_times == 0 {
         cfg.health_check.failed_times = 5;
