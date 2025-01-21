@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{get_config, ider, utils::rand::generate_random_string};
+use config::{get_config, ider, utils::rand::generate_random_string, USER_LOCK_KEY};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
@@ -36,7 +36,7 @@ use crate::{
         },
         utils::auth::{get_hash, get_role, is_root_user},
     },
-    service::db,
+    service::{db, kv},
 };
 
 pub async fn post_user(
@@ -798,6 +798,97 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
     );
     db::user::set(&user).await.unwrap();
     Ok(())
+}
+
+pub async fn get_unlock_link(email_id: &str) -> Result<HttpResponse, Error> {
+    if let Ok(user) = db::user::get_db_user(email_id).await {
+        if user.is_external && is_user_locked(email_id).await {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Bad Request".to_string(),
+            )));
+        }
+        let cfg = get_config();
+        let csrf = crate::common::utils::auth::generate_csrf_token(email_id);
+        let csrf_key = format!("{}_csrf", USER_LOCK_KEY);
+        kv::set(&csrf_key, &csrf, email_id.to_string().into())
+            .await
+            .unwrap();
+
+        let url = format!(
+            "{}{}/config/users/{}/unlock",
+            cfg.common.web_url, cfg.common.base_uri, csrf
+        );
+
+        let msg = format!("Click on the link to unlock your account: {}", url.as_str());
+
+        let subject = "Unlock instructions for your OpenObserve account";
+
+        let dest = config::meta::alerts::destinations::DestinationWithTemplate {
+            emails: vec![email_id.to_string()],
+            ..Default::default()
+        };
+
+        let _ = super::alerts::alert::send_email_notification(subject, &dest, msg).await;
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Email with unlock instructions sent successfully".to_string(),
+        )))
+    } else {
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Bad Request".to_string(),
+        )))
+    }
+}
+
+pub async fn unlock_user(csrf: &str) -> Result<HttpResponse, Error> {
+    let csrf_key = format!("{}_csrf", USER_LOCK_KEY);
+    let user_email = match kv::get(&csrf_key, csrf).await {
+        Ok(v) => match String::from_utf8(v.to_vec()) {
+            Ok(val) => val,
+            Err(_) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::NOT_FOUND.into(),
+                    "Bad Request".to_string(),
+                )));
+            }
+        },
+        Err(_) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Bad Request".to_string(),
+            )))
+        }
+    };
+
+    clear_failed_login_count(&user_email).await;
+
+    let _ = kv::delete(&csrf_key, csrf).await;
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        http::StatusCode::OK.into(),
+        "User unlocked".to_string(),
+    )))
+}
+
+pub async fn is_user_locked(user_email: &str) -> bool {
+    let user_key = format!("user_{}", user_email);
+
+    let exhausted_attempts = match kv::get(USER_LOCK_KEY, &user_key).await {
+        Ok(v) => match String::from_utf8(v.to_vec()) {
+            Ok(val) => val.parse::<u16>().unwrap_or(0),
+            Err(_) => 0,
+        },
+        Err(_) => 0,
+    };
+    exhausted_attempts >= get_config().auth.wrong_password_attempts
+}
+
+pub async fn clear_failed_login_count(user_email: &str) {
+    let user_key = format!("user_{}", user_email);
+    let lock_key = format!("{}_attempts", USER_LOCK_KEY);
+    let _ = crate::service::kv::delete(&lock_key, &user_key).await;
 }
 
 #[cfg(test)]
