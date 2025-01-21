@@ -163,11 +163,7 @@ impl PipelineReceiver {
         self.stream_name.as_str()
     }
 
-    pub fn get_stream_destination_name(&self) -> &str {
-        self.stream_destination_name.as_str()
-    }
-
-    pub async fn get_stream_endpoint(&self) -> Result<String> {
+    pub async fn get_stream_destination_name(&self) -> Result<String> {
         let pipeline_id = self.reader_header.get("pipeline_id").ok_or(Error::Message(
             "get_stream_endpoint get pipeline_id fail".to_string(),
         ))?;
@@ -188,8 +184,13 @@ impl PipelineReceiver {
             return Err(Error::Message("destination_name not found".to_string()));
         }
 
+        Ok(destination_name.unwrap())
+    }
+
+    pub async fn get_stream_endpoint(&self) -> Result<String> {
+        let destination_name = self.get_stream_destination_name().await?;
         let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name.unwrap().as_str()).await {
+        match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => {
                 if data.url.ends_with('/') {
                     Ok(data.url.trim_end_matches('/').to_string())
@@ -209,18 +210,21 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_endpoint_header(&self) -> Option<HashMap<String, String>> {
-        let destination_name = self.get_stream_destination_name();
+        let destination_name = self.get_stream_destination_name().await.unwrap_or("".to_string());
         let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name).await {
+        match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => data.headers,
             Err(_) => None,
         }
     }
 
     pub async fn get_stream_export_retry_time(&self) -> u64 {
-        let destination_name = self.get_stream_destination_name();
+        let destination_name = self
+            .get_stream_destination_name()
+            .await
+            .unwrap_or("".to_string());
         let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name).await {
+        match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => match data.remote_pipeline_max_retry_time {
                 0 => config::get_config().pipeline.remote_request_retry_time,
                 other => other,
@@ -230,9 +234,12 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_data_retention_days(&self) -> i64 {
-        let destination_name = self.get_stream_destination_name();
+        let destination_name = self
+            .get_stream_destination_name()
+            .await
+            .unwrap_or("".to_string());
         let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name).await {
+        match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => match data.data_retention_days {
                 0 => config::get_config().compact.data_retention_days,
                 other => other,

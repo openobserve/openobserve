@@ -335,8 +335,9 @@ impl PipelineWatcher {
                 );
 
                 if pr.pipeline_exporter.is_none() {
+                    let dname = pr.get_stream_destination_name().await?;
                     let skip_tl_verify = pr
-                        .get_skip_tls_verify(pr.get_org_id(), pr.get_stream_destination_name())
+                        .get_skip_tls_verify(pr.get_org_id(), dname.as_str())
                         .await;
                     pr.pipeline_exporter = Some(PipelineExporter::init(skip_tl_verify)?);
                 }
