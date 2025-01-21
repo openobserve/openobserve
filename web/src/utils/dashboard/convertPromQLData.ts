@@ -173,7 +173,7 @@ export const convertPromQLData = async (
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
-        color: "rgba(255, 173, 177, 0.4)",
+        color: "rgba(254, 241, 96, 0.2)",
       },
       data: markAreas,
     };
@@ -716,7 +716,7 @@ export const convertPromQLData = async (
     data: [[convertedTimeStampToDataFormat, null]],
     markLine: {
       itemStyle: {
-        color: "rgba(255, 173, 177, 0.4)",
+        color: "rgba(254, 241, 96, 0.2)",
       },
       silent: false,
       animation: false,
