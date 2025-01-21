@@ -4705,6 +4705,7 @@ const useLogs = () => {
 
     if (response.type === "search_response") {
       if (payload.type === "search") {
+        console.log("handle logs response", payload.traceId);
         handleLogsResponse(
           payload.queryReq,
           payload.isPagination,
@@ -4716,10 +4717,12 @@ const useLogs = () => {
       }
 
       if (payload.type === "histogram") {
+        console.log("handle hist response", payload.traceId);
         handleHistogramResponse(payload.queryReq, payload.traceId, response);
       }
 
       if (payload.type === "pageCount") {
+        console.log("handle count response", payload.traceId);
         handlePageCountResponse(payload.queryReq, payload.traceId, response);
       }
     }
@@ -4877,6 +4880,12 @@ const useLogs = () => {
     searchObj.data.queryResults.aggs.push(...response.content.results.hits);
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
+
+    if (response.content.streaming_aggs) {
+      searchObj.data.queryResults.scan_size =
+        response.content.results.scan_size;
+      searchObj.data.queryResults.took = response.content.results.took;
+    }
 
     // if total records in partition is greater than recordsPerPage then we need to update pagination
     // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
