@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::array::RecordBatch;
-use arrow_schema::DataType;
 
 use super::json::{Map as JsonMap, Value};
 
@@ -27,7 +26,6 @@ pub fn record_batches_to_json_rows(
         return Ok(Vec::new());
     }
 
-    let schema = batches.first().unwrap().schema();
     let json_buf = Vec::with_capacity(
         batches
             .iter()
@@ -38,19 +36,22 @@ pub fn record_batches_to_json_rows(
     writer.write_batches(batches)?;
     writer.finish()?;
     let json_data = writer.into_inner();
-    let mut ret: Vec<JsonMap<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
+    let ret: Vec<JsonMap<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
 
+    // This effect other function, comment it for now
+    //
     // Hack for uint64, because Chrome V8 does not support uint64
-    for field in schema.fields() {
-        if field.data_type() == &DataType::UInt64 {
-            for row in ret.iter_mut() {
-                if let Some(val) = row.get_mut(field.name()) {
-                    if val.is_u64() {
-                        *val = Value::String(val.to_string());
-                    }
-                }
-            }
-        }
-    }
+    // for field in schema.fields() {
+    //     if field.data_type() == &DataType::UInt64 {
+    //         for row in ret.iter_mut() {
+    //             if let Some(val) = row.get_mut(field.name()) {
+    //                 if val.is_u64() {
+    //                     *val = Value::String(val.to_string());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
     Ok(ret)
 }
