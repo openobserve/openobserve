@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex"
     >
       <div
-         class="border-right" :style="{ width: leftWidth + 'px' }"  >
+         :style="{ width: leftWidth + 'px' }"  >
         <div
           :style="{
             height: '100%',
@@ -246,8 +246,16 @@ export default defineComponent({
       return spanList
         .map((span:any, index:any) => {
           // Check if any span value matches the query
-          const matches = Object.values(span).some((value) => {
+          const matches = Object.entries(span).some(([key, value]) => {
             if (typeof value === "string" || typeof value === "number") {
+              // Special handling for duration
+              if (key === "duration") {
+                const formattedDuration = `${value}us`; // Format duration with "us"
+                return (
+                  String(value).toLowerCase().includes(query) ||
+                  formattedDuration.toLowerCase().includes(query)
+                );
+              }
               return String(value).toLowerCase().includes(query);
             }
             return false; // Skip non-string/non-number values

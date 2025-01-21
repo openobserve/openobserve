@@ -263,6 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
           isTimelineExpanded ? '' : 'full',
         ]"
+        ref="parentContainer" 
       >
         <trace-header
           :baseTracePosition="baseTracePosition"
@@ -273,8 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
-            <div class="position-relative">
-              <!-- <div
+            <div class="position-relative" >
+              <div
                 :style="{
                   width: '1px',
                   left: `${leftWidth}px`,
@@ -282,12 +283,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
                   zIndex: 999,
                   top: '-28px',
-                  height: 'calc(100% + 30px) !important',
+                  height: `${parentHeight}px`,
                   cursor: 'col-resize',
                 }"
-                class="absolute full-height"
+                class="absolute resize"
                 @mousedown="startResize"
-              /> -->
+              />
               <trace-tree
                 :collapseMapping="collapseMapping"
                 :spans="spanPositionList"
@@ -316,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <trace-details-sidebar
           :span="spanMap[selectedSpanId as string]"
           :baseTracePosition="baseTracePosition"
+          :search-query="searchQuery"          
           @view-logs="redirectToLogs"
           @close="closeSidebar"
           @open-trace="openTraceLink"
@@ -342,6 +344,7 @@ import {
   watch,
   defineAsyncComponent,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -420,6 +423,21 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+    const parentContainer = ref(null);
+    let parentHeight = ref(0);
+    let currentHeight = 0; 
+    const updateHeight = async () => {
+      await nextTick();
+      if (parentContainer.value) {
+        const newHeight = parentContainer.value.scrollHeight;
+        if (currentHeight !== newHeight) {
+          currentHeight = newHeight;
+          parentHeight.value = currentHeight;
+          
+        }
+      }
+    };
+
 
     const { showErrorNotification } = useNotifications();
 
@@ -498,25 +516,7 @@ export default defineComponent({
     // Watch for changes in searchQuery
     
 
-    // Disabled for now
-    // onActivated(() => {
-    //   const params = router.currentRoute.value.query;
-
-    //   // If selected trace is different from the one in the URL, reset the trace details
-    //   // If there is no selected trace, then also reset the trace details
-
-    //   if (
-    //     (searchObj.data.traceDetails.selectedTrace &&
-    //       params.trace_id !==
-    //         searchObj.data.traceDetails.selectedTrace?.trace_id) ||
-    //     !searchObj.data.traceDetails.selectedTrace
-    //   ) {
-    //     resetTraceDetails();
-    //     console.log("resetTraceDetails >>>>>>>>>>>>>");
-    //     setupTraceDetails();
-    //   }
-    // });
-
+    
     onBeforeMount(async () => {
       resetTraceDetails();
       setupTraceDetails();
@@ -533,26 +533,6 @@ export default defineComponent({
       }
     );
 
-    // Disabled for now
-    // watch(
-    //   () => router.currentRoute.value.query.trace_id,
-    //   (_new, _old) => {
-    //     // If trace_id changes, reset the trace details
-    //     if (
-    //       _new &&
-    //       _old &&
-    //       _new !== _old &&
-    //       _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
-    //     ) {
-    //       resetTraceDetails();
-    //       // setupTraceDetails();
-    //       const params = router.currentRoute.value.query;
-    //       if (params.span_id) {
-    //         updateSelectedSpan(params.span_id as string);
-    //       }
-    //     }
-    //   },
-    // );
 
     const backgroundStyle = computed(() => {
       return {
@@ -599,7 +579,16 @@ export default defineComponent({
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
       }
+      nextTick(() => {
+        updateHeight();
+      });
+      // window.addEventListener("resize", updateHeight);
     });
+
+    // onBeforeUnmount(() => {
+    //   window.removeEventListener("resize", updateHeight);
+    // });
+
 
     // watch(
     //   () => spanList.value.length,
@@ -1047,6 +1036,7 @@ export default defineComponent({
       timeRange.value.start = data.start || 0;
       timeRange.value.end = data.end || 0;
       calculateTracePosition();
+      updateHeight();
     };
 
     onMounted(() => {
@@ -1222,7 +1212,10 @@ export default defineComponent({
       currentIndex,
       handleIndexUpdate,
       handleSearchResult,
-      searchResults
+      searchResults,
+      parentContainer,
+      parentHeight,
+      updateHeight
     };
   },
 });
@@ -1397,6 +1390,16 @@ $traceChartCollapseHeight: 42px;
 .custom-height .q-field__control,.custom-height .q-field__append {
   height: 100%; /* Ensures the input control fills the container height */
   line-height: 36px; /* Vertically centers the text inside */
+}
+.resize::after{
+  content: ' ';
+  position: absolute;
+  height: 100%;
+  left: -10px;
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  z-index: 999;
 }
 
 </style>

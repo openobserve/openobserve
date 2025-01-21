@@ -142,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
                 "
               >
-                {{ key }}
+                {{ key }} 
               </td>
               <td class="q-py-xs q-px-sm">
-                {{ val }}
+                <span v-html="highlightSearch(String(val))"></span> 
               </td>
             </tr>
           </template>
@@ -164,9 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 {{ key }}
-              </td>
+            </td>
               <td class="q-py-xs q-px-sm">
-                {{ val }}
+                <span v-html="highlightSearch(val)"></span> 
               </td>
             </tr>
           </template>
@@ -174,9 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <pre class="attr-text">{{
-        JSON.stringify(spanDetails.attrs, null, 2)
-      }}</pre>
+      <pre class="attr-text" v-html="highlightedAttributes(spanDetails.attrs)"></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
@@ -231,13 +229,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                {{ column.prop(row) }}
+                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+               <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr v-if="expandedEvents[index.toString()]">
             <td colspan="2">
-              <pre class="log_json_content">{{ row }}</pre>
+              <!-- <pre class="log_json_content">{{ row }}</pre> -->
+              <pre class="log_json_content" v-html="highlightedAttributes(row)"></pre>
+
             </td>
           </q-tr>
         </template>
@@ -301,7 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                {{ column.prop(row) }}
+                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+                <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
@@ -428,6 +430,10 @@ export default defineComponent({
       type: Object,
       default: () => null,
     },
+    searchQuery: {
+      type: String,
+      default: '',
+    },
   },
   emits: ["close", "view-logs", "select-span", "open-trace"],
   setup(props, { emit }) {
@@ -449,6 +455,41 @@ export default defineComponent({
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const isLinksExpanded = ref(false);
     const router = useRouter();
+    const highlightSearch = (value: any,preserveString:any = false): string => {
+      if (!props.searchQuery) {
+        // Return the object/JSON value as is if there's no search query
+        return typeof value === 'object' && value !== null
+          ? JSON.stringify(value, null, 2)
+          : value;
+      }
+
+      if (typeof value === 'string') {
+        // Highlight text in string values
+        const regex = new RegExp(`(${props.searchQuery})`, 'gi');
+        if(preserveString){
+          return `"${value.replace(regex, (match) => `<span class="highlight">${match}</span>`)}"`;
+        }
+        else{
+          return value.replace(regex, (match) => `<span class="highlight">${match}</span>`);
+        }
+
+      } else if (Array.isArray(value)) {
+        return `[${value.map((item) => highlightSearch(item)).join(', ')}]`;
+      } else if (typeof value === 'object' && value !== null) {
+        const highlightedEntries = Object.entries(value).map(([key, val]) => {
+          // Do not highlight the keys; only process the values
+          const highlightedVal = highlightSearch(val,true);
+          return `"${key}": ${highlightedVal}`;
+        });
+        return `{\n  ${highlightedEntries.join(',\n  ')}\n}`;
+      } else {
+        return JSON.stringify(value);
+      }
+    };
+
+    const highlightedAttributes = computed(() => {
+      return (value: any) => highlightSearch(value,true);
+    });
 
     watch(
       () => props.span,
@@ -781,7 +822,9 @@ export default defineComponent({
       spanLinks,
       linkColumns,
       secondTdWidth,
-      getSecondTdWidth
+      getSecondTdWidth,
+      highlightSearch,
+      highlightedAttributes
     };
   },
 });
@@ -998,5 +1041,8 @@ export default defineComponent({
       margin-bottom: 1px;
     }
   }
+}
+.highlight {
+  background-color: yellow; /* Adjust background color as desired */
 }
 </style>
