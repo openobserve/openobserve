@@ -9,6 +9,7 @@ export const getAnnotationsData = (annotations: any, timezone: string) => {
       markAreas.push([
         {
           name: annotation.title,
+          label: { show: true, formatter: annotation.title, distance: 0.2 },
           xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
           annotationDetails: annotation,
         },
@@ -19,11 +20,11 @@ export const getAnnotationsData = (annotations: any, timezone: string) => {
       ]);
     } else if (annotation.start_time) {
       markLines.push({
-        symbol: ["none", "none"],
+        symbol: ["circle", "arrow"],
         name: annotation.title,
         type: "xAxis",
         xAxis: toZonedTime(new Date(annotation.start_time / 1000), timezone),
-        label: { show: true, formatter: annotation.title },
+        label: { show: true, formatter: annotation.title, distance: 0.2 },
         annotationDetails: annotation,
       });
     }

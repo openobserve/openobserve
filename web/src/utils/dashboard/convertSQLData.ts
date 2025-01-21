@@ -1166,7 +1166,7 @@ export const convertSQLData = async (
   const getAnnotationMarkLine = () => {
     return {
       itemStyle: {
-        color: "rgba(255, 173, 177, 0.4)",
+        color: "rgba(254, 241, 96, 0.2)",
       },
       silent: false,
       animation: false,
@@ -1176,7 +1176,7 @@ export const convertSQLData = async (
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
-        color: "rgba(255, 173, 177, 0.4)",
+        color: "rgba(254, 241, 96, 0.2)",
       },
       data: markAreas,
     };
