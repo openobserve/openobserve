@@ -371,7 +371,7 @@ export class LogsPage {
 
   async setDateTimeToToday() {
     // Set up route interception and apply filters
-    await this.page.route('**/value-query-endpoint', (route) => route.continue());
+    await this.page.route('**/api/default/_search**', (route) => route.continue());;
     
     // Click on the date-time button
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
@@ -427,7 +427,9 @@ export class LogsPage {
         expect(dateText >= startDateStr && dateText <= endDateStr).toBeTruthy();
       }
     }
+    await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
   }
+  
   
 
     
