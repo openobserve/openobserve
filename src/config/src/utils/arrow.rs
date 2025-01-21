@@ -38,7 +38,7 @@ pub fn record_batches_to_json_rows(
     let json_data = writer.into_inner();
     let ret: Vec<JsonMap<String, Value>> = serde_json::from_reader(json_data.as_slice())?;
 
-    // This effect other function, comment it for now
+    // This effects other function, comment it for now
     //
     // Hack for uint64, because Chrome V8 does not support uint64
     // for field in schema.fields() {

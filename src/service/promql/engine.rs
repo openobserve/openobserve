@@ -262,7 +262,7 @@ impl Engine {
                         .iter()
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
-                            samples: vec![v.sample],
+                            samples: vec![v.sample.clone()],
                             exemplars: None,
                             time_window: time_window.clone(),
                         })

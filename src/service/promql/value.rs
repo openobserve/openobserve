@@ -159,7 +159,7 @@ impl Label {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct Sample {
     /// Time in microseconds
     pub timestamp: i64,
