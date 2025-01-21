@@ -114,8 +114,6 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
-            
-            
           ]
 
     steps:
@@ -151,9 +149,9 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
-      # - name: Check OpenObserve logs
-      #   if: always()
-      #   run: cat o2.log
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
 
       - name: Sanitize Test Filename
         shell: bash 
