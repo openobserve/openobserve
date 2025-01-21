@@ -231,6 +231,7 @@ import {
   onBeforeMount,
   onActivated,
   defineEmits,
+  watch,
   reactive,
 } from "vue";
 import type { Ref } from "vue";
@@ -293,6 +294,23 @@ onActivated(() => {});
 onBeforeMount(() => {
   getDestinations();
 });
+watch(
+  () => createNewDestination.value,
+  (val) => {
+    if (val) {
+      formData.value = {
+        name: "",
+        url: "",
+        method: "post",
+        skip_tls_verify: false,
+        template: "",
+        headers: {},
+        emails: "",
+        type: "remote_pipeline",
+      };
+      apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
+    }
+  })
 
 const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
@@ -334,12 +352,20 @@ const createDestination = () => {
     })
     .then(() => {
       dismiss();
-      emit("get:destinations");
-      emit("cancel:hideform");
+      // emit("cancel:hideform");
       q.notify({
         type: "positive",
         message: `Destination saved successfully.`,
       });
+      selectedDestination.value = {
+        label: formData.value.name,
+        value: formData.value.name,
+      };
+      createNewDestination.value = false;
+
+      getDestinations();
+
+
     })
     .catch((err: any) => {
       if (err.response?.status == 403) {
@@ -421,7 +447,7 @@ const saveDestination = () => {
   };
   if (!selectedDestination.value) {
     q.notify({
-      message: "Please select Stream from the list",
+      message: "Please select External destination from the list",
       color: "negative",
       position: "bottom",
       timeout: 2000,
