@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::{
+    cluster_coordinator::get_coordinator,
     errors::{Error, Result},
     table::cipher::EntryKind,
 };
@@ -27,10 +28,25 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 KeysMessage::Delete { name, org } => {
                     log::info!("[SUPER_CLUSTER:DB] deleting key {}/{}", org, name);
                     infra::table::cipher::remove(&org, EntryKind::CipherKey, &name).await?;
+                    let cluster_coordinator = get_coordinator().await;
+                    cluster_coordinator
+                        .delete(&format!("/cipher_keys/{}/{}", org, name), false, true, None)
+                        .await?;
                 }
                 KeysMessage::Put { entry } => {
                     log::info!("[SUPER_CLUSTER:DB] adding key {}/{}", entry.org, entry.name);
+                    let org = entry.org.clone();
+                    let name = entry.name.clone();
                     infra::table::cipher::add(entry).await?;
+                    let cluster_coordinator = get_coordinator().await;
+                    cluster_coordinator
+                        .put(
+                            &format!("/cipher_keys/{}/{}", org, name),
+                            bytes::Bytes::new(), // no actual data, the receiver can query the db
+                            true,
+                            None,
+                        )
+                        .await?;
                 }
                 KeysMessage::Update { entry } => {
                     log::info!(
@@ -38,7 +54,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         entry.org,
                         entry.name
                     );
+                    let org = entry.org.clone();
+                    let name = entry.name.clone();
                     infra::table::cipher::update(entry).await?;
+                    let cluster_coordinator = get_coordinator().await;
+                    cluster_coordinator
+                        .put(
+                            &format!("/cipher_keys/{}/{}", org, name),
+                            bytes::Bytes::new(), // no actual data, the receiver can query the db
+                            true,
+                            None,
+                        )
+                        .await?;
                 }
             }
         }
