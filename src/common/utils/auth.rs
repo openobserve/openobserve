@@ -181,11 +181,6 @@ impl FromRequest for UserEmail {
     }
 }
 
-fn log_val<T: Debug>(x: T) -> T {
-    println!("\n\n{:?}\n\n", x);
-    x
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -219,14 +214,6 @@ impl FromRequest for AuthExtractor {
         };
 
         let folder = get_folder(&query);
-
-        println!(
-            "\n\nREQUEST {:?}\n\n{}\n{}\n\n",
-            req,
-            req.full_url(),
-            req.path()
-        );
-        // println!("\n\nREQUEST {:?}\n\n{}", req, req.path());
 
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
@@ -444,14 +431,14 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/short")
                 || path.contains("/ws")
             {
-                return ready(Ok(log_val(AuthExtractor {
+                return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method: "".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
                     bypass_check: true, // bypass check permissions
                     parent_id: folder,
-                })));
+                }));
             }
             if object_type.starts_with("stream") {
                 let object_type = match stream_type {
@@ -476,14 +463,14 @@ impl FromRequest for AuthExtractor {
                     }
                     None => object_type,
                 };
-                return ready(Ok(log_val(AuthExtractor {
+                return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method,
                     o2_type: object_type,
                     org_id,
                     bypass_check: false,
                     parent_id: folder,
-                })));
+                }));
             }
             if object_type.contains("dashboard") && url_len > 1 {
                 let object_type = if method.eq("POST") || method.eq("LIST") {
@@ -498,24 +485,24 @@ impl FromRequest for AuthExtractor {
                     object_type
                 };
 
-                return ready(Ok(log_val(AuthExtractor {
+                return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method,
                     o2_type: object_type,
                     org_id,
                     bypass_check: false,
                     parent_id: folder,
-                })));
+                }));
             }
 
-            return ready(Ok(log_val(AuthExtractor {
+            return ready(Ok(AuthExtractor {
                 auth: auth_str.to_owned(),
                 method,
                 o2_type: object_type,
                 org_id,
                 bypass_check: false,
                 parent_id: folder,
-            })));
+            }));
         }
         //}
         log::info!(

@@ -2,10 +2,7 @@
 #[cfg(test)]
 mod tests {
     use actix_http::Method;
-    use actix_web::{
-        http::{header, StatusCode},
-        test, FromRequest, HttpMessage, HttpRequest, HttpResponse,
-    };
+    use actix_web::{test, FromRequest};
 
     use super::super::auth::AuthExtractor;
 
@@ -15,7 +12,13 @@ mod tests {
     const ORG_ID: &str = "TEST_ORG_ID";
     const EMAIL_ID: &str = "TEST_EMAIL_ID";
 
+    const POST_METHOD: &str = "POST";
+    const GET_METHOD: &str = "GET";
+    const PUT_METHOD: &str = "PUT";
+    const DELETE_METHOD: &str = "DELETE";
     const LIST_METHOD: &str = "LIST";
+
+    // routes defined in handler::http::request::users
 
     #[tokio::test]
     async fn list_users() {
@@ -25,7 +28,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: LIST_METHOD.to_string(),
-                o2_type: "user:TEST_ORG_ID".to_string(),
+                o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
                 parent_id: "default".to_string(),
@@ -39,7 +42,14 @@ mod tests {
         test_auth(
             Method::POST,
             format!("api/{ORG_ID}/users/{EMAIL_ID}"),
-            default_auth(),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: POST_METHOD.to_string(),
+                o2_type: format!("user:{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
+                bypass_check: false,
+                parent_id: "default".to_string(),
+            },
         )
         .await
     }
@@ -49,7 +59,14 @@ mod tests {
         test_auth(
             Method::PUT,
             format!("api/{ORG_ID}/users/{EMAIL_ID}"),
-            default_auth(),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
+                o2_type: format!("user:{EMAIL_ID}"),
+                org_id: ORG_ID.to_string(),
+                bypass_check: false,
+                parent_id: "default".to_string(),
+            },
         )
         .await
     }
@@ -59,7 +76,14 @@ mod tests {
         test_auth(
             Method::POST,
             format!("api/{ORG_ID}/users/{EMAIL_ID}"),
-            default_auth(),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: POST_METHOD.to_string(),
+                o2_type: format!("user:{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
+                bypass_check: false,
+                parent_id: "default".to_string(),
+            },
         )
         .await
     }
@@ -69,7 +93,428 @@ mod tests {
         test_auth(
             Method::DELETE,
             format!("api/{ORG_ID}/users/{EMAIL_ID}"),
-            default_auth(),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: DELETE_METHOD.to_string(),
+                o2_type: format!("user:{EMAIL_ID}"),
+                org_id: ORG_ID.to_string(),
+                bypass_check: false,
+                parent_id: "default".to_string(),
+            },
+        )
+        .await
+    }
+
+    // routes defined in handler::http::request::organization::org
+
+    #[tokio::test]
+    async fn get_organizations() {
+        test_auth(
+            Method::GET,
+            format!("api/organizations"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("org:##user_id##"), // This doesn't seem right.
+                org_id: format!("organizations"),    // This doesn't seem right.
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn org_summary() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/summary"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!("summary:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_user_passcode() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/passcode"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!("passcode:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_user_passcode() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/passcode"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("passcode:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_user_rumtoken() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/rumtoken"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!("rumtoken:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_user_rumtoken() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/rumtoken"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("rumtoken:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_user_rumtoken() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/rumtoken"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("rumtoken:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_org() {
+        test_auth(
+            Method::POST,
+            format!("api/organizations"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("organizations"),
+                org_id: format!("organizations"), // This seems strange. Is it correct?;
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    // routes defined in handler::http::request::organization::setings
+
+    #[tokio::test]
+    async fn create_organization_settings() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/settings"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_organization_settings() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/settings"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn upload_logo() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/settings/logo"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_logo() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/settings/logo"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn set_logo_test() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/settings/logo/text"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_logo_text() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/settings/logo/text"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("settings:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    // routes defined in handler::http::request::organization::es
+
+    #[tokio::test]
+    async fn get_org_index() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!(":{ORG_ID}"),    // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_license() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_license"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!("_license:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_xpack() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_xpack"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                o2_type: format!("_xpack:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_ilm_policy() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_ilm/policy/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("_ilm:policy"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_index_template() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_index_template/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("_index_template:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_org_index_template() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/_index_template/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("_index_template:NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_data_stream() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_data_stream/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("_data_stream:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_org_data_stream() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/_data_stream/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("_data_stream:NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_org_pipeline() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/_ingest/pipeline/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("_ingest:pipeline"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_org_pipeline() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/_ingest/pipeline/NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("pipeline:NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
         )
         .await
     }
@@ -140,7 +585,6 @@ mod tests {
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
-                ingester_srv_url: String::default(),
             },
             common: config::Common {
                 app_name: String::default(),
@@ -297,7 +741,6 @@ mod tests {
                 metrics_file_retention: String::default(),
                 metrics_leader_push_interval: u64::default(),
                 metrics_leader_election_interval: i64::default(),
-                metrics_max_search_interval_per_group: i64::default(),
                 metrics_max_series_per_query: usize::default(),
                 metrics_max_points_per_series: usize::default(),
                 metrics_cache_max_entries: usize::default(),
@@ -524,17 +967,11 @@ mod tests {
                 tokio_console_server_port: u16::default(),
                 tokio_console_retention: u64::default(),
             },
-        }
-    }
-
-    fn default_auth() -> AuthExtractor {
-        AuthExtractor {
-            auth: "".to_string(),
-            method: "".to_string(),
-            o2_type: "".to_string(),
-            org_id: "".to_string(),
-            bypass_check: false,
-            parent_id: "".to_string(),
+            health_check: config::HealthCheck {
+                enabled: bool::default(),
+                timeout: u64::default(),
+                failed_times: usize::default(),
+            },
         }
     }
 }
