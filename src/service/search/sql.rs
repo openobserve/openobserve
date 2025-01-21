@@ -191,13 +191,14 @@ impl Sql {
             let has_original_column = has_original_column(&column_visitor.columns);
             used_schemas = generate_select_star_schema(
                 total_schemas,
+                &columns,
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
                 cfg.limit.quick_mode_num_fields,
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
-                let columns = match column_visitor.columns.get(stream) {
+                let columns = match columns.get(stream) {
                     Some(columns) => columns.clone(),
                     None => {
                         used_schemas.insert(stream.clone(), schema.clone());
@@ -325,6 +326,7 @@ impl std::fmt::Display for Sql {
 
 fn generate_select_star_schema(
     schemas: HashMap<TableReference, Arc<SchemaCache>>,
+    columns: &HashMap<TableReference, HashSet<String>>,
     has_original_column: HashMap<TableReference, bool>,
     quick_mode: bool,
     quick_mode_num_fields: usize,
@@ -340,9 +342,15 @@ fn generate_select_star_schema(
             let skip_original_column =
                 !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
-                let fts_fields = get_stream_setting_fts_fields(&stream_settings);
                 let fields = if quick_mode {
-                    generate_quick_mode_fields(schema.schema(), &fts_fields, skip_original_column)
+                    let columns = columns.get(&name);
+                    let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                    generate_quick_mode_fields(
+                        schema.schema(),
+                        columns,
+                        &fts_fields,
+                        skip_original_column,
+                    )
                 } else {
                     // skip selecting "_original" column if `SELECT * ...`
                     let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
@@ -393,6 +401,7 @@ fn generate_user_defined_schema(
 
 fn generate_quick_mode_fields(
     schema: &Schema,
+    columns: Option<&HashSet<String>>,
     fts_fields: &[String],
     skip_original_column: bool,
 ) -> Vec<Arc<arrow_schema::Field>> {
@@ -426,14 +435,27 @@ fn generate_quick_mode_fields(
         }
     };
 
-    let fields_name = fields
+    let mut fields_name = fields
         .iter()
         .map(|f| f.name().to_string())
         .collect::<HashSet<_>>();
+
     // check _timestamp
     if !fields_name.contains(&cfg.common.column_timestamp) {
         if let Ok(field) = schema.field_with_name(&cfg.common.column_timestamp) {
             fields.push(Arc::new(field.clone()));
+            fields_name.insert(cfg.common.column_timestamp.to_string());
+        }
+    }
+    // add the selected columns
+    if let Some(columns) = columns {
+        for column in columns {
+            if !fields_name.contains(column) {
+                if let Ok(field) = schema.field_with_name(column) {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(column.to_string());
+                }
+            }
         }
     }
     // check fts fields
@@ -441,6 +463,7 @@ fn generate_quick_mode_fields(
         if !fields_name.contains(field) {
             if let Ok(field) = schema.field_with_name(field) {
                 fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
             }
         }
     }
@@ -449,6 +472,7 @@ fn generate_quick_mode_fields(
         if !fields_name.contains(field) {
             if let Ok(field) = schema.field_with_name(field) {
                 fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
             }
         }
     }
