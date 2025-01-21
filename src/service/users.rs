@@ -873,9 +873,7 @@ pub async fn unlock_user(csrf: &str) -> Result<HttpResponse, Error> {
 }
 
 pub async fn is_user_locked(user_email: &str) -> bool {
-    let user_key = format!("user_{}", user_email);
-
-    let exhausted_attempts = match kv::get(USER_LOCK_KEY, &user_key).await {
+    let exhausted_attempts = match kv::get(USER_LOCK_KEY, user_email).await {
         Ok(v) => match String::from_utf8(v.to_vec()) {
             Ok(val) => val.parse::<u16>().unwrap_or(0),
             Err(_) => 0,
@@ -886,9 +884,8 @@ pub async fn is_user_locked(user_email: &str) -> bool {
 }
 
 pub async fn clear_failed_login_count(user_email: &str) {
-    let user_key = format!("user_{}", user_email);
     let lock_key = format!("{}_attempts", USER_LOCK_KEY);
-    let _ = crate::service::kv::delete(&lock_key, &user_key).await;
+    let _ = crate::service::kv::delete(&lock_key, user_email).await;
 }
 
 #[cfg(test)]
