@@ -1092,9 +1092,9 @@ checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
 name = "async-trait"
-version = "0.1.83"
+version = "0.1.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721cae7de5c34fbb2acd27e21e6d2cf7b886dce0c27388d46c4e6c47ea4318dd"
+checksum = "3f934833b4b7233644e5848f235df3f57ed8c80f1528a26c3dfa13d2147fa056"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4803,6 +4803,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "sha1",
  "sqlx",
  "svix-ksuid",
  "thiserror 1.0.69",
@@ -6035,7 +6036,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.14.1"
+version = "0.14.3"
 dependencies = [
  "actix",
  "actix-cors",

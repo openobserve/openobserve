@@ -134,7 +134,7 @@ impl MigrationTrait for Migration {
 
 /// Data structures and migration statements for the legacy folders table.
 mod legacy_folders {
-    use sea_orm::{ActiveModelTrait, IntoActiveModel};
+    use sea_orm::{ActiveModelTrait, IntoActiveModel, QueryOrder};
     use svix_ksuid::KsuidLike;
 
     use super::*;
@@ -169,12 +169,15 @@ mod legacy_folders {
         conn: &C,
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
-        let mut pages = legacy_entities::legacy_folders::Entity::find().paginate(conn, page_size);
+        let mut pages = legacy_entities::legacy_folders::Entity::find()
+            .order_by_asc(legacy_entities::legacy_folders::Column::Id)
+            .paginate(conn, page_size);
 
         while let Some(folders) = pages.fetch_and_next().await? {
             for folder in folders {
+                let ksuid = ksuid_from_hash(&folder).to_string();
                 let mut am = folder.into_active_model();
-                let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
+                println!("folder ksuid: {}", ksuid);
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
@@ -190,11 +193,31 @@ mod legacy_folders {
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
     }
+
+    /// Generates a KSUID from a hash of the folder's `org` and `folder_id`.
+    ///
+    /// To generate a KSUID this function generates the 160-bit SHA-1 hash of
+    /// the folder's `org` and `folder_id` and interprets that 160-bit hash as
+    /// a 160-bit KSUID. Therefore two KSUIDs generated in this manner will
+    /// always be equal if the folders have the same `org` and `folder_id`.
+    ///
+    /// It is important to note that KSUIDs generated in this manner will have
+    /// timestamp bits which are effectively random, meaning that the timestamp
+    /// in any KSUID generated with this function will be random.
+    fn ksuid_from_hash(folder: &legacy_entities::legacy_folders::Model) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(folder.org.clone());
+        hasher.update(folder.r#type.to_string());
+        hasher.update(folder.folder_id.clone());
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
+    }
 }
 
 /// Data structures and migration statements for the legacy dashboards table.
 mod legacy_dashboards {
-    use sea_orm::{ActiveModelTrait, IntoActiveModel};
+    use sea_orm::{ActiveModelTrait, IntoActiveModel, QueryOrder};
     use svix_ksuid::KsuidLike;
 
     use super::*;
@@ -231,13 +254,14 @@ mod legacy_dashboards {
         conn: &C,
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
-        let mut pages =
-            legacy_entities::legacy_dashboards::Entity::find().paginate(conn, page_size);
+        let mut pages = legacy_entities::legacy_dashboards::Entity::find()
+            .order_by_asc(legacy_entities::legacy_dashboards::Column::Id)
+            .paginate(conn, page_size);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
             for dashboard in dashboards {
+                let ksuid = ksuid_from_hash(&dashboard).to_string();
                 let mut am = dashboard.into_active_model();
-                let ksuid = svix_ksuid::Ksuid::new(None, None).to_string();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
             }
@@ -253,6 +277,24 @@ mod legacy_dashboards {
     pub fn drop_table() -> TableDropStatement {
         Table::drop().table(Alias::new(NEW_TABLE_NAME)).to_owned()
     }
+
+    /// Generates a KSUID from a hash of the dashboards's `dashboard_id`.
+    ///
+    /// To generate a KSUID this function generates the 160-bit SHA-1 hash of
+    /// the dashboard's `dashboard_id` and interprets that 160-bit hash as a
+    /// 160-bit KSUID. Therefore two KSUIDs generated in this manner will always
+    /// be equal if the dashboard's have the same `dashboard_id`.
+    ///
+    /// It is important to note that KSUIDs generated in this manner will have
+    /// timestamp bits which are effectively random, meaning that the timestamp
+    /// in any KSUID generated with this function will be random.
+    fn ksuid_from_hash(dashboard: &legacy_entities::legacy_dashboards::Model) -> svix_ksuid::Ksuid {
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(dashboard.dashboard_id.clone());
+        let hash = hasher.finalize();
+        svix_ksuid::Ksuid::from_bytes(hash.into())
+    }
 }
 
 /// Data structures and migration statements for the legacy alerts table.
@@ -261,7 +303,6 @@ mod legacy_alerts {
 
     const OLD_TABLE_NAME: &str = "alerts";
     const NEW_TABLE_NAME: &str = "legacy_alerts";
-
     /// Statement to rename the legacy alerts table from `alerts` to
     /// `legacy_alerts`.
     pub fn rename_to_legacy_alerts() -> TableRenameStatement {
@@ -465,8 +506,9 @@ mod new_dashboards {
 }
 
 mod new_alerts {
-    use super::*;
+    use sea_orm::QueryOrder;
 
+    use super::*;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
     const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
         "alerts_org_stream_type_stream_name_name_idx_2";
@@ -654,6 +696,7 @@ mod new_alerts {
     pub async fn populate<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
         let mut legacy_alerts_pages = legacy_entities::legacy_alerts::Entity::find()
             .find_also_related(legacy_entities::legacy_folders::Entity)
+            .order_by_asc(legacy_entities::legacy_alerts::Column::Id)
             .paginate(conn, 100);
         while let Some(legacy_alerts) = legacy_alerts_pages.fetch_and_next().await? {
             let conversions_rslt: Result<Vec<_>, _> = legacy_alerts

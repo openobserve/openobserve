@@ -122,6 +122,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::dashboards::reports::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
+    tokio::task::spawn(async move { db::pipeline::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
 
@@ -201,6 +202,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { ingester::run().await });
+
+    // load metrics disk cache
+    tokio::task::spawn(async move { crate::service::promql::search::init().await });
 
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;

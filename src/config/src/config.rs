@@ -544,11 +544,6 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
-    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
-    pub connection_pool_disabled: bool,
-    // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
-    #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
-    pub ingester_srv_url: String,
 }
 
 #[derive(EnvConfig)]
@@ -631,7 +626,13 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
     pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS", default = 0)]
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
@@ -909,6 +910,12 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(
+        name = "ZO_METRICS_CACHE_ENABLED",
+        default = true,
+        help = "Enable result cache for PromQL metrics queries"
+    )]
+    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
@@ -943,8 +950,28 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 1000)]
+    #[deprecated(
+        since = "0.14.1",
+        note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
+    )]
+    #[env_config(
+        name = "ZO_UDSCHEMA_MAX_FIELDS",
+        default = 0,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
     pub udschema_max_fields: usize,
+    #[env_config(
+        name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS",
+        default = 1000,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
+    pub schema_max_fields_to_enable_uds: usize,
+    #[env_config(
+        name = "ZO_USER_DEFINED_SCHEMA_MAX_FIELDS",
+        default = 1000,
+        help = "Maximum number of fields allowed in user-defined schema"
+    )]
+    pub user_defined_schema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
@@ -1005,6 +1032,8 @@ pub struct Limit {
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 100000)]
+    pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -1605,6 +1634,12 @@ pub fn init() -> Config {
         cfg.limit.consistent_hash_vnodes = 100;
     }
 
+    // check for uds
+    #[allow(deprecated)]
+    if cfg.limit.udschema_max_fields > 0 {
+        cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
+    }
+
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -1683,11 +1718,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_search_interval_per_group == 0 {
         cfg.limit.metrics_max_search_interval_per_group = 24;
     }
+    if cfg.limit.metrics_max_search_interval_per_group < 3600 {
+        // convert hours to microseconds
+        cfg.limit.metrics_max_search_interval_per_group *= 3_600_000_000;
+    }
     if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30000;
+        cfg.limit.metrics_max_series_per_query = 30_000;
     }
     if cfg.limit.metrics_max_points_per_series == 0 {
-        cfg.limit.metrics_max_points_per_series = 30000;
+        cfg.limit.metrics_max_points_per_series = 30_000;
+    }
+    if cfg.limit.metrics_cache_max_entries == 0 {
+        cfg.limit.metrics_cache_max_entries = 100_000;
     }
 
     // check search job retention
@@ -1793,6 +1835,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!(
             "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
         ));
+    }
+
+    // check for join match one
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    {
+        cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 
     Ok(())
