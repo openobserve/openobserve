@@ -731,9 +731,11 @@ export default defineComponent({
         searchObj.meta.refreshHistogram = true;
         searchObj.loading = true;
 
+
         resetSearchObj();
 
         resetStreamData();
+
 
         restoreUrlQueryParams();
 
@@ -743,7 +745,19 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        loadLogsData();
+
+        await loadLogsData();
+          if (searchObj.data.stream.selectedStream.length == 0) {
+            if (searchObj.data.stream.streamLists.length > 0) {
+                searchObj.data.stream.selectedStream.push(
+                searchObj.data.stream.streamLists[0].value,
+              );
+            }
+            await extractFields();
+            searchObj.data.queryResults.hits = [];
+            // searchObj.loading = false;
+            // searchObj.meta.searchApplied = false;
+        }
 
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
@@ -752,6 +766,7 @@ export default defineComponent({
         searchObj.meta.quickMode = isQuickModeEnabled();
 
         isLogsMounted.value = true;
+
       } catch (error) {
         console.error("Failed to setup logs tab:", error);
         searchObj.loading = false;
