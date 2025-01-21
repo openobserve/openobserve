@@ -106,7 +106,7 @@ impl PromqlContext {
             if result_type_exec.is_some() {
                 result_type = result_type_exec;
             }
-            return Ok((value, result_type, self.scan_stats.read().await.clone()));
+            return Ok((value, result_type, *self.scan_stats.read().await));
         }
 
         // Range query
@@ -168,17 +168,13 @@ impl PromqlContext {
             return Ok((
                 Value::String(output_str),
                 result_type,
-                self.scan_stats.read().await.clone(),
+                *self.scan_stats.read().await,
             ));
         }
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((
-                Value::None,
-                result_type,
-                self.scan_stats.read().await.clone(),
-            ));
+            return Ok((Value::None, result_type, *self.scan_stats.read().await));
         }
 
         // merge data
@@ -201,7 +197,7 @@ impl PromqlContext {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((value, result_type, self.scan_stats.read().await.clone()))
+        Ok((value, result_type, *self.scan_stats.read().await))
     }
 
     /// Query exemplars
@@ -266,11 +262,7 @@ impl PromqlContext {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((
-                Value::None,
-                result_type,
-                self.scan_stats.read().await.clone(),
-            ));
+            return Ok((Value::None, result_type, *self.scan_stats.read().await));
         }
 
         // merge data
@@ -296,6 +288,6 @@ impl PromqlContext {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((value, result_type, self.scan_stats.read().await.clone()))
+        Ok((value, result_type, *self.scan_stats.read().await))
     }
 }
