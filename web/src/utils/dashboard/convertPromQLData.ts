@@ -172,9 +172,9 @@ export const convertPromQLData = async (
 
   const getSeriesMarkArea = () => {
     return {
-      // itemStyle: {
-      //   color: "rgba(255, 173, 177, 0.4)",
-      // },
+      itemStyle: {
+        color: "rgba(255, 173, 177, 0.4)",
+      },
       data: markAreas,
     };
   };
@@ -460,9 +460,9 @@ export const convertPromQLData = async (
                 ...seriesPropsBasedOnChartType,
                 // markLine if exist
                 markLine: {
-                  silent: false,
+                  silent: true,
                   animation: false,
-                  data: [...getMarkLineData(panelSchema), ...markLines],
+                  data: getMarkLineData(panelSchema),
                 },
                 markArea: getSeriesMarkArea(),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
@@ -707,6 +707,22 @@ export const convertPromQLData = async (
     }
   });
 
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+
+  options.series.push({
+    type: "line",
+    data: [[convertedTimeStampToDataFormat, null]],
+    markLine: {
+      itemStyle: {
+        color: "rgba(255, 173, 177, 0.4)",
+      },
+      silent: false,
+      animation: false,
+      data: markLines,
+    },
+  });
   options.series = options.series.flat();
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width

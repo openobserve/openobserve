@@ -669,7 +669,7 @@ export const convertSQLData = async (
           yAxisIndex: index,
           data: [[convertedTimeStampToDataFormat, null]],
           markArea: getSeriesMarkArea(),
-          markLine: getSeriesMarkLine(),
+          markLine: getAnnotationMarkLine(),
         });
 
         if (index > 0) {
@@ -1177,15 +1177,22 @@ export const convertSQLData = async (
 
   const getSeriesMarkLine = () => {
     return {
+      silent: true,
+      animation: false,
+      data: getMarkLineData(panelSchema),
+    };
+  };
+
+  const getAnnotationMarkLine = () => {
+    return {
       itemStyle: {
         color: "rgba(255, 173, 177, 0.4)",
       },
       silent: false,
       animation: false,
-      data: [...getMarkLineData(panelSchema), ...markLines],
+      data: markLines,
     };
   };
-
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
@@ -1225,7 +1232,7 @@ export const convertSQLData = async (
       ...defaultSeriesProps,
       label: getSeriesLabel(),
       // markLine if exist
-      // markLine: getSeriesMarkLine(),
+      markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
@@ -2551,7 +2558,7 @@ export const convertSQLData = async (
   options.series.push({
     type: "line",
     data: [[convertedTimeStampToDataFormat, null]],
-    markLine: getSeriesMarkLine(),
+    markLine: getAnnotationMarkLine(),
     markArea: getSeriesMarkArea(),
   });
   console.log("options", options);
