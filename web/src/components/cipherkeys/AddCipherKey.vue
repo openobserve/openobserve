@@ -316,11 +316,13 @@ const setupTemplateData = () => {
           originalData.value = JSON.stringify(formData.value);
         })
         .catch((error) => {
-          $q.notify({
-            type: "negative",
-            message:
-              error.response.data.message || "Error fetching cipher key.",
-          });
+          if (error.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                error.response.data.message || "Error fetching cipher key.",
+            });
+          }
         });
     }
   }
@@ -340,10 +342,12 @@ const onSubmit = () => {
     })
     .catch((error: any) => {
       isSubmitting.value = false;
-      $q.notify({
-        type: "negative",
-        message: "Please fill all the required fields",
-      });
+      if (error?.status != 403) {
+        $q.notify({
+          type: "negative",
+          message: "Please fill all the required fields",
+        });
+      }
     });
 };
 
@@ -366,10 +370,12 @@ const createCipherKey = () => {
     })
     .catch((error) => {
       dismiss();
-      $q.notify({
-        type: "negative",
-        message: error.response.data.message,
-      });
+      if (error.status != 403) {
+        $q.notify({
+          type: "negative",
+          message: error.response.data.message,
+        });
+      }
     });
 };
 
@@ -441,10 +447,12 @@ const updateCipherKey = () => {
     .catch((error) => {
       isSubmitting.value = false;
       dismiss();
-      $q.notify({
-        type: "negative",
-        message: error.response.data.message,
-      });
+      if (error.status != 403) {
+        $q.notify({
+          type: "negative",
+          message: error.response.data.message,
+        });
+      }
     });
 };
 

@@ -299,13 +299,15 @@ export default defineComponent({
         .catch((error) => {
           loading.value = false;
           dismiss();
-          $q.notify({
-            type: "negative",
-            message:
-              error.response?.data?.message ||
-              "Failed to fetch cipher keys. Please try again.",
-            timeout: 5000,
-          });
+          if (error.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                error.response?.data?.message ||
+                "Failed to fetch cipher keys. Please try again.",
+              timeout: 5000,
+            });
+          }
         });
     };
 
@@ -352,11 +354,13 @@ export default defineComponent({
                 timeout: 2000,
               });
             } else {
-              $q.notify({
-                type: "negative",
-                message: err.response.data.message,
-                timeout: 2000,
-              });
+              if (err?.status != 403) {
+                $q.notify({
+                  type: "negative",
+                  message: err.response.data.message,
+                  timeout: 2000,
+                });
+              }
             }
           });
       }
