@@ -241,10 +241,10 @@ await page.waitForTimeout(1000);
         });
 
     await page
-        .locator('[data-test="table-row-expand-menu"]')
-        .first()
+        .locator('[data-test="log-table-column-0-source"]')
         .click({ force: true });
-       await page.getByText('{ arrow_drop_downjob:test }').toBeVisible()
+    await expect(page.getByText('arrow_drop_downjob:test')).toBeVisible();
+
     
   });
 
