@@ -88,8 +88,7 @@ export interface Destination {
   headers: Headers;
   template: string | Template;
   emails: string;
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
-
+  type: "http" | "email" | "external_destination";
 }
 
 export interface DestinationPayload {
@@ -100,15 +99,10 @@ export interface DestinationPayload {
   headers: Headers;
   template: string | Template;
   emails: string[];
-  type: "http" | "email" | "external_destination" | "remote_pipeline";
-  stream_name? : string;
-  stream_type? : string;
-
+  type: "http" | "email" | "external_destination";
 }
 
 // Destination object which is modified in frontend to display in table and form
 export interface DestinationData extends Destination {
   "#"?: number | string;
-  stream_name?: string;
-  stream_type?: string;
 }
