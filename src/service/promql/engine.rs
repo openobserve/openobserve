@@ -1142,6 +1142,7 @@ async fn selector_load_data_from_datafusion(
             vec![col(HASH_LABEL)],
             vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
         )?
+        .sort(vec![col(HASH_LABEL).sort(true, true)])?
         .limit(0, Some(max_series))?
         .collect()
         .await?;
