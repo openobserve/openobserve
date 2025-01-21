@@ -535,17 +535,14 @@ export default defineComponent({
       );
     });
 
-    const dataZoomEventDataTempStorage = ref(null);
     const onDataZoom = (event: any) => {
       if (allowAnnotationsAdd.value && isAddAnnotationMode.value) {
         // looks like zoom not needed
         // handle add annotation
-        // TODO: HANDLE annotations
         handleAddAnnotation(event.start, event.end);
       } else {
         // default behavior
         emit("updated:data-zoom", event);
-        dataZoomEventDataTempStorage.value = null;
       }
     };
 
