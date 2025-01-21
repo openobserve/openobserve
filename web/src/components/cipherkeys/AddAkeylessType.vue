@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-fieldset q-pa-md q-w-lg"
       v-if="formData.key.store.akeyless.auth.type != ''"
     >
-      <legend class="q-caption bg-white q-px-sm">
+      <legend class="q-caption q-px-sm">
         {{ getAuthenticationTypeLabel(formData.key.store.akeyless.auth.type) }}
         Configuration
       </legend>
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-fieldset q-pa-md q-w-lg"
       v-if="formData.key.store.akeyless.store.type != ''"
     >
-      <legend class="q-caption bg-white q-px-sm">
+      <legend class="q-caption q-px-sm">
         {{ getSecretOptionLabel(formData.key.store.akeyless.store.type) }}
         Configuration
       </legend>
