@@ -158,6 +158,7 @@ export const useAnnotationsData = (
       await annotationService.update_timed_annotations(
         organization,
         dashboardId,
+        annotationData.id,
         [payload],
       );
 

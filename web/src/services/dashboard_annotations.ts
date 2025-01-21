@@ -15,33 +15,32 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().post(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
+    return http().post(
+      `/api/${org_id}/dashboards/${dashboard_id}/annotations`,
+      data,
+      {
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+        },
       },
-    });
+    );
   },
 
   update_timed_annotations: (
     org_id: string,
     dashboard_id: string,
-    annotations: any[],
+    timed_annotation_id: string,
+    changedFields: any,
   ) => {
-    // Construct the request payload
-    const data: any = {
-      timed_annotations: annotations.map((annotation) => ({
-        ...annotation,
-        // Ensure annotation_id is preserved and not regenerated
-        annotation_id: annotation.annotation_id,
-      })),
-    };
-
-    // Make the API call
-    return http().put(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
+    return http().put(
+      `/api/${org_id}/dashboards/${dashboard_id}/annotations/${timed_annotation_id}`,
+      changedFields,
+      {
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+        },
       },
-    });
+    );
   },
 
   delete_timed_annotations: (
@@ -49,11 +48,14 @@ export const annotationService = {
     dashboardId: string,
     annotationIds: string[],
   ) => {
-    return http().delete(`/api/${organization}/dashboards/${dashboardId}/annotations`, {
-      data: {
-        annotation_ids: annotationIds,
+    return http().delete(
+      `/api/${organization}/dashboards/${dashboardId}/annotations`,
+      {
+        data: {
+          annotation_ids: annotationIds,
+        },
       },
-    });
+    );
   },
 
   get_timed_annotations: (
@@ -78,6 +80,8 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().get(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, { params: queryParams });
+    return http().get(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, {
+      params: queryParams,
+    });
   },
 };
