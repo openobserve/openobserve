@@ -250,7 +250,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
-const props = defineProps<{}>();
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];

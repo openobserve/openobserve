@@ -311,11 +311,16 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-const props = defineProps<{
-  templates: Template[] | [];
-  destination: DestinationPayload | null;
-  isAlerts: boolean | true;
-}>();
+const props = withDefaults(
+  defineProps<{
+    templates: Template[] | [];
+    destination: DestinationPayload | null;
+    isAlerts: boolean;
+  }>(),
+  {
+    isAlerts: true,
+  }
+);
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
