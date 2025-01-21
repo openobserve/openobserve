@@ -459,7 +459,11 @@ pub async fn exist(file: &str) -> bool {
 #[inline]
 pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if !cfg.disk_cache.enabled || (!cfg.common.result_cache_enabled && is_local_disk_storage()) {
+    if !cfg.disk_cache.enabled
+        || (is_local_disk_storage()
+            && !cfg.common.result_cache_enabled
+            && !cfg.common.metrics_cache_enabled)
+    {
         return Ok(());
     }
     let idx = get_bucket_idx(file);

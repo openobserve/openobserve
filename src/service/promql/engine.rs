@@ -559,6 +559,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<HashMap<HashLabelValue, RangeValue>> {
+        let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
@@ -579,7 +580,7 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[trace_id: {}] [PromQL] Loading data for stream: {}, range: [{},{}), filter: {:?}",
+            "[trace_id: {}] loading data for stream: {}, range: [{},{}), filter: {:?}",
             self.trace_id,
             table_name,
             start,
@@ -617,8 +618,10 @@ impl Engine {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
             let query_exemplars = self.ctx.query_exemplars;
+            let trace_id = self.trace_id.to_string();
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
                 selector_load_data_from_datafusion(
+                    &trace_id,
                     ctx,
                     schema,
                     selector,
@@ -656,9 +659,10 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] [PromQL] Load data done for stream: {}",
+            "[trace_id: {}] load data done for stream: {}, took: {}ms",
             self.trace_id,
-            table_name
+            table_name,
+            start_time.elapsed().as_millis()
         );
 
         Ok(metrics)
@@ -1082,7 +1086,9 @@ impl Engine {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn selector_load_data_from_datafusion(
+    trace_id: &str,
     ctx: SessionContext,
     schema: Arc<Schema>,
     selector: VectorSelector,
@@ -1196,7 +1202,10 @@ async fn selector_load_data_from_datafusion(
     timestamp_values.dedup();
     let timestamp_values = timestamp_values.into_iter().map(lit).collect::<Vec<_>>();
 
-    log::info!("load hashing took: {:?}", start_time.elapsed());
+    log::info!(
+        "[trace_id: {trace_id}] load hashing took: {:?}",
+        start_time.elapsed()
+    );
 
     // get series
     let series = df_group
@@ -1278,21 +1287,28 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    log::info!("load series took: {:?}", start_time.elapsed());
+    log::info!(
+        "[trace_id: {trace_id}] load series took: {:?}",
+        start_time.elapsed()
+    );
 
     // get values
     if query_exemplars {
-        load_exemplars_from_datafusion(hash_field_type, &mut metrics, df_group).await?;
+        load_exemplars_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
     } else {
-        load_samples_from_datafusion(hash_field_type, &mut metrics, df_group).await?;
+        load_samples_from_datafusion(trace_id, hash_field_type, &mut metrics, df_group).await?;
     }
 
-    log::info!("load samples took: {:?}", start_time.elapsed());
+    log::info!(
+        "[trace_id: {trace_id}] load samples took: {:?}",
+        start_time.elapsed()
+    );
 
     Ok(metrics)
 }
 
 async fn load_samples_from_datafusion(
+    trace_id: &str,
     hash_field_type: &DataType,
     metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
@@ -1305,7 +1321,7 @@ async fn load_samples_from_datafusion(
         .await?;
 
     log::info!(
-        "load_samples_from_datafusion took: {:?}",
+        "[trace_id: {trace_id}] load samples from datafusion took: {:?}",
         start_time.elapsed()
     );
 
@@ -1389,12 +1405,16 @@ async fn load_samples_from_datafusion(
         }
     }
 
-    log::info!("post group batches took: {:?}", start_time.elapsed());
+    log::info!(
+        "[trace_id: {trace_id}] group batches took: {:?}",
+        start_time.elapsed()
+    );
 
     Ok(())
 }
 
 async fn load_exemplars_from_datafusion(
+    _trace_id: &str,
     hash_field_type: &DataType,
     metrics: &mut HashMap<HashLabelValue, RangeValue>,
     df: DataFrame,
