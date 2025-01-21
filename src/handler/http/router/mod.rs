@@ -281,6 +281,8 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::zo_config)
             .service(status::logout)
+            .service(users::get_unlock_link)
+            .service(users::unlock_user)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
