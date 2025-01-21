@@ -1537,7 +1537,7 @@ pub struct HealthCheck {
     pub timeout: u64,
     #[env_config(
         name = "ZO_HEALTH_CHECK_FAILED_TIMES",
-        default = 3,
+        default = 5,
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
