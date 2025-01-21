@@ -2235,7 +2235,7 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.health_check.timeout = 3;
     }
     if cfg.health_check.failed_times == 0 {
-        cfg.health_check.failed_times = 3;
+        cfg.health_check.failed_times = 5;
     }
     Ok(())
 }
