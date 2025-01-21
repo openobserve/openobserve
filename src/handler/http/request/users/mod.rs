@@ -709,9 +709,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 
 async fn handle_failed_login(user_email: &str) -> Option<String> {
     if get_config().auth.wrong_pass_lock_users || is_root_user(user_email) {
-        let user_key = format!("user_{}", user_email);
         let lock_key = format!("{}_attempts", USER_LOCK_KEY);
-        let exhausted_attempts = match crate::service::kv::get(&lock_key, &user_key).await {
+        let exhausted_attempts = match crate::service::kv::get(&lock_key, user_email).await {
             Ok(v) => match String::from_utf8(v.to_vec()) {
                 Ok(val) => val.parse::<u16>().unwrap_or(0),
                 Err(_) => 0,
@@ -724,7 +723,7 @@ async fn handle_failed_login(user_email: &str) -> Option<String> {
         } else {
             crate::service::kv::set(
                 &lock_key,
-                &user_key,
+                user_email,
                 (exhausted_attempts + 1).to_string().into(),
             )
             .await
