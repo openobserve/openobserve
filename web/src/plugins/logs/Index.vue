@@ -782,7 +782,6 @@ export default defineComponent({
           resetStreamData();
           await restoreUrlQueryParams();
           await loadLogsData();
-          console.log(searchObj.data.queryResults.pagination,'refreshed pagination part 1')
         }
       },
     );
