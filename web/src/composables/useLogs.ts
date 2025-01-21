@@ -4883,12 +4883,6 @@ const useLogs = () => {
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
 
-    if (response.content.streaming_aggs) {
-      searchObj.data.queryResults.scan_size =
-        response.content.results.scan_size;
-      searchObj.data.queryResults.took = response.content.results.took;
-    }
-
     // if total records in partition is greater than recordsPerPage then we need to update pagination
     // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
     refreshPagination(regeratePaginationFlag);
