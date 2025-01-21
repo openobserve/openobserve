@@ -421,12 +421,29 @@ export class LogsPage {
     const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")} 23:59:59`;
   
     const rows = await this.page.locator('[data-test="logs-search-result-logs-table"] tbody:nth-of-type(2) tr').all();
+    // for (let i = 2; i < rows.length; i++) {
+    //   const dateText = await rows[i].locator('td:first-child div div:nth-child(2) span span').textContent();
+    //   if (dateText) {
+    //     expect(dateText >= startDateStr && dateText <= endDateStr).toBeTruthy();
+    //   }
+    // }
+
     for (let i = 2; i < rows.length; i++) {
       const dateText = await rows[i].locator('td:first-child div div:nth-child(2) span span').textContent();
       if (dateText) {
-        expect(dateText >= startDateStr && dateText <= endDateStr).toBeTruthy();
+        const date = new Date(dateText.trim());
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+    
+        // Check if the parsed date is valid
+        if (isNaN(date.getTime())) {
+          throw new Error(`Invalid date format: ${dateText}`);
+        }
+    
+        expect(date >= startDate && date <= endDate).toBeTruthy();
       }
     }
+    
     await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
   }
   
