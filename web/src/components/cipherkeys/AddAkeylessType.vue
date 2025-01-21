@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
-      {{ formData.key.store.akeyless.access_id }}
+      <pre class="pre-text">{{ formData.key.store.akeyless.access_id }}</pre>
       <q-btn data-test="add-cipher-key-akeyless-access-id-input-update" @click="isUpdateAccessID = true" size="sm" color="primary" :label="t('common.update')" />
     </div>
     <q-select
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
-          {{ formData.key.store.akeyless.auth.access_key }}
+          <pre class="pre-text">{{ formData.key.store.akeyless.auth.access_key }}</pre>
           <q-btn data-test="add-cipher-key-akeyless-access-key-input-update" @click="isUpdateAccessKey = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
       </div>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
-          {{ formData.key.store.akeyless.auth.ldap.username }}
+          <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.username }}</pre>
           <q-btn data-test="add-cipher-key-akeyless-ldap-username-input-update" @click="isUpdateLDAPUsername = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
         <div v-if="!formData.isUpdate || isUpdateLDAPPass || formData.key.store.akeyless.auth.ldap.password == ''">
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label class="row q-field q-mb-md">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
-          {{ formData.key.store.akeyless.auth.ldap.password }}
+          <pre class="pre-text">{{ formData.key.store.akeyless.auth.ldap.password }}</pre>
           <q-btn data-test="add-cipher-key-akeyless-ldap-password-input-update" @click="isUpdateLDAPPass = true" size="sm" color="primary" :label="t('common.update')" />
         </div>
       </div>
@@ -394,6 +394,14 @@ export default defineComponent({
     color: var(--q-color-dark);
     margin-left: 8px;
     padding: 0 4px;
+  }
+
+  .pre-text {
+    text-wrap: auto;
+    word-wrap: break-word;
+    border: 1px solid #E1E1E1;
+    padding: 5px;
+    margin-bottom: 5px;
   }
 }
 </style>

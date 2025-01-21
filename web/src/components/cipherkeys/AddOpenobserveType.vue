@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      {{ formData.key.store.local }}
+      <pre class="pre-text">{{ formData.key.store.local }}</pre>
       <q-btn data-test="add-cipher-key-openobserve-secret-input-update" @click="isUpdate = true" size="sm" color="primary" :label="t('common.update')" />
     </div>
   </div>
@@ -97,3 +97,12 @@ export default defineComponent({
   },
 });
 </script>
+<style lang="scss" scoped>
+.pre-text {
+  text-wrap: auto;
+  word-wrap: break-word;
+  border: 1px solid #E1E1E1;
+  padding: 5px;
+  margin-bottom: 5px;
+}
+</style>
