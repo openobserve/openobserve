@@ -297,6 +297,8 @@ pub fn get_config_routes(svc: &mut web::ServiceConfig) {
             .service(status::refresh_token_with_dex)
             .service(status::logout)
             .service(users::service_accounts::exchange_token)
+            .service(users::get_unlock_link)
+            .service(users::unlock_user)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }
@@ -328,7 +330,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::delete)
         .service(users::update)
         .service(users::add_user_to_org)
-        .service(users::unlock_user)
         .service(organization::org::organizations)
         .service(organization::settings::get)
         .service(organization::settings::create)

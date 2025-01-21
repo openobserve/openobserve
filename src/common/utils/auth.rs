@@ -21,6 +21,7 @@ use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use once_cell::sync::Lazy;
+use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 
 #[cfg(feature = "enterprise")]
@@ -623,6 +624,18 @@ pub fn generate_presigned_url(
         "{}/auth/login?request_time={}&exp_in={}&auth={}",
         base_url, time, exp_in, auth
     )
+}
+
+pub fn generate_csrf_token(email_id: &str) -> String {
+    let token_length = 32; // You can choose the length of the token
+    let rng = rand::thread_rng();
+    let random_token = rng
+        .sample_iter(&Alphanumeric)
+        .take(token_length)
+        .map(char::from)
+        .collect();
+    let combined_input = format!("{}{}", email_id, random_token);
+    sha256::try_digest(combined_input).unwrap_or(random_token)
 }
 
 #[cfg(test)]

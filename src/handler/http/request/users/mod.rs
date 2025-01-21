@@ -41,7 +41,6 @@ use crate::{
     common::{
         meta::{
             self,
-            http::HttpResponse as MetaHttpResponse,
             user::{
                 AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
                 UserRequest, UserRole,
@@ -238,18 +237,16 @@ pub async fn delete(
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
 }
 
-#[delete("/{org_id}/users/{email_id}/lock")]
-pub async fn unlock_user(
-    path: web::Path<(String, String)>,
-    user_email: UserEmail,
-) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = path.into_inner();
-    let initiator_id = user_email.user_id;
-    clear_failed_login_count(&email_id).await;
-    Ok(HttpResponse::Ok().json(meta::http::HttpResponse::message(
-        http::StatusCode::OK.into(),
-        "User unlocked successfully".to_string(),
-    )))
+#[get("/users/{email_id}/unlock/link")]
+pub async fn get_unlock_link(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let email_id = path.into_inner();
+    users::get_unlock_link(&email_id).await
+}
+
+#[get("/users/{csrf}/unlock")]
+pub async fn unlock_user(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let csrf = path.into_inner();
+    users::unlock_user(&csrf).await
 }
 
 /// AuthenticateUser
@@ -338,7 +335,7 @@ pub async fn authentication(
         }
     }
 
-    if is_user_locked(&auth.name).await {
+    if users::is_user_locked(&auth.name).await {
         return unauthorized_error(resp, Some(&auth.name)).await;
     }
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
@@ -361,7 +358,7 @@ pub async fn authentication(
         let cfg = get_config();
 
         // clear the failed login count
-        clear_failed_login_count(&auth.name).await;
+        users::clear_failed_login_count(&auth.name).await;
 
         let access_token = format!(
             "Basic {}",
@@ -712,8 +709,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 async fn handle_failed_login(user_email: &str) -> Option<String> {
     if get_config().auth.wrong_pass_lock_users || is_root_user(user_email) {
         let user_key = format!("user_{}", user_email);
-
-        let exhausted_attempts = match crate::service::kv::get(USER_LOCK_KEY, &user_key).await {
+        let lock_key = format!("{}_attempts", USER_LOCK_KEY);
+        let exhausted_attempts = match crate::service::kv::get(&lock_key, &user_key).await {
             Ok(v) => match String::from_utf8(v.to_vec()) {
                 Ok(val) => val.parse::<u16>().unwrap_or(0),
                 Err(_) => 0,
@@ -725,7 +722,7 @@ async fn handle_failed_login(user_email: &str) -> Option<String> {
             return Some("User blocked after max login attempts, please contact admin".to_string());
         } else {
             crate::service::kv::set(
-                USER_LOCK_KEY,
+                &lock_key,
                 &user_key,
                 (exhausted_attempts + 1).to_string().into(),
             )
@@ -734,28 +731,6 @@ async fn handle_failed_login(user_email: &str) -> Option<String> {
         };
     }
     None
-}
-
-async fn is_user_locked(user_email: &str) -> bool {
-    let user_key = format!("user_{}", user_email);
-
-    let exhausted_attempts = match crate::service::kv::get(USER_LOCK_KEY, &user_key).await {
-        Ok(v) => match String::from_utf8(v.to_vec()) {
-            Ok(val) => val.parse::<u16>().unwrap_or(0),
-            Err(_) => 0,
-        },
-        Err(_) => 0,
-    };
-    if exhausted_attempts >= get_config().auth.wrong_password_attempts {
-        true
-    } else {
-        false
-    }
-}
-
-async fn clear_failed_login_count(user_email: &str) {
-    let user_key = format!("user_{}", user_email);
-    let _ = crate::service::kv::delete(USER_LOCK_KEY, &user_key).await;
 }
 
 #[cfg(test)]

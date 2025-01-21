@@ -77,7 +77,7 @@ impl Destination {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct DestinationWithTemplate {
     pub name: String,
     pub url: String,
