@@ -4825,7 +4825,19 @@ const useLogs = () => {
           searchObj.data.queryResults.scan_size +=
             response.content.results.scan_size;
         } else {
-          if (isPagination) {
+          if (response.content?.streaming_aggs) {
+            if (!Object.keys(searchObj.data.queryResults)?.length) {
+              searchObj.data.queryResults = response.content.results;
+            } else {
+              searchObj.data.queryResults.hits = response.content.results.hits;
+              searchObj.data.queryResults.total =
+                response.content.results.total;
+
+              searchObj.data.queryResults.took += response.content.results.took;
+              searchObj.data.queryResults.scan_size +=
+                response.content.results.scan_size;
+            }
+          } else if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
             searchObj.data.queryResults.from = response.content.results.from;
             searchObj.data.queryResults.scan_size =
@@ -4846,8 +4858,6 @@ const useLogs = () => {
       if (isPagination) refreshPagination(true);
 
       processPostPaginationData();
-
-      searchObj.loading = false;
 
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
