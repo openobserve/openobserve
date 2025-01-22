@@ -21,7 +21,6 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        dbg!("hello");
         manager.create_table(create_table_stmt()).await?;
         Ok(())
     }
