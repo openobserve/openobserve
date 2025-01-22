@@ -202,7 +202,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     {
         let org_usage_record = OrgUsageRecord::new(&entry.identifier);
-        if let Err(e) = org_usage::put(&entry.identifier, org_usage_record).await {
+        if let Err(e) = org_usage::set(&entry.identifier, org_usage_record).await {
             log::error!("Error saving org usage record: {}", e);
         }
     }

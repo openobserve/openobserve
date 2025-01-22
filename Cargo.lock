@@ -6069,6 +6069,7 @@ dependencies = [
  "arrow",
  "async-recursion",
  "async-stripe",
+ "async-trait",
  "base64 0.21.7",
  "byteorder",
  "bytes",
