@@ -519,6 +519,127 @@ mod tests {
         .await
     }
 
+    // routes defined in handler::http::request::stream
+
+    #[tokio::test]
+    async fn get_schema() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/streams/STREAM_NAME/schema"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn create_stream_settings() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/streams/STREAM_NAME/settings"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_stream_settings() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/streams/STREAM_NAME/settings"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_stream_fields() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/streams/STREAM_NAME/delete_fields"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_stream() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/streams/STREAM_NAME"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn list_streams() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/streams"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_stream_cache() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/streams/STREAM_NAME/cache/results"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("stream:STREAM_NAME"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
     /// Tests that the correct authorization information is extracted from a
     /// request to the given path.
     async fn test_auth(method: Method, path: String, expected: AuthExtractor) {
