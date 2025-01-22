@@ -89,9 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::{
-    pipeline::pipeline_file_server::PipelineFileServer, tls::http_tls_config,
-};
+use openobserve::service::tls::http_tls_config;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -219,7 +217,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = init_enterprise().await {
+            if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -266,16 +264,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
-            let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
-            let Ok(_) = PipelineFileServer::run(fileserver_stop_rx).await else {
-                job_init_tx.send(false).ok();
-                panic!("pipeline file server run failed");
-            };
-
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
-            fileserver_stopped_tx.send(()).ok();
 
             // shutdown meter provider
             let _ = meter_provider.shutdown();
@@ -908,5 +899,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         openobserve::super_cluster_queue::init().await?;
     }
+
+    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+
     Ok(())
 }

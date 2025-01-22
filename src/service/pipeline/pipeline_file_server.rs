@@ -15,7 +15,10 @@
 
 use config::cluster::LOCAL_NODE;
 use infra::errors::Result;
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    signal,
+    sync::{mpsc, oneshot},
+};
 
 use crate::service::pipeline::pipeline_watcher::PipelineWatcher;
 
@@ -68,12 +71,21 @@ impl PipelineFileServer {
         )
     }
 
-    pub async fn run(outside_shutdown_rx: oneshot::Receiver<()>) -> Result<()> {
+    pub async fn run() -> Result<()> {
         let check = LOCAL_NODE.is_ingester() || LOCAL_NODE.is_alert_manager();
         if !check {
             log::debug!("PipelineFileServer can only run on ingester or alert_manager");
             return Ok(());
         }
+
+        let (fileserver_stopped_tx, fileserver_stop_rx) = oneshot::channel();
+        tokio::spawn(async move {
+            // Wait for a termination signal
+            signal::ctrl_c().await.expect("Failed to listen for ctrl_c");
+            log::info!("PipelineFileServer shutdown signal received");
+            // Send the shutdown signal
+            fileserver_stopped_tx.send(()).ok();
+        });
 
         log::info!("PipelineFileServer started");
         let (mut pipeline_watcher, stop_pipeline_watcher_sender, stop_pipeline_watcher_rx) =
@@ -88,7 +100,7 @@ impl PipelineFileServer {
         tokio::spawn(async move {
             log::info!("PipelineFileServer running and waiting for shutdown signal");
 
-            let _ = outside_shutdown_rx.await;
+            let _ = fileserver_stop_rx.await;
 
             log::info!("PipelineWatcher begin to shutdown");
             let _ = stop_pipeline_watcher_sender.send(()).await;
@@ -117,9 +129,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_file_server() {
-        let (stop_tx, stop_rx) = tokio::sync::oneshot::channel();
-        tokio::spawn(PipelineFileServer::run(stop_rx));
+        tokio::spawn(PipelineFileServer::run());
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        stop_tx.send(()).unwrap();
     }
 }
