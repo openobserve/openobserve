@@ -688,7 +688,7 @@ async fn unauthorized_error(
         let error = handle_failed_login(user).await.unwrap_or_default();
         if !error.is_empty() {
             resp.message = error;
-            return Ok(HttpResponse::Unauthorized().json(resp));
+            return Ok(HttpResponse::Locked().json(resp));
         }
     };
 
