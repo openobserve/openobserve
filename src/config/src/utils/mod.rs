@@ -30,6 +30,7 @@ pub mod rand;
 pub mod record_batch_ext;
 pub mod schema;
 pub mod schema_ext;
+pub mod sort;
 pub mod sql;
 pub mod str;
 pub mod tantivy;

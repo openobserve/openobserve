@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, fmt, sync::Arc, time::Duration};
+use std::{fmt, sync::Arc, time::Duration};
 
 use config::{
     meta::promql::NAME_LABEL,
     utils::{
         hash::{gxhash, Sum64},
         json,
+        sort::sort_float,
     },
     FxIndexMap,
 };
@@ -745,18 +746,13 @@ impl Value {
     pub fn sort(&mut self) {
         match self {
             Value::Vector(v) => {
-                v.sort_by(|a, b| {
-                    b.sample
-                        .value
-                        .partial_cmp(&a.sample.value)
-                        .unwrap_or(Ordering::Equal)
-                });
+                v.sort_by(|a, b| sort_float(&b.sample.value, &a.sample.value));
             }
             Value::Matrix(v) => {
                 v.sort_by(|a, b| {
                     let a = a.samples.iter().map(|x| x.value).sum::<f64>();
                     let b = b.samples.iter().map(|x| x.value).sum::<f64>();
-                    b.partial_cmp(&a).unwrap_or(Ordering::Equal)
+                    sort_float(&b, &a)
                 });
             }
             _ => {}
