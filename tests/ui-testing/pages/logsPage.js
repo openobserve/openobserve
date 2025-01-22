@@ -64,7 +64,7 @@ export class LogsPage {
   }
 
   async validateLogsPage() {
-    await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
+    await expect(this.page.locator('[data-test="logs-search-error-message"]')).toContainText('info No records found. Please adjust the filters and try again. ');
   }
 
   async logsPageDefaultMultiOrg() {
