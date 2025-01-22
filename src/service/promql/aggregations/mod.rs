@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use config::{meta::promql::NAME_LABEL, FxIndexMap};
 use datafusion::error::{DataFusionError, Result};
-use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
@@ -296,19 +295,16 @@ pub async fn eval_top(
     }
 
     let comparator = if is_bottom {
-        |a: &TopItem, b: &TopItem| a.value.partial_cmp(&b.value).unwrap()
+        |a: &TopItem, b: &TopItem| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal)
     } else {
-        |a: &TopItem, b: &TopItem| b.value.partial_cmp(&a.value).unwrap()
+        |a: &TopItem, b: &TopItem| b.value.partial_cmp(&a.value).unwrap_or(Ordering::Equal)
     };
 
     let values = score_values
-        .values()
-        .flat_map(|items| {
-            items
-                .iter()
-                .sorted_by(|a, b| comparator(a, b))
-                .take(n)
-                .collect::<Vec<_>>()
+        .into_values()
+        .flat_map(|mut items| {
+            items.sort_by(comparator);
+            items.into_iter().take(n).collect::<Vec<_>>()
         })
         .map(|item| data[item.index].clone())
         .collect();

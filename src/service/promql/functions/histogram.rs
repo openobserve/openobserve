@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::cmp::Ordering;
+
 use config::meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
@@ -107,7 +109,11 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     if phi > 1.0 {
         return f64::INFINITY;
     }
-    buckets.sort_by(|a, b| a.upper_bound.partial_cmp(&b.upper_bound).unwrap());
+    buckets.sort_by(|a, b| {
+        a.upper_bound
+            .partial_cmp(&b.upper_bound)
+            .unwrap_or(Ordering::Equal)
+    });
     // The caller of `bucket_quantile` guarantees that `buckets` is non-empty.
     let highest_bucket = &buckets[buckets.len() - 1];
     if !(highest_bucket.upper_bound.is_infinite() && highest_bucket.upper_bound.is_sign_positive())
