@@ -1017,6 +1017,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
 async fn init_enterprise() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::search::init().await?;
 
+    o2_enterprise::enterprise::actions::action_manager::init_client()?;
+
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled

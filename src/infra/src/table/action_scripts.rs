@@ -18,8 +18,8 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Schema, Set,
 };
 
 use super::{
