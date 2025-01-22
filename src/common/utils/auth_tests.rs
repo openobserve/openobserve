@@ -51,7 +51,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -68,7 +68,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -85,7 +85,7 @@ mod tests {
                 o2_type: format!("user:{EMAIL_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -102,7 +102,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -119,7 +119,7 @@ mod tests {
                 o2_type: format!("user:{EMAIL_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -506,7 +506,7 @@ mod tests {
                 o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -523,7 +523,7 @@ mod tests {
                 o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -541,7 +541,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -560,7 +560,7 @@ mod tests {
                 o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -577,7 +577,7 @@ mod tests {
                 o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -596,7 +596,7 @@ mod tests {
                 o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -614,7 +614,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -632,7 +632,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -650,7 +650,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -668,7 +668,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -686,7 +686,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -704,7 +704,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -721,7 +721,7 @@ mod tests {
                 o2_type: format!("prometheus:api"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -739,7 +739,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -757,7 +757,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -774,7 +774,7 @@ mod tests {
                 o2_type: format!("prometheus:api"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -791,7 +791,7 @@ mod tests {
                 o2_type: format!("prometheus:api"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -808,7 +808,7 @@ mod tests {
                 o2_type: format!("prometheus:api"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -826,7 +826,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -844,7 +844,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -863,7 +863,7 @@ mod tests {
                 o2_type: format!("enrichment_table:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -883,7 +883,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -900,7 +900,7 @@ mod tests {
                 o2_type: format!("stream:STREAM_NAME"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -917,7 +917,7 @@ mod tests {
                 o2_type: format!("stream:STREAM_NAME"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -935,7 +935,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -953,7 +953,7 @@ mod tests {
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
-                parent_id: "default".to_string(),
+                parent_id: format!("default"),
             },
         )
         .await
@@ -2176,7 +2176,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{PUT_METHOD}"),
-                o2_type: format!("syslog-route:TEST_SYSLOG_ROUTE_ID"),
+                o2_type: format!("syslog-route:{SYSLOG_ROUTE_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
