@@ -460,17 +460,17 @@ export default defineComponent({
                 });
               }
             })
-            .catch((e: Error) => {
+            .catch((e: any) => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
               loginform.value.resetValidation();
-              if (e.response.status == 423) {
+              if (e?.response?.status == 423) {
                 lockedAccountFlag.value = true;
               }
               $q.notify({
                 color: "negative",
                 message:
-                  e.response?.data?.message || "Invalid username or password",
+                  e?.response?.data?.message || "Invalid username or password",
                 timeout: 4000,
               });
               console.log(e);
@@ -498,7 +498,7 @@ export default defineComponent({
         });
       } else {
         authService
-          .unlock_account({ email: unlockfrm_name.value })
+          .unlock_account(unlockfrm_name.value)
           .then((res) => {
             if (res.data.status == true) {
               resetUnlockForm();
