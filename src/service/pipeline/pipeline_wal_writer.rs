@@ -199,7 +199,7 @@ impl PipelineWalWriter {
             wal_write_buffer_size,
             Some(header),
         )
-        .map_err(|e| Error::WalFileError(e.to_string()))
+        .map_err(|e| Error::WalFileError(format!("wal::Writer::build error: {e}")))
     }
     pub async fn write_wal(&self, data: Vec<json::Value>) -> Result<()> {
         // write data to wal
