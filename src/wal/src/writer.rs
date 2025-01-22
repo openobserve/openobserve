@@ -80,7 +80,7 @@ impl Writer {
                 .context(FileReadSnafu { path: path.clone() })?;
         }
 
-        if let Err(e) = f.write_all(super::FILE_TYPE_IDENTIFIER) {
+        if let Err(e) = f.write_all(super::FILE_TYPE_IDENTIFIER_WITH_HEADER) {
             _ = remove_file(&path);
             return Err(Error::WriteFileType { source: e });
         }

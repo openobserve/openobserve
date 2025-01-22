@@ -44,26 +44,30 @@ impl Reader<BufReader<File>> {
             length: super::FILE_TYPE_IDENTIFIER.len(),
         })?;
         ensure!(
-            &buf == super::FILE_TYPE_IDENTIFIER,
+            &buf == super::FILE_TYPE_IDENTIFIER || &buf == super::FILE_TYPE_IDENTIFIER_WITH_HEADER,
             FileIdentifierMismatchSnafu,
         );
 
-        // check the file header, and skip header.
-        // if we need to get header, use Reader::header
-        let mut buf = [0; super::WAL_FILE_HEADER_LEN];
-        f.read_exact(&mut buf).context(UnableToReadArraySnafu {
-            length: super::WAL_FILE_HEADER_LEN,
-        })?;
-        let mut buf = std::io::Cursor::new(buf);
-        let header_len = buf
-            .read_u32::<BigEndian>()
-            .context(UnableToReadLengthSnafu)? as usize;
-        let mut bytes = vec![0u8; header_len];
-        f.read_exact(&mut bytes)
-            .context(UnableToReadArraySnafu { length: header_len })?;
-        let header = Self::deserialize_header(&bytes)?;
+        if &buf == super::FILE_TYPE_IDENTIFIER_WITH_HEADER {
+            // check the file header, and skip header.
+            // if we need to get header, use Reader::header
+            let mut buf = [0; super::WAL_FILE_HEADER_LEN];
+            f.read_exact(&mut buf).context(UnableToReadArraySnafu {
+                length: super::WAL_FILE_HEADER_LEN,
+            })?;
+            let mut buf = std::io::Cursor::new(buf);
+            let header_len = buf
+                .read_u32::<BigEndian>()
+                .context(UnableToReadLengthSnafu)? as usize;
+            let mut bytes = vec![0u8; header_len];
+            f.read_exact(&mut bytes)
+                .context(UnableToReadArraySnafu { length: header_len })?;
+            let header = Self::deserialize_header(&bytes)?;
 
-        Ok(Self::new(path, f, header))
+            Ok(Self::new(path, f, header))
+        } else {
+            Ok(Self::new(path, f, HashMap::new()))
+        }
     }
 
     pub fn from_path_position(path: impl Into<PathBuf>, read_from: ReadFrom) -> Result<Self> {

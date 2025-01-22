@@ -29,6 +29,7 @@ pub const FILE_TYPE_IDENTIFIER_LEN: usize = 13;
 pub const ENTRY_HEADER_LEN: u64 = 8;
 type FileTypeIdentifier = [u8; FILE_TYPE_IDENTIFIER_LEN];
 const FILE_TYPE_IDENTIFIER: &FileTypeIdentifier = b"OPENOBSERVEV2";
+const FILE_TYPE_IDENTIFIER_WITH_HEADER: &FileTypeIdentifier = b"OPENOBSERVEV3";
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
 
