@@ -1164,7 +1164,7 @@ export const convertSQLData = async (
   const getAnnotationMarkLine = () => {
     return {
       itemStyle: {
-        color: "rgba(234, 239, 44, 0.8)",
+        color: "rgba(0, 191, 255, 0.5)",
       },
       silent: false,
       animation: false,
@@ -1174,7 +1174,7 @@ export const convertSQLData = async (
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
-        color: "rgba(254, 241, 96, 0.2)",
+        color: "rgba(0, 191, 255, 0.15)",
       },
       data: markAreas,
     };
@@ -2529,12 +2529,27 @@ export const convertSQLData = async (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
-  options.series.push({
-    type: "line",
-    data: [[convertedTimeStampToDataFormat, null]],
-    markLine: getAnnotationMarkLine(),
-    markArea: getSeriesMarkArea(),
-  });
+  if (
+    [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.type) &&
+    isTimeSeriesFlag &&
+    !panelSchema.config.trellis?.layout
+  ) {
+    options.series.push({
+      type: "line",
+      data: [[convertedTimeStampToDataFormat, null]],
+      markLine: getAnnotationMarkLine(),
+      markArea: getSeriesMarkArea(),
+    });
+  }
 
   return {
     options,
