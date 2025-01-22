@@ -204,7 +204,8 @@ impl PipelineWalWriter {
     pub async fn write_wal(&self, data: Vec<json::Value>) -> Result<()> {
         // write data to wal
         if data.is_empty() {
-            return Err(Error::Message("No data to write to WAL".to_string()));
+            log::warn!("No data to write to WAL");
+            return Ok(());
         }
 
         let mut entry = Entry {
@@ -252,7 +253,10 @@ impl PipelineWalWriter {
                     fs::create_dir_all(dir)?;
                 }
             }
-
+            log::debug!(
+                "rename tmp wal file to remote wal file: {path_str} -> {}",
+                persist_path.display()
+            );
             fs::rename(writer.path(), persist_path.clone()).map_err(|e| {
                 Error::Message(format!(
                     "rename to persist_path fail: {}, error: {e}",
