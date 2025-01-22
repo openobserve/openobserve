@@ -640,6 +640,110 @@ mod tests {
         .await
     }
 
+    // routes defined in handler::http::request::logs::ingest
+
+    #[tokio::test]
+    async fn logs_ingest_bulk() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/_bulk"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn logs_ingest_multi() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/_multi"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn logs_ingest_json() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/_json"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn handle_kinesis_request() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/STREAM_NAME/_kinesis_firehose"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn handle_gcp_request() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/STREAM_NAME/_sub"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn otlp_logs_write() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/v1/logs"),
+            AuthExtractor {
+                auth: format!("{AUTH_HEADER_VAL}"),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                org_id: format!("{ORG_ID}"),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
     /// Tests that the correct authorization information is extracted from a
     /// request to the given path.
     async fn test_auth(method: Method, path: String, expected: AuthExtractor) {
