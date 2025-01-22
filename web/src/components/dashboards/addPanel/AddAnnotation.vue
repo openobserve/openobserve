@@ -8,18 +8,20 @@
         <q-input
           v-model="annotationData.title"
           label="Title"
+          stack-label
+          class="q-py-md showLabelOnTop"
           dense
           outlined
-          clearable
-          style="margin-bottom: 16px"
+          style="margin-bottom: 10px"
           :rules="[(val) => !!val || 'Field is required!']"
         />
         <q-input
           v-model="annotationData.text"
           label="Description"
+          stack-label
+          class="q-py-md showLabelOnTop"
           dense
           outlined
-          clearable
           type="textarea"
           :rows="3"
         />
