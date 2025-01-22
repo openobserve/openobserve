@@ -43,7 +43,7 @@ pub async fn grpc_search(
 
     let trace_id = trace_id.to_string();
     let org_id = org_id.to_string();
-    let stream_type = stream_type.to_string();
+    let stream_type = stream_type.as_str();
     let in_req = in_req.clone();
     let task = tokio::task::spawn(
         async move {
@@ -114,7 +114,6 @@ pub async fn grpc_search_partition(
 
     let trace_id = trace_id.to_string();
     let org_id = org_id.to_string();
-    let stream_type = stream_type.to_string();
     let in_req = in_req.clone();
     let task = tokio::task::spawn(
         async move {
