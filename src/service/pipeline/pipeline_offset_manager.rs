@@ -201,17 +201,17 @@ impl PipelineOffsetManager {
 
     pub async fn get_all_remote_wal_file() -> Vec<PathBuf> {
         let cfg = config::get_config();
-        let remote_stream_tmp_wal_dir = &cfg.pipeline.remote_stream_wal_dir.replace(
-            crate::service::pipeline::pipeline_wal_writer::REMOTE_REALTIME_STREAM_WAL_DIR,
-            crate::service::pipeline::pipeline_wal_writer::REMOTE_QUERY_STREAM_TMP_WAL_DIR,
-        );
-        let wal_dir = Path::new(remote_stream_tmp_wal_dir.as_str());
+        let wal_dir = Path::new(cfg.pipeline.remote_stream_wal_dir.as_str());
         Self::iter_dir_wal_file(wal_dir).await
     }
 
     pub async fn get_all_remote_tmp_wal_file() -> Vec<PathBuf> {
         let cfg = config::get_config();
-        let wal_dir = Path::new(cfg.pipeline.remote_stream_wal_dir.as_str());
+        let remote_stream_tmp_wal_dir = &cfg.pipeline.remote_stream_wal_dir.replace(
+            crate::service::pipeline::pipeline_wal_writer::REMOTE_REALTIME_STREAM_WAL_DIR,
+            crate::service::pipeline::pipeline_wal_writer::REMOTE_QUERY_STREAM_TMP_WAL_DIR,
+        );
+        let wal_dir = Path::new(remote_stream_tmp_wal_dir.as_str());
         Self::iter_dir_wal_file(wal_dir).await
     }
 
