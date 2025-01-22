@@ -165,13 +165,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-btn
-            data-test="pipeline-list-add-pipeline-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`pipeline.addPipeline`)"
-            :to="{ name: 'createPipeline' }"
+              data-test="pipeline-list-add-pipeline-btn"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              :label="t(`pipeline.addPipeline`)"
+              @click="routeToAddPipeline"
           />
         </div>
 
@@ -505,6 +505,8 @@ const editPipeline = (pipeline: any) => {
     node.type = node.io_type;
   });
 
+  console.log(pipeline,'pipeline')
+
   pipelineObj.currentSelectedPipeline = pipeline;
   pipelineObj.pipelineWithoutChange = pipeline;
   router.push({
@@ -621,6 +623,14 @@ const filterData = (rows: any, terms: any) => {
   }
   return filtered;
 };
+const routeToAddPipeline = () => {
+  router.push({
+    name: "createPipeline",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+}
 </script>
 <style lang="scss" scoped>
 .pipeline-list-table {

@@ -78,6 +78,10 @@ pub enum Error {
     NotImplemented,
     #[error("Unknown error")]
     Unknown,
+    #[error("Error# {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("Error# {0}")]
+    WalFileError(String),
 }
 
 unsafe impl Send for Error {}
