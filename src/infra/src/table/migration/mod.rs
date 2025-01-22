@@ -32,7 +32,6 @@ mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
-mod m20250114_123850_add_dashboard_id_unique_idx_dashboard_table;
 mod m20250115_000001_create_timed_annotations_table;
 mod m20250115_000002_create_timed_annotation_panels_table;
 
@@ -59,7 +58,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
-            Box::new(m20250114_123850_add_dashboard_id_unique_idx_dashboard_table::Migration),
             Box::new(m20250115_000001_create_timed_annotations_table::Migration),
             Box::new(m20250115_000002_create_timed_annotation_panels_table::Migration),
         ]

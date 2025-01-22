@@ -16,13 +16,14 @@
 use chrono::Utc;
 use config::{ider, meta::timed_annotations::*};
 use sea_orm::{
-    prelude::Expr, ColumnTrait, Condition, EntityTrait, QueryFilter, Set, TransactionTrait,
+    prelude::Expr, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
 };
 
 use super::{
     entity::{
-        timed_annotation_panels,
-        timed_annotations::{self, *},
+        dashboards, timed_annotation_panels,
+        timed_annotations::{self},
     },
     get_lock,
 };
@@ -44,15 +45,29 @@ pub async fn get(
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Step 1: Build the query for `timed_annotations` with a JOIN on `annotation_panels`
+    // Step 1: Resolve the user-facing `dashboard_id` to the primary key (KSUID)
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
+
+    // Step 2: Build the query for `timed_annotations` with a JOIN on `annotation_panels`
     let mut query = timed_annotations::Entity::find()
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_id))
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
         .join(
             JoinType::InnerJoin,
             timed_annotations::Relation::TimedAnnotationPanels.def(),
         );
 
-    // Step 2: If `panel_ids` is provided, filter by `panel_id`
+    // Step 3: If `panel_ids` is provided, filter by `panel_id`
     if let Some(panel_ids) = panel_ids {
         query = query.filter(
             Expr::col((
@@ -63,7 +78,7 @@ pub async fn get(
         );
     }
 
-    // Step 3: Filter by time range (overlap condition)
+    // Step 4: Filter by time range (overlap condition)
     // Handle entries where end_time is null and ensure start_time is within the query range
     query = query
         .filter(
@@ -101,17 +116,13 @@ pub async fn get(
                 ),
         );
 
-    // Step 4: Select distinct annotations
-    let annotations = query
-        .distinct_on([timed_annotations::Column::Id])
-        .all(client)
-        .await?;
+    // Step 5: Execute Query
+    let annotations = query.all(client).await?;
 
     if annotations.is_empty() {
         return Ok(vec![]); // No annotations found
     }
 
-    // Step 5: Collect annotation IDs
     let annotation_ids: Vec<String> = annotations.iter().map(|a| a.id.clone()).collect();
 
     // Step 6: Fetch associated panels for the retrieved annotations
@@ -157,123 +168,30 @@ pub async fn get(
     Ok(results)
 }
 
-pub async fn add(
-    dashboard_id: &str,
-    timed_annotation: TimedAnnotation,
-) -> Result<String, errors::Error> {
-    let record = ActiveModel {
-        id: Set(ider::uuid()),
-        dashboard_id: Set(dashboard_id.to_string()),
-        start_time: Set(timed_annotation.start_time),
-        end_time: Set(timed_annotation.end_time),
-        title: Set(timed_annotation.title),
-        text: Set(timed_annotation.text),
-        tags: Set(timed_annotation.tags.into()),
-        created_at: Set(Utc::now().timestamp_micros()),
-    };
-
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let insert_result = Entity::insert(record).exec(client).await?;
-    let timed_annotation_id = insert_result.last_insert_id;
-
-    // Insert into the annotation_panels table
-    for panel_id in timed_annotation.panels {
-        let record = timed_annotation_panels::ActiveModel {
-            id: (Set(panel_id.clone())),
-            timed_annotation_id: Set(timed_annotation_id.clone()),
-            panel_id: Set(panel_id),
-        };
-
-        timed_annotation_panels::Entity::insert(record)
-            .exec(client)
-            .await?;
-    }
-
-    Ok(timed_annotation_id)
-}
-
-pub async fn add_many(
-    dashboard_id: &str,
-    timed_annotations: Vec<TimedAnnotation>,
-) -> Result<Vec<TimedAnnotation>, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    // Begin a transaction to ensure atomicity
-    let txn = client.begin().await?;
-
-    // Vector to store the inserted `TimedAnnotation` objects
-    let mut inserted_annotations = Vec::new();
-
-    for timed_annotation in timed_annotations {
-        // Step 1: Insert the annotation into the `timed_annotations` table
-        let annotation_id = ider::uuid(); // Generate a unique ID for the annotation
-        let record = timed_annotations::ActiveModel {
-            id: Set(annotation_id.clone()),
-            dashboard_id: Set(dashboard_id.to_string()),
-            start_time: Set(timed_annotation.start_time),
-            end_time: Set(timed_annotation.end_time),
-            title: Set(timed_annotation.title.clone()),
-            text: Set(timed_annotation.text.clone()),
-            tags: Set(timed_annotation.tags.clone().into()),
-            created_at: Set(Utc::now().timestamp_micros()),
-        };
-
-        timed_annotations::Entity::insert(record)
-            .exec(&txn) // Use the transaction
-            .await?;
-
-        // Step 2: Insert associated panels into the `annotation_panels` table
-        for panel_id in &timed_annotation.panels {
-            let panel_record = timed_annotation_panels::ActiveModel {
-                id: Set(ider::uuid()),
-                timed_annotation_id: Set(annotation_id.clone()),
-                panel_id: Set(panel_id.clone()),
-            };
-
-            timed_annotation_panels::Entity::insert(panel_record)
-                .exec(&txn) // Use the transaction
-                .await?;
-        }
-
-        // Step 3: Construct the full `TimedAnnotation` object and add it to the list
-        inserted_annotations.push(TimedAnnotation {
-            annotation_id: Some(annotation_id),
-            start_time: timed_annotation.start_time,
-            end_time: timed_annotation.end_time,
-            title: timed_annotation.title,
-            text: timed_annotation.text,
-            tags: timed_annotation.tags,
-            panels: timed_annotation.panels,
-        });
-    }
-
-    // Commit the transaction
-    txn.commit().await?;
-
-    // Return the list of inserted `TimedAnnotation` objects
-    Ok(inserted_annotations)
-}
-
 pub async fn delete(dashboard_id: &str, timed_annotation_id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
 
-    // Step 1: Delete the annotation from `timed_annotations`
+    let dashboard_pk = dashboard_record.id;
+
     let delete_result = timed_annotations::Entity::delete_many()
         .filter(timed_annotations::Column::Id.eq(timed_annotation_id))
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_id))
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
         .exec(client)
         .await?;
 
-    // Step 2: Check if the annotation was actually deleted
     if delete_result.rows_affected == 0 {
         return Err(errors::Error::DbError(errors::DbError::KeyNotExists(
             format!("Annotation with ID {} does not exist", timed_annotation_id),
@@ -291,6 +209,18 @@ pub async fn delete_many(
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
 
     // Step 1: Build the condition to match multiple annotation IDs
     let mut condition = Condition::any(); // Use `Condition::any()` to OR multiple conditions
@@ -301,7 +231,7 @@ pub async fn delete_many(
     // Step 2: Perform the batch deletion
     let delete_result = timed_annotations::Entity::delete_many()
         .filter(condition) // Match the IDs
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_id)) // Ensure they belong to the same dashboard
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk)) // Ensure they belong to the same dashboard
         .exec(client)
         .await?;
 
@@ -325,25 +255,32 @@ pub async fn get_one(
     // Initialize the ORM client
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Step 1: Fetch the annotation by `dashboard_id` and `timed_annotation_id`
+    // Step 1: Resolve the user-facing `dashboard_id` to the primary key
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
+
+    // Step 2: Fetch the annotation by `dashboard_id` and `timed_annotation_id`
     let annotation = timed_annotations::Entity::find()
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_id))
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
         .filter(timed_annotations::Column::Id.eq(timed_annotation_id))
         .one(client)
-        .await?;
-
-    // Step 2: Check if the annotation exists
-    let annotation = match annotation {
-        Some(annotation) => annotation,
-        None => {
-            return Err(errors::Error::DbError(errors::DbError::KeyNotExists(
-                format!(
-                    "TimedAnnotation with ID {} not found in dashboard {}",
-                    timed_annotation_id, dashboard_id
-                ),
-            )));
-        }
-    };
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "TimedAnnotation with ID {} not found in dashboard {}",
+                timed_annotation_id, dashboard_id
+            )))
+        })?;
 
     // Step 3: Fetch associated panels for the annotation
     let panels = timed_annotation_panels::Entity::find()
@@ -387,12 +324,26 @@ pub async fn update(
     // Initialize the ORM client
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // Step 1: Build the update query
+    // Step 1: Resolve the user-facing `dashboard_id` to the primary key
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
+
+    // Step 2: Build the update query
     let mut update_query = timed_annotations::Entity::update_many()
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_id))
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
         .filter(timed_annotations::Column::Id.eq(timed_annotation_id));
 
-    // Step 2: Apply updates from the `TimedAnnotationUpdate` struct
+    // Step 3: Apply updates from the `TimedAnnotationUpdate` struct
     if let Some(start_time) = timed_annotation.start_time {
         update_query = update_query.col_expr(
             timed_annotations::Column::StartTime,
@@ -420,10 +371,10 @@ pub async fn update(
             update_query.col_expr(timed_annotations::Column::Tags, Expr::value(tags_json));
     }
 
-    // Step 3: Execute the update query
+    // Step 4: Execute the update query
     let result = update_query.exec(client).await?;
 
-    // Step 4: Check if any rows were affected
+    // Step 5: Check if any rows were affected
     if result.rows_affected == 0 {
         return Err(errors::Error::DbError(errors::DbError::KeyNotExists(
             format!(
@@ -434,4 +385,87 @@ pub async fn update(
     }
 
     Ok(())
+}
+
+pub async fn add(
+    dashboard_id: &str,
+    timed_annotation: TimedAnnotation,
+) -> Result<Vec<TimedAnnotation>, errors::Error> {
+    add_many(dashboard_id, vec![timed_annotation]).await
+}
+
+pub async fn add_many(
+    dashboard_id: &str,
+    timed_annotations: Vec<TimedAnnotation>,
+) -> Result<Vec<TimedAnnotation>, errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let txn = client.begin().await?;
+    let mut inserted_annotations = Vec::new();
+
+    for timed_annotation in timed_annotations {
+        let annotation = insert_timed_annotation(&txn, dashboard_id, timed_annotation).await?;
+        inserted_annotations.push(annotation);
+    }
+
+    txn.commit().await?;
+    Ok(inserted_annotations)
+}
+
+/// Helper function to insert a single `TimedAnnotation` record and its associated panels
+async fn insert_timed_annotation<'a>(
+    txn: &'a DatabaseTransaction,
+    dashboard_id: &str,
+    timed_annotation: TimedAnnotation,
+) -> Result<TimedAnnotation, errors::Error> {
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(txn)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard with ID {} not found",
+                dashboard_id
+            )))
+        })?;
+    let dashboard_pk = dashboard_record.id;
+
+    let annotation_id = ider::uuid();
+    let record = timed_annotations::ActiveModel {
+        id: Set(annotation_id.clone()),
+        dashboard_id: Set(dashboard_pk.to_string()),
+        start_time: Set(timed_annotation.start_time),
+        end_time: Set(timed_annotation.end_time),
+        title: Set(timed_annotation.title.clone()),
+        text: Set(timed_annotation.text.clone()),
+        tags: Set(timed_annotation.tags.clone().into()),
+        created_at: Set(Utc::now().timestamp_micros()),
+    };
+
+    timed_annotations::Entity::insert(record).exec(txn).await?;
+
+    for panel_id in &timed_annotation.panels {
+        let panel_record = timed_annotation_panels::ActiveModel {
+            id: Set(ider::uuid()),
+            timed_annotation_id: Set(annotation_id.clone()),
+            panel_id: Set(panel_id.clone()),
+        };
+
+        timed_annotation_panels::Entity::insert(panel_record)
+            .exec(txn)
+            .await?;
+    }
+
+    Ok(TimedAnnotation {
+        annotation_id: Some(annotation_id),
+        start_time: timed_annotation.start_time,
+        end_time: timed_annotation.end_time,
+        title: timed_annotation.title,
+        text: timed_annotation.text,
+        tags: timed_annotation.tags,
+        panels: timed_annotation.panels,
+    })
 }

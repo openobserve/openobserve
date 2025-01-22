@@ -75,7 +75,7 @@ fn create_table_stmt() -> TableCreateStatement {
             sea_query::ForeignKey::create()
                     .name(TIMED_ANNOTATIONS_DASHBOARDS_FK)
                     .from(TimedAnnotations::Table, TimedAnnotations::DashboardId)
-                    .to(Dashboards::Table, Dashboards::DashboardId)
+                    .to(Dashboards::Table, Dashboards::Id)
                     .on_delete(ForeignKeyAction::Cascade)
         )
         .to_owned()
@@ -107,5 +107,5 @@ enum TimedAnnotations {
 #[derive(DeriveIden)]
 enum Dashboards {
     Table,
-    DashboardId,
+    Id,
 }

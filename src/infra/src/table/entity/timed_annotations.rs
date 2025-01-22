@@ -22,7 +22,7 @@ pub enum Relation {
     #[sea_orm(
         belongs_to = "super::dashboards::Entity",
         from = "Column::DashboardId",
-        to = "super::dashboards::Column::DashboardId",
+        to = "super::dashboards::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
