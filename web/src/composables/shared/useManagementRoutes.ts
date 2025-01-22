@@ -4,7 +4,6 @@ const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertsDestinationList = () =>
   import("@/components/alerts/AlertsDestinationList.vue");
-const PipelinesDestinationList = () => import("@/components/alerts/PipelinesDestinationList.vue")
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -45,14 +44,6 @@ const useManagementRoutes = () => {
           },
         },
         {
-          path: "pipeline_destinations",
-          name: "pipelineDestinations",
-          component: PipelinesDestinationList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
           path: "templates",
           name: "alertTemplates",
           component: TemplateList,
@@ -73,6 +64,15 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
           },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipeline_destinations",
+          name: "pipelineDestinations",
+          component: () =>
+            import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
