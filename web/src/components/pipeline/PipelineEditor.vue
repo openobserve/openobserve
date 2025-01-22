@@ -190,6 +190,8 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 
+import config from "@/aws-exports";
+
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
 );
@@ -345,15 +347,7 @@ const nodeTypes: any = [
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
-  },
-  {
-    label: "Remote",
-    subtype: "remote_stream",
-    io_type: "output",
-    icon: "img:" + externalOutputImage,
-    tooltip: "Destination: External Destination Node",
-    isSectionHeader: false,
-  },
+  }
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
@@ -404,6 +398,16 @@ const dialog = ref({
 });
 
 onBeforeMount(() => {
+  if (config.isEnterprise == "true") {
+    nodeTypes.push({
+      label: "Remote",
+      subtype: "remote_stream",
+      io_type: "output",
+      icon: "img:" + externalOutputImage,
+      tooltip: "Destination: External Destination Node",
+      isSectionHeader: false,
+    });
+  }
   const route = router.currentRoute.value;
   if (route.name == "pipelineEditor" && route.query.id) {
     getPipeline();

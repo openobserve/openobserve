@@ -22,6 +22,8 @@ import { useI18n } from "vue-i18n";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getImageURL } from "@/utils/zincutils";
 
+import config from "@/aws-exports";
+
 const streamImage = getImageURL("images/pipeline/stream.svg");
 
 const functionImage = getImageURL("images/pipeline/function.svg");
@@ -30,6 +32,7 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
+
 
 
 const props = defineProps({
@@ -206,6 +209,7 @@ function getIcon(data, ioType) {
       class="node_handle_custom"
      
     />
+
     <div
       v-if="data.node_type == 'function'"
       :class="`o2vf_node_${io_type}`"
@@ -247,6 +251,7 @@ function getIcon(data, ioType) {
         </q-item-section>
       </q-item>
           <q-item
+              v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
@@ -367,6 +372,7 @@ function getIcon(data, ioType) {
         </q-item-section>
       </q-item>
       <q-item
+            v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
@@ -482,6 +488,7 @@ function getIcon(data, ioType) {
         </q-item-section>
       </q-item>
       <q-item
+            v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
@@ -583,7 +590,8 @@ function getIcon(data, ioType) {
 
         </q-item-section>
       </q-item>
-      <q-item
+      <q-item 
+            v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
@@ -694,7 +702,8 @@ function getIcon(data, ioType) {
 
         </q-item-section>
       </q-item>
-      <q-item
+      <q-item 
+            v-if="config.isEnterprise == 'true'"
             clickable
             @click="(event) => onExternalDestinationClick(data, event, id)"
           >
