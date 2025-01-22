@@ -26,7 +26,7 @@ const auth = {
     return res.data;
   },
   unlock_account: async (email_id: string) => {
-    const res = await http().get(`config/users/{email_id}/unlock/link`);
+    const res = await http().get(`config/users/${email_id}/unlock/link`);
     return res.data;
   },
 };
