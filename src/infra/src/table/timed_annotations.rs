@@ -390,13 +390,15 @@ pub async fn update(
 pub async fn add(
     dashboard_id: &str,
     timed_annotation: TimedAnnotation,
+    use_given_id: bool,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
-    add_many(dashboard_id, vec![timed_annotation]).await
+    add_many(dashboard_id, vec![timed_annotation], use_given_id).await
 }
 
 pub async fn add_many(
     dashboard_id: &str,
     timed_annotations: Vec<TimedAnnotation>,
+    use_given_id: bool,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
@@ -407,7 +409,8 @@ pub async fn add_many(
     let mut inserted_annotations = Vec::new();
 
     for timed_annotation in timed_annotations {
-        let annotation = insert_timed_annotation(&txn, dashboard_id, timed_annotation).await?;
+        let annotation =
+            insert_timed_annotation(&txn, dashboard_id, timed_annotation, use_given_id).await?;
         inserted_annotations.push(annotation);
     }
 
@@ -420,6 +423,7 @@ async fn insert_timed_annotation<'a>(
     txn: &'a DatabaseTransaction,
     dashboard_id: &str,
     timed_annotation: TimedAnnotation,
+    use_given_id: bool,
 ) -> Result<TimedAnnotation, errors::Error> {
     let dashboard_record = dashboards::Entity::find()
         .filter(dashboards::Column::DashboardId.eq(dashboard_id))
@@ -433,7 +437,13 @@ async fn insert_timed_annotation<'a>(
         })?;
     let dashboard_pk = dashboard_record.id;
 
-    let annotation_id = ider::uuid();
+    let annotation_id: String = if use_given_id {
+        timed_annotation
+            .annotation_id
+            .unwrap_or_else(|| ider::uuid())
+    } else {
+        ider::uuid()
+    };
     let record = timed_annotations::ActiveModel {
         id: Set(annotation_id.clone()),
         dashboard_id: Set(dashboard_pk.to_string()),

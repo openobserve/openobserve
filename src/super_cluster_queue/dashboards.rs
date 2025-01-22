@@ -38,6 +38,41 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         } => {
             table::dashboards::delete_from_folder(&org_id, &folder_id, &dashboard_id).await?;
         }
+        DashboardMessage::TimedAnnotationCreate {
+            dashboard_id,
+            timed_annotation,
+            use_given_id,
+        } => {
+            table::timed_annotations::add(&dashboard_id, timed_annotation, use_given_id).await?;
+        }
+        DashboardMessage::TimedAnnotationPut {
+            dashboard_id,
+            timed_annotation_id,
+            timed_annotation,
+        } => {
+            table::timed_annotations::update(&dashboard_id, &timed_annotation_id, timed_annotation)
+                .await?;
+        }
+        DashboardMessage::TimedAnnotationDelete {
+            dashboard_id,
+            timed_annotation_id,
+        } => {
+            table::timed_annotations::delete(&dashboard_id, &timed_annotation_id).await?;
+        }
+        DashboardMessage::TimedAnnotationPanelsPut {
+            timed_annotation_id,
+            panels,
+        } => {
+            table::timed_annotation_panels::insert_many_panels(&timed_annotation_id, panels)
+                .await?;
+        }
+        DashboardMessage::TimedAnnotationPanelsDelete {
+            timed_annotation_id,
+            panels,
+        } => {
+            table::timed_annotation_panels::delete_many_panels(&timed_annotation_id, panels)
+                .await?;
+        }
     };
     Ok(())
 }

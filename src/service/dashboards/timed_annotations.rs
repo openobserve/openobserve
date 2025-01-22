@@ -23,9 +23,28 @@ pub async fn create_timed_annotations(
     dashboard_id: &str,
     req: TimedAnnotationReq,
 ) -> Result<Vec<TimedAnnotation>, anyhow::Error> {
-    let res = table::timed_annotations::add_many(dashboard_id, req.timed_annotations).await?;
-    // TODO: send WATCH for super cluster
-    Ok(res)
+    let timed_annotations_res =
+        table::timed_annotations::add_many(dashboard_id, req.timed_annotations, false).await?;
+
+    #[cfg(feature = "enterprise")]
+    for timed_annotation in timed_annotations_res.iter() {
+        match super_cluster::emit_timed_annotation_create_event(
+            dashboard_id,
+            timed_annotation.clone(),
+            true,
+        )
+        .await
+        {
+            Ok(_) => (),
+            Err(e) => tracing::error!(
+                "[dashboard_id: {}] Failed to emit event to super cluster: {:?}",
+                dashboard_id,
+                e
+            ),
+        };
+    }
+
+    Ok(timed_annotations_res)
 }
 
 #[tracing::instrument]
@@ -37,7 +56,6 @@ pub async fn get_timed_annotations(
 ) -> Result<Vec<TimedAnnotation>, anyhow::Error> {
     let annotations =
         table::timed_annotations::get(dashboard_id, panels, start_time, end_time).await?;
-    // TODO: send WATCH for super cluster
     Ok(annotations)
 }
 
@@ -50,7 +68,19 @@ pub async fn delete_timed_annotations(
         return Err(anyhow::anyhow!("annotation_ids cannot be empty"));
     }
     table::timed_annotations::delete_many(dashboard_id, &req.annotation_ids).await?;
-    // TODO: send WATCH for super cluster
+
+    #[cfg(feature = "enterprise")]
+    for id in req.annotation_ids.iter() {
+        match super_cluster::emit_timed_annotation_delete_event(dashboard_id, id).await {
+            Ok(_) => (),
+            Err(e) => tracing::error!(
+                "[timed_annotation_id: {}] Failed to emit event to super cluster: {:?}",
+                id,
+                e
+            ),
+        };
+    }
+
     Ok(())
 }
 
@@ -61,6 +91,9 @@ pub async fn update_timed_annotations(
     req: &TimedAnnotationUpdate,
 ) -> Result<TimedAnnotation, anyhow::Error> {
     table::timed_annotations::update(dashboard_id, timed_annotation_id, req.clone()).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_timed_annotation_put_event(dashboard_id, timed_annotation_id, req.clone())
+        .await?;
 
     if let Some(new_panels) = &req.panels {
         let existing_panels =
@@ -73,14 +106,22 @@ pub async fn update_timed_annotations(
 
         // Add only new panels
         if !panels_to_add.is_empty() {
-            table::timed_annotation_panels::insert_many_panels(timed_annotation_id, panels_to_add)
-                .await?;
+            table::timed_annotation_panels::insert_many_panels(
+                timed_annotation_id,
+                panels_to_add.clone(),
+            )
+            .await?;
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_timed_annotation_panels_put_event(
+                timed_annotation_id,
+                panels_to_add,
+            )
+            .await?;
         }
     }
     let updated_record =
         table::timed_annotations::get_one(dashboard_id, timed_annotation_id).await?;
 
-    // TODO: send WATCH for super cluster
     Ok(updated_record)
 }
 
@@ -92,7 +133,101 @@ pub async fn delete_timed_annotation_panels(
     if panels.is_empty() {
         return Err(anyhow::anyhow!("panels cannot be empty"));
     }
-    table::timed_annotation_panels::delete_many_panels(timed_annotation_id, panels).await?;
+    table::timed_annotation_panels::delete_many_panels(timed_annotation_id, panels.clone()).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_timed_annotation_panels_delete_event(timed_annotation_id, panels).await?;
 
     Ok(())
+}
+
+/// Helper functions for sending events to the super cluster queue.
+mod super_cluster {
+    use config::meta::timed_annotations::TimedAnnotationUpdate;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+
+    use super::TimedAnnotation;
+
+    pub async fn emit_timed_annotation_create_event(
+        dashboard_id: &str,
+        timed_annotation: TimedAnnotation,
+        use_given_id: bool,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_create(
+                dashboard_id,
+                timed_annotation,
+                use_given_id,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to super cluster queue for a new timed annotation entry.    
+    pub async fn emit_timed_annotation_put_event(
+        dashboard_id: &str,
+        timed_annotation_id: &str,
+        timed_annotation: TimedAnnotationUpdate,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_put(
+                dashboard_id,
+                timed_annotation_id,
+                timed_annotation,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to super cluster queue for a deleted timed annotation entry.
+    pub async fn emit_timed_annotation_delete_event(
+        dashboard_id: &str,
+        timed_annotation_id: &str,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_delete(
+                dashboard_id,
+                timed_annotation_id,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to super cluster queue for a new timed annotation panels entry.
+    pub async fn emit_timed_annotation_panels_put_event(
+        timed_annotation_id: &str,
+        panels: Vec<String>,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_put(
+                timed_annotation_id,
+                panels,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to super cluster queue for a deleted timed annotation panels entry.
+    pub async fn emit_timed_annotation_panels_delete_event(
+        timed_annotation_id: &str,
+        panels: Vec<String>,
+    ) -> Result<(), infra::errors::Error> {
+        if get_o2_config().super_cluster.enabled {
+            let _ =
+                o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_delete(
+                    timed_annotation_id,
+                    panels,
+                )
+                .await
+                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
 }
