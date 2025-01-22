@@ -244,9 +244,21 @@ impl PipelineWalWriter {
                 REMOTE_QUERY_STREAM_TMP_WAL_DIR,
                 REMOTE_REALTIME_STREAM_WAL_DIR,
             );
-            // Convert the String back to a PathBuf
             let persist_path = PathBuf::from(new_path_str);
-            fs::rename(writer.path(), persist_path.clone())?;
+
+            if let Some(dir) = persist_path.parent() {
+                // Check if the directory exists
+                if !dir.exists() {
+                    fs::create_dir_all(dir)?;
+                }
+            }
+
+            fs::rename(writer.path(), persist_path.clone()).map_err(|e| {
+                Error::Message(format!(
+                    "rename to persist_path fail: {}, error: {e}",
+                    persist_path.display()
+                ))
+            })?;
             // notify file watcher
             notify_file_watcher(persist_path).await;
         }
