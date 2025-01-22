@@ -268,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <trace-header
           :baseTracePosition="baseTracePosition"
           :splitterWidth="leftWidth"
+          @resize-start="startResize"
         />
         <div class="relative-position full-height">
           <div
@@ -423,7 +424,7 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
-    const parentContainer = ref(null);
+    const parentContainer = ref<HTMLElement | null>(null);
     let parentHeight = ref(0);
     let currentHeight = 0; 
     const updateHeight = async () => {
@@ -1044,6 +1045,8 @@ export default defineComponent({
     });
 
     const startResize = (event: any) => {
+      console.log("called");
+      
       initialX.value = event.clientX;
       initialWidth.value = leftWidth.value;
 
