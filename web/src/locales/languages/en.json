@@ -74,7 +74,8 @@
     "unsavedTitle": "Unsaved Changes",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
     "cancelTitle": "Cancel Changes",
-    "cancelMessage": "Are you sure you want to cancel the changes?"
+    "cancelMessage": "Are you sure you want to cancel the changes?",
+    "submit": "Submit"
   },
   "search": {
     "metrics": "Metrics",
@@ -232,7 +233,9 @@
     "cnfpassword": "Confirm Password",
     "singnInWithGoogle": "Continue with Google",
     "email": "Email",
-    "login": "Login"
+    "login": "Login",
+    "unlockAccount": "Unlock Your Account",
+    "resetLockedAccount": "Reset Locked Account"
   },
   "user": {
     "header": "Organization Member",

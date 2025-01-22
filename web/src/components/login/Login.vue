@@ -79,7 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div style="font-size: 22px" class="full-width text-center q-pb-md">
-      Login
+      <span v-if="!showUnlockAccountForm">{{ t("login.login") }}</span>
+      <span v-else>{{ t("login.unlockAccount") }}</span>
     </div>
 
     <div v-if="showSSO" class="flex justify-center">
@@ -115,7 +116,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+      v-if="
+        (!showSSO && !showUnlockAccountForm) ||
+        (showSSO &&
+          loginAsInternalUser &&
+          showInternalLogin &&
+          !showUnlockAccountForm)
+      "
       class="o2-input login-inputs"
     >
       <q-form ref="loginform"
@@ -161,6 +168,68 @@ class="q-gutter-md" @submit.prevent="">
             no-caps
             @click="onSignIn()"
           />
+          <q-btn
+            v-if="lockedAccountFlag"
+            data-cy="login-locked-account-btn"
+            unelevated
+            class="full-width text-bold no-border q-mt-sm"
+            color="primary"
+            type="submit"
+            padding="sm lg"
+            :label="t('login.resetLockedAccount')"
+            no-caps
+            @click="showUnlockAccountForm = true"
+          />
+        </div>
+      </q-form>
+    </div>
+
+    <div v-if="showUnlockAccountForm" class="q-mt-md">
+      <q-form ref="unlockAccountFormRef"
+class="q-gutter-md" @submit.prevent="">
+        <q-input
+          v-model="unlockfrm_name"
+          data-cy="unlock-account-user-id"
+          data-test="unlock-account-user-id"
+          outlined
+          :label="`${t('login.userEmail')} *`"
+          placeholder="Email"
+          class="showLabelOnTop no-case"
+          type="email"
+          dense
+          stack-label
+          filled
+          :rules="[ 
+            (v: string) => !!v || 'Email is required',
+            (v: string) => /.+@.+\..+/.test(v) || 'E-mail must be valid',
+           ]"
+        />
+
+        <div class="flex q-mb-xl">
+          <q-btn
+            data-cy="unlock-account-submit"
+            unelevated
+            class="col text-bold q-mr-sm"
+            text-color="light-text"
+            type="submit"
+            padding="sm lg"
+            :label="t('common.cancel')"
+            :loading="submitting"
+            no-caps
+            @click="resetUnlockForm()"
+          />
+          <q-btn
+            data-cy="unlock-account-submit"
+            unelevated
+            class="col text-bold no-border"
+            color="primary"
+            type="submit"
+            padding="sm lg"
+            :label="t('common.submit')"
+            :loading="submitting"
+            no-caps
+            @click="onUnlockAccount()"
+          />
         </div>
       </q-form>
     </div>
@@ -201,8 +270,12 @@ export default defineComponent({
     const confirmpassword = ref("");
     const email = ref("");
     const loginform = ref();
+    const unlockfrm_name = ref("");
     const selectedOrg = ref({});
     let orgOptions = ref([{ label: Number, value: String }]);
+    const lockedAccountFlag = ref(false);
+    const showUnlockAccountForm = ref(false);
+    const unlockAccountFormRef = ref();
 
     const submitting = ref(false);
 
@@ -391,9 +464,13 @@ export default defineComponent({
               //if any error occurs, show error message and reset form.
               submitting.value = false;
               loginform.value.resetValidation();
+              if (e.response.status == 423) {
+                lockedAccountFlag.value = true;
+              }
               $q.notify({
                 color: "negative",
-                message: "Invalid username or password",
+                message:
+                  e.response?.data?.message || "Invalid username or password",
                 timeout: 4000,
               });
               console.log(e);
@@ -410,6 +487,46 @@ export default defineComponent({
       }
     };
 
+    const onUnlockAccount = () => {
+      if (unlockfrm_name.value == "") {
+        $q.notify({
+          position: "top",
+          color: "warning",
+          textColor: "white",
+          icon: "warning",
+          message: "Please input valid username.",
+        });
+      } else {
+        authService
+          .unlock_account({ email: unlockfrm_name.value })
+          .then((res) => {
+            if (res.data.status == true) {
+              resetUnlockForm();
+              $q.notify({
+                color: "positive",
+                message: res.data.message,
+              });
+            } else {
+              $q.notify({
+                color: "negative",
+                message: res.data.message || "Error while unlocking account.",
+              });
+            }
+          })
+          .catch((e) => {
+            $q.notify({
+              color: "negative",
+              message: "Error while unlocking account.",
+            });
+          });
+      }
+    };
+
+    const resetUnlockForm = () => {
+      showUnlockAccountForm.value = false;
+      lockedAccountFlag.value = false;
+    };
+
     return {
       t,
       name,
@@ -417,6 +534,7 @@ export default defineComponent({
       confirmpassword,
       email,
       loginform,
+      unlockfrm_name,
       submitting,
       onSignIn,
       tab: ref("signin"),
@@ -428,6 +546,11 @@ export default defineComponent({
       showInternalLogin,
       loginWithSSo,
       config,
+      lockedAccountFlag,
+      onUnlockAccount,
+      showUnlockAccountForm,
+      resetUnlockForm,
+      unlockAccountFormRef,
     };
   },
   methods: {
