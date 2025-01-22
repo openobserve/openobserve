@@ -339,7 +339,7 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "positive",
-              message: `Cipher Key ${confirmDelete.value.data.name} deleted successfully`,
+              message: `Cipher Key deleted successfully`,
               timeout: 2000,
             });
 
