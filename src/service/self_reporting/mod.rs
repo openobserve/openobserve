@@ -78,10 +78,10 @@ pub async fn report_request_usage_stats(
     timestamp: i64,
 ) {
     metrics::INGEST_RECORDS
-        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
         .inc_by(stats.records as u64);
     metrics::INGEST_BYTES
-        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
         .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
@@ -316,21 +316,9 @@ pub fn http_report_metrics(
     let time = start.elapsed().as_secs_f64();
     let uri = format!("/api/org/{}", uri);
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            &uri,
-            code,
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
+        .with_label_values(&[&uri, code, org_id, stream_name, stream_type.as_str()])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            &uri,
-            code,
-            org_id,
-            stream_name,
-            stream_type.to_string().as_str(),
-        ])
+        .with_label_values(&[&uri, code, org_id, stream_name, stream_type.as_str()])
         .inc();
 }

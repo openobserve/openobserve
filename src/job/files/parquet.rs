@@ -561,10 +561,10 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .sub(file.meta.compressed_size);
         }
 

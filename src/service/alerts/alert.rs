@@ -1015,7 +1015,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
 
         resp = resp
             .replace("{org_name}", &alert.org_id)
-            .replace("{stream_type}", &alert.stream_type.to_string())
+            .replace("{stream_type}", alert.stream_type.as_str())
             .replace("{stream_name}", &alert.stream_name)
             .replace("{alert_name}", &alert.name)
             .replace("{alert_type}", alert_type)
@@ -1233,7 +1233,7 @@ async fn process_dest_template(
 
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
-        .replace("{stream_type}", &alert.stream_type.to_string())
+        .replace("{stream_type}", alert.stream_type.as_str())
         .replace("{stream_name}", &alert.stream_name)
         .replace("{alert_name}", &alert.name)
         .replace("{alert_type}", alert_type)
