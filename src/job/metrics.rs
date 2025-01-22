@@ -209,7 +209,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
-                    .with_label_values(&[org_id.as_str(), stream_type.to_string().as_str()])
+                    .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                     .set(streams.len() as i64);
             }
         }

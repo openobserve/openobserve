@@ -128,7 +128,7 @@ pub async fn submit_job(
         &trace_id,
         &org_id,
         &user_id,
-        &stream_type.to_string(),
+        stream_type.as_str(),
         &stream_names,
         &json::to_string(&req).unwrap(),
         req.query.start_time,

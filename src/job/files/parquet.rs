@@ -561,10 +561,10 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .sub(file.meta.compressed_size);
         }
 
@@ -882,7 +882,7 @@ pub(crate) async fn generate_index_on_ingester(
 
         crate::common::utils::auth::set_ownership(
             org_id,
-            &StreamType::Index.to_string(),
+            StreamType::Index.as_str(),
             Authz::new(&index_stream_name),
         )
         .await;
@@ -967,7 +967,7 @@ pub(crate) async fn generate_index_on_ingester(
     let writer = ingester::get_writer(
         0,
         org_id,
-        &StreamType::Index.to_string(),
+        StreamType::Index.as_str(),
         &index_stream_name,
     )
     .await;

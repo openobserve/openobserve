@@ -64,7 +64,7 @@ impl StreamType {
         )
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",

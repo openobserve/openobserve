@@ -122,7 +122,7 @@ impl Metadata for TraceListIndex {
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+            ingester::get_writer(0, org_id, StreamType::Metadata.as_str(), STREAM_NAME).await;
         _ = ingestion::write_file(
             &writer,
             STREAM_NAME,
@@ -297,7 +297,7 @@ mod tests {
         let writer = ingester::get_writer(
             0,
             "openobserve",
-            &StreamType::Metadata.to_string(),
+            StreamType::Metadata.as_str(),
             STREAM_NAME,
         )
         .await;
