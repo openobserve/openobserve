@@ -166,13 +166,12 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
     match Entity::insert(record).exec(client).await {
         Ok(_) => {}
         Err(e) => {
-            log::info!("error while saving cipher key to db : {}", e);
+            drop(_lock);
             match e.sql_err() {
                 Some(SqlErr::UniqueConstraintViolation(_)) => {
                     return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
                 }
                 _ => {
-                    drop(_lock);
                     return Err(e.into());
                 }
             }
