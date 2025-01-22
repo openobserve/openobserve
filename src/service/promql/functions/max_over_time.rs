@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::cmp::Ordering;
+
 use datafusion::error::Result;
 
 use crate::service::promql::value::{RangeValue, Value};
@@ -29,7 +31,7 @@ fn exec(data: &RangeValue) -> Option<f64> {
         data.samples
             .iter()
             .map(|s| s.value)
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
             .unwrap(),
     )
 }
