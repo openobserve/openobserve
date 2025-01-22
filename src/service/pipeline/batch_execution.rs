@@ -38,6 +38,7 @@ use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
+        pipeline::pipeline_wal_writer::get_pipeline_wal_writer,
         self_reporting::publish_error,
     },
 };
@@ -212,6 +213,7 @@ impl ExecutablePipeline {
         // Spawn tasks for each node
         let mut node_tasks = Vec::new();
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
+            let pl_id_cp = self.id.to_string();
             let org_id_cp = org_id.to_string();
             let node = self.node_map.get(node_id).unwrap().clone();
             let node_receiver = node_receivers.remove(node_id).unwrap();
@@ -226,6 +228,7 @@ impl ExecutablePipeline {
 
             let task = tokio::spawn(async move {
                 process_node(
+                    pl_id_cp,
                     idx,
                     org_id_cp,
                     node,
@@ -376,6 +379,7 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::Query(_) => write!(f, "query"),
             NodeData::Function(_) => write!(f, "function"),
             NodeData::Condition(_) => write!(f, "condition"),
+            NodeData::RemoteStream(_) => write!(f, "remote_stream"),
         }
     }
 }
@@ -477,6 +481,7 @@ impl Default for ExecutablePipelineTraceInputs {
 
 #[allow(clippy::too_many_arguments)]
 async fn process_node(
+    pipeline_id: String,
     node_id: usize,
     org_id: String,
     node: ExecutableNode,
@@ -674,6 +679,39 @@ async fn process_node(
                 count += 1;
             }
             log::debug!("[Pipeline]: query node {node_id} done processing {count} records");
+        }
+        NodeData::RemoteStream(remote_stream) => {
+            let mut records = vec![];
+            log::debug!(
+                "[Pipeline]: Destination node {node_id} starts processing, remote_stream : {:?}",
+                remote_stream
+            );
+            while let Some((_, record, _)) = receiver.recv().await {
+                // External destinations will automatically flatten the payload, hence
+                // no need to flatten the records here
+                records.push(record);
+                count += 1;
+            }
+
+            let mut remote_stream = remote_stream.clone();
+            remote_stream.org_id = org_id.into();
+            let writer = get_pipeline_wal_writer(pipeline_id, remote_stream.clone()).await?;
+            if let Err(e) = writer.write_wal(records).await {
+                let err_msg = format!(
+                    "DestinationNode error persisting data to be ingested externally: {}",
+                    e
+                );
+                if let Err(send_err) = error_sender
+                    .send((node.id.to_string(), node.node_type(), err_msg))
+                    .await
+                {
+                    log::error!(
+                        "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                    );
+                }
+            }
+
+            log::debug!("[Pipeline]: DestinationNode {node_id} done processing {count} records");
         }
     }
 

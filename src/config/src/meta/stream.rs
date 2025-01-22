@@ -120,6 +120,13 @@ pub struct StreamParams {
     pub stream_type: StreamType,
 }
 
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(default)]
+pub struct RemoteStreamParams {
+    pub org_id: faststr::FastStr,
+    pub destination_name: faststr::FastStr,
+}
+
 impl Default for StreamParams {
     fn default() -> Self {
         Self {
