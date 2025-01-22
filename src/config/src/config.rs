@@ -373,6 +373,8 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
+    pub pipeline: Pipeline,
+    pub health_check: HealthCheck,
 }
 
 #[derive(EnvConfig)]
@@ -544,11 +546,6 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
-    #[env_config(name = "ZO_ROUTE_CONNECTION_POOL_DISABLED", default = false)]
-    pub connection_pool_disabled: bool,
-    // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
-    #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
-    pub ingester_srv_url: String,
 }
 
 #[derive(EnvConfig)]
@@ -629,7 +626,13 @@ pub struct Common {
     pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
     pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS", default = 0)]
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
     pub feature_join_right_side_max_rows: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
@@ -907,6 +910,12 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+    #[env_config(
+        name = "ZO_METRICS_CACHE_ENABLED",
+        default = true,
+        help = "Enable result cache for PromQL metrics queries"
+    )]
+    pub metrics_cache_enabled: bool,
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
@@ -941,8 +950,28 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 1000)]
+    #[deprecated(
+        since = "0.14.1",
+        note = "Please use `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` instead. This ENV is subject to be removed soon"
+    )]
+    #[env_config(
+        name = "ZO_UDSCHEMA_MAX_FIELDS",
+        default = 0,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
     pub udschema_max_fields: usize,
+    #[env_config(
+        name = "ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS",
+        default = 1000,
+        help = "Exceeding this limit will auto enable user-defined schema"
+    )]
+    pub schema_max_fields_to_enable_uds: usize,
+    #[env_config(
+        name = "ZO_USER_DEFINED_SCHEMA_MAX_FIELDS",
+        default = 1000,
+        help = "Maximum number of fields allowed in user-defined schema"
+    )]
+    pub user_defined_schema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     pub mem_table_max_size: usize,
@@ -997,12 +1026,12 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_METRICS_MAX_SEARCH_INTERVAL_PER_GROUP", default = 24)] // hours
-    pub metrics_max_search_interval_per_group: i64,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
     pub metrics_max_series_per_query: usize,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
+    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 100000)]
+    pub metrics_cache_max_entries: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -1091,7 +1120,7 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = false)]
+    #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = true)]
     pub quick_mode_force_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 500)]
     pub quick_mode_num_fields: usize,
@@ -1497,6 +1526,64 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
+#[derive(Debug, EnvConfig)]
+pub struct Pipeline {
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_WAL_DIR",
+        default = "",
+        help = "For the remote stream WAL directory, if the pipeline destination is a remote stream, we use a separate path to distinguish between local WAL and remote WAL"
+    )]
+    pub remote_stream_wal_dir: String,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_CONCURRENT_COUNT",
+        default = 30,
+        help = "control the remote stream wal send concurrent count"
+    )]
+    pub remote_stream_wal_concurrent_count: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_OFFSET_FLUSH_INTERVAL",
+        default = 10,
+        help = "flush remote stream wal sended-ok-offset interval"
+    )]
+    pub offset_flush_interval: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_TIMEOUT",
+        default = 600,
+        help = "pipeline exporter client request timeout"
+    )]
+    pub remote_request_timeout: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY_TIME",
+        default = 1440,
+        help = "pipeline exporter client request retry times, default 1440 minutes(24 hours)"
+    )]
+    pub remote_request_retry_time: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_CONNECTIONS",
+        default = 1024,
+        help = "pipeline exporter client max connections"
+    )]
+    pub max_connections: usize,
+}
+
+#[derive(EnvConfig)]
+pub struct HealthCheck {
+    #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_TIMEOUT",
+        default = 10,
+        help = "Health check timeout in seconds"
+    )]
+    pub timeout: u64,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_FAILED_TIMES",
+        default = 5,
+        help = "The node will be removed from consistent hash if health check failed exceed this times"
+    )]
+    pub failed_times: usize,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1591,6 +1678,12 @@ pub fn init() -> Config {
         cfg.limit.consistent_hash_vnodes = 100;
     }
 
+    // check for uds
+    #[allow(deprecated)]
+    if cfg.limit.udschema_max_fields > 0 {
+        cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
+    }
+
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -1641,6 +1734,11 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    // check health check config
+    if let Err(e) = check_health_check_config(&mut cfg) {
+        panic!("health check config error: {e}");
+    }
+
     cfg
 }
 
@@ -1666,14 +1764,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for metrics limit
-    if cfg.limit.metrics_max_search_interval_per_group == 0 {
-        cfg.limit.metrics_max_search_interval_per_group = 24;
-    }
     if cfg.limit.metrics_max_series_per_query == 0 {
-        cfg.limit.metrics_max_series_per_query = 30000;
+        cfg.limit.metrics_max_series_per_query = 30_000;
     }
     if cfg.limit.metrics_max_points_per_series == 0 {
-        cfg.limit.metrics_max_points_per_series = 30000;
+        cfg.limit.metrics_max_points_per_series = 30_000;
+    }
+    if cfg.limit.metrics_cache_max_entries == 0 {
+        cfg.limit.metrics_cache_max_entries = 100_000;
     }
 
     // check search job retention
@@ -1781,6 +1879,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    // check for join match one
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    {
+        cfg.common.feature_join_right_side_max_rows = 50_000;
+    }
+
     Ok(())
 }
 
@@ -1851,6 +1955,17 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
+    }
+
+    // pipeline
+    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
+    }
+
+    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
+        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
+    {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
     }
     Ok(())
 }
@@ -2164,6 +2279,16 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
+    Ok(())
+}
+
+fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.health_check.timeout == 0 {
+        cfg.health_check.timeout = 10;
+    }
+    if cfg.health_check.failed_times == 0 {
+        cfg.health_check.failed_times = 5;
+    }
     Ok(())
 }
 

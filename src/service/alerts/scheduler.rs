@@ -914,7 +914,7 @@ async fn handle_derived_stream_triggers(
                 // incr trigger retry count
                 new_trigger.retries += 1;
                 // set end to now to exit the loop below
-                end = now;
+                end = now + 1;
             }
             Ok((ret, next)) => {
                 let is_satisfied = ret.as_ref().map_or(false, |ret| !ret.is_empty());
@@ -963,6 +963,7 @@ async fn handle_derived_stream_triggers(
                                         StreamType::Logs
                                             | StreamType::EnrichmentTables
                                             | StreamType::Metrics
+                                            | StreamType::Traces
                                     ) {
                                         let (_, results): (Vec<_>, Vec<_>) =
                                             stream_pl_results.into_iter().unzip();
@@ -1042,7 +1043,7 @@ async fn handle_derived_stream_triggers(
                         .await;
 
                         // set end to now to exit the loop below but not moving time range forward
-                        end = now;
+                        end = now + 1;
                     } else {
                         // SUCCESS: move the time range forward by frequency and continue
                         start = Some(next);

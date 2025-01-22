@@ -367,9 +367,75 @@ export class LogsPage {
     await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]')).not.toHaveText(/job/);
    
   }
+   
 
-
+  async setDateTimeToToday() {
+    // Set up route interception and apply filters
+    await this.page.route('**/api/default/_search**', (route) => route.continue());;
     
+    // Click on the date-time button
+    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.locator(this.dateTimeButton).click();
   
+    // Select the absolute date-time tab
+    await this.page.locator('[data-test="date-time-absolute-tab"]').click();
+  
+    // Select the current date
+    const date = new Date().getDate();
+    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).click();
+    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).click();
+  
+    // Fill the start time
+    const startTimeInput = this.page.locator(".startEndTime td:nth-child(1) input");
+    await startTimeInput.click();
+    await startTimeInput.fill("");
+    await startTimeInput.type("000000");
+  
+    // Wait briefly for UI stability
+    // await this.page.waitForTimeout(2000);
+    await this.page.waitForSelector('.startEndTime td:nth-child(2) input', { state: 'visible' });
+
+  
+    // Fill the end time
+    const endTimeInput = this.page.locator(".startEndTime td:nth-child(2) input");
+    await endTimeInput.click();
+    await endTimeInput.fill("");
+    await this.page.waitForTimeout(2000);
+    await endTimeInput.type("235900");
+    await this.page.locator('[data-test="logs-logs-toggle"]',{state: 'visible'}).click();
+    await this.page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  
+    // Wait briefly for search results to load
+    await this.page.waitForTimeout(2000);
+  
+    // Validate the date range of the log entries
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0);
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59);
+  
+    const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")} 00:00:00`;
+    const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")} 23:59:59`;
+  
+    const rows = await this.page.locator('[data-test="logs-search-result-logs-table"] tbody:nth-of-type(2) tr').all();
+
+    for (let i = 2; i < rows.length; i++) {
+      const dateText = await rows[i].locator('td:first-child div div:nth-child(2) span span').textContent();
+      if (dateText) {
+        const date = new Date(dateText.trim());
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+    
+        // Check if the parsed date is valid
+        if (isNaN(date.getTime())) {
+          throw new Error(`Invalid date format: ${dateText}`);
+        }
+    
+        expect(date >= startDate && date <= endDate).toBeTruthy();
+      }
+    }
+    
+    await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
+  }
 
 }

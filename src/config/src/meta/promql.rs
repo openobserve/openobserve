@@ -120,7 +120,7 @@ pub struct RequestQuery {
 }
 
 /// Range query.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RequestRangeQuery {
     /// PromQL expression.
     pub query: Option<String>,
@@ -217,6 +217,24 @@ pub struct RequestLabelValues {
 #[derive(Debug, Deserialize)]
 pub struct RequestFormatQuery {
     pub query: String,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum HashLabelValue {
+    String(String),
+    Number(u64),
+}
+
+impl From<&str> for HashLabelValue {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<u64> for HashLabelValue {
+    fn from(value: u64) -> Self {
+        Self::Number(value)
+    }
 }
 
 #[cfg(test)]

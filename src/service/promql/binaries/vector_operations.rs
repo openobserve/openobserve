@@ -214,7 +214,7 @@ fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) 
         })
         .map(|instant| InstantValue {
             labels: instant.labels.without_metric_name(),
-            sample: instant.sample,
+            sample: instant.sample.clone(),
         })
         .collect();
 

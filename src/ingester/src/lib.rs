@@ -38,6 +38,8 @@ pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchE
 pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::FileMeta>> =
     Lazy::new(Default::default);
 
+pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
+
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;

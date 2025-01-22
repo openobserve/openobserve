@@ -27,7 +27,7 @@ use url::Url;
 pub async fn ws_proxy(
     req: HttpRequest,
     payload: web::Payload,
-    ws_base_url: String,
+    ws_base_url: &str,
 ) -> Result<HttpResponse, Error> {
     // log node role
     let cfg = get_config();
@@ -36,7 +36,7 @@ pub async fn ws_proxy(
     // Upgrade the client connection to a WebSocket
     let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
 
-    let ws_req = match convert_actix_to_tungstenite_request(&req, &ws_base_url) {
+    let ws_req = match convert_actix_to_tungstenite_request(&req, ws_base_url) {
         Ok(req) => req,
         Err(e) => {
             log::error!(

@@ -27,7 +27,7 @@ use config::{
         stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json},
+    utils::{inverted_index::split_token, json, time::BASE_TIME},
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
@@ -54,6 +54,7 @@ use crate::{
             distributed_plan::{
                 remote_scan::RemoteScanExec,
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                EmptyExecVisitor,
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
@@ -394,7 +395,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
-        sql.index_optimize_mode,
+        sql.index_optimize_mode.clone(),
         false, // for super cluster
         context,
     );
@@ -413,6 +414,17 @@ pub async fn run_datafusion(
     if streaming_output {
         let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    }
+
+    let mut visitor = EmptyExecVisitor::default();
+    if physical_plan.visit(&mut visitor).is_err() {
+        log::error!("[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable");
+        return Err(Error::Message(
+            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+        ));
+    }
+    if visitor.get_data().is_some() {
+        return Ok((vec![], ScanStats::default(), "".to_string()));
     }
 
     if cfg.common.print_key_sql {
@@ -777,8 +789,17 @@ pub async fn get_file_id_lists(
 ) -> Result<HashMap<TableReference, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for stream in stream_names {
+        let mut time_range = time_range;
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
+        // if stream is enrich, rewrite the time_range
+        if let Some(schema) = stream.schema() {
+            if schema == "enrich" || schema == "enrichment_tables" {
+                let start = BASE_TIME.timestamp_micros();
+                let end = chrono::Utc::now().timestamp_micros();
+                time_range = Some((start, end));
+            }
+        }
         // get file list
         let file_id_list =
             crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;

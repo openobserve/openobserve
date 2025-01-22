@@ -69,7 +69,7 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
             "#,
         )
         .bind(org_id)
-        .bind(stream_type.to_string())
+        .bind(stream_type.as_str())
         .bind(stream_name)
         .bind(start_dt)
         .bind(value)

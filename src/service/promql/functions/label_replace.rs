@@ -68,7 +68,7 @@ pub(crate) fn label_replace(
             };
             InstantValue {
                 labels,
-                sample: instant.sample,
+                sample: instant.sample.clone(),
             }
         })
         .collect();
