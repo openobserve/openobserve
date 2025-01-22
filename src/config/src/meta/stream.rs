@@ -124,8 +124,6 @@ pub struct StreamParams {
 #[serde(default)]
 pub struct RemoteStreamParams {
     pub org_id: faststr::FastStr,
-    pub stream_name: faststr::FastStr,
-    pub stream_type: StreamType,
     pub destination_name: faststr::FastStr,
 }
 

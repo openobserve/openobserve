@@ -190,8 +190,6 @@ mod tests {
         let data = PipelineEntryBuilder::new()
             .stream_path("path-to-stream-wal-file".into())
             .stream_endpoint("http://127.0.0.1:50800/api/default/default/_json".to_string())
-            .stream_org_id("default".to_string())
-            .stream_type("logs".to_string())
             .stream_header(Some(header))
             .entry(entry)
             .build();

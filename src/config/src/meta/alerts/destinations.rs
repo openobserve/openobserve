@@ -20,10 +20,12 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::templates::Template;
-use crate::meta::stream::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
+    #[serde(rename = "type")]
+    #[serde(default)]
+    pub destination_type: DestinationType,
     #[serde(default)]
     pub name: String,
     /// Required for `Http` or `RemotePipeline` destination_type
@@ -33,20 +35,6 @@ pub struct Destination {
     #[serde(default)]
     pub method: HTTPType,
     /// Required for `RemotePipeline` destination_type
-    #[serde(default)]
-    pub remote_pipeline_max_retry_time: u64,
-    /// Required for `RemotePipeline` destination_type
-    #[serde(default)]
-    pub org_id: String,
-    /// Required for `RemotePipeline` destination_type
-    #[serde(default)]
-    pub stream_name: String,
-    /// Required for `RemotePipeline` destination_type
-    #[serde(default)]
-    pub stream_type: StreamType,
-    /// Required for `RemotePipeline` destination_type
-    #[serde(default)]
-    pub data_retention_days: i64,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -61,9 +49,6 @@ pub struct Destination {
     pub sns_topic_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aws_region: Option<String>,
-    #[serde(rename = "type")]
-    #[serde(default)]
-    pub destination_type: DestinationType,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]

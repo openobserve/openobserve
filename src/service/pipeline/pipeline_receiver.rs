@@ -53,11 +53,9 @@ impl From<ReadFromConfig> for ReadFrom {
 pub struct PipelineReceiver {
     pub path: PathBuf,
     org_id: String,
-    stream_type: String,
-    stream_name: String,
     reader: Reader<BufReader<File>>,
     file_position: FilePosition,
-    stream_destination_name: String,
+    destination_name: String,
     pub pipeline_exporter: Option<PipelineExporter>,
     pub reader_header: wal::FileHeader,
 }
@@ -67,9 +65,7 @@ impl std::fmt::Debug for PipelineReceiver {
         f.debug_struct("FileReceiver")
             .field("path", &self.path)
             .field("org_id", &self.org_id)
-            .field("stream_type", &self.stream_type)
-            .field("stream_name", &self.stream_name)
-            .field("stream_destination_name", &self.stream_destination_name)
+            .field("destination_name", &self.destination_name)
             .field("reader_header", &self.reader_header)
             .field("file_position", &self.get_file_position())
             .finish()
@@ -99,30 +95,23 @@ impl PipelineReceiver {
             )));
         }
 
-        let stream_type = file_columns[file_columns.len() - 2];
+        let _ = file_columns[file_columns.len() - 2]; // this should be always pipeline
         let org_id = file_columns[file_columns.len() - 3];
 
         let reader_header = reader.header().clone();
-        let stream_destination_name = reader_header
+        let destination_name = reader_header
             .get("destination_name")
-            .unwrap_or(&"".to_string())
-            .to_string();
-
-        let stream_name = reader_header
-            .get("stream_name")
             .unwrap_or(&"".to_string())
             .to_string();
 
         Ok(PipelineReceiver {
             path,
             org_id: org_id.to_string(),
-            stream_type: stream_type.to_string(),
             reader,
             file_position,
             pipeline_exporter: None,
             reader_header,
-            stream_name,
-            stream_destination_name,
+            destination_name,
         })
     }
 
@@ -155,15 +144,7 @@ impl PipelineReceiver {
         self.org_id.as_str()
     }
 
-    pub fn get_stream_type(&self) -> &str {
-        self.stream_type.as_str()
-    }
-
-    pub fn get_stream_name(&self) -> &str {
-        self.stream_name.as_str()
-    }
-
-    pub async fn get_stream_destination_name(&self) -> Result<String> {
+    pub async fn get_destination_name(&self) -> Result<String> {
         let pipeline_id = self.reader_header.get("pipeline_id").ok_or(Error::Message(
             "get_stream_endpoint get pipeline_id fail".to_string(),
         ))?;
@@ -188,7 +169,7 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_endpoint(&self) -> Result<String> {
-        let destination_name = self.get_stream_destination_name().await?;
+        let destination_name = self.get_destination_name().await?;
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => {
@@ -210,10 +191,7 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_endpoint_header(&self) -> Option<HashMap<String, String>> {
-        let destination_name = self
-            .get_stream_destination_name()
-            .await
-            .unwrap_or("".to_string());
+        let destination_name = self.get_destination_name().await.unwrap_or("".to_string());
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name.as_str()).await {
             Ok(data) => data.headers,
@@ -222,33 +200,11 @@ impl PipelineReceiver {
     }
 
     pub async fn get_stream_export_retry_time(&self) -> u64 {
-        let destination_name = self
-            .get_stream_destination_name()
-            .await
-            .unwrap_or("".to_string());
-        let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name.as_str()).await {
-            Ok(data) => match data.remote_pipeline_max_retry_time {
-                0 => config::get_config().pipeline.remote_request_retry_time,
-                other => other,
-            },
-            Err(_) => config::get_config().pipeline.remote_request_retry_time,
-        }
+        config::get_config().pipeline.remote_request_retry_time
     }
 
     pub async fn get_stream_data_retention_days(&self) -> i64 {
-        let destination_name = self
-            .get_stream_destination_name()
-            .await
-            .unwrap_or("".to_string());
-        let org_id = self.get_org_id();
-        match destinations::get(org_id, destination_name.as_str()).await {
-            Ok(data) => match data.data_retention_days {
-                0 => config::get_config().compact.data_retention_days,
-                other => other,
-            },
-            Err(_) => config::get_config().compact.data_retention_days,
-        }
+        config::get_config().compact.data_retention_days
     }
 
     /// Read a entry from the wal file

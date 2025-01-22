@@ -173,18 +173,6 @@ impl PipelineWalWriter {
         let mut header = wal::FileHeader::new();
         header.insert("pipeline_id".to_string(), pipeline_id);
         header.insert(
-            "org_id".to_string(),
-            remote_stream_params.org_id.to_string(),
-        );
-        header.insert(
-            "stream_name".to_string(),
-            remote_stream_params.stream_name.to_string(),
-        );
-        header.insert(
-            "stream_type".to_string(),
-            remote_stream_params.stream_type.to_string(),
-        );
-        header.insert(
             "destination_name".to_string(),
             remote_stream_params.destination_name.to_string(),
         );
@@ -192,7 +180,7 @@ impl PipelineWalWriter {
         wal::Writer::build(
             wal_file_dir,
             remote_stream_params.org_id.as_str(),
-            remote_stream_params.stream_type.as_str(),
+            "pipeline",
             wal_id,
             0, /* warn: it must be zero, because reader will read init_size with buf, result
                 * reader can not read the latest real-time data */
@@ -209,9 +197,9 @@ impl PipelineWalWriter {
         }
 
         let mut entry = Entry {
-            stream: Arc::from(self.remote_stream_params.stream_name.as_str()),
+            stream: Arc::from(""),
             schema: None, // empty Schema
-            schema_key: Arc::from(self.remote_stream_params.stream_type.as_str()),
+            schema_key: Arc::from(""),
             partition_key: Arc::from(""),
             data: data.iter().map(|d| Arc::new(d.clone())).collect(),
             data_size: data.len(),
@@ -328,10 +316,9 @@ impl PipelineWalWriter {
         let wal_dir = Self::build_wal_dir(&self.pipeline_source_type, &config::get_config());
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         log::info!(
-            "[PIPELINE:WAL] create file: {}/{}/{}/{}.wal",
+            "[PIPELINE:WAL] create file: {}/{}/pipeline/{}.wal",
             wal_dir.display().to_string(),
             &self.remote_stream_params.org_id,
-            &self.remote_stream_params.stream_type,
             wal_id
         );
 

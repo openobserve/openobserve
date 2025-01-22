@@ -207,8 +207,6 @@ mod tests {
         let node: NodeData = json::from_value(data).unwrap();
         let node_data = NodeData::RemoteStream(RemoteStreamParams {
             org_id: "default".into(),
-            stream_name: "default".into(),
-            stream_type: StreamType::Logs,
             destination_name: "4423".into(),
         });
         assert_eq!(node_data, node);

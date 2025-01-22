@@ -23,9 +23,6 @@ use wal::FilePosition;
 struct PipelineStreamInfo {
     pub stream_path: PathBuf,
     pub stream_endpoint: String,
-    pub stream_org_id: String,
-    pub stream_type: String,
-    pub stream_name: String,
     pub stream_header: Option<HashMap<String, String>>,
     #[allow(dead_code)]
     pub stream_tls_cert_path: Option<String>,
@@ -40,20 +37,6 @@ pub struct PipelineEntry {
 }
 
 impl PipelineEntry {
-    #[allow(dead_code)]
-    pub fn get_stream_name(&self) -> &str {
-        self.stream_info.stream_name.as_str()
-    }
-    #[allow(dead_code)]
-    pub fn get_org_id(&self) -> &str {
-        self.stream_info.stream_org_id.as_str()
-    }
-
-    #[allow(dead_code)]
-    pub fn get_stream_type(&self) -> &str {
-        self.stream_info.stream_type.as_str()
-    }
-
     pub fn get_stream_endpoint_header(&self) -> Option<&HashMap<String, String>> {
         self.stream_info.stream_header.as_ref()
     }
@@ -87,11 +70,6 @@ impl PipelineEntryBuilder {
         Self::default()
     }
 
-    pub fn stream_name(mut self, stream_name: String) -> Self {
-        self.stream_info.stream_name = stream_name;
-        self
-    }
-
     pub fn stream_path(mut self, path: PathBuf) -> Self {
         self.stream_info.stream_path = path;
         self
@@ -99,16 +77,6 @@ impl PipelineEntryBuilder {
 
     pub fn stream_endpoint(mut self, endpoint: String) -> Self {
         self.stream_info.stream_endpoint = endpoint;
-        self
-    }
-
-    pub fn stream_org_id(mut self, org_id: String) -> Self {
-        self.stream_info.stream_org_id = org_id;
-        self
-    }
-
-    pub fn stream_type(mut self, stream_type: String) -> Self {
-        self.stream_info.stream_type = stream_type;
         self
     }
 

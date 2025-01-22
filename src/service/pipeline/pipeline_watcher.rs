@@ -326,8 +326,7 @@ impl PipelineWatcher {
         match entry {
             Ok((Some(entry), file_position)) => {
                 log::debug!(
-                    "Read entry from file, stream_name: {}, get_stream_endpoint: {:?}, get_stream_endpoint_header: {:?}, stream_data: {:?}, stream_path: {}",
-                    pr.get_stream_name(),
+                    "Read entry from file, endpoint: {:?}, endpoint_header: {:?}, data: {:?}, path: {}",
                     pr.get_stream_endpoint().await,
                     pr.get_stream_endpoint_header().await,
                     entry.data,
@@ -335,7 +334,7 @@ impl PipelineWatcher {
                 );
 
                 if pr.pipeline_exporter.is_none() {
-                    let dname = pr.get_stream_destination_name().await?;
+                    let dname = pr.get_destination_name().await?;
                     let skip_tl_verify = pr
                         .get_skip_tls_verify(pr.get_org_id(), dname.as_str())
                         .await;
@@ -343,14 +342,10 @@ impl PipelineWatcher {
                 }
 
                 let endpoint = pr.get_stream_endpoint().await?;
-                let stream_name = pr.get_stream_name();
                 let header = pr.get_stream_endpoint_header().await;
                 let data = PipelineEntryBuilder::new()
                     .stream_path(pr.path.clone())
                     .stream_endpoint(endpoint)
-                    .stream_org_id(pr.get_org_id().to_string())
-                    .stream_type(pr.get_stream_type().to_string())
-                    .stream_name(stream_name.to_string())
                     .stream_header(header)
                     .set_entry_position_of_file(file_position)
                     .entry(entry)
