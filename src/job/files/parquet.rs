@@ -882,7 +882,7 @@ pub(crate) async fn generate_index_on_ingester(
 
         crate::common::utils::auth::set_ownership(
             org_id,
-            &StreamType::Index.to_string(),
+            StreamType::Index.as_str(),
             Authz::new(&index_stream_name),
         )
         .await;

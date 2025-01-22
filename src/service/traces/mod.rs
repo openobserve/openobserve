@@ -543,7 +543,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -552,7 +552,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -689,7 +689,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -698,7 +698,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 

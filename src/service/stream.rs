@@ -86,8 +86,8 @@ pub async fn get_streams(
 
     let filtered_indices = if let Some(s_type) = stream_type {
         let s_type = match s_type {
-            StreamType::EnrichmentTables => "enrichment_table".to_string(),
-            _ => s_type.to_string(),
+            StreamType::EnrichmentTables => "enrichment_table",
+            _ => s_type.as_str(),
         };
         match permitted_streams {
             Some(permitted_streams) => {

@@ -167,7 +167,7 @@ pub async fn get_latest_traces(
                 .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
                 .unwrap()
                 .clone();
-            let stream_type_str = StreamType::Traces.to_string();
+            let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
                 user_id.to_str().unwrap(),
@@ -177,8 +177,8 @@ pub async fn get_latest_traces(
                     o2_type: format!(
                         "{}:{}",
                         OFGA_MODELS
-                            .get(stream_type_str.as_str())
-                            .map_or(stream_type_str.as_str(), |model| model.key),
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
                         stream_name
                     ),
                     org_id: org_id.clone(),

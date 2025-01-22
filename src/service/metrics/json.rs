@@ -351,7 +351,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     .await?;
                     crate::common::utils::auth::set_ownership(
                         org_id,
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                         Authz::new(&stream_name),
                     )
                     .await;
@@ -473,7 +473,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -482,7 +482,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 

@@ -583,7 +583,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
@@ -592,7 +592,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 
