@@ -19,7 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
-  ZO_QUICK_MODE_NUM_FIELDS: 5
+  ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
@@ -114,8 +114,6 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
-            
-            
           ]
 
     steps:
