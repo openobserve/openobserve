@@ -440,7 +440,7 @@ async fn insert_timed_annotation<'a>(
     let annotation_id: String = if use_given_id {
         timed_annotation
             .annotation_id
-            .unwrap_or_else(|| ider::uuid())
+            .unwrap_or_else(ider::uuid)
     } else {
         ider::uuid()
     };
