@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sortable: true,
           },
         ]"
-        :rows="data.currentFieldsList"
+        :rows="currentFieldsList"
         v-model:pagination="pagination"
         row-key="column"
         :filter="dashboardPanelData.meta.stream.filterField"
@@ -705,7 +705,7 @@ export default defineComponent({
       // schemaList: [],
       // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
-      currentFieldsList: [],
+      // currentFieldsList: [],
     });
     const filteredStreams = ref([]);
     const {
@@ -907,46 +907,49 @@ export default defineComponent({
         }
       },
     );
+
     // update the current list fields if any of the lists changes
     watch(
       () => [
-        store.state.zoConfig.user_defined_schemas_enabled,
-        dashboardPanelData.meta.stream.selectedStreamFields,
         dashboardPanelData.meta.stream.customQueryFields,
-        dashboardPanelData.meta.stream.userDefinedSchema,
-        dashboardPanelData.meta.stream.useUserDefinedSchemas,
         dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ],
       () => {
-        data.currentFieldsList = [];
-        // if user defined schema is enabled, use user defined schema
-        // else use selectedStreamFields
-
-        if (
-          store.state.zoConfig.user_defined_schemas_enabled &&
-          dashboardPanelData.meta.stream.userDefinedSchema.length > 0 &&
-          dashboardPanelData.meta.stream.useUserDefinedSchemas ==
-            "user_defined_schema"
-        ) {
-          data.currentFieldsList = [
-            ...dashboardPanelData.meta.stream.customQueryFields,
-            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-            ...dashboardPanelData.meta.stream.userDefinedSchema,
-          ];
-        } else {
-          data.currentFieldsList = [
-            ...dashboardPanelData.meta.stream.customQueryFields,
-            ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
-            ...dashboardPanelData.meta.stream.selectedStreamFields,
-          ];
-        }
-
         // set the custom query fields length
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
       },
     );
+
+    const currentFieldsList = computed(() => {
+      const { user_defined_schemas_enabled } = store.state.zoConfig;
+      const {
+        selectedStreamFields,
+        customQueryFields,
+        userDefinedSchema,
+        useUserDefinedSchemas,
+        vrlFunctionFieldList,
+      } = dashboardPanelData.meta.stream;
+
+      if (
+        user_defined_schemas_enabled &&
+        userDefinedSchema.length > 0 &&
+        useUserDefinedSchemas === "user_defined_schema"
+      ) {
+        return [
+          ...customQueryFields,
+          ...vrlFunctionFieldList,
+          ...userDefinedSchema,
+        ];
+      } else {
+        return [
+          ...customQueryFields,
+          ...vrlFunctionFieldList,
+          ...selectedStreamFields,
+        ];
+      }
+    });
 
     watch(
       () => dashboardPanelData.meta.stream.filterField,
@@ -1207,6 +1210,7 @@ export default defineComponent({
       toggleSchema,
       userDefinedSchemaBtnGroupOption,
       pagination,
+      currentFieldsList,
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /
