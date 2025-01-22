@@ -15,7 +15,7 @@
 
 use infra::{
     cluster_coordinator::get_coordinator,
-    errors::{Error, Result},
+    errors::{DbError, Error, Result},
     table::cipher::EntryKind,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{KeysMessage, Message, MessageType};
@@ -37,7 +37,15 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     log::info!("[SUPER_CLUSTER:DB] adding key {}/{}", entry.org, entry.name);
                     let org = entry.org.clone();
                     let name = entry.name.clone();
-                    infra::table::cipher::add(entry).await?;
+                    match infra::table::cipher::add(entry).await {
+                        Ok(_) => {}
+                        // this is the case when the cluster sending the message also receives
+                        // and processes it. Because message will be delivered to all clients,
+                        // clients in the sending cluster will also get this, and we want to ignore
+                        // that case.
+                        Err(Error::DbError(DbError::UniqueViolation)) => {}
+                        Err(e) => return Err(e),
+                    };
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(

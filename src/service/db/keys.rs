@@ -95,7 +95,7 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
                     .await
                 {
                     Ok(_) => {
-                        log::error!(
+                        log::info!(
                             "successfully sent cipher key update notification to super cluster queue for {}/{}",entry.org,entry.name
                         );
                     }
@@ -132,7 +132,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
                 match o2_enterprise::enterprise::super_cluster::queue::keys_delete(org, name).await
                 {
                     Ok(_) => {
-                        log::error!(
+                        log::info!(
                             "successfully sent cipher key delete notification to super cluster queue for {org}/{name}"
                         );
                     }
