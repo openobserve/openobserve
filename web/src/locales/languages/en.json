@@ -74,7 +74,8 @@
     "unsavedTitle": "Unsaved Changes",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
     "cancelTitle": "Cancel Changes",
-    "cancelMessage": "Are you sure you want to cancel the changes?"
+    "cancelMessage": "Are you sure you want to cancel the changes?",
+    "save":"Save"
   },
   "search": {
     "metrics": "Metrics",

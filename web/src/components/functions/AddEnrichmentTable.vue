@@ -45,16 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
           <!-- Add the toggle button to switch between File Upload and URL Input -->
-          <div>
+          <!-- <div>
             <q-toggle
             v-model="useUrlInput"
             :label="t('function.useUrlInput')"
             left-label
           />
-          </div>
+          </div> -->
           <q-file
-            v-if="!useUrlInput"
-            color="lime-11"
             filled
             v-model="formData.file"
             :label="t('function.uploadCSVFile')"
@@ -63,13 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             stack-label
             outlined
             dense
+            accept=".csv"
             :rules="[(val: any) => !!val || 'CSV File is required!']"
-            hint="Note: Only CSV files are allowed. Maximum file size: 10 MB." 
+            hint="Note: Only CSV files are allowed." 
             >
             <template v-slot:prepend>
               <q-icon name="attachment" />
             </template>
           </q-file>
+          
           <div v-if="isUpdating && !useUrlInput">
             <q-toggle
               class="col-12 q-py-md text-grey-8 text-bold"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.appendData')"
             />
           </div>
-          <q-input
+          <!-- <q-input
             v-if="useUrlInput"
             v-model="formData.file_link"
             :label="t('function.fileLink')"
@@ -89,9 +89,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             dense
             :rules="[(val: any) => !!val || 'URL is required!']"
-          />
+          /> -->
         </div>
-
+        <!-- <div v-if="uploadProgress > 0" class="q-mt-md">
+            <q-linear-progress
+              :value="uploadProgress/100"
+              color="primary"
+              size="md"
+            />
+              <div class="text-center text-bold">{{ uploadProgress }}% Uploaded</div>
+          </div> -->
         <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
@@ -107,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('cancel:hideform')"
           />
           <q-btn
-            :label="t('function.save')"
+            :label="t('common.save')"
             class="q-mb-md text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
@@ -121,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, onMounted, onUnmounted,onBeforeUnmount } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -162,10 +169,11 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const useUrlInput = ref(false); 
     let compilationErr = ref("");
-
+    let worker: Worker | null = null;
     const editorUpdate = (e: any) => {
       formData.value.function = e.target.value;
     };
+    const uploadProgress = ref(0);
     // Helper to handle success
     const handleSuccess = (res: any, dismiss: any) => {
       formData.value = defaultValue(); // Clear form data
@@ -191,43 +199,80 @@ export default defineComponent({
       dismiss(); // Dismiss the loading notification
     };
     const onSubmit = () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
+      // const dismiss = q.notify({
+      //   spinner: true,
+      //   message: "Please wait...",
+      //   timeout: 2000,
+      // });
+
+      // Start Web Worker to handle the file upload in chunks
+      worker = new Worker(new URL("../../workers/mock-worker.js", import.meta.url));
+      const uploadDialog = q.dialog({
+        message: 'Uploading... 0%',
+        progress: true,
+        persistent: true, 
+        ok: false,
+        class: 'custom-dialog'
+      })
+
+      worker.onmessage = (event) => {
+        const { status, chunk, error,progress } = event.data;
+        if (status === "chunk-uploaded") {
+          uploadProgress.value = progress; 
+          uploadDialog.update({
+          message: `Uploading... ${progress}%`
+        })
+          console.log(`Chunk ${chunk} uploaded`);
+        } else if (status === "upload-complete") {
+          uploadDialog.hide();
+          // dismiss();
+          q.notify({
+            type: "positive",
+            message: "File uploaded successfully",
+          });
+          emit("update:list");
+          uploadProgress.value = 0;
+          worker.terminate();
+        } else if (status === "error") {
+          // dismiss();
+          compilationErr.value = error;
+          q.notify({
+            type: "negative",
+            message: `Error: ${error}`,
+          });
+        }
+      };
+
+      worker.postMessage({
+        file: formData.value.file,
+        chunkSize: 5 * 1024 * 1024, // 5MB per chunk
+        fileName: formData.value.name,
+        orgIdentifier: store.state.selectedOrganization.identifier,
+        append: formData.value.append,
       });
-
-      const organizationId = store.state.selectedOrganization.identifier;
-
-      if (useUrlInput.value) {
-        // Handle URL input submission
-        jsTransformService
-          .create_enrichment_table(
-            organizationId,
-            formData.value.name,
-            formData.value.file_link,
-            formData.value.append,
-            true
-          )
-          .then((res) => handleSuccess(res, dismiss))
-          .catch((err) => handleError(err, dismiss));
-      } else {
-        // Handle file upload submission
-        const reqFormData = new FormData();
-        reqFormData.append("file", formData.value.file);
-
-        jsTransformService
-          .create_enrichment_table(
-            organizationId,
-            formData.value.name,
-            reqFormData,
-            formData.value.append,
-            false
-          )
-          .then((res) => handleSuccess(res, dismiss))
-          .catch((err) => handleError(err, dismiss));
+    };
+    onBeforeUnmount(() => {
+      if (worker) {
+        worker.terminate();
       }
-  };
+    });
+    const warnOnRefresh = (event) => {
+      if (uploadProgress.value) {
+        event.preventDefault();
+      
+        return event.returnValue;
+      }
+    };
+
+    // Add and remove the beforeunload listener
+    onMounted(() => {
+      window.addEventListener("beforeunload", warnOnRefresh);
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", warnOnRefresh);
+    });
+
 
     return {
       t,
@@ -244,6 +289,9 @@ export default defineComponent({
       isFetchingStreams,
       useUrlInput,
       onSubmit,
+      uploadProgress,
+      worker,
+      warnOnRefresh
     };
   },
   created() {
@@ -274,6 +322,13 @@ export default defineComponent({
 .lookup-table-file-uploader {
   .q-field__label {
     left: -30px;
+  }
+}
+.custom-dialog{
+  .q-card__section{
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 </style>
