@@ -15,49 +15,53 @@
 
 use std::str::FromStr;
 
+use chrono::{DateTime, Utc};
 use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, JsonValue, Order,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 
-use super::get_lock;
+use super::{
+    entity::action_scripts::{ActiveModel, Model},
+    get_lock,
+};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors::{self, DbError, Error},
+    table::entity::action_scripts::{Column, Entity},
 };
-
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "action_scripts")]
-pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String, // Primary key, unique identifier
-    #[sea_orm(column_type = "String(StringLen::N(32))")]
-    pub name: String, // Name with a max length of 32 characters
-    pub file_path: String, // Zip file for action script
-    pub file_name: String,
-    #[sea_orm(column_type = "String(StringLen::N(128))")]
-    pub org_id: String,
-    #[sea_orm(column_type = "String(StringLen::N(128))")]
-    pub created_by: String,
-    // URLs can be long
-    #[sea_orm(column_type = "Text")]
-    pub origin_cluster_url: String,
-    #[sea_orm(column_type = "Json")]
-    pub env: JsonValue, // Environment variables serialized as JSON
-    #[sea_orm(column_type = "Json")]
-    pub execution_details: ExecutionDetailsType,
-    #[sea_orm(column_type = "String(StringLen::N(32))")]
-    pub cron_expr: Option<String>,
-    #[sea_orm(default_value = "CURRENT_TIMESTAMP")]
-    pub created_at: DateTimeUtc, // Automatically set on insert
-    pub last_modified_at: DateTimeUtc,
-    pub last_executed_at: Option<DateTimeUtc>,
-    pub last_successful_at: Option<DateTimeUtc>,
-    #[sea_orm(column_type = "Text")]
-    pub description: Option<String>,
-    pub status: ActionStatus,
-}
+// #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+// #[sea_orm(table_name = "action_scripts")]
+// pub struct Model {
+//     #[sea_orm(primary_key, auto_increment = false)]
+//     pub id: String, // Primary key, unique identifier
+//     #[sea_orm(column_type = "String(StringLen::N(32))")]
+//     pub name: String, // Name with a max length of 32 characters
+//     pub file_path: String, // Zip file for action script
+//     pub file_name: String,
+//     #[sea_orm(column_type = "String(StringLen::N(128))")]
+//     pub org_id: String,
+//     #[sea_orm(column_type = "String(StringLen::N(128))")]
+//     pub created_by: String,
+//     // URLs can be long
+//     #[sea_orm(column_type = "Text")]
+//     pub origin_cluster_url: String,
+//     #[sea_orm(column_type = "Json")]
+//     pub env: JsonValue, // Environment variables serialized as JSON
+//     #[sea_orm(column_type = "Json")]
+//     pub execution_details: ExecutionDetailsType,
+//     #[sea_orm(column_type = "String(StringLen::N(32))")]
+//     pub cron_expr: Option<String>,
+//     #[sea_orm(default_value = "CURRENT_TIMESTAMP")]
+//     pub created_at: DateTimeUtc, // Automatically set on insert
+//     pub last_modified_at: DateTimeUtc,
+//     pub last_executed_at: Option<DateTimeUtc>,
+//     pub last_successful_at: Option<DateTimeUtc>,
+//     #[sea_orm(column_type = "Text")]
+//     pub description: Option<String>,
+//     pub status: ActionStatus,
+// }
 
 impl TryFrom<Model> for Action {
     type Error = errors::Error;
@@ -72,36 +76,26 @@ impl TryFrom<Model> for Action {
             org_id: model.org_id,
             environment_variables: serde_json::from_value(model.env)?,
             created_by: model.created_by,
-            execution_details: model.execution_details,
+            execution_details: ExecutionDetailsType::try_from(model.execution_details.as_str())
+                .unwrap(),
             zip_file_path: Some(model.file_path),
-            created_at: model.created_at,
-            last_executed_at: model.last_executed_at,
+            created_at: DateTime::<Utc>::from_timestamp_micros(model.created_at).unwrap(),
+            last_executed_at: model
+                .last_executed_at
+                .and_then(|ts| DateTime::<Utc>::from_timestamp_micros(ts)),
             description: model.description,
             cron_expr: model.cron_expr,
-            status: model.status,
+            status: ActionStatus::try_from(model.status.as_str()).unwrap(),
             zip_file_name: model.file_name,
-            last_modified_at: model.last_modified_at,
-            last_successful_at: model.last_successful_at,
-            origin_cluster_url: model.origin_cluster_url,
+            last_modified_at: DateTime::<Utc>::from_timestamp_micros(model.last_modified_at)
+                .unwrap(),
+            last_successful_at: model
+                .last_successful_at
+                .and_then(|ts| DateTime::<Utc>::from_timestamp_micros(ts)),
+            origin_cluster_url: (model.origin_cluster_url),
         })
     }
 }
-#[derive(Copy, Clone, Debug, EnumIter)]
-pub enum Relation {}
-
-impl RelationTrait for Relation {
-    fn def(&self) -> RelationDef {
-        panic!("No relations defined")
-    }
-}
-
-impl ActiveModelBehavior for ActiveModel {}
-
-pub async fn init() -> Result<(), errors::Error> {
-    create_table().await?;
-    Ok(())
-}
-
 pub async fn create_table() -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let builder = client.get_database_backend();
@@ -127,16 +121,16 @@ pub async fn add(action: &Action) -> Result<(), errors::Error> {
             .clone()
             .ok_or(Error::Message("file path not set".to_string()))?),
         env: Set(serde_json::json!(action.environment_variables.clone())),
-        execution_details: Set(action.execution_details.clone()),
+        execution_details: Set(action.execution_details.to_string()),
         cron_expr: Set(action.cron_expr.clone()),
-        created_at: Set(action.created_at),
-        last_modified_at: Set(action.last_modified_at),
-        last_executed_at: Set(action.last_executed_at),
-        last_successful_at: Set(action.last_successful_at),
+        created_at: Set(action.created_at.timestamp_micros()),
+        last_modified_at: Set(action.last_modified_at.timestamp_micros()),
+        last_executed_at: Set(action.last_executed_at.map(|d| d.timestamp_micros())),
+        last_successful_at: Set(action.last_successful_at.map(|d| d.timestamp_micros())),
         description: Set(action.description.clone()),
         file_name: Set(action.zip_file_name.clone()),
         created_by: Set(action.created_by.clone()),
-        status: Set(action.status.clone()),
+        status: Set(action.status.to_string()),
         origin_cluster_url: Set(action.origin_cluster_url.clone()),
     };
 
@@ -160,16 +154,16 @@ pub async fn update(action: &Action) -> Result<(), errors::Error> {
             .clone()
             .ok_or(Error::Message("file path not set".to_string()))?),
         env: Set(serde_json::json!(action.environment_variables.clone())),
-        execution_details: Set(action.execution_details.clone()),
+        execution_details: Set(action.execution_details.to_string()),
         cron_expr: Set(action.cron_expr.clone()),
-        created_at: Set(action.created_at),
-        last_modified_at: Set(action.last_modified_at),
-        last_executed_at: Set(action.last_executed_at),
-        last_successful_at: Set(action.last_successful_at),
+        created_at: Set(action.created_at.timestamp_micros()),
+        last_modified_at: Set(action.last_modified_at.timestamp_micros()),
+        last_executed_at: Set(action.last_executed_at.map(|d| d.timestamp_micros())),
+        last_successful_at: Set(action.last_successful_at.map(|d| d.timestamp_micros())),
         description: Set(action.description.clone()),
         file_name: Set(action.zip_file_name.clone()),
         created_by: Set(action.created_by.clone()),
-        status: Set(action.status.clone()),
+        status: Set(action.status.to_string()),
         origin_cluster_url: Set(action.origin_cluster_url.clone()),
     };
 

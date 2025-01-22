@@ -34,7 +34,6 @@ pub mod short_urls;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
-    action_scripts::init().await?;
     Ok(())
 }
 

@@ -8,16 +8,21 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-#[derive(
-    Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum,
-)]
-#[sea_orm(db_type = "Enum", rs_type = "String", enum_name = "execution_details")]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutionDetailsType {
-    #[sea_orm(string_value = "once")]
     #[default]
     Once,
-    #[sea_orm(string_value = "repeat")]
     Repeat,
+}
+
+impl std::fmt::Display for ExecutionDetailsType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ExecutionDetailsType::Once => "Once",
+            ExecutionDetailsType::Repeat => "Repeat",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 impl TryFrom<&str> for ExecutionDetailsType {
@@ -59,6 +64,18 @@ impl TryFrom<&str> for ActionStatus {
             "completed" => Ok(ActionStatus::Completed),
             _ => Err(anyhow::anyhow!("Invalid ActionStatus")),
         }
+    }
+}
+
+impl Display for ActionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ActionStatus::Ready => "Ready",
+            ActionStatus::Running => "Running",
+            ActionStatus::Errored => "Errored",
+            ActionStatus::Completed => "Completed",
+        };
+        write!(f, "{}", s)
     }
 }
 
