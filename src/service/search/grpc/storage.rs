@@ -541,13 +541,14 @@ pub async fn filter_file_list_by_tantivy_index(
             // Spawn a task for each file, wherein full text search and
             // secondary index search queries are executed
             let index_condition_clone = index_condition.clone();
+            let idx_optimize_rule_clone = idx_optimize_rule.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
                     index_condition_clone,
-                    idx_optimize_rule,
+                    idx_optimize_rule_clone,
                     &file,
                 )
                 .await;
@@ -752,8 +753,9 @@ async fn search_tantivy_index(
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+    let idx_optimize_rule_clone = idx_optimize_rule.clone();
     let matched_docs =
-        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
+        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
             (false, _) | (true, None) => tantivy_searcher
                 .search(&query, &tantivy::collector::DocSetCollector)
                 .map(|ret| (ret, 0)),

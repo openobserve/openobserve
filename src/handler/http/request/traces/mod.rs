@@ -167,7 +167,7 @@ pub async fn get_latest_traces(
                 .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
                 .unwrap()
                 .clone();
-            let stream_type_str = StreamType::Traces.to_string();
+            let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
                 user_id.to_str().unwrap(),
@@ -177,8 +177,8 @@ pub async fn get_latest_traces(
                     o2_type: format!(
                         "{}:{}",
                         OFGA_MODELS
-                            .get(stream_type_str.as_str())
-                            .map_or(stream_type_str.as_str(), |model| model.key),
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
                         stream_name
                     ),
                     org_id: org_id.clone(),
@@ -321,7 +321,7 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     "default",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -330,7 +330,7 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     "default",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
@@ -356,8 +356,8 @@ pub async fn get_latest_traces(
         HashMap::with_capacity(resp_search.hits.len());
     for item in resp_search.hits {
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-        let trace_start_time = item.get("trace_start_time").unwrap().as_i64().unwrap();
-        let trace_end_time = item.get("trace_end_time").unwrap().as_i64().unwrap();
+        let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap());
+        let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap());
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {
             start_time = trace_start_time / 1000;
@@ -412,7 +412,7 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         &stream_name,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -421,7 +421,7 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         &stream_name,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
@@ -443,9 +443,9 @@ pub async fn get_latest_traces(
         let resp_size = resp_search.hits.len() as i64;
         for item in resp_search.hits {
             let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-            let trace_start_time = item.get("start_time").unwrap().as_i64().unwrap();
-            let trace_end_time = item.get("end_time").unwrap().as_i64().unwrap();
-            let duration = item.get("duration").unwrap().as_i64().unwrap();
+            let trace_start_time = json::get_int_value(item.get("start_time").unwrap());
+            let trace_end_time = json::get_int_value(item.get("end_time").unwrap());
+            let duration = json::get_int_value(item.get("duration").unwrap());
             let service_name = item
                 .get("service_name")
                 .unwrap()
@@ -505,7 +505,7 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             &stream_name,
-            stream_type.to_string().as_str(),
+            stream_type.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -514,7 +514,7 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             &stream_name,
-            stream_type.to_string().as_str(),
+            stream_type.as_str(),
         ])
         .inc();
 
