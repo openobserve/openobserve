@@ -49,7 +49,7 @@ export function calculateGridPositions(width: any, height: any, numGrids: any) {
 
 // Configuration object for chart spacing and padding
 const SPACING_CONFIG = {
-  horizontal: 4, // Horizontal space between charts (px)
+  horizontal: 15, // Horizontal space between charts (px)
   vertical: 30, // Vertical space between charts (px)
   padding: {
     top: 20, // Top padding for title (px)
@@ -62,6 +62,7 @@ const SPACING_CONFIG = {
 // it is used to create grid array for trellis chart
 export function getTrellisGrid(
   width: number,
+  height: number,
   numGrids: number,
   leftMargin: number,
   numOfColumns: number = -1,
@@ -133,11 +134,13 @@ export function getTrellisGrid(
   // Calculate cell height based on cell width
   const cellHeightInPx = cellWidthInPx * 0.4;
 
-  const totalChartHeight =
+  let totalChartHeight =
     cellHeightInPx * numRows +
     SPACING_CONFIG.vertical * (numRows - 1) +
     SPACING_CONFIG.padding.top +
     SPACING_CONFIG.padding.bottom;
+
+  totalChartHeight = Math.max(totalChartHeight, height);
 
   const topPadding = (SPACING_CONFIG.padding.top / totalChartHeight) * 100;
 
