@@ -820,7 +820,11 @@ pub async fn get_unlock_link(email_id: &str) -> Result<HttpResponse, Error> {
             cfg.common.web_url, cfg.common.base_uri, csrf
         );
 
-        let msg = format!("Click on the link to unlock your account: {}", url.as_str());
+        let msg = format!(
+            "Hi {}, \n Click the link to unlock your OpenObserve account: {}",
+            email_id,
+            url.as_str()
+        );
 
         let subject = "Unlock instructions for your OpenObserve account";
 
