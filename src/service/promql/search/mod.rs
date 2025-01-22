@@ -395,7 +395,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             (
-                sig.clone(),
+                sig,
                 RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
             )
         })
@@ -411,7 +411,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
     let mut merged_data = HashMap::new();
-    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::new();
+    let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric

@@ -20,7 +20,7 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
 use crate::service::promql::value::{
-    signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
+    signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Value,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
@@ -58,7 +58,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         }
     };
 
-    let mut metrics_with_buckets: HashMap<Signature, MetricWithBuckets> = HashMap::default();
+    let mut metrics_with_buckets: HashMap<u64, MetricWithBuckets> = HashMap::default();
     for InstantValue { mut labels, sample } in in_vec {
         // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
         //

@@ -15,7 +15,14 @@
 
 use std::{cmp::Ordering, fmt, sync::Arc, time::Duration};
 
-use config::{meta::promql::NAME_LABEL, utils::json, FxIndexMap};
+use config::{
+    meta::promql::NAME_LABEL,
+    utils::{
+        hash::{gxhash, Sum64},
+        json,
+    },
+    FxIndexMap,
+};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -56,7 +63,7 @@ pub trait LabelsExt {
     fn without_label(&self, name: &str) -> Labels;
 
     /// Signature for the given set of labels
-    fn signature(&self) -> Signature;
+    fn signature(&self) -> u64;
 
     /// keep the labels as described by the `labels` vector
     /// and delete everything else
@@ -97,7 +104,7 @@ impl LabelsExt for Labels {
         }))
     }
 
-    fn signature(&self) -> Signature {
+    fn signature(&self) -> u64 {
         signature(self)
     }
 
@@ -796,50 +803,26 @@ impl Value {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Signature([u8; 32]);
-
-impl PartialOrd for Signature {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Signature {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl From<Signature> for String {
-    fn from(sig: Signature) -> Self {
-        hex::encode(sig.0)
-    }
-}
-
 // REFACTORME: make this a method of `Metric`
-pub fn signature(labels: &Labels) -> Signature {
+pub fn signature(labels: &Labels) -> u64 {
     signature_without_labels(labels, &[])
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
-pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> Signature {
-    let mut hasher = blake3::Hasher::new();
-    labels
+pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    let key = labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
-        .for_each(|item| {
-            hasher.update_rayon(item.name.as_bytes());
-            hasher.update_rayon(item.value.as_bytes());
-        });
-    Signature(hasher.finalize().into())
+        .map(|item| format!("{}:{}", item.name, item.value))
+        .collect::<Vec<String>>()
+        .join("|");
+    gxhash::new().sum64(&key)
 }
 
 #[cfg(test)]
 mod tests {
-    use expect_test::expect;
     use float_cmp::approx_eq;
 
     use super::*;
@@ -870,17 +853,10 @@ mod tests {
         let labels: Labels = generate_test_labels();
 
         let sig = signature(&labels);
-        expect![[r#"
-            "f287fde2994111abd7740b5c7c28b0eeabe3f813ae65397bb6acb684e2ab6b22"
-        "#]]
-        .assert_debug_eq(&String::from(sig));
+        assert_eq!(sig, 7475913944712002188);
 
-        let sig: String = signature_without_labels(&labels, &["a", "c"]).into();
-        expect![[r#"
-            "ec9c3a0c9c03420d330ab62021551cffe993c07b20189c5ed831dad22f54c0c7"
-        "#]]
-        .assert_debug_eq(&sig);
-        assert_eq!(sig.len(), 64);
+        let sig = signature_without_labels(&labels, &["a", "c"]);
+        assert_eq!(sig, 16794648939107156088);
 
         assert_eq!(signature(&labels), signature_without_labels(&labels, &[]));
     }
