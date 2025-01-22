@@ -18,7 +18,7 @@ mod tests {
     const DELETE_METHOD: &str = "DELETE";
     const LIST_METHOD: &str = "LIST";
 
-    // routes defined in handler::http::request::users
+    // Tests for routes defined in handler::http::request::users.
 
     #[tokio::test]
     async fn list_users() {
@@ -105,7 +105,7 @@ mod tests {
         .await
     }
 
-    // routes defined in handler::http::request::organization::org
+    // Tests for routes defined in handler::http::request::organization::org.
 
     #[tokio::test]
     async fn get_organizations() {
@@ -115,8 +115,10 @@ mod tests {
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
                 method: format!("{LIST_METHOD}"),
-                o2_type: format!("org:##user_id##"), // This doesn't seem right.
-                org_id: format!("organizations"),    // This doesn't seem right.
+                // In subsequent authorization steps `##user_id##` is replaced
+                // with the actual user ID.
+                o2_type: format!("org:##user_id##"),
+                org_id: format!("organizations"), // This is expected.
                 bypass_check: false,
                 parent_id: format!("default"),
             },
@@ -131,7 +133,9 @@ mod tests {
             format!("api/{ORG_ID}/summary"),
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                // LIST is used instead of GET because there is no resource ID
+                // associated with a summary.
+                method: format!("{LIST_METHOD}"),
                 o2_type: format!("summary:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
@@ -148,7 +152,9 @@ mod tests {
             format!("api/{ORG_ID}/passcode"),
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                // LIST is used instead of GET because there is no resource ID
+                // associated with a passcode.
+                method: format!("{LIST_METHOD}"),
                 o2_type: format!("passcode:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
@@ -182,7 +188,9 @@ mod tests {
             format!("api/{ORG_ID}/rumtoken"),
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
+                // LIST is used instead of GET because there is no resource ID
+                // associated with a rumtoken.
+                method: format!("{LIST_METHOD}"),
                 o2_type: format!("rumtoken:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
@@ -226,24 +234,10 @@ mod tests {
         .await
     }
 
-    #[tokio::test]
-    async fn create_org() {
-        test_auth(
-            Method::POST,
-            format!("api/organizations"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("organizations"),
-                org_id: format!("organizations"), // This seems strange. Is it correct?;
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
+    // TODO: Add test for organization creation after org_cloud_singe branch is
+    // merged.
 
-    // routes defined in handler::http::request::organization::setings
+    // Tests for routes defined in handler::http::request::organization::setings.
 
     #[tokio::test]
     async fn create_organization_settings() {
@@ -303,6 +297,7 @@ mod tests {
             format!("api/{ORG_ID}/settings/logo"),
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
+                // In OpenFGA we treat this operation as PUT rather than DELETE.
                 method: format!("{PUT_METHOD}"),
                 o2_type: format!("settings:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
@@ -347,179 +342,10 @@ mod tests {
         .await
     }
 
-    // routes defined in handler::http::request::organization::es
+    // Routes defined in handler::http::request::organization::es are all
+    // ignored by the AuthExtractor so they are omitted from these tests.
 
-    #[tokio::test]
-    async fn get_org_index() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
-                o2_type: format!(":{ORG_ID}"),    // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_license() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_license"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
-                o2_type: format!("_license:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_xpack() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_xpack"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"), // Should this really be LIST instead of GET?
-                o2_type: format!("_xpack:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_ilm_policy() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_ilm/policy/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("_ilm:policy"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_index_template() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_index_template/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("_index_template:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn create_org_index_template() {
-        test_auth(
-            Method::PUT,
-            format!("api/{ORG_ID}/_index_template/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
-                o2_type: format!("_index_template:NAME"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_data_stream() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_data_stream/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("_data_stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn create_org_data_stream() {
-        test_auth(
-            Method::PUT,
-            format!("api/{ORG_ID}/_data_stream/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
-                o2_type: format!("_data_stream:NAME"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn get_org_pipeline() {
-        test_auth(
-            Method::GET,
-            format!("api/{ORG_ID}/_ingest/pipeline/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("_ingest:pipeline"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn create_org_pipeline() {
-        test_auth(
-            Method::PUT,
-            format!("api/{ORG_ID}/_ingest/pipeline/NAME"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
-                o2_type: format!("pipeline:NAME"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: false,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    // routes defined in handler::http::request::stream
+    // Tests for routes defined in handler::http::request::stream.
 
     #[tokio::test]
     async fn get_schema() {
@@ -546,7 +372,7 @@ mod tests {
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
                 method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                o2_type: format!("stream:STREAM_NAME"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -563,7 +389,7 @@ mod tests {
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
                 method: format!("{PUT_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                o2_type: format!("stream:STREAM_NAME"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -580,7 +406,7 @@ mod tests {
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
                 method: format!("{PUT_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"), // Is this correct?
+                o2_type: format!("stream:STREAM_NAME"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -614,7 +440,11 @@ mod tests {
             AuthExtractor {
                 auth: format!("{AUTH_HEADER_VAL}"),
                 method: format!("{LIST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
+                // o2_type is intentially stream:TEST_ORG_ID instead of
+                // stream:STREAM_NAME because stream:TEST_ORG_ID indicates
+                // permission for listing all streams that belong to the
+                // organization.
+                o2_type: format!("stream:{ORG_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -640,109 +470,8 @@ mod tests {
         .await
     }
 
-    // routes defined in handler::http::request::logs::ingest
-
-    #[tokio::test]
-    async fn logs_ingest_bulk() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/_bulk"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn logs_ingest_multi() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/_multi"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn logs_ingest_json() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/_json"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn handle_kinesis_request() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/STREAM_NAME/_kinesis_firehose"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn handle_gcp_request() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/STREAM_NAME/_sub"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
-    #[tokio::test]
-    async fn otlp_logs_write() {
-        test_auth(
-            Method::POST,
-            format!("api/{ORG_ID}/v1/logs"),
-            AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:{ORG_ID}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
+    // Routes defined in handler::http::request::logs::ingest are all ignored by
+    // AuthExtractor so they are omitted from these tests.
 
     /// Tests that the correct authorization information is extracted from a
     /// request to the given path.
