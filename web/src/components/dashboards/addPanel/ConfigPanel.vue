@@ -1795,16 +1795,7 @@ export default defineComponent({
     });
 
     const showTrellisConfig = computed(() => {
-      const supportedTypes = [
-        "area",
-        "area-stacked",
-        "bar",
-        "h-bar",
-        "line",
-        "scatter",
-        "stacked",
-        "h-stacked",
-      ];
+      const supportedTypes = ["area", "bar", "h-bar", "line", "scatter"];
       return supportedTypes.includes(dashboardPanelData.data.type);
     });
 

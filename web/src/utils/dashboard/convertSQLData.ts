@@ -1366,7 +1366,13 @@ export const convertSQLData = async (
           : {},
       );
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length)
+      if (
+        (panelSchema.type === "line" ||
+          panelSchema.type == "area" ||
+          panelSchema.type == "scatter") &&
+        panelSchema.config.trellis?.layout &&
+        breakDownKeys.length
+      )
         updateTrellisConfig();
 
       break;
@@ -1616,10 +1622,6 @@ export const convertSQLData = async (
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
-
       break;
     }
     case "heatmap": {
@@ -1806,27 +1808,21 @@ export const convertSQLData = async (
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
-
       const temp = options.xAxis;
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      if (!panelSchema.config.trellis?.layout) {
-        const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
-          return Math.max(acc, it.axisLabel.width || 0);
-        }, 0);
+      const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
+        return Math.max(acc, it.axisLabel.width || 0);
+      }, 0);
 
-        options.yAxis.map((it: any) => {
-          it.nameGap =
-            Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
-            10;
-        });
+      options.yAxis.map((it: any) => {
+        it.nameGap =
+          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
+          10;
+      });
 
-        options.xAxis.nameGap = 25;
-      }
+      options.xAxis.nameGap = 25;
 
       break;
     }
