@@ -78,7 +78,7 @@
 <script setup>
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 
 const props = defineProps({
@@ -98,8 +98,6 @@ const emit = defineEmits(["save", "remove", "close", "update"]);
 const store = useStore();
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
-const originalAnnotation = ref(null);
-const changes = ref({});
 
 const annotationData = ref(
   props.annotation || {
@@ -113,43 +111,13 @@ const annotationData = ref(
   },
 );
 
-onMounted(() => {
-  if (props.annotation) {
-    originalAnnotation.value = JSON.parse(JSON.stringify(props.annotation));
-  }
-});
-
 watch(
   () => props.annotation,
   (newVal) => {
     if (newVal) {
       annotationData.value = newVal;
-      originalAnnotation.value = JSON.parse(JSON.stringify(newVal));
     }
   },
-);
-
-watch(
-  () => annotationData.value,
-  (newVal, oldVal) => {
-    if (isEditMode.value && originalAnnotation.value) {
-      const changedFields = {};
-
-      Object.keys(newVal).forEach((key) => {
-        if (key === "annotation_id") return;
-
-        const originalValue = originalAnnotation.value[key];
-        const currentValue = newVal[key];
-
-        if (JSON.stringify(originalValue) !== JSON.stringify(currentValue)) {
-          changedFields[key] = currentValue;
-        }
-      });
-
-      changes.value = changedFields;
-    }
-  },
-  { deep: true },
 );
 
 const isEditMode = computed(() => !!annotationData?.value?.annotation_id);
@@ -184,18 +152,20 @@ const organization = store.state.selectedOrganization.identifier;
 const handleSave = async () => {
   if (annotationData?.value?.title?.trim()) {
     if (isEditMode.value) {
-      if (Object.keys(changes.value).length > 0) {
-        // update annotation
-        const response = await annotationService.update_timed_annotations(
-          organization,
-          props.dashboardId,
-          annotationData.value.annotation_id,
-          changes.value,
-        );
-
-        changes.value = {};
-        originalAnnotation.value = null;
-      }
+      const annotationToUpdate = {
+        start_time: annotationData.value.start_time,
+        end_time: annotationData.value.end_time,
+        title: annotationData.value.title,
+        text: annotationData.value.text,
+        panels: annotationData.value.panels,
+        tags: annotationData.value.tags,
+      };
+      const response = await annotationService.update_timed_annotations(
+        organization,
+        props.dashboardId,
+        annotationData.value.annotation_id,
+        annotationToUpdate,
+      );
     } else {
       // create annotation
       const response = await annotationService.create_timed_annotations(

@@ -30,11 +30,11 @@ export const annotationService = {
     org_id: string,
     dashboard_id: string,
     timed_annotation_id: string,
-    changedFields: any,
+    annotations: any[],
   ) => {
     return http().put(
       `/api/${org_id}/dashboards/${dashboard_id}/annotations/${timed_annotation_id}`,
-      changedFields,
+      annotations,
       {
         headers: {
           "Content-Type": "application/json; charset=UTF-8",
