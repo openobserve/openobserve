@@ -444,6 +444,7 @@ const saveDestination = () => {
     destination_name: selectedDestination.value.value,
     node_type: "remote_stream",
     io_type: "output",
+    org_id: store.state.selectedOrganization.identifier,
   };
   if (!selectedDestination.value) {
     q.notify({
