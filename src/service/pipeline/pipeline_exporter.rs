@@ -21,9 +21,8 @@ use infra::errors::Result;
 use reqwest::ClientBuilder;
 
 use crate::service::pipeline::{
-    pipeline_entry::PipelineEntry,
-    pipeline_http_exporter_client::PipelineHttpExporterClient,
-    pipeline_offset_manager::{init_pipeline_offset_manager, PIPELINE_OFFSET_MANAGER},
+    pipeline_entry::PipelineEntry, pipeline_http_exporter_client::PipelineHttpExporterClient,
+    pipeline_offset_manager::get_pipeline_offset_manager,
 };
 
 const INITIAL_RETRY_DELAY_MS: u64 = 100;
@@ -80,9 +79,7 @@ impl PipelineExporter {
                     }
 
                     // update file position
-                    let manager = PIPELINE_OFFSET_MANAGER
-                        .get_or_init(init_pipeline_offset_manager)
-                        .await;
+                    let manager = get_pipeline_offset_manager().await;
                     manager
                         .write()
                         .await
