@@ -464,7 +464,6 @@ export const convertPromQLData = async (
                   animation: false,
                   data: getMarkLineData(panelSchema),
                 },
-                markArea: getSeriesMarkArea(),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
@@ -716,12 +715,13 @@ export const convertPromQLData = async (
     data: [[convertedTimeStampToDataFormat, null]],
     markLine: {
       itemStyle: {
-        color: "rgba(254, 241, 96, 0.2)",
+        color: "rgba(234, 239, 44, 0.8)",
       },
       silent: false,
       animation: false,
       data: markLines,
     },
+  markArea: getSeriesMarkArea(),
   });
   options.series = options.series.flat();
 
