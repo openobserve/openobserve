@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fmt::{self, Debug, Formatter},
     sync::Arc,
 };
@@ -15,6 +14,7 @@ use datafusion::{
     },
     scalar::ScalarValue,
 };
+use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
