@@ -56,15 +56,11 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
+) -> Result<Option<(SessionContext, Arc<Schema>, ScanStats)>> {
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{}] is being deleted", stream_name);
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // get latest schema
@@ -78,6 +74,10 @@ pub(crate) async fn create_context(
             ));
         }
     };
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(None);
+    }
 
     // get index fields
     let stream_settings = unwrap_stream_settings(&schema);
@@ -115,11 +115,7 @@ pub(crate) async fn create_context(
     )
     .await?;
     if files.is_empty() {
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // calculate scan size
@@ -206,7 +202,7 @@ pub(crate) async fn create_context(
         &[],
     )
     .await?;
-    Ok((ctx, schema, scan_stats))
+    Ok(Some((ctx, schema, scan_stats)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]

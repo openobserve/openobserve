@@ -17,13 +17,13 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.1"
+version = "0.14.3"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["enterprise"]
-enterprise = ["dep:o2_enterprise"]
+default = []
+enterprise = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
@@ -51,7 +51,7 @@ actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
-actix-web-opentelemetry = { version = "0.17", features = ["metrics"] }
+actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
     "support-rust-embed-for-web",
@@ -66,6 +66,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
+async-walkdir.workspace = true
 awc = { version = "3.5", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -107,34 +108,15 @@ http-auth-basic = "0.3"
 ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.2.0"
-kube.workspace = true
-k8s-openapi.workspace = true
 log.workspace = true
 maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
 once_cell.workspace = true
-opentelemetry = "0.25"
-opentelemetry_sdk = { version = "0.25", features = [
-    "rt-tokio",
-    "trace",
-    "metrics",
-] }
-opentelemetry-otlp = { version = "0.25", features = [
-    "http-proto",
-    "serialize",
-    "serde",
-    "trace",
-    "reqwest-client",
-] }
-opentelemetry-proto = { version = "0.25", features = [
-    "gen-tonic",
-    "with-serde",
-    "logs",
-    "metrics",
-    "trace",
-] }
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.4"
@@ -173,6 +155,7 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+tempfile.workspace = true
 uaparser = "0.6.1"
 url.workspace = true
 utoipa.workspace = true
@@ -191,6 +174,7 @@ tantivy.workspace = true
 zip = "2.2.2"
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
+wal.workspace = true
 tokio-util = "0.7.13"
 
 [build-dependencies]
@@ -228,7 +212,12 @@ report_server = { path = "src/report_server" }
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
-actix-tls = { version = "3.4", features = ["connect", "uri", "rustls-0_23-native-roots", "rustls-0_23-webpki-roots"] }
+actix-tls = { version = "3.4", features = [
+    "connect",
+    "uri",
+    "rustls-0_23-native-roots",
+    "rustls-0_23-webpki-roots",
+] }
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -276,8 +265,6 @@ hex = "0.4"
 indexmap = { version = "2.7", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.13"
-kube = { version = "0.98.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.24.0", features = ["latest"] }
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
     "hostname",
@@ -305,7 +292,10 @@ reqwest = { version = "0.12", default-features = false, features = [
     "stream",
 ] }
 rustls-pemfile = "2"
-rustls = { version = "0.23.20", default-features = false, features = ["std", "tls12"]}
+rustls = { version = "0.23.20", default-features = false, features = [
+    "std",
+    "tls12",
+] }
 sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
@@ -319,7 +309,8 @@ sea-orm-migration = { version = "1.1.0", features = [
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+sha1 = "0.10.6"
 sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
@@ -344,11 +335,31 @@ tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.26"
+tracing-opentelemetry = "0.27"
 tracing-subscriber = { version = "0.3.0", features = [
     "env-filter",
     "json",
     "registry",
+] }
+opentelemetry = "0.26"
+opentelemetry_sdk = { version = "0.26", features = [
+    "rt-tokio",
+    "trace",
+    "metrics",
+] }
+opentelemetry-otlp = { version = "0.26", features = [
+    "http-proto",
+    "serialize",
+    "serde",
+    "trace",
+    "reqwest-client",
+] }
+opentelemetry-proto = { version = "0.26", features = [
+    "gen-tonic",
+    "with-serde",
+    "logs",
+    "metrics",
+    "trace",
 ] }
 url = "2.2"
 urlencoding = "2.1"

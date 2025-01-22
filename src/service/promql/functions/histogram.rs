@@ -22,7 +22,7 @@ use crate::service::promql::value::{
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Bucket {
     upper_bound: f64,
     count: f64,
@@ -109,7 +109,7 @@ fn bucket_quantile(phi: f64, mut buckets: Vec<Bucket>) -> f64 {
     }
     buckets.sort_by(|a, b| a.upper_bound.partial_cmp(&b.upper_bound).unwrap());
     // The caller of `bucket_quantile` guarantees that `buckets` is non-empty.
-    let highest_bucket = buckets[buckets.len() - 1];
+    let highest_bucket = &buckets[buckets.len() - 1];
     if !(highest_bucket.upper_bound.is_infinite() && highest_bucket.upper_bound.is_sign_positive())
     {
         return f64::NAN;
@@ -157,7 +157,7 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
     let mut st = None;
     let mut buckets = buckets
         .into_iter()
-        .filter_map(|b| match st {
+        .filter_map(|b| match st.clone() {
             None => {
                 st = Some(b);
                 None
@@ -165,8 +165,8 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
             Some(last) => {
                 if b.upper_bound == last.upper_bound {
                     st = Some(Bucket {
+                        upper_bound: last.upper_bound,
                         count: last.count + b.count,
-                        ..last
                     });
                     None
                 } else {

@@ -471,7 +471,7 @@
     "search": "Search Function",
     "name": "Name",
     "function": "Function Detail",
-    "save": "Save Function",
+    "save": "Save",
     "jsfunction": "Function",
     "stream_name": "Stream Name",
     "order": "Order",
@@ -732,7 +732,8 @@
     "searchMsg": "Search for Dashboards across Folders",
     "trellisLayout": "Trellis Layout",
     "numOfColumns": "Columns per Row",
-    "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout"
+    "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout",
+    "communityDashboard": "Community Dashboards"
   },
   "panel": {
     "header": "Panel",
@@ -925,7 +926,7 @@
     "body": "Body"
   },
   "alert_destinations": {
-    "header": "Destinations",
+    "header": "Alert Destinations",
     "add": "Add Destination",
     "edit": "Edit",
     "search": "Search destination",
@@ -943,6 +944,9 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify"
+  },
+  "pipeline_destinations": {
+    "header":"Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",

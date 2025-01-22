@@ -119,7 +119,7 @@ pub fn apply_vrl_fn(
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &format!("{:?}", stream_name),
                         TRANSFORM_FAILED,
                     ])
@@ -136,7 +136,7 @@ pub fn apply_vrl_fn(
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     org_id,
-                    StreamType::Logs.to_string().as_str(),
+                    StreamType::Logs.as_str(),
                     &format!("{:?}", stream_name),
                     TRANSFORM_FAILED,
                 ])
@@ -374,7 +374,12 @@ pub async fn write_file(
             (acc_records + records, acc_size + size)
         });
     if let Err(e) = writer.write_batch(entries, fsync).await {
-        log::error!("ingestion write file error: {}", e);
+        log::error!(
+            "ingestion write file for stream {}/{} error: {}",
+            writer.get_key_str(),
+            stream_name,
+            e
+        );
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;

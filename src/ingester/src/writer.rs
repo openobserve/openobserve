@@ -187,7 +187,7 @@ impl Writer {
                     wal_dir,
                     &key.org_id,
                     &key.stream_type,
-                    wal_id,
+                    wal_id.to_string(),
                     cfg.limit.max_file_size_on_disk as u64,
                     cfg.limit.wal_write_buffer_size,
                 )
@@ -197,6 +197,10 @@ impl Writer {
             next_seq,
             created_at: AtomicI64::new(now),
         }
+    }
+
+    pub fn get_key_str(&self) -> String {
+        format!("{}/{}", self.key.org_id, self.key.stream_type)
     }
 
     // check_ttl is used to check if the memtable has expired
@@ -302,7 +306,7 @@ impl Writer {
             wal_dir,
             &self.key.org_id,
             &self.key.stream_type,
-            wal_id,
+            wal_id.to_string(),
             cfg.limit.max_file_size_on_disk as u64,
             cfg.limit.wal_write_buffer_size,
         )

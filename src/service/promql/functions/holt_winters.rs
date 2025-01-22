@@ -60,7 +60,7 @@ pub fn holt_winters_calculation(
     let mut current_smoothed = data.samples[0].value;
     let mut trend = data.samples[1].value - data.samples[0].value;
 
-    for (i, &sample) in data.samples[1..].iter().enumerate() {
+    for (i, sample) in data.samples[1..].iter().enumerate() {
         let scaled_value = smoothing_factor * sample.value;
         trend = calculate_trend(
             i as i64,

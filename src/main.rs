@@ -92,7 +92,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::tls::{awc_client_tls_config, http_tls_config};
+use openobserve::service::tls::http_tls_config;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -167,11 +167,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
+        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total / 1024 / 1024,
-        cfg.limit.disk_total / 1024 / 1024 / 1024,
-        cfg.limit.disk_free / 1024 / 1024 / 1024,
+        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
+    );
+    log::info!(
+        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
+        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
     );
 
     // init script server
@@ -221,7 +227,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = o2_enterprise::enterprise::init().await {
+            if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -565,16 +571,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let mut client_builder = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects();
-            if cfg.http.tls_enabled {
-                let config = awc_client_tls_config().unwrap();
-                client_builder =
-                    client_builder.connector(awc::Connector::new().rustls_0_23(config));
-            }
-            let client = client_builder.finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -588,7 +586,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -674,11 +672,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = awc::Client::builder()
-                .connector(awc::Connector::new().limit(cfg.route.max_connections))
-                .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects()
-                .finish();
+            let http_client =
+                router::http::create_http_client().expect("Failed to create http tls client");
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -692,7 +687,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         .configure(get_basic_routes)
                         .configure(get_proxy_routes),
                 )
-                .app_data(web::Data::new(client))
+                .app_data(web::Data::new(http_client))
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
@@ -775,10 +770,8 @@ async fn graceful_shutdown(handle: ServerHandle) {
     // println!("ctrl-c received!");
 
     // offline the node
-    if !config::cluster::LOCAL_NODE.is_standalone() {
-        if let Err(e) = cluster::set_offline(true).await {
-            log::error!("set offline failed: {}", e);
-        }
+    if let Err(e) = cluster::set_offline(true).await {
+        log::error!("set offline failed: {}", e);
     }
     log::info!("Node is offline");
 
@@ -1017,4 +1010,23 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::get_app_details)
             .service(script_server::list_deployed_apps),
     );
+}
+
+/// Initializes enterprise features.
+#[cfg(feature = "enterprise")]
+async fn init_enterprise() -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::search::init().await?;
+
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        log::info!("init super cluster");
+        o2_enterprise::enterprise::super_cluster::kv::init().await?;
+        openobserve::super_cluster_queue::init().await?;
+    }
+
+    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+
+    Ok(())
 }

@@ -544,7 +544,7 @@ pub async fn handle_otlp_request(
 
         // write to file
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
@@ -578,22 +578,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            "",
-            StreamType::Metrics.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            "",
-            StreamType::Metrics.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
         .inc();
 
     // only one trigger per request, as it updates etcd
@@ -625,7 +613,7 @@ fn process_gauge(
         process_data_point(rec, data_point);
         let val_map = rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-        val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(rec.clone());
     }
     records
@@ -652,7 +640,7 @@ fn process_sum(
         process_data_point(&mut dp_rec, data_point);
         let val_map = dp_rec.as_object_mut().unwrap();
         let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-        val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+        val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec.clone());
     }
     records
@@ -678,7 +666,7 @@ fn process_histogram(
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
@@ -704,7 +692,7 @@ fn process_exponential_histogram(
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
@@ -730,7 +718,7 @@ fn process_summary(
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &get_exclude_labels());
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
