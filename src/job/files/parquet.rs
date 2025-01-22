@@ -967,7 +967,7 @@ pub(crate) async fn generate_index_on_ingester(
     let writer = ingester::get_writer(
         0,
         org_id,
-        &StreamType::Index.to_string(),
+        StreamType::Index.as_str(),
         &index_stream_name,
     )
     .await;
