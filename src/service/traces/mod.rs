@@ -952,8 +952,7 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer =
-        ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
+    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,

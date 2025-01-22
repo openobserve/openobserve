@@ -62,10 +62,10 @@ impl Metrics for MetricsQuerier {
 
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/metrics/query", "200", org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, "", stream_type])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/metrics/query", "200", org_id, "", &stream_type])
+            .with_label_values(&["/metrics/query", "200", org_id, "", stream_type])
             .inc();
 
         Ok(Response::new(result))

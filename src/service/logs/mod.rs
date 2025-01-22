@@ -503,13 +503,8 @@ async fn write_logs(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(
-        thread_id,
-        org_id,
-        StreamType::Logs.as_str(),
-        stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
