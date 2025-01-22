@@ -280,6 +280,13 @@ pub fn unwrap_partition_time_level(
     }
 }
 
+pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    settings
+        .as_ref()
+        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .unwrap_or_default()
+}
+
 pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
     match settings {

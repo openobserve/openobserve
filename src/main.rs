@@ -164,11 +164,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
+        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total / 1024 / 1024,
-        cfg.limit.disk_total / 1024 / 1024 / 1024,
-        cfg.limit.disk_free / 1024 / 1024 / 1024,
+        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
+    );
+    log::info!(
+        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
+        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
     );
 
     // init backend jobs
@@ -211,7 +217,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = init_enterprise().await {
+            if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -893,5 +899,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         openobserve::super_cluster_queue::init().await?;
     }
+
+    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+
     Ok(())
 }
