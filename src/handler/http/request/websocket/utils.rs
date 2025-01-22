@@ -52,12 +52,12 @@ pub mod enterprise_utils {
 
         // If the user is external, check permissions
         if user.is_external {
-            let stream_type_str = stream_type.to_string();
+            let stream_type_str = stream_type.as_str();
             let o2_type = format!(
                 "{}:{}",
                 OFGA_MODELS
-                    .get(stream_type_str.as_str())
-                    .map_or(stream_type_str.as_str(), |model| model.key),
+                    .get(stream_type_str)
+                    .map_or(stream_type_str, |model| model.key),
                 stream_name
             );
 

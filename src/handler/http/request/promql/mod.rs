@@ -168,7 +168,7 @@ async fn query(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.to_string();
+            let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
                 let user: crate::common::meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
@@ -182,8 +182,8 @@ async fn query(
                         o2_type: format!(
                             "{}:{}",
                             OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
                             name
                         ),
                         org_id: org_id.to_string(),
@@ -433,7 +433,7 @@ async fn query_range(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         if !is_root_user(user_email) {
-            let stream_type_str = StreamType::Metrics.to_string();
+            let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
                 let user: crate::common::meta::user::User = USERS
                     .get(&format!("{org_id}/{}", user_email))
@@ -448,8 +448,8 @@ async fn query_range(
                             o2_type: format!(
                                 "{}:{}",
                                 OFGA_MODELS
-                                    .get(stream_type_str.as_str())
-                                    .map_or(stream_type_str.as_str(), |model| model.key),
+                                    .get(stream_type_str)
+                                    .map_or(stream_type_str, |model| model.key),
                                 name
                             ),
                             org_id: org_id.to_string(),
@@ -687,7 +687,7 @@ async fn series(
                 .get(&format!("{org_id}/{}", user_email))
                 .unwrap()
                 .clone();
-            let stream_type_str = StreamType::Metrics.to_string();
+            let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
                     user_email,
@@ -697,8 +697,8 @@ async fn series(
                         o2_type: format!(
                             "{}:{}",
                             OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
                             metric_name
                         ),
                         org_id: org_id.to_string(),

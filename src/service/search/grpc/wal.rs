@@ -326,7 +326,7 @@ pub async fn search_memtable(
 
     let mut batches = ingester::read_from_memtable(
         &query.org_id,
-        &query.stream_type.to_string(),
+        query.stream_type.as_str(),
         &query.stream_name,
         query.time_range,
         &filters,
@@ -336,7 +336,7 @@ pub async fn search_memtable(
     batches.extend(
         ingester::read_from_immutable(
             &query.org_id,
-            &query.stream_type.to_string(),
+            query.stream_type.as_str(),
             &query.stream_name,
             query.time_range,
             &filters,

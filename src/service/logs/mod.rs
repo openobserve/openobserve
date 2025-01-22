@@ -380,7 +380,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -392,7 +392,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -506,7 +506,7 @@ async fn write_logs(
     let writer = ingester::get_writer(
         thread_id,
         org_id,
-        &StreamType::Logs.to_string(),
+        StreamType::Logs.as_str(),
         stream_name,
     )
     .await;

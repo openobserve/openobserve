@@ -544,7 +544,7 @@ pub async fn handle_otlp_request(
 
         // write to file
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
@@ -583,7 +583,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
@@ -592,7 +592,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             "",
-            StreamType::Metrics.to_string().as_str(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 
