@@ -54,6 +54,7 @@ use crate::{
             distributed_plan::{
                 remote_scan::RemoteScanExec,
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                EmptyExecVisitor,
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
@@ -394,7 +395,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
-        sql.index_optimize_mode,
+        sql.index_optimize_mode.clone(),
         false, // for super cluster
         context,
     );
@@ -413,6 +414,17 @@ pub async fn run_datafusion(
     if streaming_output {
         let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    }
+
+    let mut visitor = EmptyExecVisitor::default();
+    if physical_plan.visit(&mut visitor).is_err() {
+        log::error!("[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable");
+        return Err(Error::Message(
+            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+        ));
+    }
+    if visitor.get_data().is_some() {
+        return Ok((vec![], ScanStats::default(), "".to_string()));
     }
 
     if cfg.common.print_key_sql {

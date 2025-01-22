@@ -356,8 +356,8 @@ pub async fn get_latest_traces(
         HashMap::with_capacity(resp_search.hits.len());
     for item in resp_search.hits {
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-        let trace_start_time = item.get("trace_start_time").unwrap().as_i64().unwrap();
-        let trace_end_time = item.get("trace_end_time").unwrap().as_i64().unwrap();
+        let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap());
+        let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap());
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {
             start_time = trace_start_time / 1000;
@@ -443,9 +443,9 @@ pub async fn get_latest_traces(
         let resp_size = resp_search.hits.len() as i64;
         for item in resp_search.hits {
             let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-            let trace_start_time = item.get("start_time").unwrap().as_i64().unwrap();
-            let trace_end_time = item.get("end_time").unwrap().as_i64().unwrap();
-            let duration = item.get("duration").unwrap().as_i64().unwrap();
+            let trace_start_time = json::get_int_value(item.get("start_time").unwrap());
+            let trace_end_time = json::get_int_value(item.get("end_time").unwrap());
+            let duration = json::get_int_value(item.get("duration").unwrap());
             let service_name = item
                 .get("service_name")
                 .unwrap()
