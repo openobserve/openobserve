@@ -22,7 +22,7 @@ use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::OrganizationInvites,
-    o2_enterprise::enterprise::cloud::org_usage,
+    o2_enterprise::enterprise::cloud::billings as cloud_billings,
 };
 
 use crate::{
@@ -94,8 +94,10 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         id += 1;
         #[cfg(feature = "cloud")]
         let org_subscription = {
-            if let Ok(Some(subscription)) = org_usage::get(org.identifier.as_str()).await {
-                subscription.subscription_type as i32
+            if let Ok(Some(subscription_type)) =
+                cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id).await
+            {
+                subscription_type as i32
             } else {
                 0
             }

@@ -125,7 +125,11 @@ pub async fn process_session_detail(
     {
         Err(e) => e.into_http_response(),
         Ok(()) => {
-            let redirect_url = format!("{}/api/billings/plans?org_identifier={}", &get_config().common.web_url, &org_id);
+            let redirect_url = format!(
+                "{}/api/billings/plans?org_identifier={}",
+                &get_config().common.web_url,
+                &org_id
+            );
             RedirectResponseBuilder::new(&redirect_url)
                 .build()
                 .redirect_http()

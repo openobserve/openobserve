@@ -16,7 +16,7 @@
 //! These models define the schemas of HTTP request and response JSON bodies in
 //! billings API endpoints.
 
-use o2_enterprise::enterprise::cloud::{billings as cloud_billings, org_usage as cloud_org_usage};
+use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -59,23 +59,23 @@ pub struct OrgQuotaThreshold {
     trace: i64,
 }
 
-impl From<cloud_org_usage::OrgUsageRecord> for GetQuotaThresholdResponseBody {
-    fn from(value: cloud_org_usage::OrgUsageRecord) -> Self {
-        let data = OrgQuotaThreshold {
-            ingestion: value.ingestion_size,
-            query: value.query_size,
-            pipeline_process: value.pipeline_process_size,
-            rum_session: value.rum_session_size,
-            dashboard: value.dashboard_size,
-            metric: value.metric_size,
-            trace: value.trace_size,
-        };
-        Self {
-            data,
-            message: "Organization monthly quota pulled successfully.".to_string(),
-        }
-    }
-}
+// impl From<cloud_org_usage::OrgUsageRecord> for GetQuotaThresholdResponseBody {
+//     fn from(value: cloud_org_usage::OrgUsageRecord) -> Self {
+//         let data = OrgQuotaThreshold {
+//             ingestion: value.ingestion_size,
+//             query: value.query_size,
+//             pipeline_process: value.pipeline_process_size,
+//             rum_session: value.rum_session_size,
+//             dashboard: value.dashboard_size,
+//             metric: value.metric_size,
+//             trace: value.trace_size,
+//         };
+//         Self {
+//             data,
+//             message: "Organization monthly quota pulled successfully.".to_string(),
+//         }
+//     }
+// }
 
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
     fn from(value: cloud_billings::CustomerBilling) -> Self {

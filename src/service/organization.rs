@@ -525,40 +525,28 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
 #[cfg(feature = "cloud")]
 pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool {
-    use o2_enterprise::enterprise::cloud::org_usage;
+    use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 
-    let org = org_usage::get(org_id).await;
+    let subscription_type = cloud_billings::get_org_subscription_type(org_id, user_email)
+        .await
+        .unwrap_or_default();
     let mut is_already_part_of_free_org = false;
     let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
     if member_orgs.is_empty() {
         return true;
     }
     for member_org in member_orgs {
-        if let Ok(subscription) = org_usage::get(&member_org.identifier).await {
-            if subscription.is_some() {
-                let subscription = subscription.unwrap();
-                if subscription.is_free_sub() {
-                    is_already_part_of_free_org = true;
-                    break;
-                }
+        if let Ok(Some(subscription_type)) =
+            cloud_billings::get_org_subscription_type(&member_org.identifier, user_email).await
+        {
+            if subscription_type.is_free_sub() {
+                is_already_part_of_free_org = true;
+                break;
             }
         }
     }
 
-    if org.is_ok() {
-        let org = org.unwrap();
-        if org.is_some() {
-            let org = org.unwrap();
-            if org.is_free_sub() && is_already_part_of_free_org {
-                return false;
-            }
-        } else if is_already_part_of_free_org {
-            return false;
-        }
-    } else if is_already_part_of_free_org {
-        return false;
-    }
-    true
+    !subscription_type.is_some_and(|sub| sub.is_free_sub() && is_already_part_of_free_org)
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {
