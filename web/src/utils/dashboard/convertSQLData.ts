@@ -712,24 +712,27 @@ export const convertSQLData = async (
     yAxisNameGap: number,
     gridData: null | any = null,
   ) => {
-    const maxYValue = formatUnitValue(
-      getUnitValue(
-        Math.max(
-          ...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat(),
-        ),
-        panelSchema.config?.unit,
-        panelSchema.config?.unit_custom,
-        panelSchema.config?.decimals,
-      ),
+    const maxYValue = getUnitValue(
+      Math.max(...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat()),
+      panelSchema.config?.unit,
+      panelSchema.config?.unit_custom,
+      panelSchema.config?.decimals,
     );
 
     // Update yAxis label properties for each chart yAxis based on the grid position
     options.yAxis.forEach((it: any, index: number) => {
-      it.max = maxYValue;
+      it.max = maxYValue.value;
+
       it.axisLabel = {
-        formatter: function (value: number) {
-          // Force two decimal places for all charts
-          return value.toFixed(2);
+        formatter: function (value: any) {
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            ),
+          );
         },
       };
 
@@ -769,9 +772,7 @@ export const convertSQLData = async (
       if (isHorizontalChart) {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       } else {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.xAxis.length - gridData.gridNoOfCol <= index;
       }
 
       it.axisTick.length = showAxisLabel ? 5 : 0;
