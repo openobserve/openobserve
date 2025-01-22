@@ -157,6 +157,7 @@ class="q-gutter-md" @submit.prevent="">
 
         <div class="q-mt-lg q-mb-xl">
           <q-btn
+            :disable="lockedAccountFlag"
             data-cy="login-sign-in"
             unelevated
             class="full-width text-bold no-border"
@@ -178,7 +179,7 @@ class="q-gutter-md" @submit.prevent="">
             padding="sm lg"
             :label="t('login.resetLockedAccount')"
             no-caps
-            @click="showUnlockAccountForm = true"
+            @click="openUnlockAccountForm()"
           />
         </div>
       </q-form>
@@ -207,7 +208,7 @@ class="q-gutter-md" @submit.prevent="">
 
         <div class="flex q-mb-xl">
           <q-btn
-            data-cy="unlock-account-submit"
+            data-cy="unlock-account-cancel"
             unelevated
             class="col text-bold q-mr-sm"
             text-color="light-text"
@@ -527,6 +528,13 @@ export default defineComponent({
       lockedAccountFlag.value = false;
     };
 
+    const openUnlockAccountForm = () => {
+      showUnlockAccountForm.value = true;
+      if (name.value) {
+        unlockfrm_name.value = name.value;
+      }
+    };
+
     return {
       t,
       name,
@@ -551,6 +559,7 @@ export default defineComponent({
       showUnlockAccountForm,
       resetUnlockForm,
       unlockAccountFormRef,
+      openUnlockAccountForm,
     };
   },
   methods: {
