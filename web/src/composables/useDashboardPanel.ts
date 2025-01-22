@@ -111,6 +111,7 @@ const getDefaultDashboardPanelData: any = () => ({
         query: "",
         vrlFunctionQuery: "",
         customQuery: false,
+        joins: [],
         fields: {
           stream: "",
           stream_type: "logs",
@@ -2222,8 +2223,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields?.filter.conditions,
     ];
-
-    console.log(fields, "fields");
 
     const array = fields.map((field, i) => {
       let selector = "";
