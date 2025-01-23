@@ -333,7 +333,7 @@ impl PipelineWatcher {
                     pr.pipeline_exporter = Some(PipelineExporter::init(skip_tl_verify)?);
                 }
 
-                let max_retry_time = pr.get_stream_export_retry_time().await;
+                let max_retry_time = pr.get_stream_export_max_retry_time().await;
                 // if entry.data just has one record, it will be a performance issue for exporter
                 if let Some(exporter) = &pr.pipeline_exporter {
                     if let Err(e) = exporter
