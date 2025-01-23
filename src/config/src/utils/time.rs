@@ -47,6 +47,11 @@ pub fn now_micros() -> i64 {
 }
 
 #[inline(always)]
+pub fn day_micros(n: i64) -> i64 {
+    Duration::try_days(n).unwrap().num_microseconds().unwrap()
+}
+
+#[inline(always)]
 pub fn hour_micros(n: i64) -> i64 {
     Duration::try_hours(n).unwrap().num_microseconds().unwrap()
 }

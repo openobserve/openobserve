@@ -20,7 +20,7 @@ use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
-use itertools::chain;
+use itertools::{chain, Itertools};
 use lettre::{
     transport::smtp::{
         authentication::Credentials,
@@ -29,10 +29,14 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
+use regex::Regex;
 use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
-    meta::cluster,
+    meta::{
+        cluster,
+        promql::{DownsamplingRule, Function},
+    },
     utils::{cgroup, file::get_file_meta},
 };
 
@@ -184,6 +188,36 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields.sort();
     fields.dedup();
     fields
+});
+
+pub static METRICS_DOWNSAMPLING_RULES: Lazy<Vec<DownsamplingRule>> = Lazy::new(|| {
+    get_config()
+        .compact
+        .metrics_downsampling_rules
+        .split(',')
+        .filter_map(|s| {
+            if s.is_empty() {
+                return None;
+            }
+            let (rule, function, offest, step) = s.split(':').collect_tuple().unwrap();
+            let rule = if rule.is_empty() {
+                None
+            } else {
+                Some(Regex::new(rule).unwrap())
+            };
+            let function = if function.is_empty() {
+                Function::Last
+            } else {
+                Function::from(function)
+            };
+            Some(DownsamplingRule {
+                rule,
+                function,
+                offest: get_seconds_from_string(offest),
+                step: get_seconds_from_string(step),
+            })
+        })
+        .collect::<Vec<_>>()
 });
 
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
@@ -1272,6 +1306,8 @@ pub struct Compact {
     pub job_clean_wait_time: i64,
     #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
     pub pending_jobs_metric_interval: u64,
+    #[env_config(name = "ZO_METRICS_DOWNSAMPLING_RULES", default = "")]
+    pub metrics_downsampling_rules: String,
 }
 
 #[derive(EnvConfig)]
@@ -2157,6 +2193,35 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
 
+    // TODO: avoid conflict with compactor and flatten compactor
+    // if cfg.metrics_downsampling_rules is not empty, then run downsampling job
+    // 1. split cfg.metrics_downsampling_rules by comma to get each rules
+    // 2. split each rule by : to get regex:function:interval:offest
+    if !cfg.compact.metrics_downsampling_rules.is_empty() {
+        let rules = cfg.compact.metrics_downsampling_rules.split(',');
+        for rule in rules {
+            let (regex, function, offest, step) = rule.split(':').collect_tuple().expect("invalid downsampling rule");
+            if !regex.is_empty() {
+                let _ = Regex::new(regex).expect("invalid regex for downsampling");
+            }
+            if !function.is_empty() {
+                let _ = Function::from(function);
+            }
+            if offest.is_empty() {
+                return Err(anyhow::anyhow!("offest is required for downsampling"));
+            }
+            if step.is_empty() {
+                return Err(anyhow::anyhow!("step is required for downsampling"));
+            }
+            // to do check the interval and offset is valid
+            let offest = get_seconds_from_string(offest);
+            let step = get_seconds_from_string(step);
+            if offest % step != 0 {
+                return Err(anyhow::anyhow!("offest must be a multiple of step"));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -2229,6 +2294,18 @@ pub fn get_cluster_name() -> String {
         cfg.common.cluster_name.to_string()
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
+    }
+}
+
+fn get_seconds_from_string(s: &str) -> i64 {
+    let (num, unit) = s.split_at(s.len() - 1);
+    let num = num.parse::<i64>().unwrap();
+    match unit {
+        "m" => num * 60,
+        "h" => num * 3600,
+        "d" => num * 86400,
+        "s" => num,
+        _ => panic!("invalid unit for downsampling: {}, only support s, m, h, d", unit),
     }
 }
 

@@ -25,6 +25,7 @@ use config::{
     get_config, ider, is_local_disk_storage,
     meta::{
         inverted_index::InvertedIndexFormat,
+        promql::get_largest_downsampling_rule,
         search::StorageType,
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats,
@@ -36,7 +37,7 @@ use config::{
         parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
-        time::hour_micros,
+        time::{day_micros, hour_micros},
     },
     FILE_EXT_PARQUET,
 };
@@ -302,6 +303,122 @@ pub async fn generate_old_data_job_by_stream(
     Ok(())
 }
 
+/// Generate downsampling job by stream and rule
+/// 1. get offset from db
+/// 2. check if other node is processing
+/// 3. create job or return
+pub async fn generate_downsampling_job_by_stream_and_rule(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    rule: (i64, i64), // offset, step
+) -> Result<(), anyhow::Error> {
+    assert!(stream_type == StreamType::Metrics);
+    // get last compacted offset
+    let (mut offset, node) =
+        db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return Ok(()); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let lock_key = format!(
+            "/compact/downsampling/{}/{}/{}/{}/{}",
+            org_id, stream_type, stream_name, rule.0, rule.1
+        );
+        let locker = dist_lock::lock(&lock_key, 0).await?;
+        // check the working node again, maybe other node locked it first
+        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(()); // other node is processing
+        }
+        // set to current node
+        let ret = db::compact::downsampling::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            rule,
+            offset,
+            Some(&LOCAL_NODE.uuid.clone()),
+        )
+        .await;
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+        ret?;
+    }
+
+    // get schema
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_created = stream::stream_created(&schema).unwrap_or_default();
+    if offset == 0 {
+        offset = stream_created
+    }
+    if offset == 0 {
+        return Ok(()); // no data
+    }
+
+    let cfg = get_config();
+    // check offset
+    let time_now: DateTime<Utc> = Utc::now();
+    let time_now_day = Utc
+        .with_ymd_and_hms(time_now.year(), time_now.month(), time_now.day(), 0, 0, 0)
+        .unwrap()
+        .timestamp_micros();
+    // must wait for at least 3 * max_file_retention_time
+    // -- first period: the last hour local file upload to storage, write file list
+    // -- second period, the last hour file list upload to storage
+    // -- third period, we can do the merge, so, at least 3 times of
+    // max_file_retention_time
+    // TODO: metrics by default is daily, so we need to add 1 day, to avoid the same offset rule
+    // apply to a stream multiple times
+    if offset >= time_now_day
+        || time_now.timestamp_micros() - offset
+            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
+                * 3
+                + day_micros(1)
+    {
+        return Ok(()); // the time is future, just wait
+    }
+
+    log::debug!(
+        "[COMPACTOR] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?}, offset: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        rule,
+        offset
+    );
+
+    // generate downsampling job
+    if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
+        return Err(anyhow::anyhow!(
+            "[COMPACT] add file_list_jobs failed: {}",
+            e
+        ));
+    }
+
+    // write new offset
+    let offset = offset + day_micros(1);
+    // format to day with zero hour, minutes, seconds
+    let offset = offset - offset % day_micros(1);
+    db::compact::downsampling::set_offset(
+        org_id,
+        stream_type,
+        stream_name,
+        rule,
+        offset,
+        Some(&LOCAL_NODE.uuid.clone()),
+    )
+    .await?;
+
+    Ok(())
+}
+
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
 /// 4. read last compacted offset: year/month/day/hour
@@ -375,6 +492,7 @@ pub async fn merge_by_stream(
         .unwrap()
         .timestamp_micros();
 
+    // TODO: how to handle downsampling with step > 1 day
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
         if partition_time_level == PartitionTimeLevel::Daily {
@@ -448,20 +566,53 @@ pub async fn merge_by_stream(
                 return Ok(());
             }
 
+            // TODO: skip group file when do downsampling
+            let skip_group_files = stream_type == StreamType::Metrics
+                && get_largest_downsampling_rule(
+                    &stream_name,
+                    files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
+                )
+                .is_some();
             // group files need to merge
             let mut batch_groups = Vec::new();
-            let mut new_file_list = Vec::new();
-            let mut new_file_size = 0;
-            for file in files_with_size.iter() {
-                if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
-                    if new_file_list.len() <= 1 {
-                        if job_strategy == MergeStrategy::FileSize {
-                            break;
+
+            if skip_group_files {
+                batch_groups.push(MergeBatch {
+                    batch_id: 0,
+                    org_id: org_id.clone(),
+                    stream_type,
+                    stream_name: stream_name.clone(),
+                    prefix: prefix.clone(),
+                    files: files_with_size.clone(),
+                });
+            } else {
+                let mut new_file_list = Vec::new();
+                let mut new_file_size = 0;
+                for file in files_with_size.iter() {
+                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+                        if new_file_list.len() <= 1 {
+                            if job_strategy == MergeStrategy::FileSize {
+                                break;
+                            }
+                            new_file_size = 0;
+                            new_file_list.clear();
+                            continue; // this batch don't need to merge, skip
                         }
+                        batch_groups.push(MergeBatch {
+                            batch_id: batch_groups.len(),
+                            org_id: org_id.clone(),
+                            stream_type,
+                            stream_name: stream_name.clone(),
+                            prefix: prefix.clone(),
+                            files: new_file_list.clone(),
+                        });
                         new_file_size = 0;
                         new_file_list.clear();
-                        continue; // this batch don't need to merge, skip
                     }
+                    new_file_size += file.meta.original_size;
+                    new_file_list.push(file.clone());
+                }
+                if new_file_list.len() > 1 {
                     batch_groups.push(MergeBatch {
                         batch_id: batch_groups.len(),
                         org_id: org_id.clone(),
@@ -470,25 +621,11 @@ pub async fn merge_by_stream(
                         prefix: prefix.clone(),
                         files: new_file_list.clone(),
                     });
-                    new_file_size = 0;
-                    new_file_list.clear();
                 }
-                new_file_size += file.meta.original_size;
-                new_file_list.push(file.clone());
-            }
-            if new_file_list.len() > 1 {
-                batch_groups.push(MergeBatch {
-                    batch_id: batch_groups.len(),
-                    org_id: org_id.clone(),
-                    stream_type,
-                    stream_name: stream_name.clone(),
-                    prefix: prefix.clone(),
-                    files: new_file_list.clone(),
-                });
-            }
 
-            if batch_groups.is_empty() {
-                return Ok(()); // no files need to merge
+                if batch_groups.is_empty() {
+                    return Ok(()); // no files need to merge
+                }
             }
 
             // send to worker
@@ -775,6 +912,7 @@ pub async fn merge_files(
         let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
+                // TODO: when generate multiple files, how to generate FileMeta
                 exec::merge_parquet_files(
                     stream_type,
                     &stream_name,

@@ -97,10 +97,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { run_generate_job().await });
     tokio::task::spawn(async move { run_generate_old_data_job().await });
+    tokio::task::spawn(async move { run_generate_downsampling_job().await });
     tokio::task::spawn(async move { run_merge(tx).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
     tokio::task::spawn(async move { run_sync_to_db().await });
+    tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
     tokio::task::spawn(async move { run_check_running_jobs().await });
     tokio::task::spawn(async move { run_clean_done_jobs().await });
     tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
@@ -165,6 +167,20 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     }
 }
 
+/// Generate downsampling job for compactor
+async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval + 1,
+        ))
+        .await;
+        log::info!("[COMPACTOR] Running generate downsampling job");
+        if let Err(e) = compact::run_generate_downsampling_job().await {
+            log::error!("[COMPACTOR] run generate downsampling job error: {e}");
+        }
+    }
+}
+
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
     loop {
@@ -216,6 +232,19 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
         log::debug!("[COMPACTOR] Running sync cached compact offset to db");
         if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
             log::error!("[COMPACTOR] run sync cached compact offset to db error: {e}");
+        }
+    }
+}
+
+async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.sync_to_db_interval,
+        ))
+        .await;
+        log::debug!("[COMPACTOR] Running sync cached downsampling offset to db");
+        if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
+            log::error!("[COMPACTOR] run sync cached downsampling offset to db error: {e}");
         }
     }
 }

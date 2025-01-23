@@ -19,6 +19,7 @@ use arrow_schema::Field;
 use config::{
     get_config,
     meta::{
+        promql::{get_largest_downsampling_rule, Function, HASH_LABEL, VALUE_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
@@ -105,13 +106,15 @@ pub async fn merge_parquet_files(
             fields_str,
             cfg.common.column_timestamp
         )
+    } else if stream_type == StreamType::Metrics {
+        generate_downsampling_sql(stream_name, metadata, &schema)
     } else {
         format!(
             "SELECT * FROM tbl ORDER BY {} DESC",
             cfg.common.column_timestamp
         )
     };
-    log::debug!("merge_parquet_files sql: {}", sql);
+    log::info!("merge_parquet_files sql: {}", sql);
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -483,4 +486,66 @@ async fn get_cpu_and_mem_limit(
         }
     }
     Ok((target_partitions, memory_size))
+}
+
+fn generate_downsampling_sql(
+    stream_name: &str,
+    metadata: &FileMeta,
+    schema: &Arc<Schema>,
+) -> String {
+    let cfg = get_config();
+    let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
+    if let Some(rule) = rule {
+        let step = rule.step;
+        // let fun = rule.function.fun();
+        let fields = schema
+            .fields()
+            .iter()
+            .filter_map(|f| {
+                if f.name() != HASH_LABEL
+                    && f.name() != VALUE_LABEL
+                    && f.name() != &cfg.common.column_timestamp
+                {
+                    Some(format!("max({}) as {}", f.name(), f.name()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let fun_str = if rule.function == Function::Last || rule.function == Function::First {
+            format!(
+                "{}_value({} ORDER BY ASC{}) as {}",
+                rule.function.fun(),
+                VALUE_LABEL,
+                cfg.common.column_timestamp,
+                VALUE_LABEL
+            )
+        } else {
+            format!(
+                "{}({}) as {}",
+                rule.function.fun(),
+                VALUE_LABEL,
+                VALUE_LABEL
+            )
+        };
+
+        return format!(
+                "SELECT {}, date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00')) as {}, {}, {} FROM tbl GROUP BY {}, {} ORDER BY {} DESC",
+                HASH_LABEL,
+                step,
+                cfg.common.column_timestamp,
+                cfg.common.column_timestamp,
+                fields.join(", "),
+                fun_str,
+                HASH_LABEL,
+                cfg.common.column_timestamp,
+                cfg.common.column_timestamp,
+            );
+    }
+
+    format!(
+        "SELECT * FROM tbl ORDER BY {} DESC",
+        cfg.common.column_timestamp
+    )
 }

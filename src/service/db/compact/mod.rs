@@ -18,3 +18,4 @@ pub mod files;
 pub mod organization;
 pub mod retention;
 pub mod stats;
+pub mod downsampling;
