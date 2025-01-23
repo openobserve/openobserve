@@ -212,7 +212,7 @@ class="q-gutter-md" @submit.prevent="">
             unelevated
             class="col text-bold q-mr-sm"
             text-color="light-text"
-            type="submit"
+            type="button"
             padding="sm lg"
             :label="t('common.cancel')"
             no-caps
@@ -497,16 +497,19 @@ export default defineComponent({
           message: "Please input valid username.",
         });
       } else {
+        submitting.value = true;
         authService
           .unlock_account(unlockfrm_name.value)
           .then((res) => {
             if (res.code == "200") {
+              submitting.value = false;
               resetUnlockForm();
               $q.notify({
                 color: "positive",
                 message: res.message,
               });
             } else {
+              submitting.value = false;
               $q.notify({
                 color: "negative",
                 message: res.message || "Error while unlocking account.",
@@ -514,9 +517,12 @@ export default defineComponent({
             }
           })
           .catch((e) => {
+            submitting.value = false;
             $q.notify({
               color: "negative",
-              message: "Error while unlocking account.",
+              message:
+                e?.response?.data?.message ||
+                "Failed to unlock account. Please try again.",
             });
           });
       }
