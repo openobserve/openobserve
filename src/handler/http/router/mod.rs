@@ -518,7 +518,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(keys::delete)
         .service(keys::save)
         .service(keys::list)
-        .service(keys::update);
+        .service(keys::update)
         .service(search::job::query_status)
         .service(actions::action::get_action_from_id)
         .service(actions::action::list_actions)
