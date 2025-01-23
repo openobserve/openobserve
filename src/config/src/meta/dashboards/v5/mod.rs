@@ -552,10 +552,13 @@ pub enum LineInterpolation {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
 pub enum LabelPosition {
+    #[serde(rename = "top")]
     Top,
+    #[serde(rename = "inside")]
     Inside,
+    #[serde(rename = "insideTop")]
     InsideTop,
+    #[serde(rename = "insideBottom")]
     InsideBottom,
 }
