@@ -215,7 +215,6 @@ class="q-gutter-md" @submit.prevent="">
             type="submit"
             padding="sm lg"
             :label="t('common.cancel')"
-            :loading="submitting"
             no-caps
             @click="resetUnlockForm()"
           />
