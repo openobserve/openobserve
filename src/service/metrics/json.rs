@@ -351,7 +351,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     .await?;
                     crate::common::utils::auth::set_ownership(
                         org_id,
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                         Authz::new(&stream_name),
                     )
                     .await;
@@ -440,7 +440,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
@@ -473,7 +473,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -482,7 +482,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 

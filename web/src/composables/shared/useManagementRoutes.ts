@@ -2,7 +2,8 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const DestinationList = () => import("@/components/alerts/DestinationList.vue");
+const AlertsDestinationList = () =>
+  import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -35,9 +36,9 @@ const useManagementRoutes = () => {
           },
         },
         {
-          path: "destinations",
+          path: "alert_destinations",
           name: "alertDestinations",
-          component: DestinationList,
+          component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -74,6 +75,15 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
           },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "pipeline_destinations",
+          name: "pipelineDestinations",
+          component: () =>
+            import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

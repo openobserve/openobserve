@@ -4837,6 +4837,7 @@ dependencies = [
  "object_store",
  "once_cell",
  "parking_lot",
+ "reqwest",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -6179,6 +6180,7 @@ dependencies = [
  "sysinfo",
  "syslog_loose 0.18.0",
  "tantivy",
+ "tempfile",
  "thiserror 1.0.69",
  "tikv-jemallocator",
  "time",
@@ -6195,6 +6197,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "vrl",
+ "wal",
  "zstd",
 ]
 

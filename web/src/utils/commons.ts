@@ -524,7 +524,7 @@ export const getDashboard = async (
   }
   
   if(!dashboardId){
-    return;
+    return {};
   }
 
   const apiResponse = await dashboardService.get_Dashboard(

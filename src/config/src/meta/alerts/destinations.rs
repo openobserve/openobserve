@@ -23,18 +23,23 @@ use super::templates::Template;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Destination {
+    #[serde(rename = "type")]
+    #[serde(default)]
+    pub destination_type: DestinationType,
     #[serde(default)]
     pub name: String,
-    /// Required for `Http` destination_type
+    /// Required for `Http` or `RemotePipeline` destination_type
     #[serde(default)]
     pub url: String,
-    /// Required for `Http` destination_type
+    /// Required for `Http` or `RemotePipeline` destination_type
     #[serde(default)]
     pub method: HTTPType,
+    /// Required for `RemotePipeline` destination_type
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
+    #[serde(default)]
     pub template: String,
     /// Required when `destination_type` is `Email`
     #[serde(default)]
@@ -44,9 +49,6 @@ pub struct Destination {
     pub sns_topic_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aws_region: Option<String>,
-    #[serde(rename = "type")]
-    #[serde(default)]
-    pub destination_type: DestinationType,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
@@ -58,6 +60,32 @@ pub enum DestinationType {
     Email,
     #[serde(rename = "sns")]
     Sns,
+    #[serde(rename = "remote_pipeline")]
+    RemotePipeline,
+}
+
+impl fmt::Display for DestinationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            DestinationType::Http => "http",
+            DestinationType::Email => "email",
+            DestinationType::Sns => "sns",
+            DestinationType::RemotePipeline => "remote_pipeline",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl From<&str> for DestinationType {
+    fn from(s: &str) -> Self {
+        match s {
+            "http" => DestinationType::Http,
+            "email" => DestinationType::Email,
+            "sns" => DestinationType::Sns,
+            "remote_pipeline" => DestinationType::RemotePipeline,
+            _ => DestinationType::Http,
+        }
+    }
 }
 
 impl Destination {
@@ -74,6 +102,10 @@ impl Destination {
             sns_topic_arn: self.sns_topic_arn.clone(),
             aws_region: self.aws_region.clone(),
         }
+    }
+
+    pub fn is_remote_pipeline(&self) -> bool {
+        self.destination_type == DestinationType::RemotePipeline
     }
 }
 
