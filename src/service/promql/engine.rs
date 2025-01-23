@@ -15,6 +15,7 @@
 
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
+use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
     get_config,
@@ -1219,12 +1220,29 @@ async fn selector_load_data_from_datafusion(
         HashMap::with_capacity(hash_value_set.len());
     for batch in series {
         if hash_field_type == &DataType::UInt64 {
+            let columns = batch.columns();
+            let schema = batch.schema();
+            let fields = schema.fields();
+            let cols = fields
+                .iter()
+                .zip(columns)
+                .filter_map(|(field, col)| {
+                    if field.name() == HASH_LABEL {
+                        None
+                    } else if let Some(col) = col.as_any().downcast_ref::<StringArray>() {
+                        Some((field.name(), col))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>();
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<UInt64Array>()
                 .unwrap();
+            let mut labels = Vec::with_capacity(columns.len());
             for i in 0..batch.num_rows() {
                 let hash = hash_values.value(i).into();
                 if !hash_value_set.contains(&hash) {
@@ -1233,31 +1251,43 @@ async fn selector_load_data_from_datafusion(
                 if metrics.contains_key(&hash) {
                     continue;
                 }
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == HASH_LABEL {
+                labels.clear(); // reset and reuse the same vector
+                for (name, value) in cols.iter() {
+                    if value.is_null(i) {
                         continue;
                     }
-                    if v.is_null(i) {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
                     labels.push(Arc::new(Label {
                         name: name.to_string(),
                         value: value.value(i).to_string(),
                     }));
                 }
                 labels.sort_by(|a, b| a.name.cmp(&b.name));
-                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
+                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
             }
         } else {
+            let columns = batch.columns();
+            let schema = batch.schema();
+            let fields = schema.fields();
+            let cols = fields
+                .iter()
+                .zip(columns)
+                .filter_map(|(field, col)| {
+                    if field.name() == HASH_LABEL {
+                        None
+                    } else if let Some(col) = col.as_any().downcast_ref::<StringArray>() {
+                        Some((field.name(), col))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>();
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<StringArray>()
                 .unwrap();
+            let mut labels = Vec::with_capacity(columns.len());
             for i in 0..batch.num_rows() {
                 let hash = hash_values.value(i).into();
                 if !hash_value_set.contains(&hash) {
@@ -1266,23 +1296,18 @@ async fn selector_load_data_from_datafusion(
                 if metrics.contains_key(&hash) {
                     continue;
                 }
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == HASH_LABEL {
+                labels.clear(); // reset and reuse the same vector
+                for (name, value) in cols.iter() {
+                    if value.is_null(i) {
                         continue;
                     }
-                    if v.is_null(i) {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
                     labels.push(Arc::new(Label {
                         name: name.to_string(),
                         value: value.value(i).to_string(),
                     }));
                 }
                 labels.sort_by(|a, b| a.name.cmp(&b.name));
-                metrics.insert(hash, RangeValue::new(labels, Vec::new()));
+                metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
             }
         }
     }
