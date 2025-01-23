@@ -1306,7 +1306,7 @@ const getServiceAccounts = async () => {
       ...res.data.data.map((account: any) => account.email),
     );
     filteredServiceAccounts.value = [...serviceAccountsOptions];
-  } catch (err) {
+  } catch (err: any) {
     if (err.response?.status != 403) {
       q.notify({
         type: "negative",
