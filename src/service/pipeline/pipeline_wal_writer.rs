@@ -95,18 +95,6 @@ async fn notify_file_watcher(path: PathBuf) {
     }
 }
 
-async fn stop_watch_tmp_file(path: PathBuf) {
-    let watcher = FILE_WATCHER_NOTIFY.write().await;
-    if let Some(watcher) = watcher.clone() {
-        if let Err(e) = watcher
-            .send(WatcherEvent::StopWatchFileAndWait(path.clone()))
-            .await
-        {
-            log::error!("pipeline_wal_writer stop_watch_tmp_file error: {}", e);
-        }
-    }
-}
-
 pub fn get_metadata_motified(metadata: &Metadata) -> Instant {
     metadata
         .modified()
@@ -267,8 +255,7 @@ impl PipelineWalWriter {
             notify_file_watcher(persist_path).await;
             // notify file watcher stop watch tmp wal file
             // everytime query stream should write just one wal file, and next time use a new wal
-            stop_watch_tmp_file(writer.path().clone()).await;
-            // drop writer
+            // drop writer lock and then force rotate
             drop(writer);
             // force rotate
             self.rotate(0, true).await?;
