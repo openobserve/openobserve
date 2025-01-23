@@ -59,7 +59,7 @@ pub(crate) fn histogram_quantile(sample_time: i64, phi: f64, data: Value) -> Res
         }
     };
 
-    let mut metrics_with_buckets: HashMap<u64, MetricWithBuckets> = HashMap::with_capacity(in_vec.len());
+    let mut metrics_with_buckets: HashMap<u64, MetricWithBuckets> = HashMap::default();
     for InstantValue { mut labels, sample } in in_vec {
         // [https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile]:
         //

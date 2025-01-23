@@ -396,7 +396,7 @@ impl TimeWindow {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
@@ -536,17 +536,6 @@ impl RangeValue {
             labels,
             samples: vec![],
             exemplars: Some(Vec::from_iter(exemplars)),
-            time_window: None,
-        }
-    }
-}
-
-impl Default for RangeValue {
-    fn default() -> Self {
-        Self {
-            labels: vec![],
-            samples: vec![],
-            exemplars: None,
             time_window: None,
         }
     }
