@@ -1328,10 +1328,7 @@ async fn load_samples_from_datafusion(
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics
-            .keys()
-            .map(|k| (k.clone(), RangeValue::default()))
-            .collect::<HashMap<_, _>>();
+        let mut series = metrics.clone();
         let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
                 let cfg = get_config();
@@ -1431,10 +1428,7 @@ async fn load_exemplars_from_datafusion(
     let mut tasks = Vec::new();
     for mut stream in streams {
         let hash_field_type = hash_field_type.clone();
-        let mut series = metrics
-            .keys()
-            .map(|k| (k.clone(), RangeValue::default()))
-            .collect::<HashMap<_, _>>();
+        let mut series = metrics.clone();
         let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
                 loop {
