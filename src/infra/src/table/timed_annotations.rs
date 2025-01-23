@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::Utc;
 use config::{ider, meta::timed_annotations::*};
 use sea_orm::{
@@ -38,8 +40,6 @@ pub async fn get(
     start_time: i64,
     end_time: i64,
 ) -> Result<Vec<TimedAnnotation>, errors::Error> {
-    use sea_orm::{entity::*, query::*, sea_query::JoinType};
-
     // make sure only one client is writing to the database (only for SQLite)
     let _lock = get_lock().await;
 
@@ -59,27 +59,32 @@ pub async fn get(
 
     let dashboard_pk = dashboard_record.id;
 
-    // Step 2: Build the query for `timed_annotations` with a JOIN on `annotation_panels`
+    // Step 2: Build the query for `timed_annotations`
     let mut query = timed_annotations::Entity::find()
-        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
-        .join(
-            JoinType::InnerJoin,
-            timed_annotations::Relation::TimedAnnotationPanels.def(),
-        );
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk));
 
-    // Step 3: If `panel_ids` is provided, filter by `panel_id`
-    if let Some(panel_ids) = panel_ids {
+    // Step 3: Combine panel filtering logic
+    if let Some(ref panel_ids) = panel_ids {
         query = query.filter(
-            Expr::col((
-                timed_annotation_panels::Entity,
-                timed_annotation_panels::Column::PanelId,
-            ))
-            .is_in(panel_ids),
+            Condition::any()
+                .add(
+                    Expr::col((
+                        timed_annotation_panels::Entity,
+                        timed_annotation_panels::Column::PanelId,
+                    ))
+                    .is_in(panel_ids.to_vec()), /* Include annotations linked to the specified
+                                                 * panels */
+                )
+                .add(
+                    Expr::col((
+                        timed_annotation_panels::Entity,
+                        timed_annotation_panels::Column::PanelId,
+                    ))
+                    .is_null(), // Include annotations with no panels
+                ),
         );
     }
-
     // Step 4: Filter by time range (overlap condition)
-    // Handle entries where end_time is null and ensure start_time is within the query range
     query = query
         .filter(
             Expr::col((
@@ -116,54 +121,52 @@ pub async fn get(
                 ),
         );
 
-    // Step 5: Execute Query
-    let annotations = query.all(client).await?;
-
-    if annotations.is_empty() {
-        return Ok(vec![]); // No annotations found
-    }
-
-    let annotation_ids: Vec<String> = annotations.iter().map(|a| a.id.clone()).collect();
-
-    // Step 6: Fetch associated panels for the retrieved annotations
-    let panels = timed_annotation_panels::Entity::find()
-        .filter(timed_annotation_panels::Column::TimedAnnotationId.is_in(annotation_ids.clone()))
+    // Step 5: Execute Query with `find_also_related`
+    let annotations_with_panels = query
+        .find_also_related(timed_annotation_panels::Entity)
         .all(client)
         .await?;
 
-    // Step 7: Group panel IDs by annotation ID
-    let mut panels_map: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
-
-    for panel in panels {
-        panels_map
-            .entry(panel.timed_annotation_id.clone())
-            .or_default()
-            .push(panel.panel_id.clone());
+    if annotations_with_panels.is_empty() {
+        return Ok(vec![]);
     }
 
-    // Step 8: Combine annotations with their associated panel IDs
-    let results = annotations
-        .into_iter()
-        .map(|annotation| TimedAnnotation {
-            panels: panels_map
-                .get(&annotation.id)
-                .cloned()
-                .unwrap_or_else(Vec::new),
-            annotation_id: Some(annotation.id),
-            start_time: annotation.start_time,
-            end_time: annotation.end_time,
-            title: annotation.title,
-            text: annotation.text,
-            tags: annotation
-                .tags
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect(),
-        })
-        .collect();
+    // Step 6: Group annotations and aggregate panels
+    let mut grouped_annotations: HashMap<String, TimedAnnotation> = HashMap::new();
+
+    for (annotation, panel) in annotations_with_panels {
+        let annotation_id = annotation.id.clone();
+
+        grouped_annotations
+            .entry(annotation_id.clone())
+            .or_insert_with(|| TimedAnnotation {
+                annotation_id: Some(annotation.id.clone()),
+                start_time: annotation.start_time,
+                end_time: annotation.end_time,
+                title: annotation.title,
+                text: annotation.text,
+                tags: annotation
+                    .tags
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                panels: vec![], // Initialize with an empty panel list
+            });
+
+        // Add the panel ID to the annotation, if it exists
+        if let Some(panel) = panel {
+            grouped_annotations
+                .get_mut(&annotation_id)
+                .unwrap()
+                .panels
+                .push(panel.panel_id.clone());
+        }
+    }
+
+    // Step 7: Convert grouped annotations back into a Vec
+    let results: Vec<TimedAnnotation> = grouped_annotations.into_values().collect();
 
     Ok(results)
 }
@@ -438,9 +441,7 @@ async fn insert_timed_annotation<'a>(
     let dashboard_pk = dashboard_record.id;
 
     let annotation_id: String = if use_given_id {
-        timed_annotation
-            .annotation_id
-            .unwrap_or_else(ider::uuid)
+        timed_annotation.annotation_id.unwrap_or_else(ider::uuid)
     } else {
         ider::uuid()
     };

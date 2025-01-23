@@ -36,7 +36,7 @@ pub async fn create_timed_annotations(
         .await
         {
             Ok(_) => (),
-            Err(e) => tracing::error!(
+            Err(e) => log::error!(
                 "[dashboard_id: {}] Failed to emit event to super cluster: {:?}",
                 dashboard_id,
                 e
@@ -73,7 +73,7 @@ pub async fn delete_timed_annotations(
     for id in req.annotation_ids.iter() {
         match super_cluster::emit_timed_annotation_delete_event(dashboard_id, id).await {
             Ok(_) => (),
-            Err(e) => tracing::error!(
+            Err(e) => log::error!(
                 "[timed_annotation_id: {}] Failed to emit event to super cluster: {:?}",
                 id,
                 e
@@ -154,7 +154,7 @@ mod super_cluster {
         use_given_id: bool,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_create(
+            o2_enterprise::enterprise::super_cluster::queue::timed_annotations_create(
                 dashboard_id,
                 timed_annotation,
                 use_given_id,
@@ -172,7 +172,7 @@ mod super_cluster {
         timed_annotation: TimedAnnotationUpdate,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_put(
+            o2_enterprise::enterprise::super_cluster::queue::timed_annotations_put(
                 dashboard_id,
                 timed_annotation_id,
                 timed_annotation,
@@ -189,7 +189,7 @@ mod super_cluster {
         timed_annotation_id: &str,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotations_delete(
+            o2_enterprise::enterprise::super_cluster::queue::timed_annotations_delete(
                 dashboard_id,
                 timed_annotation_id,
             )
@@ -205,7 +205,7 @@ mod super_cluster {
         panels: Vec<String>,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_put(
+            o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_put(
                 timed_annotation_id,
                 panels,
             )
@@ -221,13 +221,12 @@ mod super_cluster {
         panels: Vec<String>,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let _ =
-                o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_delete(
-                    timed_annotation_id,
-                    panels,
-                )
-                .await
-                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+            o2_enterprise::enterprise::super_cluster::queue::timed_annotation_panels_delete(
+                timed_annotation_id,
+                panels,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
         }
         Ok(())
     }
