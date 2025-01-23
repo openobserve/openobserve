@@ -18,10 +18,7 @@ use std::{io::Error, str::FromStr};
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use bytes::Bytes;
-use config::{
-    get_config,
-    meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest},
-};
+use config::meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::stream::{self};
 use infra::table::action_scripts;
@@ -525,11 +522,7 @@ pub async fn upload_zipped_action(
         return Ok(HttpResponse::BadRequest().body("Uploaded file is empty"));
     }
 
-    let data_dir = get_config().common.data_dir.clone();
-    let file_path = format!(
-        "{}/actions/{}/{}.zip",
-        data_dir, org_id, action.zip_file_name
-    );
+    let file_path = format!("files/{}/actions/{}", org_id, action.zip_file_name);
 
     let passcode = if let Ok(res) = get_passcode(Some(&org_id), &action.service_account).await {
         res.passcode
