@@ -533,7 +533,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(billings::process_session_detail)
         .service(billings::list_subscription)
         .service(billings::list_invoices)
-        .service(billings::unsubscribe);
+        .service(billings::unsubscribe)
+        .service(billings::org_usage::get_org_quota_threshold)
+        .service(billings::org_usage::get_org_usage);
 
     svc.service(service);
 }

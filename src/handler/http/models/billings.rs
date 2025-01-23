@@ -20,7 +20,6 @@ use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-// for search job pagination
 #[derive(Debug, Deserialize)]
 pub struct CheckoutSessionDetailRequestQuery {
     pub session_id: String,
@@ -28,20 +27,53 @@ pub struct CheckoutSessionDetailRequestQuery {
     pub plan: String,
 }
 
-/// HTTP request body for `ListInvoices` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct ListInvoicesResponseBody {
     pub invoices: Vec<cloud_billings::StripeInvoice>,
 }
 
-/// HTTP request body for `CreateQuotaThreshold` endpoint.
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
 }
 
-/// HTTP request body for `CreateQuotaThreshold` endpoint.
+impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
+    fn from(value: cloud_billings::CustomerBilling) -> Self {
+        Self {
+            subscription_type: value.subscription_type.to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct GetOrgUsageResponseBody {
+    pub data: OrgUserData,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema, Default)]
+pub struct OrgUserData {
+    ingestion: f64,
+    search: f64,
+    functions: f64,
+    other: f64,
+}
+
+impl From<cloud_billings::org_usage::OrgUsage> for GetOrgUsageResponseBody {
+    fn from(value: cloud_billings::org_usage::OrgUsage) -> Self {
+        Self {
+            data: OrgUserData {
+                ingestion: value.ingestion,
+                search: value.search,
+                functions: value.functions,
+                other: value.other,
+            },
+            message: "Data usage retried successfully".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetQuotaThresholdResponseBody {
     pub data: OrgQuotaThreshold,
@@ -50,37 +82,22 @@ pub struct GetQuotaThresholdResponseBody {
 
 #[derive(Clone, Debug, Serialize, ToSchema, Default)]
 pub struct OrgQuotaThreshold {
-    ingestion: i64,
-    query: i64,
-    pipeline_process: i64,
-    rum_session: i64,
-    dashboard: i64,
-    metric: i64,
-    trace: i64,
+    ingestion: f64,
+    search: f64,
+    functions: f64,
+    other: f64,
 }
 
-// impl From<cloud_org_usage::OrgUsageRecord> for GetQuotaThresholdResponseBody {
-//     fn from(value: cloud_org_usage::OrgUsageRecord) -> Self {
-//         let data = OrgQuotaThreshold {
-//             ingestion: value.ingestion_size,
-//             query: value.query_size,
-//             pipeline_process: value.pipeline_process_size,
-//             rum_session: value.rum_session_size,
-//             dashboard: value.dashboard_size,
-//             metric: value.metric_size,
-//             trace: value.trace_size,
-//         };
-//         Self {
-//             data,
-//             message: "Organization monthly quota pulled successfully.".to_string(),
-//         }
-//     }
-// }
-
-impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
-    fn from(value: cloud_billings::CustomerBilling) -> Self {
+impl From<cloud_billings::org_usage::OrgUsageThreshold> for GetQuotaThresholdResponseBody {
+    fn from(value: cloud_billings::org_usage::OrgUsageThreshold) -> Self {
         Self {
-            subscription_type: value.subscription_type.to_string(),
+            data: OrgQuotaThreshold {
+                ingestion: value.ingestion,
+                search: value.search,
+                functions: value.functions,
+                other: value.other,
+            },
+            message: "Organization monthly quota pulled successfully".to_string(),
         }
     }
 }

@@ -30,6 +30,8 @@ use crate::{
     service::organization,
 };
 
+pub mod org_usage;
+
 /// GetSubscriptionUrl
 #[utoipa::path(
     context_path = "/api",
@@ -184,8 +186,8 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     ),
 )]
 #[get("/{org_id}/billings/invoices")]
