@@ -11,7 +11,9 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
 // await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1000); 
+  await page.getByText('Login as internal user').click();
+  //Enter Email
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -957,7 +959,8 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(6000);
     await page.getByRole('cell', { name: 'Trace ID' }).click();
     // Locate the row using a known static value like the SQL query
-    const row = page.locator('tr:has-text("select histogram")');
+    // const row = page.locator('tr:has-text("select histogram")');
+    const row = page.locator('tr:has-text("SELECT histogram")');
     // Click the button inside the located row
   await row.locator('button.q-btn').nth(0).click();
     await page.getByRole('button', { name: 'Logs' }).click();

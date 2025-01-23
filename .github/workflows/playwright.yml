@@ -114,6 +114,9 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
+            "cipherKeys.spec.js",
+            
+            
           ]
 
     steps:
