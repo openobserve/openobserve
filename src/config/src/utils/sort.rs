@@ -38,7 +38,7 @@ mod tests {
         // Test with NaN
         assert_eq!(sort_float(&f64::NAN, &1.0), Ordering::Less);
         assert_eq!(sort_float(&1.0, &f64::NAN), Ordering::Greater);
-        assert_eq!(sort_float(&f64::NAN, &f64::NAN), Ordering::Less);
+        assert_eq!(sort_float(&f64::NAN, &f64::NAN), Ordering::Equal);
 
         // Test with infinity
         assert_eq!(sort_float(&f64::INFINITY, &1.0), Ordering::Greater);
