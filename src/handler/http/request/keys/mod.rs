@@ -35,8 +35,6 @@ use crate::common::{
         content = KeyAddRequest,
         description = "Key data to add",
         content_type = "application/json",
-        // example = json!({            
-        // })
     ),
     responses(
         (
@@ -44,9 +42,6 @@ use crate::common::{
             description = "Empty response",
             body = (),
             content_type = "application/json",
-            // example = json!({
-            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
-            // })
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
@@ -121,7 +116,7 @@ pub async fn save(
     }
 }
 
-/// get credentials for given key name
+/// get key with given name if present
 #[utoipa::path(
     get,
     context_path = "/api",
@@ -134,9 +129,6 @@ pub async fn save(
             description = "Key info",
             body = KeyGetResponse,
             content_type = "application/json",
-            // example = json!({
-            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
-            // })
         ),
         (status = 404, description = "Key not found", content_type = "text/plain")
     ),
@@ -180,7 +172,7 @@ pub async fn get(
     Ok(MetaHttpResponse::forbidden("not supported"))
 }
 
-/// get credentials for given key name
+/// list all keys for given org
 #[utoipa::path(
     get,
     context_path = "/api",
@@ -190,9 +182,6 @@ pub async fn get(
             description = "list all keys in the org",
             body = KeyListResponse,
             content_type = "application/json",
-            // example = json!({
-            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
-            // })
         ),
     ),
     tag = "Key"
@@ -244,9 +233,6 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
             description = "Empty response",
             body = (),
             content_type = "application/json",
-            // example = json!({
-            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
-            // })
         ),
     ),
     tag = "Keys"
@@ -284,12 +270,13 @@ pub async fn delete(
 #[utoipa::path(
     post,
     context_path = "/api",
+    params(
+        ("key_name" = String, Path, description = "name of the key to update", example = "test_key")
+    ),
     request_body(
         content = KeyAddRequest,
-        description = "Key data to update",
+        description = "updated key data",
         content_type = "application/json",
-        // example = json!({            
-        // })
     ),
     responses(
         (
@@ -297,9 +284,6 @@ pub async fn delete(
             description = "Empty response",
             body = (),
             content_type = "application/json",
-            // example = json!({
-            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
-            // })
         ),
         (status = 400, description = "Invalid request", content_type = "application/json")
     ),
