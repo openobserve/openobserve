@@ -15,7 +15,9 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
+use aes_siv::{siv::Aes256Siv, KeyInit};
 use arc_swap::ArcSwap;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
@@ -375,6 +377,7 @@ pub struct Config {
     pub tokio_console: TokioConsole,
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
+    pub encryption: Encryption,
 }
 
 #[derive(EnvConfig)]
@@ -1573,6 +1576,13 @@ pub struct Pipeline {
 }
 
 #[derive(EnvConfig)]
+pub struct Encryption {
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
+    pub algorithm: String,
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
+    pub master_key: String,
+}
+#[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
     pub enabled: bool,
@@ -1740,6 +1750,9 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
@@ -2338,6 +2351,34 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
+}
+
+fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.encryption.algorithm.is_empty() {
+        if cfg.encryption.algorithm != "aes-256-siv" {
+            return Err(anyhow::anyhow!(
+                "invalid algorithm specified, only [aes-256-siv] is supported"
+            ));
+        }
+        // this is basically a duplication of code from tables/cipher.rs
+        // but we only support one algorithm for now, so ok. Once we support more
+        // we have to extract this into proper functions and use the same in both places
+        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "master encryption key is not properly base64 encoded : {e}"
+                ));
+            }
+        };
+        match Aes256Siv::new_from_slice(&key) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
