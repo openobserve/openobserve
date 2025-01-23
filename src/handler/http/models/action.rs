@@ -62,6 +62,7 @@ pub struct GetActionDetailsResponse {
     pub cron_expr: Option<String>,
     pub zip_file_name: String,
     pub description: Option<String>,
+    pub service_account: String,
 }
 
 impl TryFrom<Action> for GetActionDetailsResponse {
@@ -76,6 +77,7 @@ impl TryFrom<Action> for GetActionDetailsResponse {
             cron_expr: value.cron_expr,
             zip_file_name: value.zip_file_name,
             description: value.description,
+            service_account: value.service_account,
         })
     }
 }
