@@ -51,7 +51,7 @@ impl TryFrom<Model> for Action {
             created_at: DateTime::<Utc>::from_timestamp_micros(model.created_at).unwrap(),
             last_executed_at: model
                 .last_executed_at
-                .and_then(|ts| DateTime::<Utc>::from_timestamp_micros(ts)),
+                .and_then(DateTime::<Utc>::from_timestamp_micros),
             description: model.description,
             cron_expr: model.cron_expr,
             status: ActionStatus::try_from(model.status.as_str()).unwrap(),
@@ -60,7 +60,7 @@ impl TryFrom<Model> for Action {
                 .unwrap(),
             last_successful_at: model
                 .last_successful_at
-                .and_then(|ts| DateTime::<Utc>::from_timestamp_micros(ts)),
+                .and_then(DateTime::<Utc>::from_timestamp_micros),
             origin_cluster_url: (model.origin_cluster_url),
             service_account: (model.service_account),
         })
