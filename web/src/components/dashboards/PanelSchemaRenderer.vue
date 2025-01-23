@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays">
+  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays" @mouseenter="showPopupsAndOverlays">
     <div
       ref="chartPanelRef"
       style="height: 100%; position: relative"
@@ -129,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
-        v-if="allowAnnotationsAdd"
-        style="position: absolute; top: 0px; right: 0px; z-index: 9999999"
+        v-if="allowAnnotationsAdd && isCursorOverPanel"
+        style="position: absolute; top: 0px; right: 0px; z-index: 9"
         @click.stop
       >
         <q-btn
@@ -345,6 +345,11 @@ export default defineComponent({
       height: "100%",
       width: "100%",
     });
+
+    const isCursorOverPanel = ref(false);
+    const showPopupsAndOverlays = () => {
+      isCursorOverPanel.value = true;
+    }
 
     // get refs from props
     const {
@@ -669,6 +674,8 @@ export default defineComponent({
       if (drilldownPopUpRef.value) {
         drilldownPopUpRef.value.style.display = "none";
       }
+
+      isCursorOverPanel.value = false;
     };
 
     // drilldown
@@ -1309,6 +1316,8 @@ export default defineComponent({
       annotationToAddEdit,
       checkIfPanelIsTimeSeries,
       panelsList,
+      isCursorOverPanel,
+      showPopupsAndOverlays,
     };
   },
 });
