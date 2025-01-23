@@ -4964,7 +4964,7 @@ dependencies = [
  "object_store",
  "once_cell",
  "parking_lot",
- "reqwest",
+ "reqwest 0.12.9",
  "sea-orm",
  "sea-orm-migration",
  "serde",
