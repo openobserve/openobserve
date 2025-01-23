@@ -132,8 +132,7 @@ pub async fn handle_search_request(
 
     // handle search result size
     let req_size = if req.payload.query.size == 0 {
-        req.payload.query.size = cfg.limit.query_default_limit;
-        req.payload.query.size
+        cfg.limit.query_default_limit;
     } else {
         req.payload.query.size
     };
