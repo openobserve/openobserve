@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set,
+    QuerySelect, Schema, Set, Unchanged,
 };
 
 use super::{
@@ -31,37 +31,6 @@ use crate::{
     errors::{self, DbError, Error},
     table::entity::action_scripts::{Column, Entity},
 };
-// #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-// #[sea_orm(table_name = "action_scripts")]
-// pub struct Model {
-//     #[sea_orm(primary_key, auto_increment = false)]
-//     pub id: String, // Primary key, unique identifier
-//     #[sea_orm(column_type = "String(StringLen::N(32))")]
-//     pub name: String, // Name with a max length of 32 characters
-//     pub file_path: String, // Zip file for action script
-//     pub file_name: String,
-//     #[sea_orm(column_type = "String(StringLen::N(128))")]
-//     pub org_id: String,
-//     #[sea_orm(column_type = "String(StringLen::N(128))")]
-//     pub created_by: String,
-//     // URLs can be long
-//     #[sea_orm(column_type = "Text")]
-//     pub origin_cluster_url: String,
-//     #[sea_orm(column_type = "Json")]
-//     pub env: JsonValue, // Environment variables serialized as JSON
-//     #[sea_orm(column_type = "Json")]
-//     pub execution_details: ExecutionDetailsType,
-//     #[sea_orm(column_type = "String(StringLen::N(32))")]
-//     pub cron_expr: Option<String>,
-//     #[sea_orm(default_value = "CURRENT_TIMESTAMP")]
-//     pub created_at: DateTimeUtc, // Automatically set on insert
-//     pub last_modified_at: DateTimeUtc,
-//     pub last_executed_at: Option<DateTimeUtc>,
-//     pub last_successful_at: Option<DateTimeUtc>,
-//     #[sea_orm(column_type = "Text")]
-//     pub description: Option<String>,
-//     pub status: ActionStatus,
-// }
 
 impl TryFrom<Model> for Action {
     type Error = errors::Error;
@@ -93,6 +62,7 @@ impl TryFrom<Model> for Action {
                 .last_successful_at
                 .and_then(|ts| DateTime::<Utc>::from_timestamp_micros(ts)),
             origin_cluster_url: (model.origin_cluster_url),
+            service_account: (model.service_account),
         })
     }
 }
@@ -111,7 +81,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn add(action: &Action) -> Result<(), errors::Error> {
+pub async fn add(action: &Action) -> Result<String, errors::Error> {
     let record = ActiveModel {
         id: Set(action.id.unwrap().to_string()),
         name: Set(action.name.clone()),
@@ -132,21 +102,22 @@ pub async fn add(action: &Action) -> Result<(), errors::Error> {
         created_by: Set(action.created_by.clone()),
         status: Set(action.status.to_string()),
         origin_cluster_url: Set(action.origin_cluster_url.clone()),
+        service_account: Set(action.service_account.clone()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record).exec(client).await?;
+    let uuid = Entity::insert(record).exec(client).await?.last_insert_id;
 
-    Ok(())
+    Ok(uuid)
 }
 
-pub async fn update(action: &Action) -> Result<(), errors::Error> {
+pub async fn update(action: &Action) -> Result<String, errors::Error> {
     let id = action.id.ok_or(Error::Message("id not set".to_string()))?;
     let record = ActiveModel {
-        id: Set(id.to_string()),
+        id: Unchanged(id.to_string()),
         name: Set(action.name.clone()),
         org_id: Set(action.org_id.to_string()),
         file_path: Set(action
@@ -165,15 +136,16 @@ pub async fn update(action: &Action) -> Result<(), errors::Error> {
         created_by: Set(action.created_by.clone()),
         status: Set(action.status.to_string()),
         origin_cluster_url: Set(action.origin_cluster_url.clone()),
+        service_account: Set(action.service_account.clone()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update(record).exec(client).await?;
+    let action = Entity::update(record).exec(client).await?;
 
-    Ok(())
+    Ok(action.id)
 }
 pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)

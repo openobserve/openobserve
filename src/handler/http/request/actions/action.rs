@@ -24,6 +24,7 @@ use config::{
 };
 use futures::{StreamExt, TryStreamExt};
 use futures_util::stream::{self};
+use infra::table::action_scripts;
 use o2_enterprise::enterprise::actions::action_manager::{
     delete_app_from_target_cluster, serve_file_from_s3, update_app_on_target_cluster,
 };
@@ -39,6 +40,7 @@ use crate::{
         utils::auth::{check_permissions, remove_ownership, set_ownership, UserEmail},
     },
     handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
+    service::organization::get_passcode,
 };
 
 const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
@@ -132,7 +134,22 @@ pub async fn update_action_details(
 ) -> Result<HttpResponse, Error> {
     let (org_id, ksuid) = path.into_inner();
     let req = req.into_inner();
-    match update_app_on_target_cluster(&org_id, ksuid, req).await {
+    let sa = match req.service_account.clone() {
+        None => {
+            if let Ok(action) = dbg!(action_scripts::get(&ksuid.to_string(), &org_id).await) {
+                action.service_account
+            } else {
+                return Ok(MetaHttpResponse::bad_request("Failed to fetch action"));
+            }
+        }
+        Some(sa) => sa,
+    };
+    let passcode = if let Ok(res) = get_passcode(Some(&org_id), &sa).await {
+        res.passcode
+    } else {
+        return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
+    };
+    match update_app_on_target_cluster(&org_id, ksuid, req, &passcode).await {
         Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -237,6 +254,7 @@ pub async fn upload_zipped_action(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut file_data = Vec::new();
+    let mut is_update = false;
     let mut action = Action {
         org_id: org_id.clone(),
         ..Default::default()
@@ -447,11 +465,31 @@ pub async fn upload_zipped_action(
                 if let Ok(id) = String::from_utf8(id) {
                     if let Ok(id) = Ksuid::from_str(&id) {
                         action.id = Some(id);
+                        is_update = true;
                     } else {
                         return Ok(HttpResponse::BadRequest().body("Invalid ID"));
                     }
                 } else {
                     return Ok(HttpResponse::BadRequest().body("Invalid ID"));
+                }
+            }
+            "service_account" => {
+                received_fields.push("service_account");
+                let mut service_account = Vec::new();
+                while let Some(chunk) = field.next().await {
+                    match chunk {
+                        Ok(bytes) => service_account.extend_from_slice(&bytes),
+                        Err(_) => {
+                            return Ok(HttpResponse::BadRequest()
+                                .body("Failed to read service_account field"))
+                        }
+                    }
+                }
+                if let Ok(service_account) = String::from_utf8(service_account) {
+                    action.service_account = service_account;
+                } else {
+                    return Ok(HttpResponse::BadRequest()
+                        .body("Service account field contains invalid UTF-8 data"));
                 }
             }
             _ => {}
@@ -488,15 +526,26 @@ pub async fn upload_zipped_action(
     }
 
     let data_dir = get_config().common.data_dir.clone();
-    let file_path = format!("{}/actions/{}/{}.zip", data_dir, org_id, action.name);
+    let file_path = format!(
+        "{}/actions/{}/{}.zip",
+        data_dir, org_id, action.zip_file_name
+    );
+
+    let passcode = if let Ok(res) = get_passcode(Some(&org_id), &action.service_account).await {
+        res.passcode
+    } else {
+        return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
+    };
 
     // Attempt to read the uploaded data as a ZIP file
     match zip::read::ZipArchive::new(std::io::Cursor::new(file_data)) {
         Ok(archive) => {
             log::info!("Successfully read ZIP archive with {} files", archive.len());
-            match register_app(action, archive, &file_path).await {
+            match register_app(action, archive, &file_path, &passcode).await {
                 Ok(uuid) => {
-                    set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
+                    if !is_update {
+                        set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
+                    }
                     Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid})))
                 }
                 Err(e) => Ok(HttpResponse::BadRequest().json(

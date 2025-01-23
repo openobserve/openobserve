@@ -20,9 +20,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     let action_scripts_message: ActionScriptsMessage = msg.try_into()?;
     match action_scripts_message {
         ActionScriptsMessage::Put { action } => {
+            // TODO Cleanup the zip file from s3 if it exists
             infra::table::action_scripts::add(&action).await?;
         }
         ActionScriptsMessage::Delete { org_id, action_id } => {
+            // TODO Cleanup the zip file from s3 if it exists
             infra::table::action_scripts::remove(&org_id, &action_id).await?;
         }
     }

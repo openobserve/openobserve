@@ -103,6 +103,7 @@ pub struct Action {
     pub status: ActionStatus,
     pub created_at: DateTime<Utc>,
     pub last_executed_at: Option<DateTime<Utc>>,
+    // User Set variable
     pub zip_file_name: String,
     // default to created_at
     #[serde(default)]
@@ -110,6 +111,7 @@ pub struct Action {
     #[serde(default)]
     pub last_successful_at: Option<DateTime<Utc>>,
     pub origin_cluster_url: String,
+    pub service_account: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -124,6 +126,8 @@ pub struct UpdateActionDetailsRequest {
     pub cron_expr: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
+    pub service_account: Option<String>,
 }
 
 /// Request send to Action Deployer, to deploy an action
@@ -145,6 +149,10 @@ pub struct DeployActionRequest {
     pub runtime: String,
     #[serde(default)]
     pub origin_cluster_url: String,
+    #[serde(default)]
+    pub sa_token: String,
+    #[serde(default)]
+    pub service_account: String,
 }
 
 /// Request send to Action Deployer, to deploy an action

@@ -99,6 +99,11 @@ fn create_table_stmt() -> TableCreateStatement {
                 .string_len(128)
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(ActionScripts::ServiceAccount)
+                .string_len(256)
+                .not_null(),
+        )
         .to_owned()
 }
 
@@ -121,4 +126,5 @@ enum ActionScripts {
     LastSuccessfulAt,
     Description,
     Status,
+    ServiceAccount,
 }
