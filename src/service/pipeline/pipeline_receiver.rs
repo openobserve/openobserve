@@ -199,13 +199,38 @@ impl PipelineReceiver {
         }
     }
 
-    pub async fn get_stream_export_retry_time(&self) -> u64 {
-        // minitues to ms
-        config::get_config().pipeline.remote_request_retry_time * 60 * 1000
+    // unit is seconds, need to convert to milliseconds
+    pub async fn get_stream_export_max_retry_time(&self) -> u64 {
+        config::get_config().pipeline.remote_request_max_retry_time * 1000
     }
 
     pub async fn get_stream_data_retention_days(&self) -> i64 {
-        config::get_config().compact.data_retention_days
+        let pipeline_id = self.reader_header.get("pipeline_id").ok_or(Error::Message(
+            "get_stream_data_retention_days get pipeline_id fail".to_string(),
+        ));
+
+        if pipeline_id.is_err() {
+            return config::get_config().compact.data_retention_days;
+        }
+
+        let pipeline = db::pipeline::get_by_id(pipeline_id.unwrap().as_str()).await;
+
+        if pipeline.is_err() {
+            return config::get_config().compact.data_retention_days;
+        }
+
+        let stream_params = pipeline.unwrap().get_source_stream_params();
+        match infra::schema::get_settings(
+            stream_params.org_id.as_str(),
+            stream_params.stream_name.as_str(),
+            stream_params.stream_type,
+        )
+        .await
+        {
+            Some(settings) if settings.data_retention > 0 => settings.data_retention,
+            Some(_) => config::get_config().compact.data_retention_days,
+            None => config::get_config().compact.data_retention_days,
+        }
     }
 
     /// Read a entry from the wal file
@@ -253,13 +278,13 @@ impl PipelineReceiver {
     pub async fn should_delete_on_data_retention(&self) -> bool {
         if let Ok(metadata) = self.reader.metadata() {
             let modified = get_metadata_motified(&metadata);
-            log::debug!(
-                "PipelineReceiver should_delete_on_data_retention file {} modified elapsed: {} ",
-                self.reader.path().display(),
-                modified.elapsed().as_secs()
-            );
-
             let retention_time = self.get_stream_data_retention_days().await;
+            log::debug!(
+                "PipelineReceiver should_delete_on_data_retention file {} modified elapsed: {}, retention_time: {} ",
+                self.reader.path().display(),
+                modified.elapsed().as_secs(),
+                retention_time
+            );
             modified.elapsed().as_secs() > (retention_time * 24 * 3600) as u64
         } else {
             true

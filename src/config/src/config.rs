@@ -15,7 +15,9 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
+use aes_siv::{siv::Aes256Siv, KeyInit};
 use arc_swap::ArcSwap;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
@@ -375,6 +377,7 @@ pub struct Config {
     pub tokio_console: TokioConsole,
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
+    pub encryption: Encryption,
 }
 
 #[derive(EnvConfig)]
@@ -1553,11 +1556,17 @@ pub struct Pipeline {
     )]
     pub remote_request_timeout: u64,
     #[env_config(
-        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY_TIME",
-        default = 1440,
-        help = "pipeline exporter client request retry times, default 1440 minutes(24 hours)"
+        name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
+        default = 86400,
+        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
     )]
-    pub remote_request_retry_time: u64,
+    pub remote_request_max_retry_time: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_WAL_SIZE_LIMIT",
+        default = 0,
+        help = "pipeline wal dir data size limit, default is 50% of local volume available space, unit is MB"
+    )]
+    pub wal_size_limit: u64,
     #[env_config(
         name = "ZO_PIPELINE_MAX_CONNECTIONS",
         default = 1024,
@@ -1566,6 +1575,13 @@ pub struct Pipeline {
     pub max_connections: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct Encryption {
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
+    pub algorithm: String,
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
+    pub master_key: String,
+}
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
@@ -1734,9 +1750,17 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
+    }
+
+    // check pipeline config
+    if let Err(e) = check_pipeline_config(&mut cfg) {
+        panic!("pipeline config error: {e}");
     }
 
     cfg
@@ -1957,16 +1981,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
 
-    // pipeline
-    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
-        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
-    }
-
-    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
-        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
-    {
-        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
-    }
     Ok(())
 }
 
@@ -2282,6 +2296,36 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // pipeline
+    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
+    }
+
+    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
+        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
+    {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
+    }
+
+    if cfg.pipeline.offset_flush_interval == 0 {
+        cfg.pipeline.offset_flush_interval = 10;
+    }
+    if cfg.pipeline.remote_request_max_retry_time == 0 {
+        cfg.pipeline.remote_request_max_retry_time = 86400; // 24 hours, in seconds
+    }
+
+    if cfg.pipeline.wal_size_limit == 0 {
+        cfg.pipeline.wal_size_limit = cfg.limit.disk_free as u64 / 2; // 50%
+        if cfg.pipeline.wal_size_limit > 1024 * 1024 * 1024 * 100 {
+            cfg.pipeline.wal_size_limit = 1024 * 1024 * 1024 * 100; // 100GB
+        }
+    } else {
+        cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+    Ok(())
+}
+
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
         cfg.health_check.timeout = 10;
@@ -2307,6 +2351,34 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
+}
+
+fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.encryption.algorithm.is_empty() {
+        if cfg.encryption.algorithm != "aes-256-siv" {
+            return Err(anyhow::anyhow!(
+                "invalid algorithm specified, only [aes-256-siv] is supported"
+            ));
+        }
+        // this is basically a duplication of code from tables/cipher.rs
+        // but we only support one algorithm for now, so ok. Once we support more
+        // we have to extract this into proper functions and use the same in both places
+        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "master encryption key is not properly base64 encoded : {e}"
+                ));
+            }
+        };
+        match Aes256Siv::new_from_slice(&key) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
