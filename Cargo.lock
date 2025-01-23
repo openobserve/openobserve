@@ -2446,6 +2446,7 @@ name = "config"
 version = "0.1.0"
 dependencies = [
  "actix-web-prometheus",
+ "aes-siv",
  "ahash 0.8.11",
  "anyhow",
  "arc-swap",
