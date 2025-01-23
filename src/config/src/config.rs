@@ -1553,23 +1553,23 @@ pub struct Pipeline {
     )]
     pub remote_request_timeout: u64,
     #[env_config(
-        name = "ZO_PIPELINE_REMOTE_REQUEST_RETRY_TIME",
-        default = 1440,
-        help = "pipeline exporter client request retry times, default 1440 minutes(24 hours)"
+        name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
+        default = 86400,
+        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
     )]
-    pub remote_request_retry_time: u64,
+    pub remote_request_max_retry_time: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_WAL_SIZE_LIMIT",
+        default = 0,
+        help = "pipeline wal dir data size limit, default is 50% of local volume available space, unit is MB"
+    )]
+    pub wal_size_limit: u64,
     #[env_config(
         name = "ZO_PIPELINE_MAX_CONNECTIONS",
         default = 1024,
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
-    #[env_config(
-        name = "ZO_PIPELINE_DATA_RETENTION_SIZE_LIMIT",
-        default = 53687091200,
-        help = "pipeline wal dir data retention size limit, default 50GB"
-    )]
-    pub data_retention_size_limit: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1743,6 +1743,11 @@ pub fn init() -> Config {
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
+    }
+
+    // check pipeline config
+    if let Err(e) = check_pipeline_config(&mut cfg) {
+        panic!("pipeline config error: {e}");
     }
 
     cfg
@@ -1963,16 +1968,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
 
-    // pipeline
-    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
-        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
-    }
-
-    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
-        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
-    {
-        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
-    }
     Ok(())
 }
 
@@ -2285,6 +2280,36 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
+    Ok(())
+}
+
+fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // pipeline
+    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
+    }
+
+    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
+        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
+    {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
+    }
+
+    if cfg.pipeline.offset_flush_interval == 0 {
+        cfg.pipeline.offset_flush_interval = 10;
+    }
+    if cfg.pipeline.remote_request_max_retry_time == 0 {
+        cfg.pipeline.remote_request_max_retry_time = 86400; // 24 hours, in seconds
+    }
+
+    if cfg.pipeline.wal_size_limit == 0 {
+        cfg.pipeline.wal_size_limit = cfg.limit.disk_free as u64 / 2; // 50%
+        if cfg.pipeline.wal_size_limit > 1024 * 1024 * 1024 * 100 {
+            cfg.pipeline.wal_size_limit = 1024 * 1024 * 1024 * 100; // 100GB
+        }
+    } else {
+        cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
     Ok(())
 }
 

@@ -199,9 +199,9 @@ impl PipelineReceiver {
         }
     }
 
-    pub async fn get_stream_export_retry_time(&self) -> u64 {
-        // min to ms
-        config::get_config().pipeline.remote_request_retry_time * 60 * 1000
+    // unit is seconds, need to convert to milliseconds
+    pub async fn get_stream_export_max_retry_time(&self) -> u64 {
+        config::get_config().pipeline.remote_request_max_retry_time * 1000
     }
 
     pub async fn get_stream_data_retention_days(&self) -> i64 {

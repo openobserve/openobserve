@@ -44,8 +44,8 @@ async fn cleanup_expired_remote_wal_files() {
 async fn cleanup() -> Result<(), anyhow::Error> {
     let mut wal_file_iter = PipelineOffsetManager::get_all_remote_wal_file().await;
     let tmp_wal_file_iter = PipelineOffsetManager::get_all_remote_tmp_wal_file().await;
-    let mut total_size = 0u128;
-    let mut files_donot_delete: BinaryHeap<(u128, u128, String)> = BinaryHeap::new();
+    let mut total_size = 0;
+    let mut files_donot_delete: BinaryHeap<(u64, u64, String)> = BinaryHeap::new();
     wal_file_iter.extend(tmp_wal_file_iter);
     for wal_file in wal_file_iter.iter() {
         match PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
@@ -74,9 +74,9 @@ async fn cleanup() -> Result<(), anyhow::Error> {
                     }
                 };
 
-                let file_size = metadata.len() as u128;
-                total_size = total_size.saturating_add(file_size);
-                let mod_time = get_metadata_motified(&metadata).elapsed().as_micros();
+                let file_size = metadata.len();
+                total_size += file_size;
+                let mod_time = get_metadata_motified(&metadata).elapsed().as_secs();
                 files_donot_delete.push((
                     mod_time,
                     file_size,
@@ -101,7 +101,8 @@ async fn cleanup() -> Result<(), anyhow::Error> {
     }
 
     // clean up by size limit
-    while total_size > config::get_config().pipeline.data_retention_size_limit as u128 {
+    let wal_size_limit = config::get_config().pipeline.wal_size_limit;
+    while total_size > wal_size_limit {
         if let Some((_, size, file_path)) = files_donot_delete.pop() {
             log::debug!("[PIPELINE] cleanup deleting: {}", file_path);
             if let Err(e) = tokio::fs::remove_file(&file_path).await {
