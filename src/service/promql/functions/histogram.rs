@@ -173,8 +173,9 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
                     });
                     None
                 } else {
+                    let nb = last.clone();
                     *last = b;
-                    Some(last.clone())
+                    Some(nb)
                 }
             }
         })
