@@ -70,8 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-              v-bind:readonly="isEditingActionScript"
-              v-bind:disable="isEditingActionScript"
               :rules="[
                 (val: any) =>
                   !!val
@@ -121,64 +119,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="outlinedDashboard"
               :done="step > 1"
             >
-            <div class="flex items-center o2-input">
-              <q-file
-                v-if="!isEditingActionScript || formData.fileNameToShow == ''"
-                ref="fileInput"
-                color="primary"
-                filled
-                v-model="formData.codeZip"
-                :label="t('actions.uploadCodeZip')"
-                bg-color="input-bg"
-                class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
-                stack-label
-                outlined
-                dense
-                accept=".zip"
-                :rules="[
-                  (val: any) => {
-                    if (!isEditingActionScript) {
-                      return !!val || 'CSV File is required!';
-                    }
-                    return true;
-                  }
-                ]"
-
-              >
-                <template v-slot:prepend>
-                  <q-icon name="attachment" />
-                </template>
-                <template v-slot:hint>
+              <div class="flex items-center o2-input">
+                <q-file
+                  v-if="!isEditingActionScript || formData.fileNameToShow == ''"
+                  ref="fileInput"
+                  color="primary"
+                  filled
+                  v-model="formData.codeZip"
+                  :label="t('actions.uploadCodeZip')"
+                  bg-color="input-bg"
+                  class="tw-w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
+                  stack-label
+                  outlined
+                  dense
+                  accept=".zip"
+                  :rules="[
+                    (val: any) => {
+                      if (!isEditingActionScript) {
+                        return !!val || 'CSV File is required!';
+                      }
+                      return true;
+                    },
+                  ]"
+                >
+                  <template v-slot:prepend>
+                    <q-icon name="attachment" />
+                  </template>
+                  <template v-slot:hint>
                     Note: Only .zip files are accepted and it may contain
                     various resources such as .py, .txt and main.py file etc.
                   </template>
-              </q-file>
+                </q-file>
 
-              <div v-else-if=" isEditingActionScript && formData.fileNameToShow != ''">
-                {{ formData.fileNameToShow }}
-                <q-btn
-                  data-test="edit-action-script-step1-continue-btn"
-                  @click="editFileToUpload"
-                  icon="edit"
-                  no-caps
-                  dense
-                  flat
-                  size="14px"
-                />
+                <div
+                  v-else-if="
+                    isEditingActionScript && formData.fileNameToShow != ''
+                  "
+                >
+                  {{ formData.fileNameToShow }}
+                  <q-btn
+                    data-test="edit-action-script-step1-continue-btn"
+                    @click="editFileToUpload"
+                    icon="edit"
+                    no-caps
+                    dense
+                    flat
+                    size="14px"
+                  />
+                </div>
+                <div
+                  v-if="isEditingActionScript && formData.fileNameToShow == ''"
+                  class="q-pt-md q-mt-xs q-pl-md"
+                >
+                  <q-btn
+                    data-test="cancel-upload-new-btn-file"
+                    @click="cancelUploadingNewFile"
+                    color="red"
+                    label="Cancel"
+                    no-caps
+                  />
+                </div>
               </div>
-              <div v-if="isEditingActionScript && formData.fileNameToShow == ''" class="q-pt-md q-mt-xs q-pl-md"
-              >
-                <q-btn
-                  data-test="cancel-upload-new-btn-file"
-                  @click="cancelUploadingNewFile"
-                  color="red"
-                  label="Cancel"
-                  no-caps
-                />
-              </div>
-            </div>
-              
-              
+
               <q-stepper-navigation>
                 <q-btn
                   data-test="add-action-script-step1-continue-btn"
@@ -263,14 +265,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span style="font-size: 14px">
                               Pattern: * * * * * means every minute .
                               <br />
-                              Format: [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] 
-                              [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                              Format: [Minute 0-59] [Hour 0-23] [Day of Month
+                              1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
+                              '1L-7L', 0 and 7 for Sunday].
                               <br />
                               Use '*' to represent any value, 'L' for the last
                               day/weekday. <br />
-                              Example: 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies minute, hour, day of
-                              month, month, and day of week, respectively.</span
+                              Example: 0 12 * * ? - Triggers at 12:00 PM daily.
+                              It specifies minute, hour, day of month, month,
+                              and day of week, respectively.</span
                             >
                           </q-tooltip>
                         </q-icon>
@@ -546,203 +549,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <q-stepper-navigation>
-  
                 <div>
+                  <q-btn
+                    data-test="add-action-script-step2-continue-btn"
+                    @click="step = 3"
+                    color="secondary"
+                    label="Continue"
+                    class="q-ml-sm"
+                    no-caps
+                  />
+                  <q-btn
+                    data-test="add-action-script-step2-back-btn"
+                    @click="step = 1"
+                    flat
+                    color="primary"
+                    label="Back"
+                    class="q-ml-sm"
+                    no-caps
+                  />
+                </div>
+              </q-stepper-navigation>
+            </q-step>
 
+            <q-step
+              data-test="add-action-script-select-serice-account-step"
+              :name="3"
+              title="Select Service Account"
+              :icon="outlinedDashboard"
+              :done="step > 3"
+              class="q-mt-md"
+            >
+              <div class="flex items-center o2-input">
+                <div class="o2-input service-account-selector">
+                  <q-select
+                    data-test="add-action-script-service-account-select"
+                    v-model="formData.service_account"
+                    :options="filteredServiceAccounts"
+                    :label="t('actions.serviceAccount') + ' *'"
+                    :loading="isFetchingServiceAccounts"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm showLabelOnTop no-case"
+                    filled
+                    stack-label
+                    outlined
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input
+                    :input-debounce="400"
+                    @filter="filterServiceAccounts"
+                    behavior="menu"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    style="min-width: 250px !important; width: 250px !important"
+                  />
+                </div>
+              </div>
+
+              <q-stepper-navigation>
                 <q-btn
-                  data-test="add-action-script-step2-continue-btn"
-                  @click="step = 3"
+                  data-test="add-action-script-step3-continue-btn"
+                  @click="step = 4"
                   color="secondary"
                   label="Continue"
-                  class="q-ml-sm"
                   no-caps
+                  class="q-mt-sm"
                 />
                 <q-btn
-                  data-test="add-action-script-step2-back-btn"
-                  @click="step = 1"
+                  data-test="add-action-script-step4-back-btn"
+                  @click="step = 2"
                   flat
                   color="primary"
                   label="Back"
                   class="q-ml-sm"
                   no-caps
                 />
-                </div>
               </q-stepper-navigation>
             </q-step>
             <q-step
               data-test="add-action-script-select-schedule-step"
-              :name="3"
+              :name="4"
               title="Environmental Variables"
               icon="lock"
-              :done="step > 3"
+              :done="step > 4"
               class="q-mt-md"
             >
-            <div
-                  v-for="(header, index) in mandatoryKeys"
-                  :key="header.uuid"
-                  class="row q-col-gutter-sm o2-input"
-                >
-                  <div class="col-5 q-ml-none">
-                    <q-input
-                      :data-test="`add-action-script-header-${header['key']}-key-input`"
-                      v-model="header.key"
-                      color="input-border"
-                      bg-color="input-bg"
-                      stack-label
-                      outlined
-                      filled
-                      :placeholder="'Key'"
-                      dense
-                      tabindex="0"
-                      :readonly="true"
-
-                    />
-                  </div>
-                  <div class="col-5 q-ml-none q-mb-sm">
-                    <q-input
-                      :data-test="`add-action-script-header-${header['key']}-value-input`"
-                      v-model="header.value"
-                      :placeholder="t('alert_destinations.api_header_value')"
-                      color="input-border"
-                      bg-color="input-bg"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      isUpdatingDestination
-                      tabindex="0"
-                      :rules="[isRequiredValue]"
-                      hide-bottom-space
-
-                    />
-                  </div>
-                  <div class="col-2 q-ml-none">
-                  <div class="" v-if="header.key == 'ORIGIN_CLUSTER_TOKEN'">
-                      <q-icon
-                        :name="outlinedInfo"
-                        size="17px"
-                        class="q-ml-xs cursor-pointer"
-                        :class="
-                        store.state.theme === 'dark'
-                          ? 'text-grey-5'
-                          : 'text-grey-7'
-                        "
-                      >
-                        <q-tooltip
-                          anchor="center right"
-                          self="center left"
-                          max-width="300px"
-                        >
-                          <span style="font-size: 14px"
-                            >
-                            ORIGIN_CLUSTER_TOKEN Is Required
-                            </span
-                          >
-                        </q-tooltip>
-                      </q-icon>
-                      </div>
-                      <div class="" v-else>
-                      <q-icon
-                        :name="outlinedInfo"
-                        size="17px"
-                        class="q-ml-xs cursor-pointer"
-                        :class="
-                        store.state.theme === 'dark'
-                          ? 'text-grey-5'
-                          : 'text-grey-7'
-                        "
-                      >
-                        <q-tooltip
-                          anchor="center right"
-                          self="center left"
-                          max-width="300px"
-                        >
-                          <span style="font-size: 14px"
-                            >
-                            ORIGIN_CLUSTER_URL Is Required
-                            </span
-                          >
-                        </q-tooltip>
-                      </q-icon>
-                      </div>
-                  </div>
+              <div
+                v-for="(header, index) in environmentalVariables"
+                :key="header.uuid"
+                class="row q-col-gutter-sm o2-input"
+              >
+                <div class="col-5 q-ml-none">
+                  <q-input
+                    :data-test="`add-action-script-header-${header['key']}-key-input`"
+                    v-model="header.key"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    outlined
+                    filled
+                    :placeholder="'Key'"
+                    dense
+                    tabindex="0"
+                  />
                 </div>
-                <div
-                  v-for="(header, index) in environmentalVariables"
-                  :key="header.uuid"
-                  class="row q-col-gutter-sm o2-input"
-                >
-                  <div class="col-5 q-ml-none">
-                    <q-input
-                      :data-test="`add-action-script-header-${header['key']}-key-input`"
-                      v-model="header.key"
-                      color="input-border"
-                      bg-color="input-bg"
-                      stack-label
-                      outlined
-                      filled
-                      :placeholder="'Key'"
-                      dense
-                      tabindex="0"
-
-                    />
-                  </div>
-                  <div class="col-5 q-ml-none q-mb-sm">
-                    <q-input
-                      :data-test="`add-action-script-header-${header['key']}-value-input`"
-                      v-model="header.value"
-                      :placeholder="t('alert_destinations.api_header_value')"
-                      color="input-border"
-                      bg-color="input-bg"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      isUpdatingDestination
-                      tabindex="0"
-                    />
-                  </div>
-                  <div class="col-2 q-ml-none">
-                    <q-btn
-                      :data-test="`add-action-script-header-${header['key']}-delete-btn`"
-                      icon="delete"
-                      class="q-ml-xs iconHoverBtn"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :title="t('alert_templates.delete')"
-                      @click="deleteApiHeader(header)"
-                    />
-                    <q-btn
-                      data-test="add-action-script-add-header-btn"
-                      v-if="index === environmentalVariables.length - 1"
-                      icon="add"
-                      class="q-ml-xs iconHoverBtn"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :title="t('alert_templates.edit')"
-                      @click="addApiHeader()"
-                    />
-                  </div>
+                <div class="col-5 q-ml-none q-mb-sm">
+                  <q-input
+                    :data-test="`add-action-script-header-${header['key']}-value-input`"
+                    v-model="header.value"
+                    :placeholder="t('alert_destinations.api_header_value')"
+                    color="input-border"
+                    bg-color="input-bg"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    isUpdatingDestination
+                    tabindex="0"
+                  />
                 </div>
+                <div class="col-2 q-ml-none">
+                  <q-btn
+                    :data-test="`add-action-script-header-${header['key']}-delete-btn`"
+                    icon="delete"
+                    class="q-ml-xs iconHoverBtn"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.delete')"
+                    @click="deleteApiHeader(header)"
+                  />
+                  <q-btn
+                    data-test="add-action-script-add-header-btn"
+                    v-if="index === environmentalVariables.length - 1"
+                    icon="add"
+                    class="q-ml-xs iconHoverBtn"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    :title="t('alert_templates.edit')"
+                    @click="addApiHeader()"
+                  />
+                </div>
+              </div>
               <q-stepper-navigation>
                 <q-btn
-                  data-test="add-action-script-step3-back-btn"
+                  data-test="add-action-script-step4-back-btn"
                   flat
-                  @click="step = 2"
+                  @click="step = 3"
                   color="primary"
                   label="Back"
                   class="q-ml-sm"
                   no-caps
                 />
-            </q-stepper-navigation>
+              </q-stepper-navigation>
             </q-step>
-            
           </q-stepper>
         </q-form>
       </div>
@@ -811,6 +777,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import cronParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
+import service_accounts from "@/services/service_accounts";
 
 defineProps({
   report: {
@@ -819,7 +786,6 @@ defineProps({
   },
 });
 const emit = defineEmits(["getActionScripts"]);
-
 
 const defaultActionScript = {
   codeZip: null,
@@ -843,7 +809,8 @@ const defaultActionScript = {
   owner: "",
   lastEditedBy: "",
   fileNameToShow: "",
-  id: ""
+  id: "",
+  service_account: "",
 };
 
 const { t } = useI18n();
@@ -894,20 +861,6 @@ const frequencyTabs = [
   },
 ];
 
-const mandatoryKeys = ref([
-    {
-        key: "ORIGIN_CLUSTER_URL",
-        value: "",
-        uuid: getUUID(),
-    },
-    {
-        key: "ORIGIN_CLUSTER_TOKEN",
-        value: "",
-        uuid: getUUID(),
-    },
-]);
-
-
 const selectedTimeTab = ref("scheduleNow");
 
 const store = useStore();
@@ -946,15 +899,12 @@ watch(
   () => router.currentRoute.value.query?.id,
   async (action_id) => {
     await handleActionScript();
-});
-
+  },
+);
 
 onBeforeMount(async () => {
-  await handleActionScript()
+  await handleActionScript();
 });
-
-
-
 
 const onSubmit = () => {};
 
@@ -1028,18 +978,19 @@ const saveActionScript = async () => {
   // }
   let form;
 
-// Determine if FormData is needed
+  // Determine if FormData is needed
   const useFormData =
-      !isEditingActionScript.value ||
-      (isEditingActionScript.value && formData.value.codeZip);
+    !isEditingActionScript.value ||
+    (isEditingActionScript.value && formData.value.codeZip);
   // Initialize form as FormData or plain object
   form = useFormData ? new FormData() : {};
 
   // Common fields
   const commonFields: Record<string, any> = {
-      name: formData.value.name,
-      description: formData.value.description,
-      execution_details: frequency.value.type,
+    name: formData.value.name,
+    description: formData.value.description,
+    execution_details: frequency.value.type,
+    service_account: formData.value.service_account,
   };
   // const convertedDateTime = convertDateToTimestamp(
   //   scheduling.value.date,
@@ -1062,58 +1013,36 @@ const saveActionScript = async () => {
   //   commonFields.timezoneOffset = null;
   // }
 
-    // Add environment variables if present
-    if (environmentalVariables.value.length > 0) {
-      // Convert environmentalVariables to an object, ignoring conflicts with mandatory keys
-      const environment_variables = environmentalVariables.value.reduce(
-        (acc: any, curr: any) => {
-          // Check if the key exists in mandatoryKeys
-          const isMandatoryKey = mandatoryKeys.value.some(
-            (mandatory) => mandatory.key === curr.key
-          );
-
-          if (!isMandatoryKey && curr.key) {
-            // Add the key only if it is not a mandatory key
-            acc[curr.key] = curr.value;
-          }
-
-          return acc;
-        },
-        {}
-      );
-
-      // Add mandatory fields to ensure they're present
-      mandatoryKeys.value.forEach((mandatory) => {
-        if (!environment_variables[mandatory.key]) {
-          environment_variables[mandatory.key] = mandatory.value || ""; // Add missing mandatory fields
+  // Add environment variables if present
+  if (environmentalVariables.value.length > 0) {
+    // Convert environmentalVariables to an object, ignoring conflicts with mandatory keys
+    const environment_variables = environmentalVariables.value.reduce(
+      (acc: any, curr: any) => {
+        // Check if the key exists in mandatoryKeys
+        if (curr.key) {
+          // Add the key only if it is not a mandatory key
+          acc[curr.key] = curr.value;
         }
-      });
 
-      // Assign to commonFields
-      commonFields.environment_variables = environment_variables;
-    } else {
-      // If environmentalVariables is empty, initialize with mandatory fields
-      commonFields.environment_variables = mandatoryKeys.value.reduce(
-        (acc: any, curr: any) => {
-          acc[curr.key] = curr.value || ""; // Use default value if none exists
-          return acc;
-        },
-        {}
-      );
-    }
+        return acc;
+      },
+      {},
+    );
 
+    // Assign to commonFields
+    commonFields.environment_variables = environment_variables;
+  }
 
-
-// Populate form (either FormData or plain object)
+  // Populate form (either FormData or plain object)
   Object.entries(commonFields).forEach(([key, value]) => {
     if (useFormData) {
       (form as FormData).append(
-            key,
-            typeof value === "object" ? JSON.stringify(value) : value,
-          );
+        key,
+        typeof value === "object" ? JSON.stringify(value) : value,
+      );
     } else {
       (form as Record<string, any>)[key] = value;
-      }
+    }
   });
 
   // Add file fields if using FormData
@@ -1128,7 +1057,6 @@ const saveActionScript = async () => {
   if (isEditingActionScript.value && formData.value.codeZip) {
     (form as FormData).append("id", formData.value.id);
   }
-
 
   // Check if all report input fields are valid
   try {
@@ -1164,8 +1092,7 @@ const saveActionScript = async () => {
         timeout: 3000,
       });
       goToActionScripts();
-      emit("getActionScripts")
-      
+      emit("getActionScripts");
     })
     .catch((error) => {
       step.value = 3;
@@ -1191,11 +1118,7 @@ const validateActionScriptData = async () => {
     step.value = 1;
     return;
   }
-  if(mandatoryKeys.value[0].value == "" || mandatoryKeys.value[1].value == ""){
-    step.value = 3;
-    return;
-  }
- 
+
   if (formData.value.execution_details === "Repeat") {
     try {
       cronParser.parseExpression(frequency.value.cron);
@@ -1232,7 +1155,6 @@ const setupEditingActionScript = async (report: any) => {
     ...report,
   };
   formData.value.fileNameToShow = report.zip_file_name;
-  mandatoryKeys.value = [];
 
   // set date, time and timezone in scheduling
   // const date = new Date(report.start / 1000);
@@ -1271,12 +1193,7 @@ const setupEditingActionScript = async (report: any) => {
     environmentalVariables.value = [];
     Object.entries(formData.value.environment_variables).forEach(
       ([key, value]: [string, any]) => {
-        if (key != "ORIGIN_CLUSTER_TOKEN" && key != "ORIGIN_CLUSTER_URL"){
-          addApiHeader(key, value);
-        }
-        else{
-          mandatoryKeys.value.push({key:key, value:value,uuid: getUUID()})
-        }
+        addApiHeader(key, value);
       },
     );
   }
@@ -1289,24 +1206,28 @@ const openCancelDialog = () => {
   }
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
-  dialog.value.message = "Are you sure you want to cancel Action Script changes?";
+  dialog.value.message =
+    "Are you sure you want to cancel Action Script changes?";
   dialog.value.okCallback = goToActionScripts;
 };
 const editFileToUpload = () => {
-  formData.value.fileNameToShow = ""
-
-}
+  formData.value.fileNameToShow = "";
+};
 const cancelUploadingNewFile = () => {
   formData.value.fileNameToShow = JSON.parse(
     originalActionScriptData.value,
   ).zip_file_name;
-}
+};
 const addApiHeader = (key: string = "", value: string = "") => {
-  environmentalVariables.value.push({ key: key, value: value, uuid: getUUID() });
+  environmentalVariables.value.push({
+    key: key,
+    value: value,
+    uuid: getUUID(),
+  });
 };
 const deleteApiHeader = (header: any) => {
   environmentalVariables.value = environmentalVariables.value.filter(
-    (_header) => _header.uuid !== header.uuid
+    (_header) => _header.uuid !== header.uuid,
   );
   if (
     (formData.value.environment_variables as { [key: string]: any })[header.key]
@@ -1329,35 +1250,80 @@ const isRequiredValue = (value: any) => {
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
 
-    if (isEditingActionScript.value) {
-      isEditingActionScript.value = true;
-      isFetchingActionScript.value = true;
+  if (isEditingActionScript.value) {
+    isEditingActionScript.value = true;
+    isFetchingActionScript.value = true;
 
-      const actionId: string = (router.currentRoute.value.query?.id ||
-        "") as string;
-      actions
-        .get_by_id(store.state.selectedOrganization.identifier, actionId)
-        .then((res: any) => {
-          setupEditingActionScript(res.data);
+    const actionId: string = (router.currentRoute.value.query?.id ||
+      "") as string;
+    actions
+      .get_by_id(store.state.selectedOrganization.identifier, actionId)
+      .then((res: any) => {
+        setupEditingActionScript(res.data);
 
-          originalActionScriptData.value = JSON.stringify(formData.value);
-        })
-        .catch((err) => {
-          if (err.response.status != 403) {
-            q.notify({
-              type: "negative",
-              message: err?.data?.message || "Error while fetching Action Script!",
-              timeout: 4000,
-            });
-          }
-        })
-        .finally(() => {
-          isFetchingActionScript.value = false;
-        });
-    } else {
-      originalActionScriptData.value = JSON.stringify(formData.value);
+        originalActionScriptData.value = JSON.stringify(formData.value);
+      })
+      .catch((err) => {
+        if (err.response.status != 403) {
+          q.notify({
+            type: "negative",
+            message:
+              err?.data?.message || "Error while fetching Action Script!",
+            timeout: 4000,
+          });
+        }
+      })
+      .finally(() => {
+        isFetchingActionScript.value = false;
+      });
+  } else {
+    originalActionScriptData.value = JSON.stringify(formData.value);
+  }
+};
+
+const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref(
+  [],
+);
+const isFetchingServiceAccounts = ref(false);
+
+const filterServiceAccounts = (val: string, update: Function) => {
+  filteredServiceAccounts.value = filterColumns(
+    serviceAccountsOptions,
+    val,
+    update,
+  );
+};
+
+const serviceAccountsOptions: any[] = [];
+
+const getServiceAccounts = async () => {
+  isFetchingServiceAccounts.value = true;
+  try {
+    const res = await service_accounts.list(
+      store.state.selectedOrganization.identifier,
+    );
+    serviceAccountsOptions.push(
+      ...res.data.data.map((account: any) => account.email),
+    );
+    filteredServiceAccounts.value = [...serviceAccountsOptions];
+  } catch (err) {
+    if (err.response?.status != 403) {
+      q.notify({
+        type: "negative",
+        message:
+          err.response?.data?.message ||
+          "Error while fetching service accounts.",
+        timeout: 3000,
+      });
     }
-}
+  } finally {
+    isFetchingServiceAccounts.value = false;
+  }
+};
+
+onMounted(async () => {
+  await getServiceAccounts();
+});
 </script>
 
 <style lang="scss">
@@ -1372,6 +1338,12 @@ const handleActionScript = async () => {
 .lookup-table-file-uploader {
   :deep(.q-field__label) {
     left: -30px;
+  }
+}
+
+.service-account-selector {
+  :deep(.q-field__control-container .q-field__native > :first-child) {
+    text-transform: none !important;
   }
 }
 </style>

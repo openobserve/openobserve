@@ -1049,6 +1049,7 @@
     "deleteText": "Are you sure you want to delete file ?",
     "uploadCodeZip": "Upload Code Zip",
     "update":"Update Action Script",
-    "type":"Execution Type"
+    "type":"Execution Type",
+    "serviceAccount":"Service Account"
   }
 }
