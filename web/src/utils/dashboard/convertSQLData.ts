@@ -709,15 +709,34 @@ export const convertSQLData = async (
     gridData: null | any = null,
   ) => {
     const maxYValue = getUnitValue(
-      Math.max(...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat()),
+      Math.max(
+        ...yAxisKeys
+          .map((key: any) => getAxisDataFromKey(key))
+          .flat()
+          .filter((value: any) => typeof value === "number"),
+      ),
       panelSchema.config?.unit,
       panelSchema.config?.unit_custom,
       panelSchema.config?.decimals,
     );
 
-    // Update yAxis label properties for each chart yAxis based on the grid position
+    // Some units, currencies are formatted with , separator, we need to remove it and convert it to valid number
+    maxYValue.value = maxYValue.value.replace(",", "");
+
+    const [num, decimals] = maxYValue.value.split(".");
+
+    //  The purpose of addMaxValue is to ensure that the maxYValue.value is in a valid numeric format before updating the yAxis properties. By doing this check, the code ensures that only valid numeric values are used to set the max property of the yAxis, preventing potential errors or invalid configurations.
+    // Summary
+    // addMaxValue is a boolean that verifies if maxYValue.value is a valid numeric string.
+    // It ensures that the max property of the yAxis is only updated with valid numeric values.
+    const addMaxValue =
+      maxYValue.value ===
+      parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
+
     options.yAxis.forEach((it: any, index: number) => {
-      it.max = maxYValue.value;
+      if (addMaxValue) {
+        it.max = maxYValue.value;
+      }
 
       it.axisLabel = {
         formatter: function (value: any) {
