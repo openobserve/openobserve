@@ -620,6 +620,7 @@ export const convertSQLData = async (
         options.series.length,
         yAxisNameGap,
         customCols,
+        panelSchema.config?.axis_width,
       );
 
       options.grid = gridData.gridArray;
@@ -653,18 +654,12 @@ export const convertSQLData = async (
           text: series.name,
           textStyle: {
             fontSize: 12,
-            width:
-              parseInt(gridData.gridArray[index].width) *
-                (chartPanelRef.value.offsetWidth / 100) -
-              8,
+            width: parseInt(gridData.gridArray[index].width) - 8,
             overflow: "truncate",
             ellipsis: "...",
           },
-          top:
-            parseFloat(gridData.gridArray[index].top) -
-            (20 / (gridData.panelHeight as number)) * 100 +
-            "%",
-          left: gridData.gridArray[index].left,
+          top: parseInt(gridData.gridArray[index].top) - 20,
+          left: parseInt(gridData.gridArray[index].left),
         });
       });
 

@@ -66,6 +66,7 @@ export function getTrellisGrid(
   numGrids: number,
   leftMargin: number,
   numOfColumns: number = -1,
+  axisWidth: number | null = 10,
 ) {
   if (width <= 0) {
     throw new Error("Width and height must be positive numbers");
@@ -110,26 +111,14 @@ export function getTrellisGrid(
   }
 
   const xSpacingBetweenInPx = SPACING_CONFIG.horizontal * (numCols - 1);
-  // How many cols
-  const xSpacingBetween =
-    ((SPACING_CONFIG.horizontal * (numCols - 1)) / width) * 100;
-
-  const leftPaddingInPx = leftMargin + SPACING_CONFIG.padding.extraLeft;
-
-  const leftPadding =
-    ((leftMargin + SPACING_CONFIG.padding.extraLeft) / width) * 100;
-
-  const rightPadding = (SPACING_CONFIG.padding.right / width) * 100;
+  const leftPaddingInPx =
+    Math.max(leftMargin, axisWidth || 0) + SPACING_CONFIG.padding.extraLeft;
+  const rightPaddingInPx = SPACING_CONFIG.padding.right;
 
   // width and height for single gauge
-  const cellWidthInPx =
-    (width -
-      (SPACING_CONFIG.padding.right + leftPaddingInPx) -
-      xSpacingBetweenInPx) /
+  let cellWidthInPx =
+    (width - rightPaddingInPx - leftPaddingInPx - xSpacingBetweenInPx) /
     numCols;
-
-  const cellWidth =
-    (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
 
   // Calculate cell height based on cell width
   const cellHeightInPx = cellWidthInPx * 0.4;
@@ -142,9 +131,11 @@ export function getTrellisGrid(
 
   totalChartHeight = Math.max(totalChartHeight, height);
 
-  const topPadding = (SPACING_CONFIG.padding.top / totalChartHeight) * 100;
-
-  const cellHeight = (cellHeightInPx / totalChartHeight) * 100;
+  if (totalChartHeight > height) {
+    // as scroll bar will be added, so increse the right padding
+    const widthToReduce = 16 / numCols;
+    cellWidthInPx = cellWidthInPx - widthToReduce;
+  }
 
   // will create 2D grid array
   for (let row = 0; row < numRows; row++) {
@@ -153,10 +144,10 @@ export function getTrellisGrid(
         break;
       }
       const grid = {
-        left: `${col * cellWidth + col * ((SPACING_CONFIG.horizontal / width) * 100) + leftPadding}%`,
-        top: `${row * cellHeight + row * ((SPACING_CONFIG.vertical / totalChartHeight) * 100) + topPadding}%`,
-        width: `${cellWidth}%`,
-        height: `${cellHeight}%`,
+        left: `${col * cellWidthInPx + col * SPACING_CONFIG.horizontal + leftPaddingInPx}`,
+        top: `${row * cellHeightInPx + row * SPACING_CONFIG.vertical + SPACING_CONFIG.padding.top}`,
+        width: `${cellWidthInPx}`,
+        height: `${cellHeightInPx}`,
       };
       gridArray.push(grid);
     }
