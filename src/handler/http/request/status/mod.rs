@@ -120,6 +120,7 @@ struct ConfigResponse<'a> {
     websocket_enabled: bool,
     ingestion_url: String,
     min_auto_refresh_interval: u32,
+    query_default_limit: i64,
 }
 
 #[derive(Serialize)]
@@ -299,6 +300,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         websocket_enabled: cfg.common.websocket_enabled,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
+        query_default_limit: cfg.limit.query_default_limit,
     }))
 }
 

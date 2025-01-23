@@ -107,7 +107,7 @@ pub async fn search(
     if start == end {
         results.push(search_inner(req).await?);
     } else {
-        let group_interval = cfg.limit.metrics_max_search_interval_per_group;
+        let group_interval = 24 * 60 * 60 * 1000 * 1000;
         let group = generate_search_group(start, end, step, group_interval);
         if group.len() > 1 {
             log::info!(

@@ -34,19 +34,19 @@ test_data = [
 
 (
     "logs integer comparison query",
-    'SELECT * FROM "default" WHERE k8s_container_restart_count = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE k8s_container_restart_count = 1',
     1,
 ),
 
   (
     "logs integer cast comparison query",
-    'SELECT * FROM "default" WHERE cast(k8s_container_restart_count as INT) = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE cast(k8s_container_restart_count as INT) = 1',
     1,
 ),  
     
 (
     "logs integer try_cast comparison query",
-    'SELECT * FROM "default" WHERE try_cast(k8s_container_restart_count as INT) = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE try_cast(k8s_container_restart_count as INT) = 1',
     1,
 ),  
    

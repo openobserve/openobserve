@@ -26,7 +26,11 @@ use regex::Regex;
 use serde_json::{Map, Value};
 
 use super::str::find;
-use crate::{get_config, meta::stream::StreamType, FxIndexMap};
+use crate::{
+    get_config,
+    meta::{promql::HASH_LABEL, stream::StreamType},
+    FxIndexMap,
+};
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;
 
@@ -170,7 +174,9 @@ fn convert_data_type(
         | (DataType::Int64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
-        (DataType::Int64, DataType::Boolean) | (DataType::UInt64, DataType::Boolean) => {}
+        (DataType::UInt64, DataType::Int64)
+        | (DataType::UInt64, DataType::Boolean)
+        | (DataType::Int64, DataType::Boolean) => {}
         (DataType::UInt64, DataType::Float64) | (DataType::UInt64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
@@ -192,6 +198,7 @@ fn convert_data_type(
 }
 
 /// Fix the schema to ensure that the start_time and end_time fields are always present with uint64
+/// and the __hash__ field is always present with uint64
 /// and that null fields are removed and sort the fields by name.
 fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
     let mut fields = if stream_type == StreamType::Traces {
@@ -235,6 +242,11 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
                     DataType::Int64,
                     false,
                 ))
+            } else if stream_type == StreamType::Metrics
+                && x.data_type() == &DataType::Int64
+                && x.name() == HASH_LABEL
+            {
+                Arc::new(Field::new(x.name().clone(), DataType::UInt64, false))
             } else {
                 x
             }

@@ -301,7 +301,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             record.remove(TYPE_LABEL);
             // add hash
             let hash = super::signature_without_labels(record, &get_exclude_labels());
-            record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
             for (k, v) in record.iter_mut() {

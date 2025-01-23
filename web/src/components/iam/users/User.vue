@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit && config.isCloud == 'false'"
+            v-if="props.row.enableEdit"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -395,9 +395,9 @@ export default defineComponent({
                 // org_member_id: data.org_member_id,
                 // isLoggedinUser: store.state.userInfo.email == data.email,
                 // isExternal: !!data.is_external,
-                enableEdit: false,
+                enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
-                enableDelete: false,
+                enableDelete: config.isCloud ? true : false,
                 // status: data.status,
               };
             });
