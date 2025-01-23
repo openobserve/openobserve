@@ -379,6 +379,18 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
                 )
+            } else if method.eq("GET")
+                && path_columns[1].eq("actions")
+                && path_columns[2].eq("download")
+            {
+                // To access actions download name, you need GET permission on actions
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
             } else {
                 format!(
                     "{}:{}",
