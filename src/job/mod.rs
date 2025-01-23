@@ -36,6 +36,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
@@ -222,6 +223,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
+    // start pipeline data retention
+    tokio::task::spawn(async move { pipeline::run().await });
 
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;

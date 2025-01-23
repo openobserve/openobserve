@@ -241,7 +241,7 @@ pub async fn search_multi(
             if !is_root_user(user_id) {
                 let user: config::meta::user::User =
                     get_user(Some(&org_id), user_id).await.unwrap();
-                let stream_type_str = stream_type.to_string();
+                let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
                     user_id,
@@ -251,8 +251,8 @@ pub async fn search_multi(
                         o2_type: format!(
                             "{}:{}",
                             OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
                             stream_name
                         ),
                         org_id: org_id.clone(),
@@ -325,7 +325,7 @@ pub async fn search_multi(
                         "200",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -334,7 +334,7 @@ pub async fn search_multi(
                         "200",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
@@ -419,7 +419,7 @@ pub async fn search_multi(
                         "500",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -428,7 +428,7 @@ pub async fn search_multi(
                         "500",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
 
@@ -692,7 +692,7 @@ pub async fn _search_partition_multi(
                     "200",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -701,7 +701,7 @@ pub async fn _search_partition_multi(
                     "200",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             Ok(HttpResponse::Ok().json(res))
@@ -714,7 +714,7 @@ pub async fn _search_partition_multi(
                     "500",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -723,7 +723,7 @@ pub async fn _search_partition_multi(
                     "500",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             log::error!("search error: {:?}", err);
@@ -962,7 +962,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -971,7 +971,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
@@ -1038,7 +1038,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -1047,7 +1047,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
@@ -1097,7 +1097,7 @@ pub async fn around_multi(
                 "200",
                 &org_id,
                 &stream_names,
-                stream_type.to_string().as_str(),
+                stream_type.as_str(),
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -1106,7 +1106,7 @@ pub async fn around_multi(
                 "200",
                 &org_id,
                 &stream_names,
-                stream_type.to_string().as_str(),
+                stream_type.as_str(),
             ])
             .inc();
 

@@ -66,7 +66,7 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     };
 
     let limit = query
-        .get("limit")
+        .get("page_size")
         .unwrap_or(&"100".to_string())
         .parse::<i64>()
         .ok();
