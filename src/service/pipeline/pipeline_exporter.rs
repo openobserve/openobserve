@@ -29,7 +29,8 @@ use crate::service::pipeline::{
     pipeline_receiver::PipelineReceiver,
 };
 
-const INITIAL_RETRY_DELAY_MS: u64 = 1000;
+const INITIAL_RETRY_DELAY_MS: u64 = 100; // 100 ms
+const MAX_RETRY_TIME_LIMIT: u64 = 3600000; // 1 hour
 
 #[async_trait]
 pub trait PipelineRouter: Sync + Send {
@@ -147,10 +148,9 @@ impl PipelineExporter {
     }
 
     fn retry_backoff(delay: u64) -> u64 {
-        let max_delay = 3600000; // 1 hour
         let mut new_delay = delay * 5;
-        if new_delay >= max_delay {
-            new_delay = max_delay;
+        if new_delay >= MAX_RETRY_TIME_LIMIT {
+            new_delay = MAX_RETRY_TIME_LIMIT;
         }
 
         new_delay

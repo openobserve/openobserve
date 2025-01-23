@@ -1565,11 +1565,11 @@ pub struct Pipeline {
     )]
     pub max_connections: usize,
     #[env_config(
-        name = "ZO_PIPELINE_DATA_RETENTION_SIZE_LIMIT",
-        default = 53687091200,
-        help = "pipeline wal dir data retention size limit, default 50GB"
+        name = "ZO_PIPELINE_DATA_RETENTION_SIZE_LIMIT_RATIO",
+        default = 10,
+        help = "pipeline wal dir data retention size limit ratio, base on cfg.disk_cache.max_size"
     )]
-    pub data_retention_size_limit: u64,
+    pub data_retention_size_limit: usize,
 }
 
 #[derive(EnvConfig)]

@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::BinaryHeap;
+
 use config::cluster::LOCAL_NODE;
 use wal::ReadFrom;
 
 use crate::service::pipeline::{
     pipeline_offset_manager::PipelineOffsetManager, pipeline_receiver::PipelineReceiver,
+    pipeline_wal_writer::get_metadata_motified,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -32,21 +35,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 async fn cleanup_expired_remote_wal_files() {
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await; // 10 min interval
+        tokio::time::sleep(tokio::time::Duration::from_secs(600)).await; // 10 min interval
         log::debug!("[PIPELINE] Running data retention");
         let _ = cleanup().await;
     }
 }
 
 async fn cleanup() -> Result<(), anyhow::Error> {
-    use std::collections::BinaryHeap;
-
-    use crate::service::pipeline::pipeline_wal_writer::get_metadata_motified;
-
     let mut wal_file_iter = PipelineOffsetManager::get_all_remote_wal_file().await;
     let tmp_wal_file_iter = PipelineOffsetManager::get_all_remote_tmp_wal_file().await;
-    let mut total_size = 0;
-    let mut files_donot_delete: BinaryHeap<(u128, u64, String)> = BinaryHeap::new();
+    let mut total_size = 0u128;
+    let mut files_donot_delete: BinaryHeap<(u128, u128, String)> = BinaryHeap::new();
     wal_file_iter.extend(tmp_wal_file_iter);
     for wal_file in wal_file_iter.iter() {
         match PipelineReceiver::new(wal_file.clone(), ReadFrom::Beginning) {
@@ -64,11 +63,12 @@ async fn cleanup() -> Result<(), anyhow::Error> {
                 }
 
                 if let Ok(metadata) = tokio::fs::metadata(wal_file).await {
-                    total_size += metadata.len();
+                    let file_size = metadata.len() as u128;
+                    total_size += file_size;
                     let mod_time = get_metadata_motified(&metadata).elapsed().as_micros();
                     files_donot_delete.push((
                         mod_time,
-                        metadata.len(),
+                        file_size,
                         fw.path.to_string_lossy().to_string(),
                     ));
                 }
@@ -91,12 +91,19 @@ async fn cleanup() -> Result<(), anyhow::Error> {
     }
 
     // clean up by size limit
-    while total_size > config::get_config().pipeline.data_retention_size_limit {
+    let max_limit = (config::get_config().pipeline.data_retention_size_limit / 100)
+        * config::get_config().disk_cache.max_size;
+    while total_size > max_limit as u128 {
         if let Some((_, size, file_path)) = files_donot_delete.pop() {
             log::debug!("pipeline cleanup deleting: {}", file_path);
-            if tokio::fs::remove_file(&file_path).await.is_ok() {
-                total_size -= size;
+            if let Err(e) = tokio::fs::remove_file(&file_path).await {
+                log::error!(
+                    "pipeline cleanup failed to delete: {}, error: {e}",
+                    file_path
+                );
             }
+            // always decrease total_size, if delete above failed, next time we retry again
+            total_size -= size;
         } else {
             break;
         }
