@@ -1219,30 +1219,30 @@ async fn selector_load_data_from_datafusion(
     let mut metrics: HashMap<HashLabelValue, RangeValue> =
         HashMap::with_capacity(hash_value_set.len());
     for batch in series {
+        let columns = batch.columns();
+        let schema = batch.schema();
+        let fields = schema.fields();
+        let cols = fields
+            .iter()
+            .zip(columns)
+            .filter_map(|(field, col)| {
+                if field.name() == HASH_LABEL {
+                    None
+                } else {
+                    col.as_any()
+                        .downcast_ref::<StringArray>()
+                        .map(|col| (field.name(), col))
+                }
+            })
+            .collect::<HashMap<_, _>>();
+        let mut labels = Vec::with_capacity(columns.len());
         if hash_field_type == &DataType::UInt64 {
-            let columns = batch.columns();
-            let schema = batch.schema();
-            let fields = schema.fields();
-            let cols = fields
-                .iter()
-                .zip(columns)
-                .filter_map(|(field, col)| {
-                    if field.name() == HASH_LABEL {
-                        None
-                    } else if let Some(col) = col.as_any().downcast_ref::<StringArray>() {
-                        Some((field.name(), col))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashMap<_, _>>();
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<UInt64Array>()
                 .unwrap();
-            let mut labels = Vec::with_capacity(columns.len());
             for i in 0..batch.num_rows() {
                 let hash = hash_values.value(i).into();
                 if !hash_value_set.contains(&hash) {
@@ -1265,29 +1265,12 @@ async fn selector_load_data_from_datafusion(
                 metrics.insert(hash, RangeValue::new(labels.clone(), Vec::new()));
             }
         } else {
-            let columns = batch.columns();
-            let schema = batch.schema();
-            let fields = schema.fields();
-            let cols = fields
-                .iter()
-                .zip(columns)
-                .filter_map(|(field, col)| {
-                    if field.name() == HASH_LABEL {
-                        None
-                    } else if let Some(col) = col.as_any().downcast_ref::<StringArray>() {
-                        Some((field.name(), col))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashMap<_, _>>();
             let hash_values = batch
                 .column_by_name(HASH_LABEL)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<StringArray>()
                 .unwrap();
-            let mut labels = Vec::with_capacity(columns.len());
             for i in 0..batch.num_rows() {
                 let hash = hash_values.value(i).into();
                 if !hash_value_set.contains(&hash) {
