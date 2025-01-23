@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]
             }`"
             :style="{
-              transform: `translateY(${virtualRow.start}px)`,
+              transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
               minWidth: '100%',
             }"
             :data-index="virtualRow.index"
@@ -603,19 +603,26 @@ watch(
 
 const parentRef = ref<HTMLElement | null>(null);
 
+const isFirefox = computed(() => {
+  return typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox");
+});
+
+const baseOffset = isFirefox.value ? 20 : 0;
+
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 20,
+    estimateSize: () => 20, 
     overscan: 80,
     measureElement:
       typeof window !== "undefined" &&
-      navigator.userAgent.indexOf("Firefox") === -1
+      !isFirefox.value
         ? (element: any) => element?.getBoundingClientRect().height
         : undefined,
   };
 });
+
 
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
