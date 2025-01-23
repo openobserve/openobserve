@@ -695,7 +695,8 @@ async fn process_node(
 
             let mut remote_stream = remote_stream.clone();
             remote_stream.org_id = org_id.into();
-            let writer = get_pipeline_wal_writer(pipeline_id, remote_stream.clone()).await?;
+            let writer =
+                get_pipeline_wal_writer(&pipeline_id, node_id, remote_stream.clone()).await?;
             if let Err(e) = writer.write_wal(records).await {
                 let err_msg = format!(
                     "DestinationNode error persisting data to be ingested externally: {}",
@@ -837,7 +838,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 mod tests {
     use config::utils::json;
 
-    use super::resolve_stream_name;
+    use super::*;
 
     #[test]
     fn test_my_regex() {
@@ -863,5 +864,192 @@ mod tests {
         assert!(err1.is_err());
         let err1 = resolve_stream_name("{{eulav}}", &record);
         assert!(err1.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_init() {
+        let payload = json::json!(
+            {
+                "pipeline_id": "7288150715627750281",
+                "version": 3,
+                "enabled": true,
+                "org": "default",
+                "name": "query",
+                "description": "",
+                "source": {
+                    "source_type": "scheduled",
+                    "org_id": "default",
+                    "stream_type": "logs",
+                    "query_condition": {
+                        "type": "sql",
+                        "conditions": null,
+                        "sql": "SELECT job FROM \"hello1\"",
+                        "promql": null,
+                        "promql_condition": null,
+                        "aggregation": null,
+                        "vrl_function": null,
+                        "search_event_type": "derivedstream",
+                        "multi_time_range": null
+                    },
+                    "trigger_condition": {
+                        "period": 1,
+                        "operator": "=",
+                        "threshold": 0,
+                        "frequency": 1,
+                        "cron": "",
+                        "frequency_type": "minutes",
+                        "silence": 0,
+                        "tolerance_in_secs": null
+                    },
+                    "tz_offset": 0
+                },
+                "nodes": [
+                    {
+                        "id": "522e0c22-32b6-4047-b2c5-195daaee42f4",
+                        "data": {
+                            "node_type": "query",
+                            "org_id": "default",
+                            "stream_type": "logs",
+                            "query_condition": {
+                                "type": "sql",
+                                "conditions": null,
+                                "sql": "SELECT job FROM \"hello1\"",
+                                "promql": null,
+                                "promql_condition": null,
+                                "aggregation": null,
+                                "vrl_function": null,
+                                "search_event_type": "derivedstream",
+                                "multi_time_range": null
+                            },
+                            "trigger_condition": {
+                                "period": 1,
+                                "operator": "=",
+                                "threshold": 0,
+                                "frequency": 1,
+                                "cron": "",
+                                "frequency_type": "minutes",
+                                "silence": 0,
+                                "tolerance_in_secs": null
+                            },
+                            "tz_offset": 0
+                        },
+                        "position": {
+                            "x": 225.33333,
+                            "y": 87.0
+                        },
+                        "io_type": "input"
+                    },
+                    {
+                        "id": "8d3ee2d7-6678-40b8-9301-3ab3fb41da95",
+                        "data": {
+                            "node_type": "remote_stream",
+                            "org_id": "default",
+                            "destination_name": "hello1remote"
+                        },
+                        "position": {
+                            "x": 211.16667,
+                            "y": 289.66666
+                        },
+                        "io_type": "output"
+                    },
+                    {
+                        "id": "e75d19f6-bfc6-4acd-995d-4961d3b0c758",
+                        "data": {
+                            "node_type": "function",
+                            "name": "helloremote",
+                            "after_flatten": false,
+                            "num_args": 0
+                        },
+                        "position": {
+                            "x": -38.39253,
+                            "y": 136.0703
+                        },
+                        "io_type": "default"
+                    },
+                    {
+                        "id": "4a2a5ff7-b6a1-432b-9124-4e11df98f886",
+                        "data": {
+                            "node_type": "condition",
+                            "conditions": [
+                                {
+                                    "column": "job",
+                                    "operator": "=",
+                                    "value": "2",
+                                    "ignore_case": false
+                                }
+                            ]
+                        },
+                        "position": {
+                            "x": 522.2569,
+                            "y": 203.83688
+                        },
+                        "io_type": "default"
+                    },
+                    {
+                        "id": "61e9d421-e413-4ac3-9690-28efaee5d04c",
+                        "data": {
+                            "node_type": "remote_stream",
+                            "org_id": "default",
+                            "destination_name": "dev3"
+                        },
+                        "position": {
+                            "x": 605.17834,
+                            "y": 284.1821
+                        },
+                        "io_type": "output"
+                    }
+                ],
+                "edges": [
+                    {
+                        "id": "e522e0c22-32b6-4047-b2c5-195daaee42f4-e75d19f6-bfc6-4acd-995d-4961d3b0c758",
+                        "source": "522e0c22-32b6-4047-b2c5-195daaee42f4",
+                        "target": "e75d19f6-bfc6-4acd-995d-4961d3b0c758"
+                    },
+                    {
+                        "id": "ee75d19f6-bfc6-4acd-995d-4961d3b0c758-8d3ee2d7-6678-40b8-9301-3ab3fb41da95",
+                        "source": "e75d19f6-bfc6-4acd-995d-4961d3b0c758",
+                        "target": "8d3ee2d7-6678-40b8-9301-3ab3fb41da95"
+                    },
+                    {
+                        "id": "e522e0c22-32b6-4047-b2c5-195daaee42f4-4a2a5ff7-b6a1-432b-9124-4e11df98f886",
+                        "source": "522e0c22-32b6-4047-b2c5-195daaee42f4",
+                        "target": "4a2a5ff7-b6a1-432b-9124-4e11df98f886"
+                    },
+                    {
+                        "id": "e4a2a5ff7-b6a1-432b-9124-4e11df98f886-61e9d421-e413-4ac3-9690-28efaee5d04c",
+                        "source": "4a2a5ff7-b6a1-432b-9124-4e11df98f886",
+                        "target": "61e9d421-e413-4ac3-9690-28efaee5d04c"
+                    }
+                ]
+            }
+        );
+
+        let pipeline: Pipeline = json::from_value(payload).unwrap();
+        println!("pipeline_name: {}", pipeline.name);
+        let node_map: HashMap<String, ExecutableNode> = pipeline
+            .nodes
+            .iter()
+            .map(|node| {
+                (
+                    node.get_node_id(),
+                    ExecutableNode {
+                        id: node.get_node_id(),
+                        node_data: node.get_node_data(),
+                        children: pipeline
+                            .edges
+                            .iter()
+                            .filter(|edge| edge.source == node.id)
+                            .map(|edge| edge.target.clone())
+                            .collect(),
+                    },
+                )
+            })
+            .collect();
+        println!("node_map: {:?}", node_map);
+
+        let sorted_nodes = topological_sort(&node_map).unwrap();
+        for node in sorted_nodes {
+            println!("node id: {node}");
+        }
     }
 }
