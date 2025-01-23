@@ -202,6 +202,10 @@ export default defineComponent({
       type: String,
       default: "canvas",
     },
+    height: {
+      type: String,
+      default: "100%",
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
@@ -335,7 +339,7 @@ export default defineComponent({
               dataIndex,
               seriesIndex,
               props?.data?.extras?.panelId || -1,
-              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0]
+              chart?.getOption()?.series[seriesIndex]?.data[dataIndex][0],
             );
           }
         }
@@ -420,7 +424,7 @@ export default defineComponent({
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
-              hoveredSeriesState?.value?.hoveredTime
+              hoveredSeriesState?.value?.hoveredTime,
             );
           }
 
@@ -440,7 +444,7 @@ export default defineComponent({
         ) {
           restoreChart();
         }
-      }
+      },
     );
 
     watch(
@@ -450,7 +454,7 @@ export default defineComponent({
           type: "highlight",
           seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
         });
-      }
+      },
     );
 
     watch(
@@ -480,7 +484,7 @@ export default defineComponent({
         }
 
         chartInitialSetUp();
-      }
+      },
     );
 
     onMounted(async () => {
@@ -554,6 +558,14 @@ export default defineComponent({
     });
 
     watch(
+      () => props.height,
+      async () => {
+        await nextTick();
+        chart?.resize();
+      },
+    );
+
+    watch(
       () => props.data.options,
       async () => {
         try {
@@ -577,7 +589,7 @@ export default defineComponent({
           emit("error", e);
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef, hoveredSeriesState };
   },
