@@ -24,6 +24,7 @@ use crate::{
 
 pub mod action_scripts;
 pub mod alerts;
+pub mod cipher;
 pub mod dashboards;
 pub mod distinct_values;
 #[allow(unused_imports)]

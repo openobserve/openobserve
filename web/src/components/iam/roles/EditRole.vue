@@ -351,6 +351,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
+import cipherKeysService from "@/services/cipher_keys";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
@@ -1280,6 +1281,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     report: getReports,
     service_accounts: getServiceAccounts,
     action_scripts: getActionScripts,
+    cipher_keys: getCipherKeys,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1587,6 +1589,18 @@ const getServiceAccounts = async () => {
   updateResourceEntities("service_accounts", ["email"], accounts.data.data);
 
   return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getCipherKeys = async () => {
+  const data: any = await cipherKeysService.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
+
+  return new Promise((resolve, reject) => {
     resolve(true);
   });
 };
