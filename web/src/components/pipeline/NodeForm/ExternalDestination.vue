@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!createNewDestination"
             class="col-12 q-py-xs destination-method-select q-pb-md"
           >
-          {{  selectedDestination }}
             <q-select
               data-test="external-destination-select"
               v-model="selectedDestination"
