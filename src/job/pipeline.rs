@@ -62,16 +62,26 @@ async fn cleanup() -> Result<(), anyhow::Error> {
                     }
                 }
 
-                if let Ok(metadata) = tokio::fs::metadata(wal_file).await {
-                    let file_size = metadata.len() as u128;
-                    total_size += file_size;
-                    let mod_time = get_metadata_motified(&metadata).elapsed().as_micros();
-                    files_donot_delete.push((
-                        mod_time,
-                        file_size,
-                        fw.path.to_string_lossy().to_string(),
-                    ));
-                }
+                let metadata = match tokio::fs::metadata(wal_file).await {
+                    Ok(m) => m,
+                    Err(e) => {
+                        log::error!(
+                            "[PIPELINE] Failed to get metadata for {}: {}",
+                            wal_file.display(),
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let file_size = metadata.len() as u128;
+                total_size = total_size.saturating_add(file_size);
+                let mod_time = get_metadata_motified(&metadata).elapsed().as_micros();
+                files_donot_delete.push((
+                    mod_time,
+                    file_size,
+                    fw.path.to_string_lossy().to_string(),
+                ));
             }
             Err(e) => {
                 log::error!(
@@ -91,14 +101,24 @@ async fn cleanup() -> Result<(), anyhow::Error> {
     }
 
     // clean up by size limit
-    let max_limit = (config::get_config().pipeline.data_retention_size_limit / 100)
-        * config::get_config().disk_cache.max_size;
-    while total_size > max_limit as u128 {
+    let mut remote_wal_size_retention_limit =
+        config::get_config().pipeline.data_retention_size_limit;
+    if remote_wal_size_retention_limit == 0 || remote_wal_size_retention_limit > 100 {
+        log::error!(
+            "[PIPELINE] Invalid data_retention_size_limit: {}",
+            remote_wal_size_retention_limit
+        );
+        remote_wal_size_retention_limit = 100;
+    }
+
+    let max_cache_size = config::get_config().disk_cache.max_size;
+    let retention_limit = remote_wal_size_retention_limit.saturating_mul(max_cache_size);
+    while total_size > retention_limit as u128 {
         if let Some((_, size, file_path)) = files_donot_delete.pop() {
-            log::debug!("pipeline cleanup deleting: {}", file_path);
+            log::debug!("[PIPELINE] cleanup deleting: {}", file_path);
             if let Err(e) = tokio::fs::remove_file(&file_path).await {
                 log::error!(
-                    "pipeline cleanup failed to delete: {}, error: {e}",
+                    "[PIPELINE] cleanup failed to delete: {}, error: {e}",
                     file_path
                 );
             }
