@@ -27,8 +27,8 @@ use tokio::{
 use wal::{FilePosition, ReadFrom};
 
 use crate::service::pipeline::{
-    pipeline_entry::PipelineEntryBuilder, pipeline_exporter::PipelineExporter,
-    pipeline_offset_manager::get_pipeline_offset_manager, pipeline_receiver::PipelineReceiver,
+    pipeline_exporter::PipelineExporter, pipeline_offset_manager::get_pipeline_offset_manager,
+    pipeline_receiver::PipelineReceiver,
 };
 
 #[derive(Debug)]
@@ -325,14 +325,6 @@ impl PipelineWatcher {
     ) -> Result<Option<()>> {
         match entry {
             Ok((Some(entry), file_position)) => {
-                log::debug!(
-                    "Read entry from file, endpoint: {:?}, endpoint_header: {:?}, data: {:?}, path: {}",
-                    pr.get_stream_endpoint().await,
-                    pr.get_stream_endpoint_header().await,
-                    entry.data,
-                    pr.path.display(),
-                );
-
                 if pr.pipeline_exporter.is_none() {
                     let dname = pr.get_destination_name().await?;
                     let skip_tl_verify = pr
@@ -341,20 +333,13 @@ impl PipelineWatcher {
                     pr.pipeline_exporter = Some(PipelineExporter::init(skip_tl_verify)?);
                 }
 
-                let endpoint = pr.get_stream_endpoint().await?;
-                let header = pr.get_stream_endpoint_header().await;
-                let data = PipelineEntryBuilder::new()
-                    .stream_path(pr.path.clone())
-                    .stream_endpoint(endpoint)
-                    .stream_header(header)
-                    .set_entry_position_of_file(file_position)
-                    .entry(entry)
-                    .build();
-
-                let max_retry_time = pr.get_stream_export_retry_time().await;
+                let max_retry_time = pr.get_stream_export_max_retry_time().await;
                 // if entry.data just has one record, it will be a performance issue for exporter
                 if let Some(exporter) = &pr.pipeline_exporter {
-                    if let Err(e) = exporter.export_entry(data, max_retry_time).await {
+                    if let Err(e) = exporter
+                        .export_entry(entry, max_retry_time, file_position, pr)
+                        .await
+                    {
                         log::error!(
                             "Failed to send entry to exporter: {}, data from file : {}",
                             e.to_string(),
