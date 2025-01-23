@@ -501,16 +501,16 @@ export default defineComponent({
         authService
           .unlock_account(unlockfrm_name.value)
           .then((res) => {
-            if (res.data.status == true) {
+            if (res.code == "200") {
               resetUnlockForm();
               $q.notify({
                 color: "positive",
-                message: res.data.message,
+                message: res.message,
               });
             } else {
               $q.notify({
                 color: "negative",
-                message: res.data.message || "Error while unlocking account.",
+                message: res.message || "Error while unlocking account.",
               });
             }
           })
