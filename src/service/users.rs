@@ -844,7 +844,7 @@ pub async fn get_unlock_link(email_id: &str) -> Result<HttpResponse, Error> {
         .unwrap();
 
         let msg = format!(
-            "Hi {}, \n Click the link to unlock your OpenObserve account: {}",
+            "<p>Hi {},</p><p>Click below link to unlock your OpenObserve account:</p><a href=\"{}\">Unlock Account</a>",
             email_id,
             url.as_str()
         );
