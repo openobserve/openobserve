@@ -24,7 +24,7 @@ use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
     utils::{base64, json},
-    Config, USER_LOCK_KEY,
+    Config,
 };
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -46,7 +46,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::{generate_presigned_url, is_root_user, UserEmail},
+        utils::auth::{generate_presigned_url, UserEmail},
     },
     service::users,
 };
@@ -685,7 +685,7 @@ async fn unauthorized_error(
     resp.message = "Invalid credentials".to_string();
 
     if let Some(user) = user_email {
-        let error = handle_failed_login(user).await.unwrap_or_default();
+        let error = users::handle_failed_login(user).await.unwrap_or_default();
         if !error.is_empty() {
             resp.message = error;
             return Ok(HttpResponse::Locked().json(resp));
@@ -705,32 +705,6 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     }
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
-}
-
-async fn handle_failed_login(user_email: &str) -> Option<String> {
-    if get_config().auth.wrong_pass_lock_users || is_root_user(user_email) {
-        let lock_key = format!("{}_attempts", USER_LOCK_KEY);
-        let exhausted_attempts = match crate::service::kv::get(&lock_key, user_email).await {
-            Ok(v) => match String::from_utf8(v.to_vec()) {
-                Ok(val) => val.parse::<u16>().unwrap_or(0),
-                Err(_) => 0,
-            },
-            Err(_) => 0,
-        };
-
-        if exhausted_attempts >= get_config().auth.wrong_password_attempts {
-            return Some("User blocked after max login attempts, please contact admin".to_string());
-        } else {
-            crate::service::kv::set(
-                &lock_key,
-                user_email,
-                (exhausted_attempts + 1).to_string().into(),
-            )
-            .await
-            .unwrap();
-        };
-    }
-    None
 }
 
 #[cfg(test)]
