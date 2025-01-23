@@ -24,6 +24,7 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub status: String,
+    pub service_account: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
