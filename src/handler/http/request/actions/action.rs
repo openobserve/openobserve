@@ -136,7 +136,7 @@ pub async fn update_action_details(
     let req = req.into_inner();
     let sa = match req.service_account.clone() {
         None => {
-            if let Ok(action) = dbg!(action_scripts::get(&ksuid.to_string(), &org_id).await) {
+            if let Ok(action) = action_scripts::get(&ksuid.to_string(), &org_id).await {
                 action.service_account
             } else {
                 return Ok(MetaHttpResponse::bad_request("Failed to fetch action"));
