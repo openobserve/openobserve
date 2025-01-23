@@ -400,7 +400,7 @@ impl TimeWindow {
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
-    pub exemplars: Option<Vec<Exemplar>>,
+    pub exemplars: Option<Vec<Arc<Exemplar>>>,
     pub time_window: Option<TimeWindow>,
 }
 
@@ -476,7 +476,7 @@ impl<'de> Deserialize<'de> for RangeValue {
             {
                 let mut labels_map: Option<FxIndexMap<String, String>> = None;
                 let mut samples: Option<Vec<Sample>> = None;
-                let mut exemplars: Option<Vec<Exemplar>> = None;
+                let mut exemplars: Option<Vec<Arc<Exemplar>>> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -530,12 +530,23 @@ impl RangeValue {
 
     pub(crate) fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
     where
-        S: IntoIterator<Item = Exemplar>,
+        S: IntoIterator<Item = Arc<Exemplar>>,
     {
         Self {
             labels,
             samples: vec![],
             exemplars: Some(Vec::from_iter(exemplars)),
+            time_window: None,
+        }
+    }
+}
+
+impl Default for RangeValue {
+    fn default() -> Self {
+        Self {
+            labels: vec![],
+            samples: vec![],
+            exemplars: None,
             time_window: None,
         }
     }

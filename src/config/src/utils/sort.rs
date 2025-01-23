@@ -17,6 +17,7 @@ use std::cmp::Ordering;
 
 pub fn sort_float(a: &f64, b: &f64) -> Ordering {
     match (a.is_nan(), b.is_nan()) {
+        (true, true) => Ordering::Equal,
         (true, _) => Ordering::Less,
         (_, true) => Ordering::Greater,
         _ => a.partial_cmp(b).unwrap_or(Ordering::Equal),
