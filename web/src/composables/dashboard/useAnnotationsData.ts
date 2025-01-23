@@ -1,6 +1,8 @@
 import { ref, watch } from "vue";
 import { annotationService } from "../../services/dashboard_annotations";
 import useNotifications from "../useNotifications";
+import { getDashboard } from "@/utils/commons";
+import { useStore } from "vuex";
 
 export const useAnnotationsData = (
   organization: any,
@@ -70,6 +72,8 @@ export const useAnnotationsData = (
   };
 
   const editAnnotation = (annotation: any) => {
+    console.log("Editing annotation:", annotation);
+    
     annotationToAddEdit.value = annotation;
     showAddAnnotationDialog();
   };
@@ -92,6 +96,73 @@ export const useAnnotationsData = (
     }
   });
 
+  const store = useStore();
+  const panelsList = ref<any[]>([]);
+  const chartTypes = [
+    "area",
+    "area-stacked",
+    "bar",
+    "h-bar",
+    "line",
+    "scatter",
+    "stacked",
+    "h-stacked",
+  ];
+  const processTabPanels = (dashboardData: any): any[] => {
+    if (!dashboardData?.tabs || !Array.isArray(dashboardData.tabs)) {
+      console.warn("No tabs found in dashboard data");
+      return [];
+    }
+
+    const allPanels: any[] = [];
+
+    dashboardData.tabs.forEach((tab: any) => {
+      const tabName = tab.name?.trim() || "Unnamed Tab";
+
+      if (tab.panels && Array.isArray(tab.panels)) {
+        const tabPanels = tab.panels
+          .filter((panel: any) => chartTypes.includes(panel.type))
+          .map((panel: any) => ({
+            ...panel,
+            tabName: tabName,
+            originalTabData: {
+              tabId: tab.tabId,
+              name: tab.name,
+            },
+          }));
+
+        allPanels.push(...tabPanels);
+      } else {
+        console.log(`Tab "${tabName}" has no panels`);
+      }
+    });
+
+    return allPanels;
+  };
+
+  const fetchAllPanels = async () => {
+    try {
+      const dashboardData = await getDashboard(store, dashboardId);
+
+      const processedPanels = processTabPanels(dashboardData);
+
+      panelsList.value = processedPanels;
+
+      console.log(
+        "Processed Panels:",
+        processedPanels.map((p) => ({
+          id: p.id,
+          title: p.title,
+          tabName: p.tabName,
+          type: p.type,
+        })),
+      );
+    } catch (error) {
+      console.error("Error fetching panels:", error);
+      panelsList.value = [];
+    }
+  };
+
   return {
     isAddAnnotationMode,
     isAddAnnotationDialogVisible,
@@ -107,5 +178,7 @@ export const useAnnotationsData = (
     handleAddAnnotation,
     handleAddAnnotationButtonClick,
     closeAddAnnotation,
+    fetchAllPanels,
+    panelsList,
   };
 };

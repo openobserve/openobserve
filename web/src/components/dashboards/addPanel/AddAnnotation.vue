@@ -1,6 +1,6 @@
 <template>
   <q-dialog v-model="isOpen" persistent>
-    <q-card style="min-width: 500px">
+    <q-card style="min-width: 700px">
       <q-card-section class="q-pa-md">
         <div class="text-h6">{{ isEditMode ? "Edit" : "Add" }} Annotation</div>
       </q-card-section>
@@ -25,6 +25,57 @@
           type="textarea"
           :rows="3"
         />
+
+        <div class="q-mt-md">
+          <div class="text-subtitle1 q-mb-sm">Select Panels</div>
+          <q-select
+            v-model="selectedPanels"
+            :options="groupedPanelsOptions"
+            multiple
+            use-chips
+            stack-label
+            dense
+            outlined
+            emit-value
+            map-options
+            class="q-mt-sm"
+            :popup-content-class="'custom-select-popup'"
+            @update:model-value="updateSelectedPanels"
+            :placeholder="
+              noPanelsSelected ? noPanelsMessage : 'Select panels...'
+            "
+          >
+            <template v-slot:option="{ opt, selected, toggleOption }">
+              <q-item
+                v-if="opt.isTab"
+                class="bg-grey-3 text-bold text-dark"
+                style="pointer-events: none"
+              >
+                <q-item-section>{{ opt.label }}</q-item-section>
+              </q-item>
+
+              <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                <q-item-section avatar>
+                  <q-checkbox
+                    :model-value="selected"
+                    @update:model-value="() => toggleOption(opt)"
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ opt.label }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+
+            <template v-slot:selected-item="{ opt, index }">
+              <span v-if="index < 2" class="q-chip" :key="opt.value">{{
+                opt.label
+              }}</span>
+              <span v-if="index === 2" class="q-chip">+ more</span>
+            </template>
+          </q-select>
+        </div>
+
         <div class="text-caption q-mt-sm">
           Timestamp: {{ annotationDateString }}
         </div>
@@ -49,50 +100,44 @@
         </div>
       </q-card-actions>
     </q-card>
-  </q-dialog>
 
-  <q-dialog v-model="showDeleteConfirm">
-    <q-card>
-      <q-card-section>
-        <div class="text-h6">Confirm Delete</div>
-      </q-card-section>
-      <q-card-section>
-        Are you sure you want to delete this annotation?
-      </q-card-section>
-      <q-card-actions align="right">
-        <q-btn
-          flat
-          label="Cancel"
-          v-close-popup
-          :loading="deleteAnnotation.isLoading.value"
-        />
-        <q-btn
-          color="negative"
-          label="Delete"
-          :loading="deleteAnnotation.isLoading.value"
-          @click="deleteAnnotation.execute()"
-        />
-      </q-card-actions>
-    </q-card>
+    <q-dialog v-model="showDeleteConfirm">
+      <q-card>
+        <q-card-section>
+          <div class="text-h6">Confirm Delete</div>
+        </q-card-section>
+        <q-card-section>
+          Are you sure you want to delete this annotation?
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn
+            flat
+            label="Cancel"
+            v-close-popup
+            :loading="deleteAnnotation.isLoading.value"
+          />
+          <q-btn
+            color="negative"
+            label="Delete"
+            :loading="deleteAnnotation.isLoading.value"
+            @click="deleteAnnotation.execute()"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-dialog>
 </template>
 
 <script setup>
-import { useLoading } from "@/composables/useLoading";
-import { annotationService } from "@/services/dashboard_annotations";
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useLoading } from "@/composables/useLoading";
+import { annotationService } from "@/services/dashboard_annotations";
 
 const props = defineProps({
-  dashboardId: {
-    type: String,
-    required: true,
-  },
-  annotation: {
-    type: Object,
-    default: null,
-    required: false,
-  },
+  dashboardId: { type: String, required: true },
+  annotation: { type: Object, default: null, required: false },
+  panelsList: { type: Array, default: () => [], required: true },
 });
 
 const emit = defineEmits(["save", "remove", "close", "update"]);
@@ -113,15 +158,49 @@ const annotationData = ref(
   },
 );
 
-watch(
-  () => props.annotation,
-  (newVal) => {
-    if (newVal) {
-      annotationData.value = newVal;
-    }
-  },
+const groupedPanels = ref({});
+const selectedPanels = ref([]);
+const groupedPanelsOptions = computed(() =>
+  Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
+    { label: tab, isTab: true }, 
+    ...panels.map((panel) => ({
+      label: panel.title,
+      value: panel.id,
+      isTab: false, 
+    })),
+  ]),
 );
 
+const noPanelsSelected = computed(() => selectedPanels.value.length === 0);
+const noPanelsMessage = "Annotations will be applied to all panels.";
+
+const groupPanels = () => {
+  groupedPanels.value = props.panelsList.reduce((acc, panel) => {
+    const tabName = panel.tabName || "Unknown Tab";
+    if (!acc[tabName]) acc[tabName] = [];
+    acc[tabName].push({ id: panel.id, title: panel.title });
+    return acc;
+  }, {});
+};
+
+const updateSelectedPanels = () => {
+  annotationData.value.panels = selectedPanels.value;
+};
+
+const restorePreviousSelections = () => {
+  if (annotationData.value.panels && annotationData.value.panels.length) {
+    selectedPanels.value = annotationData.value.panels;
+  }
+};
+
+watch(
+  () => props.panelsList,
+  () => {
+    groupPanels();
+    if (props.annotation) restorePreviousSelections();
+  },
+  { immediate: true },
+);
 const isEditMode = computed(() => !!annotationData?.value?.annotation_id);
 
 const annotationDateString = computed(() => {
@@ -198,3 +277,10 @@ const confirmDelete = async () => {
 const saveAnnotation = useLoading(handleSave);
 const deleteAnnotation = useLoading(confirmDelete);
 </script>
+
+<style scoped>
+.custom-select-popup {
+  max-height: 300px;
+  overflow-y: auto;
+}
+</style>

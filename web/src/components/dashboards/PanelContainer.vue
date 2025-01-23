@@ -258,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (...args) => $emit('update:initial-variable-values', ...args)
       "
       ref="PanleSchemaRendererRef"
+      :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>

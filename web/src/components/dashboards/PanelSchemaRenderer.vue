@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardId="dashboardId"
         :annotation="annotationToAddEdit"
         @close="closeAddAnnotation"
+        :panelsList="panelsList"
       />
     </div>
   </div>
@@ -218,6 +219,7 @@ import {
   inject,
   nextTick,
   defineAsyncComponent,
+  onMounted,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -387,6 +389,8 @@ export default defineComponent({
       toggleAddAnnotationMode,
       handleAddAnnotation,
       closeAddAnnotation,
+      fetchAllPanels,
+      panelsList,
     } = useAnnotationsData(
       store.state.selectedOrganization?.identifier,
       dashboardId.value,
@@ -429,6 +433,13 @@ export default defineComponent({
       }
     });
     // ======= [END] dashboard PrintMode =======
+
+    onMounted(async () => {
+      // fetch all panels
+      await fetchAllPanels();
+      console.log("panelsList", panelsList.value);
+      panelsList.value = panelsList.value;
+    });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
     // As some panels were getting true cancel button and datetime picker were not getting updated
@@ -1297,6 +1308,7 @@ export default defineComponent({
       toggleAddAnnotationMode,
       annotationToAddEdit,
       checkIfPanelIsTimeSeries,
+      panelsList,
     };
   },
 });
