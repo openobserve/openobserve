@@ -70,10 +70,10 @@ impl TryFrom<&str> for ActionStatus {
 impl Display for ActionStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ActionStatus::Ready => "Ready",
-            ActionStatus::Running => "Running",
-            ActionStatus::Errored => "Errored",
-            ActionStatus::Completed => "Completed",
+            ActionStatus::Ready => "ready",
+            ActionStatus::Running => "running",
+            ActionStatus::Errored => "errored",
+            ActionStatus::Completed => "completed",
         };
         write!(f, "{}", s)
     }
