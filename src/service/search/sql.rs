@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, ops::ControlFlow, sync::Arc};
+use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::FieldRef;
 use chrono::Duration;
@@ -28,12 +28,12 @@ use config::{
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_fields, unwrap_stream_settings,
-        SchemaCache,
+        get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
 };
 use itertools::Itertools;
@@ -189,10 +189,16 @@ impl Sql {
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
-            used_schemas = generate_select_star_schema(total_schemas, has_original_column);
+            used_schemas = generate_select_star_schema(
+                total_schemas,
+                &columns,
+                has_original_column,
+                query.quick_mode || cfg.limit.quick_mode_force_enabled,
+                cfg.limit.quick_mode_num_fields,
+            );
         } else {
             for (stream, schema) in total_schemas.iter() {
-                let columns = match column_visitor.columns.get(stream) {
+                let columns = match columns.get(stream) {
                     Some(columns) => columns.clone(),
                     None => {
                         used_schemas.insert(stream.clone(), schema.clone());
@@ -320,19 +326,37 @@ impl std::fmt::Display for Sql {
 
 fn generate_select_star_schema(
     schemas: HashMap<TableReference, Arc<SchemaCache>>,
+    columns: &HashMap<TableReference, HashSet<String>>,
     has_original_column: HashMap<TableReference, bool>,
+    quick_mode: bool,
+    quick_mode_num_fields: usize,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
-        let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-        let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+        let stream_settings = unwrap_stream_settings(schema.schema());
+        let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() && !has_original_column {
-            if schema.contains_field(ORIGINAL_DATA_COL_NAME) {
-                // skip selecting "_original" column if `SELECT * ...`
-                let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
-                fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+        if defined_schema_fields.is_empty() {
+            let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
+            let skip_original_column =
+                !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
+            if quick_mode || skip_original_column {
+                let fields = if quick_mode {
+                    let columns = columns.get(&name);
+                    let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+                    generate_quick_mode_fields(
+                        schema.schema(),
+                        columns,
+                        &fts_fields,
+                        skip_original_column,
+                    )
+                } else {
+                    // skip selecting "_original" column if `SELECT * ...`
+                    let mut fields = schema.schema().fields().iter().cloned().collect::<Vec<_>>();
+                    fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+                    fields
+                };
                 let schema = Arc::new(SchemaCache::new(
                     Schema::new(fields).with_metadata(schema.schema().metadata().clone()),
                 ));
@@ -373,6 +397,89 @@ fn generate_user_defined_schema(
     Arc::new(SchemaCache::new(
         Schema::new(new_fields).with_metadata(schema.schema().metadata().clone()),
     ))
+}
+
+fn generate_quick_mode_fields(
+    schema: &Schema,
+    columns: Option<&HashSet<String>>,
+    fts_fields: &[String],
+    skip_original_column: bool,
+) -> Vec<Arc<arrow_schema::Field>> {
+    let cfg = get_config();
+    let strategy = cfg.limit.quick_mode_strategy.to_lowercase();
+    let schema_fields = schema.fields().iter().cloned().collect::<Vec<_>>();
+    let mut fields = match strategy.as_str() {
+        "last" => {
+            let skip = std::cmp::max(0, schema_fields.len() - cfg.limit.quick_mode_num_fields);
+            schema_fields.into_iter().skip(skip).collect()
+        }
+        "both" => {
+            let need_num = std::cmp::min(schema_fields.len(), cfg.limit.quick_mode_num_fields);
+            let mut inner_fields = schema_fields
+                .iter()
+                .take(need_num / 2)
+                .cloned()
+                .collect::<Vec<_>>();
+            if schema_fields.len() > inner_fields.len() {
+                let skip = std::cmp::max(0, schema_fields.len() + inner_fields.len() - need_num);
+                inner_fields.extend(schema_fields.into_iter().skip(skip));
+            }
+            inner_fields
+        }
+        _ => {
+            // default is first mode
+            schema_fields
+                .into_iter()
+                .take(cfg.limit.quick_mode_num_fields)
+                .collect()
+        }
+    };
+
+    let mut fields_name = fields
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<HashSet<_>>();
+
+    // check _timestamp
+    if !fields_name.contains(&cfg.common.column_timestamp) {
+        if let Ok(field) = schema.field_with_name(&cfg.common.column_timestamp) {
+            fields.push(Arc::new(field.clone()));
+            fields_name.insert(cfg.common.column_timestamp.to_string());
+        }
+    }
+    // add the selected columns
+    if let Some(columns) = columns {
+        for column in columns {
+            if !fields_name.contains(column) {
+                if let Ok(field) = schema.field_with_name(column) {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(column.to_string());
+                }
+            }
+        }
+    }
+    // check fts fields
+    for field in fts_fields {
+        if !fields_name.contains(field) {
+            if let Ok(field) = schema.field_with_name(field) {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
+            }
+        }
+    }
+    // check quick mode fields
+    for field in config::QUICK_MODEL_FIELDS.iter() {
+        if !fields_name.contains(field) {
+            if let Ok(field) = schema.field_with_name(field) {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
+            }
+        }
+    }
+    if skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
+        fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+    }
+    fields
 }
 
 // add field from full text search

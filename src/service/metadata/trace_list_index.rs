@@ -122,7 +122,7 @@ impl Metadata for TraceListIndex {
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+            ingester::get_writer(0, org_id, StreamType::Metadata.as_str(), STREAM_NAME).await;
         _ = ingestion::write_file(
             &writer,
             STREAM_NAME,
@@ -294,13 +294,9 @@ mod tests {
         hour_buf.records.push(Arc::new(data));
         hour_buf.records_size += data_size;
 
-        let writer = ingester::get_writer(
-            0,
-            "openobserve",
-            &StreamType::Metadata.to_string(),
-            STREAM_NAME,
-        )
-        .await;
+        let writer =
+            ingester::get_writer(0, "openobserve", StreamType::Metadata.as_str(), STREAM_NAME)
+                .await;
         for (key, val) in buf.iter() {
             println!(
                 "key: {key} val: {:?} schema: {}, records_size: {}, records: {:?}",

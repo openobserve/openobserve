@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator />
       <div class="row q-col-gutter-sm q-px-lg q-my-md">
-        <div class="col-12 q-pb-md">
+        <div v-if="isAlerts" class="col-12 q-pb-md">
           <app-tabs
             style="
               border: 1px solid #8a8a8a;
@@ -72,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="createEmailTemplate"
           />
         </div>
-        <div class="col-6 q-py-xs">
+        <div class="q-py-xs"
+        :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
+        >
           <q-input
             data-test="add-destination-name-input"
             v-model="formData.name"
@@ -96,7 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div class="col-6 row q-py-xs">
+        <div
+        v-if="isAlerts"
+          class="col-6 row q-py-xs"
+        >
           <div class="col-12">
             <q-select
               data-test="add-destination-template-select"
@@ -116,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <template v-if="formData.type === 'http'">
+        <template
+          v-if="
+            isAlerts && formData.type === 'http' || isAlerts == false
+          "
+        >
           <div class="col-6 q-py-xs">
             <q-input
               data-test="add-destination-url-input"
@@ -302,10 +311,16 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-const props = defineProps<{
-  templates: Template[] | [];
-  destination: DestinationPayload | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    templates: Template[] | [];
+    destination: DestinationPayload | null;
+    isAlerts: boolean;
+  }>(),
+  {
+    isAlerts: true,
+  }
+);
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
@@ -319,7 +334,7 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "http",
+  type: props.isAlerts ? "http" : "remote_pipeline",
 });
 const isUpdatingDestination = ref(false);
 
@@ -356,11 +371,11 @@ const tabs = computed(() => [
     style: {
       width: "fit-content",
       padding: "4px 14px",
-      background: formData.value.type === "email" ? "#5960B2" : "#ffffff",
+      background: formData.value.type === "email" ? "#5960B2" : "",
       border: "none !important",
       color: formData.value.type === "email" ? "#ffffff !important" : "",
     },
-  },
+  }
 ]);
 
 onActivated(() => setupDestinationData());
@@ -401,11 +416,12 @@ const getFormattedTemplates = computed(() =>
 const isValidDestination = computed(
   () =>
     formData.value.name &&
-    ((formData.value.url &&
+((formData.value.url &&
       formData.value.method &&
       formData.value.type === "http") ||
-      (formData.value.type === "email" && formData.value.emails.length)) &&
-    formData.value.template
+  (formData.value.type === "email" && formData.value.emails.length) ||
+      (!props.isAlerts && formData.value.url && formData.value.method)) &&
+    (props.isAlerts ? formData.value.template : true),
 );
 const saveDestination = () => {
   if (!isValidDestination.value) {
@@ -430,7 +446,7 @@ const saveDestination = () => {
     url: formData.value.url,
     method: formData.value.method,
     skip_tls_verify: formData.value.skip_tls_verify,
-    template: formData.value.template,
+    template: props.isAlerts ? formData.value.template : "",
     headers: headers,
     name: formData.value.name,
   };
@@ -440,6 +456,10 @@ const saveDestination = () => {
     payload["emails"] = formData.value.emails
       .split(/[;,]/)
       .map((email: string) => email.trim());
+  }
+
+  if (!props.isAlerts) {
+    payload["type"] = "remote_pipeline";
   }
 
   if (isUpdatingDestination.value) {

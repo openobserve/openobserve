@@ -218,7 +218,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = init_enterprise().await {
+            if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -907,5 +907,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         openobserve::super_cluster_queue::init().await?;
     }
+
+    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+
     Ok(())
 }

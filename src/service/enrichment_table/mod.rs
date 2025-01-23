@@ -202,7 +202,7 @@ pub async fn save_enrichment_data(
     let writer = ingester::get_writer(
         0,
         org_id,
-        &StreamType::EnrichmentTables.to_string(),
+        StreamType::EnrichmentTables.as_str(),
         stream_name,
     )
     .await;

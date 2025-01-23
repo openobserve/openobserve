@@ -543,7 +543,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -552,7 +552,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -689,7 +689,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -698,7 +698,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -952,8 +952,7 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer =
-        ingester::get_writer(0, org_id, &StreamType::Traces.to_string(), stream_name).await;
+    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
