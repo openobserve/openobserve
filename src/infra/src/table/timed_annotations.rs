@@ -84,6 +84,161 @@ pub async fn get(
                 ),
         );
     }
+
+    // Step 4: Filter by time range (overlap condition)
+    query = query
+        .filter(
+            Expr::col((
+                timed_annotations::Entity,
+                timed_annotations::Column::StartTime,
+            ))
+            .lte(end_time), // annotation.start_time <= end_time
+        )
+        .filter(
+            Condition::any()
+                .add(
+                    Expr::col((
+                        timed_annotations::Entity,
+                        timed_annotations::Column::EndTime,
+                    ))
+                    .gte(start_time), // annotation.end_time >= start_time
+                )
+                .add(
+                    Condition::all()
+                        .add(
+                            Expr::col((
+                                timed_annotations::Entity,
+                                timed_annotations::Column::EndTime,
+                            ))
+                            .is_null(), // end_time is null
+                        )
+                        .add(
+                            Expr::col((
+                                timed_annotations::Entity,
+                                timed_annotations::Column::StartTime,
+                            ))
+                            .gte(start_time), // annotation.start_time >= start_time
+                        ),
+                ),
+        );
+
+    // Step 5: Execute Query with `find_also_related`
+    let annotations_with_panels = query
+        .find_also_related(timed_annotation_panels::Entity)
+        .all(client)
+        .await?;
+
+    if annotations_with_panels.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Step 6: Group annotations and aggregate panels
+    let mut grouped_annotations: HashMap<String, TimedAnnotation> = HashMap::new();
+
+    for (annotation, panel) in annotations_with_panels {
+        let annotation_id = annotation.id.clone();
+
+        // Initialize the annotation if not already present in the HashMap
+        grouped_annotations
+            .entry(annotation_id.clone())
+            .or_insert_with(|| TimedAnnotation {
+                annotation_id: Some(annotation.id.clone()),
+                start_time: annotation.start_time,
+                end_time: annotation.end_time,
+                title: annotation.title,
+                text: annotation.text,
+                tags: annotation
+                    .tags
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                panels: vec![], // Initialize with an empty panel list
+            });
+
+        // Add the panel ID to the annotation, if it exists
+        if let Some(panel) = panel {
+            grouped_annotations
+                .get_mut(&annotation_id)
+                .unwrap()
+                .panels
+                .push(panel.panel_id.clone());
+        }
+    }
+
+    // Step 7: Fetch all panels for the annotations (to ensure we include all panels)
+    let annotation_ids: Vec<String> = grouped_annotations.keys().cloned().collect();
+    let all_panels = timed_annotation_panels::Entity::find()
+        .filter(timed_annotation_panels::Column::TimedAnnotationId.is_in(annotation_ids))
+        .all(client)
+        .await?;
+
+    // Map all panels to their respective annotations
+    for panel in all_panels {
+        if let Some(annotation) = grouped_annotations.get_mut(&panel.timed_annotation_id) {
+            if !annotation.panels.contains(&panel.panel_id) {
+                annotation.panels.push(panel.panel_id.clone());
+            }
+        }
+    }
+
+    // Step 8: Convert grouped annotations back into a Vec
+    let results: Vec<TimedAnnotation> = grouped_annotations.into_values().collect();
+
+    Ok(results)
+}
+
+pub async fn _get(
+    dashboard_id: &str,
+    panel_ids: Option<Vec<String>>,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<TimedAnnotation>, errors::Error> {
+    // make sure only one client is writing to the database (only for SQLite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Step 1: Resolve the user-facing `dashboard_id` to the primary key (KSUID)
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(client)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
+
+    // Step 2: Build the query for `timed_annotations`
+    let mut query = timed_annotations::Entity::find()
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk));
+
+    // Step 3: Combine panel filtering logic
+    if let Some(ref panel_ids) = panel_ids {
+        query = query.filter(
+            Condition::any()
+                .add(
+                    Expr::col((
+                        timed_annotation_panels::Entity,
+                        timed_annotation_panels::Column::PanelId,
+                    ))
+                    .is_in(panel_ids.to_vec()), /* Include annotations linked to the specified
+                                                 * panels */
+                )
+                .add(
+                    Expr::col((
+                        timed_annotation_panels::Entity,
+                        timed_annotation_panels::Column::PanelId,
+                    ))
+                    .is_null(), // Include annotations with no panels
+                ),
+        );
+    }
     // Step 4: Filter by time range (overlap condition)
     query = query
         .filter(
