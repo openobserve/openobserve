@@ -1002,5 +1002,3 @@ test.describe("Sanity testcases", () => {
   });
 
 });
-
-// write a function to add two numbers
