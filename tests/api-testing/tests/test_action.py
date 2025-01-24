@@ -10,7 +10,7 @@ def test_get_actions(create_session, base_url):
     print(resp_get_allactions.content)
     assert (
         resp_get_allactions.status_code == 200
-    ), f"Get all alerts list 200, but got {resp_get_allactions.status_code} {resp_get_allactions.content}"
+    ), f"Get all actions list 200, but got {resp_get_allactions.status_code} {resp_get_allactions.content}"
 
 def test_get_service_accounts(create_session, base_url):
     """Running an E2E test for get all the service_accounts list."""
