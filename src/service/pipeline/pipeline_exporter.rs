@@ -18,14 +18,19 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use config::Config;
 use infra::errors::Result;
+use ingester::Entry;
 use reqwest::ClientBuilder;
+use wal::FilePosition;
 
 use crate::service::pipeline::{
-    pipeline_entry::PipelineEntry, pipeline_http_exporter_client::PipelineHttpExporterClient,
+    pipeline_entry::{PipelineEntry, PipelineEntryBuilder},
+    pipeline_http_exporter_client::PipelineHttpExporterClient,
     pipeline_offset_manager::get_pipeline_offset_manager,
+    pipeline_receiver::PipelineReceiver,
 };
 
-const INITIAL_RETRY_DELAY_MS: u64 = 100;
+const INITIAL_RETRY_DELAY_MS: u64 = 100; // 100 ms
+const MAX_RETRY_TIME_LIMIT: u64 = 3600000; // 1 hour
 
 #[async_trait]
 pub trait PipelineRouter: Sync + Send {
@@ -66,10 +71,32 @@ impl PipelineExporter {
         Ok(Self::new(client))
     }
 
-    pub async fn export_entry(&self, entry: PipelineEntry, max_retry_time: u64) -> Result<()> {
+    pub async fn export_entry(
+        &self,
+        entry: Entry,
+        max_retry_time: u64,
+        file_position: FilePosition,
+        pr: &PipelineReceiver,
+    ) -> Result<()> {
         let mut attempts = 0;
         let mut delay = INITIAL_RETRY_DELAY_MS;
         loop {
+            log::debug!(
+                "Read entry from file, endpoint: {:?}, endpoint_header: {:?}, data: {:?}, path: {}",
+                pr.get_stream_endpoint().await,
+                pr.get_stream_endpoint_header().await,
+                entry.data,
+                pr.path.display(),
+            );
+            let endpoint = pr.get_stream_endpoint().await?;
+            let header = pr.get_stream_endpoint_header().await;
+            let entry = PipelineEntryBuilder::new()
+                .stream_path(pr.path.clone())
+                .stream_endpoint(endpoint)
+                .stream_header(header)
+                .set_entry_position_of_file(file_position)
+                .entry(entry.clone())
+                .build();
             // todo: if endpoint reponse partial success, we need to resovle the issue?
             // we assume that all the data is received successfully when the endpoint response 200.
             match self.router.export(entry.clone()).await {
@@ -112,12 +139,21 @@ impl PipelineExporter {
                     );
 
                     tokio::time::sleep(Duration::from_millis(delay)).await;
-                    delay *= 2;
+                    delay = Self::retry_backoff(delay);
                 }
             }
         }
 
         Ok(())
+    }
+
+    fn retry_backoff(delay: u64) -> u64 {
+        let mut new_delay = delay * 5;
+        if new_delay >= MAX_RETRY_TIME_LIMIT {
+            new_delay = MAX_RETRY_TIME_LIMIT;
+        }
+
+        new_delay
     }
 }
 
@@ -128,5 +164,19 @@ mod tests {
     #[test]
     fn test_pipeline_exporter_client_builder() {
         PipelineExporterClientBuilder::build(false).unwrap();
+    }
+
+    #[test]
+    fn test_retry_backoff() {
+        let mut delay = 100;
+        for i in 0..10 {
+            let new_delay = super::PipelineExporter::retry_backoff(delay);
+            println!("retry_backoff: {i} {} -> {}", delay, new_delay);
+            delay = new_delay;
+            match i {
+                v if v <= 5 => assert!(delay < 3600000),
+                _ => assert_eq!(delay, 3600000),
+            }
+        }
     }
 }
