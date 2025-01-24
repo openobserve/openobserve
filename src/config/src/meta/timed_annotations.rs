@@ -122,20 +122,6 @@ impl TimedAnnotationUpdate {
             }
         }
 
-        // Validate `panels` if provided
-        if let Some(panels) = &self.panels {
-            if panels.is_empty() {
-                return Err("panels cannot be empty".to_string());
-            }
-        }
-
-        // Validate `tags` if provided
-        if let Some(tags) = &self.tags {
-            if tags.is_empty() {
-                return Err("tags cannot be empty".to_string());
-            }
-        }
-
         Ok(())
     }
 }
