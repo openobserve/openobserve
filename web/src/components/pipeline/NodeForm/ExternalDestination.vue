@@ -55,7 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               tabindex="0"
-            />
+            >
+            <template v-slot:option="scope">
+              <q-item style="max-width: calc(40vw - 42px )" v-bind="scope.itemProps">
+                <q-item-section class="flex flex-col">
+                  <q-item-label > <span class="text-bold"> {{ scope.opt.label }}</span> - <span class="truncate-url" > {{  scope.opt.url }}</span> </q-item-label>
+                </q-item-section>
+              </q-item>
+        </template>
+          </q-select>
           </div>
           <div class="col-12 q-pb-md"></div>
           <div v-if="createNewDestination" class="col-12 q-py-xs">
@@ -270,8 +278,13 @@ const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
 const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
-const selectedDestination = ref(
-  pipelineObj.currentSelectedNodeData.data.destination_name || "",
+const selectedDestination: any = ref(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name
+    ? {
+        label: pipelineObj.currentSelectedNodeData.data.destination_name,
+        value: pipelineObj.currentSelectedNodeData.data.destination_name,
+      }
+    : { label: "", value: "" },
 );
 const destinations = ref([]);
 
@@ -392,12 +405,19 @@ const deleteApiHeader = (header: any) => {
 
 const getFormattedDestinations = computed(() => {
   return destinations.value.map((destination: any) => {
+    const truncatedUrl = destination.url.length > 70 
+      ? destination.url.slice(0, 70) + '...' 
+      : destination.url;
+
     return {
       label: destination.name,
       value: destination.name,
+      url: truncatedUrl,
     };
   });
 });
+
+
 
 const createEmailTemplate = () => {
   router.push({
@@ -476,4 +496,13 @@ const saveDestination = () => {
     }
   }
 }
+.truncate-url {
+  display: inline-block;
+  max-width: calc(40vw - 200px); /* Adjust the width as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 </style>

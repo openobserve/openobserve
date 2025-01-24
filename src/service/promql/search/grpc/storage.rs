@@ -235,10 +235,10 @@ async fn get_file_list(
     };
 
     let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(results.len());
     for file in results {
         if match_source(stream_params.clone(), Some(time_range), filters, &file).await {
-            files.push(file.clone());
+            files.push(file);
         }
     }
     Ok(files)
