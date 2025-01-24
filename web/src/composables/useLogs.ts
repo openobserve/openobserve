@@ -5317,7 +5317,15 @@ const useLogs = () => {
 
     queryReq.query.track_total_hits = true;
 
-    queryReq.query.end_time = searchObj.data.queryResults.time_offset;
+    if (
+      searchObj.data?.queryResults?.time_offset?.start_time &&
+      searchObj.data?.queryResults?.time_offset?.end_time
+    ) {
+      queryReq.query.start_time =
+        searchObj.data.queryResults.time_offset.start_time;
+      queryReq.query.end_time =
+        searchObj.data.queryResults.time_offset.end_time;
+    }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
 
