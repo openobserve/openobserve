@@ -712,6 +712,7 @@ async fn merge_files(
         tables,
         &bloom_filter_fields,
         &new_file_meta,
+        true,
     )
     .await;
 
@@ -736,11 +737,12 @@ async fn merge_files(
         }
     };
 
-    // TODO: handle multiple files in ingester
+    // ingester should not support multiple files
+    // multiple files is for downsampling that will be handled in compactor
     let buf = match buf {
         MergeParquetResult::Single(v) => v,
         MergeParquetResult::Multiple { .. } => {
-            panic!("merge_parquet_files error: multiple files");
+            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
         }
     };
 

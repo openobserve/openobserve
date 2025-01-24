@@ -922,6 +922,7 @@ pub async fn merge_files(
                     tables,
                     &bloom_filter_fields,
                     &new_file_meta,
+                    false,
                 )
                 .await
             })
