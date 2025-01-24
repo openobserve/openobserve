@@ -54,27 +54,31 @@ static PIPELINE_WAL_WRITER_MAP: Lazy<Arc<RwLock<HashMap<String, Arc<PipelineWalW
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 pub async fn get_pipeline_wal_writer(
-    pipeline_id: String,
+    pipeline_id: &str,
     remote_stream_params: RemoteStreamParams,
 ) -> Result<Arc<PipelineWalWriter>> {
+    let key = format!("{pipeline_id}-{}", remote_stream_params.destination_name);
     let mut map = PIPELINE_WAL_WRITER_MAP.write().await;
-    if let Some(writer) = map.get(&pipeline_id) {
+    if let Some(writer) = map.get(&key) {
         Ok(writer.clone())
     } else {
-        let pipeline = db::pipeline::get_by_id(pipeline_id.as_str())
+        let pipeline = db::pipeline::get_by_id(pipeline_id)
             .await
             .map_err(|e| Error::Message(format!("get_pipeline_wal_writer fail: {e}")))?;
 
-        let pipeline_source = pipeline.source.clone();
-        let writer =
-            PipelineWalWriter::new(pipeline_id.clone(), pipeline.source, remote_stream_params)?;
+        let is_realtime = matches!(&pipeline.source, PipelineSource::Realtime(_));
+        let writer = PipelineWalWriter::new(
+            pipeline_id.to_string(),
+            pipeline.source,
+            remote_stream_params,
+        )?;
         let writer = Arc::new(writer);
-        map.insert(pipeline_id, writer.clone());
+        map.insert(key, writer.clone());
 
         // only realtime wal-file must notify file wather
         // because scheduled pipeline will not write to real wal file
         // we only notify file watcher when rename the tmp file to real file successfully
-        if let PipelineSource::Realtime(_) = pipeline_source {
+        if is_realtime {
             // notify the pipeline_file_watcher begin to read entry.
             let wal_writer = writer.wal_writer.write().await;
             let path = wal_writer.path();

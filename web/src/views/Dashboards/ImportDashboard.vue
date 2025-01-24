@@ -422,19 +422,28 @@ export default defineComponent({
     });
 
     watch(jsonStr, (newVal) => {
-      if (newVal && newVal !== JSON.stringify(JSON.parse(newVal), null, 2)) {
-        try {
-          if (typeof newVal === "object") {
-            jsonStr.value = JSON.stringify(newVal, null, 2);
-          } else {
-            const jsonObject = JSON.parse(newVal);
-            jsonStr.value = JSON.stringify(jsonObject, null, 2);
+        if (newVal) {
+          try {
+            // If newVal is an object, stringify it directly
+            if (typeof newVal === "object") {
+              jsonStr.value = JSON.stringify(newVal, null, 2);
+            } else if (typeof newVal === "string") {
+              // Only parse it if it's a string
+              const jsonObject = JSON.parse(newVal);
+              jsonStr.value = JSON.stringify(jsonObject, null, 2);
+            }
+          } catch (error) {
+            showErrorNotification("Invalid JSON format");
           }
-        } catch (error) {
-          showErrorNotification("Invalid JSON format");
         }
-      }
-    });
+        if(newVal == ""){
+          jsonFiles.value = null;
+          url.value = "";
+        }
+      });
+
+
+
 
     watch(url, async (newVal) => {
       try {
