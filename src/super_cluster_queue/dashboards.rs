@@ -49,7 +49,7 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             )
             .await?;
         }
-        DashboardMessage::TimedAnnotationPut {
+        DashboardMessage::TimedAnnotationUpdate {
             dashboard_id,
             timed_annotation_id,
             timed_annotation,
@@ -63,7 +63,7 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         } => {
             table::timed_annotations::delete(&dashboard_id, &timed_annotation_id).await?;
         }
-        DashboardMessage::TimedAnnotationPanelsPut {
+        DashboardMessage::TimedAnnotationPanelsCreate {
             timed_annotation_id,
             panels,
         } => {
