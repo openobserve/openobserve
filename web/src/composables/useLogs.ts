@@ -5285,8 +5285,15 @@ const useLogs = () => {
   };
 
   const getPageCountThroughSocket = async (queryReq: any) => {
+    if (
+      searchObj.data.queryResults.total >
+      queryReq.query.from + queryReq.query.size
+    ) {
+      return;
+    }
+
     searchObj.data.countErrorMsg = "";
-    queryReq.query.size = 0;
+    queryReq.query.size = searchObj.data.queryResults.total;
     delete queryReq.query.from;
     delete queryReq.query.quick_mode;
     queryReq.query["sql_mode"] = "full";
