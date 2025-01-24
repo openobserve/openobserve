@@ -94,9 +94,7 @@ export default defineComponent({
       // else use default
       const activeFolderData = store.state.organizationData.folders.find(
         (item: any) =>
-          item.folderId === props.activeFolderId ??
-          route.query.folder ??
-          "default"
+          item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
       );
 
       return {

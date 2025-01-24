@@ -280,7 +280,7 @@ const confirmDialogMeta: any = ref({
 });
 const activeTab = ref("all");
 const filteredPipelines : any = ref([]);
-const columns = ref<Column[]>([]);
+const columns: any = ref([]);
 
 const tabs = reactive ([
 {
