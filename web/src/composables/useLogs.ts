@@ -4669,8 +4669,6 @@ const useLogs = () => {
     try {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
-        showCancelSearchNotification();
-        setCancelSearchError();
         return;
       }
 
@@ -4686,7 +4684,6 @@ const useLogs = () => {
           use_cache: (window as any).use_cache ?? true,
         },
       });
-      // cancelQuery();
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -5148,6 +5145,9 @@ const useLogs = () => {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
+
+      showCancelSearchNotification();
+      setCancelSearchError();
       return;
     }
 
