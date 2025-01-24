@@ -138,7 +138,12 @@ async fn list_destinations(
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let dst_type = query.get("dst_type").unwrap_or(&"".to_string()).to_string();
-    let dst_type = DestinationType::from(dst_type.as_str());
+    let dst_type = if dst_type.is_empty() {
+        None
+    } else {
+        Some(DestinationType::from(dst_type.as_str()))
+    };
+
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]

@@ -181,11 +181,12 @@ pub async fn get_with_template(
 pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
-    dst_type: DestinationType,
+    dst_type: Option<DestinationType>,
 ) -> Result<Vec<Destination>, anyhow::Error> {
     let destinations = db::alerts::destinations::list(org_id).await?;
     let is_target_type = |dest: &Destination| match dst_type {
-        DestinationType::RemotePipeline => dest.is_remote_pipeline(),
+        None => true,
+        Some(DestinationType::RemotePipeline) => dest.is_remote_pipeline(),
         _ => !dest.is_remote_pipeline(),
     };
 
