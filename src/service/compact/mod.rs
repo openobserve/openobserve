@@ -288,7 +288,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     None,
                 ) {
                     log::warn!(
-                        "[COMPACTOR] the stream [{}/{}/{}] is deleting, just skip",
+                        "[DOWNSAMPLING] the stream [{}/{}/{}] is deleting, just skip",
                         &org_id,
                         stream_type,
                         &stream_name,
@@ -306,7 +306,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     .await
                     {
                         log::error!(
-                            "[COMPACTOR] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
+                            "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
                             org_id,
                             stream_type,
                             stream_name,

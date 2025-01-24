@@ -331,7 +331,8 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
         );
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
-        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        let (offset, node) =
+            db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
@@ -374,8 +375,6 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of
     // max_file_retention_time
-    // TODO: metrics by default is daily, so we need to add 1 day, to avoid the same offset rule
-    // apply to a stream multiple times
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
             <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
@@ -389,7 +388,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     }
 
     log::debug!(
-        "[COMPACTOR] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?}, offset: {}",
+        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?}, offset: {}",
         org_id,
         stream_type,
         stream_name,
@@ -400,7 +399,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // generate downsampling job
     if let Err(e) = infra_file_list::add_job(org_id, stream_type, stream_name, offset).await {
         return Err(anyhow::anyhow!(
-            "[COMPACT] add file_list_jobs failed: {}",
+            "[DOWNSAMPLING] add file_list_jobs failed: {}",
             e
         ));
     }
@@ -495,7 +494,6 @@ pub async fn merge_by_stream(
         .unwrap()
         .timestamp_micros();
 
-    // TODO: how to handle downsampling with step > 1 day
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
         if partition_time_level == PartitionTimeLevel::Daily {
@@ -569,7 +567,6 @@ pub async fn merge_by_stream(
                 return Ok(());
             }
 
-            // TODO: skip group file when do downsampling
             let skip_group_files = stream_type == StreamType::Metrics
                 && get_largest_downsampling_rule(
                     &stream_name,

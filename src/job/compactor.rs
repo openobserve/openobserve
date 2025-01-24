@@ -63,9 +63,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         .await
                         {
                             Ok((file, meta, _)) => {
-                                let mut new_file_keys = Vec::new();
+                                let mut new_file_keys = Vec::with_capacity(file.len());
                                 for (file, meta) in file.into_iter().zip(meta.into_iter()) {
-                                    new_file_keys.push(FileKey::new(&file, meta, false));
+                                    new_file_keys.push(FileKey {
+                                        key: file,
+                                        meta,
+                                        deleted: false,
+                                        segment_ids: None,
+                                    });
                                 }
                                 if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await {
                                     log::error!(
@@ -172,7 +177,7 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 1,
+            get_config().compact.downsampling_interval,
         ))
         .await;
         log::info!("[COMPACTOR] Running generate downsampling job");

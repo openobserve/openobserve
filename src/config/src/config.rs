@@ -1309,6 +1309,8 @@ pub struct Compact {
     pub job_clean_wait_time: i64,
     #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
     pub pending_jobs_metric_interval: u64,
+    #[env_config(name = "ZO_COMPACT_DOWNSAMPLING_INTERVAL", default = 3600)] // seconds
+    pub downsampling_interval: u64,
     #[env_config(name = "ZO_METRICS_DOWNSAMPLING_RULES", default = "")]
     pub metrics_downsampling_rules: String,
 }
@@ -2284,9 +2286,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             let (regex, function, offest, step) = rule
                 .split(':')
                 .collect_tuple()
-                .expect("invalid downsampling rule");
+                .expect("downsampling invalid downsampling rule");
             if !regex.is_empty() {
-                let _ = Regex::new(regex).expect("invalid regex for downsampling");
+                let _ = Regex::new(regex).expect("downsampling invalid regex for downsampling");
             }
             if !function.is_empty() {
                 let _ = Function::from(function);
@@ -2300,8 +2302,15 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             // to do check the interval and offset is valid
             let offest = get_seconds_from_string(offest);
             let step = get_seconds_from_string(step);
+            if step > 86400 || 86400 % step != 0 {
+                return Err(anyhow::anyhow!(
+                    "downsampling step must be a multiple of 24 hours"
+                ));
+            }
             if offest % step != 0 {
-                return Err(anyhow::anyhow!("offest must be a multiple of step"));
+                return Err(anyhow::anyhow!(
+                    "downsampling offest must be a multiple of step"
+                ));
             }
         }
     }
@@ -2420,7 +2429,6 @@ pub fn get_cluster_name() -> String {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
 }
-
 
 fn get_seconds_from_string(s: &str) -> i64 {
     let (num, unit) = s.split_at(s.len() - 1);
