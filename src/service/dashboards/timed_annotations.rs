@@ -98,13 +98,33 @@ pub async fn update_timed_annotations(
     if let Some(new_panels) = &req.panels {
         let existing_panels =
             table::timed_annotation_panels::get_panels(timed_annotation_id).await?;
+
+        let panels_to_delete: Vec<String> = existing_panels
+            .iter()
+            .filter(|panel| !new_panels.contains(panel))
+            .cloned()
+            .collect();
+
+        if !panels_to_delete.is_empty() {
+            table::timed_annotation_panels::delete_many_panels(
+                timed_annotation_id,
+                panels_to_delete.clone(),
+            )
+            .await?;
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_timed_annotation_panels_delete_event(
+                timed_annotation_id,
+                panels_to_delete,
+            )
+            .await?;
+        }
+
         let panels_to_add: Vec<String> = new_panels
             .iter()
             .filter(|panel| !existing_panels.contains(panel))
             .cloned()
             .collect();
 
-        // Add only new panels
         if !panels_to_add.is_empty() {
             table::timed_annotation_panels::insert_many_panels(
                 timed_annotation_id,
