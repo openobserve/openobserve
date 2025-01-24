@@ -508,10 +508,24 @@ pub async fn update(
             Expr::value(start_time),
         );
     }
-    if let Some(end_time) = timed_annotation.end_time {
-        update_query =
-            update_query.col_expr(timed_annotations::Column::EndTime, Expr::value(end_time));
+
+    if let Some(end_time_option) = timed_annotation.end_time {
+        match end_time_option {
+            Some(end_time) => {
+                // Set the `end_time` to the provided value
+                update_query = update_query
+                    .col_expr(timed_annotations::Column::EndTime, Expr::value(end_time));
+            }
+            None => {
+                // Explicitly set `end_time` to NULL
+                update_query = update_query.col_expr(
+                    timed_annotations::Column::EndTime,
+                    Expr::value(sea_orm::Value::Json(None)),
+                );
+            }
+        }
     }
+
     if let Some(title) = timed_annotation.title {
         update_query = update_query.col_expr(timed_annotations::Column::Title, Expr::value(title));
     }
