@@ -216,7 +216,9 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         chart?.resize();
-      } catch (e) {}
+      } catch (e) {
+        console.error("Error during resizing", e);
+      }
     };
 
     // currently hovered series state
@@ -560,8 +562,12 @@ export default defineComponent({
     watch(
       () => props.height,
       async () => {
-        await nextTick();
-        chart?.resize();
+        try {
+          await nextTick();
+          chart?.resize();
+        } catch (e) {
+          console.error("Error while resizing", e);
+        }
       },
     );
 
@@ -573,7 +579,9 @@ export default defineComponent({
           chart?.resize();
           try {
             chart?.setOption(props?.data?.options || {}, true);
-          } catch (error) {}
+          } catch (error) {
+            console.error("Error during setOption", error);
+          }
 
           // we need that toolbox datazoom button initially selected
           // for that we required to dispatch an event
