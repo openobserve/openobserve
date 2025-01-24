@@ -63,10 +63,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         .await
                         {
                             Ok((file, meta, _)) => {
-                                if let Err(e) = tx
-                                    .send(Ok((msg.batch_id, FileKey::new(&file, meta, false))))
-                                    .await
-                                {
+                                let mut new_file_keys = Vec::new();
+                                for (file, meta) in file.into_iter().zip(meta.into_iter()) {
+                                    new_file_keys.push(FileKey::new(&file, meta, false));
+                                }
+                                if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await {
                                     log::error!(
                                         "[COMPACTOR:JOB] Error sending file to merge_job: {}",
                                         e

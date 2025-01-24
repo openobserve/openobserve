@@ -63,7 +63,7 @@ use hashbrown::HashMap;
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config, search::WorkGroup,
 };
-use parquet::file::metadata::KeyValue;
+use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 
 use super::{
     file_type::{FileType, GetExt},
@@ -237,22 +237,7 @@ pub async fn merge_parquet_files_with_downsampling(
                 max_ts = get_last_timestamp(&batch);
                 if file_meta.original_size > cfg.compact.max_file_size as i64 {
                     file_meta.max_ts = max_ts;
-                    writer.append_key_value_metadata(KeyValue::new(
-                        "min_ts".to_string(),
-                        file_meta.min_ts.to_string(),
-                    ));
-                    writer.append_key_value_metadata(KeyValue::new(
-                        "max_ts".to_string(),
-                        file_meta.max_ts.to_string(),
-                    ));
-                    writer.append_key_value_metadata(KeyValue::new(
-                        "records".to_string(),
-                        file_meta.records.to_string(),
-                    ));
-                    writer.append_key_value_metadata(KeyValue::new(
-                        "original_size".to_string(),
-                        file_meta.original_size.to_string(),
-                    ));
+                    append_metadata(&mut writer, &file_meta)?;
                     writer.close().await?;
                     bufs.push(std::mem::take(&mut buf));
                     file_metas.push(file_meta);
@@ -277,22 +262,7 @@ pub async fn merge_parquet_files_with_downsampling(
     }
     if file_meta.original_size > 0 {
         file_meta.max_ts = max_ts;
-        writer.append_key_value_metadata(KeyValue::new(
-            "min_ts".to_string(),
-            file_meta.min_ts.to_string(),
-        ));
-        writer.append_key_value_metadata(KeyValue::new(
-            "max_ts".to_string(),
-            file_meta.max_ts.to_string(),
-        ));
-        writer.append_key_value_metadata(KeyValue::new(
-            "records".to_string(),
-            file_meta.records.to_string(),
-        ));
-        writer.append_key_value_metadata(KeyValue::new(
-            "original_size".to_string(),
-            file_meta.original_size.to_string(),
-        ));
+        append_metadata(&mut writer, &file_meta)?;
         writer.close().await?;
         bufs.push(std::mem::take(&mut buf));
         file_metas.push(file_meta);
@@ -307,6 +277,29 @@ pub async fn merge_parquet_files_with_downsampling(
     );
 
     Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
+}
+
+fn append_metadata(
+    writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
+    file_meta: &FileMeta,
+) -> Result<()> {
+    writer.append_key_value_metadata(KeyValue::new(
+        "min_ts".to_string(),
+        file_meta.min_ts.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "max_ts".to_string(),
+        file_meta.max_ts.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "records".to_string(),
+        file_meta.records.to_string(),
+    ));
+    writer.append_key_value_metadata(KeyValue::new(
+        "original_size".to_string(),
+        file_meta.original_size.to_string(),
+    ));
+    Ok(())
 }
 
 pub fn create_session_config(

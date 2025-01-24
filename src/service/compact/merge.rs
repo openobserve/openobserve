@@ -86,7 +86,7 @@ pub struct MergeResult {
     pub new_file: FileKey,
 }
 
-pub type MergeSender = mpsc::Sender<Result<(usize, FileKey), anyhow::Error>>;
+pub type MergeSender = mpsc::Sender<Result<(usize, Vec<FileKey>), anyhow::Error>>;
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -648,7 +648,7 @@ pub async fn merge_by_stream(
 
             let mut last_error = None;
             for ret in worker_results {
-                let (batch_id, mut new_file) = match ret {
+                let (batch_id, new_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACT] merge files failed: {}", e);
@@ -656,25 +656,25 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
-                let new_file_name = std::mem::take(&mut new_file.key);
-                let new_file_meta = std::mem::take(&mut new_file.meta);
-                let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-                if new_file_name.is_empty() {
-                    continue;
-                }
+                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
+                let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
 
                 // delete small files keys & write big files keys, use transaction
-                let mut events = Vec::with_capacity(new_file_list.len() + 1);
-                events.push(FileKey {
-                    key: new_file_name,
-                    meta: new_file_meta,
-                    deleted: false,
-                    segment_ids: None,
-                });
+                for new_file in new_files {
+                    if new_file.key.is_empty() {
+                        continue;
+                    }
+                    events.push(FileKey {
+                        key: new_file.key,
+                        meta: new_file.meta,
+                        deleted: false,
+                        segment_ids: None,
+                    });
+                }
 
                 // collect stream stats
                 let mut stream_stats: StreamStats = StreamStats::default();
-                for file in new_file_list.iter() {
+                for file in delete_file_list.iter() {
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
                         key: file.key.clone(),
@@ -750,9 +750,9 @@ pub async fn merge_files(
     stream_name: &str,
     prefix: &str,
     files_with_size: &[FileKey],
-) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
+) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
     if files_with_size.len() <= 1 {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
 
     let mut new_file_size = 0;
@@ -779,7 +779,7 @@ pub async fn merge_files(
     }
     // no files need to merge
     if new_file_list.len() <= 1 {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
 
     let retain_file_list = new_file_list.clone();
@@ -790,7 +790,7 @@ pub async fn merge_files(
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 {
-        return Ok((String::from(""), FileMeta::default(), retain_file_list));
+        return Ok((Vec::new(), Vec::new(), retain_file_list));
     }
 
     // get time range for these files
@@ -915,7 +915,6 @@ pub async fn merge_files(
         let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
-                // TODO: when generate multiple files, how to generate FileMeta
                 exec::merge_parquet_files(
                     stream_type,
                     &stream_name,
@@ -946,54 +945,128 @@ pub async fn merge_files(
         }
     };
 
-    // TODO: handle multiple files
-    let buf = match buf {
-        MergeParquetResult::Single(v) => v,
-        MergeParquetResult::Multiple { .. } => {
-            panic!("merge_parquet_files error: multiple files");
+    let mut new_file_keys = Vec::new();
+    let mut new_file_metas = Vec::new();
+    match buf {
+        MergeParquetResult::Single(buf) => {
+            new_file_meta.compressed_size = buf.len() as i64;
+            if new_file_meta.compressed_size == 0 {
+                return Err(anyhow::anyhow!(
+                    "merge_parquet_files error: compressed_size is 0"
+                ));
+            }
+
+            let id = ider::generate();
+            let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+            log::info!(
+                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                retain_file_list.len(),
+                new_file_key,
+                new_file_meta.original_size,
+                new_file_meta.compressed_size,
+                start.elapsed().as_millis(),
+            );
+
+            // upload file to storage
+            let buf = Bytes::from(buf);
+            storage::put(&new_file_key, buf.clone()).await?;
+
+            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
+                // generate inverted index
+                generate_inverted_index(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    &new_file_key,
+                    &full_text_search_fields,
+                    &index_fields,
+                    &retain_file_list,
+                    &mut new_file_meta,
+                    &buf,
+                )
+                .await?;
+            }
+            new_file_keys.push(new_file_key);
+            new_file_metas.push(new_file_meta);
+        }
+        MergeParquetResult::Multiple { bufs, file_metas } => {
+            for (buf, file_meta) in bufs.into_iter().zip(file_metas.into_iter()) {
+                let mut new_file_meta = file_meta;
+                new_file_meta.compressed_size = buf.len() as i64;
+                if new_file_meta.compressed_size == 0 {
+                    return Err(anyhow::anyhow!(
+                        "merge_parquet_files error: compressed_size is 0"
+                    ));
+                }
+
+                let id = ider::generate();
+                let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+
+                // upload file to storage
+                let buf = Bytes::from(buf);
+                storage::put(&new_file_key, buf.clone()).await?;
+
+                if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
+                    // generate inverted index
+                    generate_inverted_index(
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        &new_file_key,
+                        &full_text_search_fields,
+                        &index_fields,
+                        &retain_file_list,
+                        &mut new_file_meta,
+                        &buf,
+                    )
+                    .await?;
+                }
+
+                new_file_keys.push(new_file_key);
+                new_file_metas.push(new_file_meta);
+            }
+            log::info!(
+                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+                retain_file_list.len(),
+                new_file_keys,
+                new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
+                new_file_metas.iter().map(|m| m.compressed_size).sum::<i64>(),
+                start.elapsed().as_millis(),
+            );
         }
     };
 
-    if new_file_meta.compressed_size == 0 {
-        return Err(anyhow::anyhow!(
-            "merge_parquet_files error: compressed_size is 0"
-        ));
-    }
+    Ok((new_file_keys, new_file_metas, retain_file_list))
+}
 
-    let id = ider::generate();
-    let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
-    log::info!(
-        "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
-        retain_file_list.len(),
-        new_file_key,
-        new_file_meta.original_size,
-        new_file_meta.compressed_size,
-        start.elapsed().as_millis(),
-    );
-
-    // upload file to storage
-    let buf = Bytes::from(buf);
-    storage::put(&new_file_key, buf.clone()).await?;
-
-    if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
-        return Ok((new_file_key, new_file_meta, retain_file_list));
-    }
-
+#[allow(clippy::too_many_arguments)]
+async fn generate_inverted_index(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    new_file_key: &str,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
+    retain_file_list: &[FileKey],
+    new_file_meta: &mut FileMeta,
+    buf: &Bytes,
+) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // generate parquet format inverted index
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
         InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
     ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(buf).await?;
         let files = generate_index_on_compactor(
-            &retain_file_list,
-            &new_file_key,
+            retain_file_list,
+            new_file_key,
             org_id,
             stream_type,
             stream_name,
-            &full_text_search_fields,
-            &index_fields,
+            full_text_search_fields,
+            index_fields,
             schema,
             &mut reader,
         )
@@ -1027,11 +1100,11 @@ pub async fn merge_files(
             .await
             {
                 log::error!(
-                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                    file_name,
-                    e.to_string(),
-                    retain_file_list
-                );
+                        "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                        file_name,
+                        e.to_string(),
+                        retain_file_list
+                    );
             }
         }
     }
@@ -1040,27 +1113,26 @@ pub async fn merge_files(
         index_format,
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
-        let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
+        let (schema, mut reader) = get_recordbatch_reader_from_bytes(buf).await?;
         let index_size =  create_tantivy_index(
-            "COMPACTOR",
-            &new_file_key,
-            &full_text_search_fields,
-            &index_fields,
-            schema,
-            &mut reader,
-        )
-        .await.map_err(|e| {
-            anyhow::anyhow!(
-                "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                "COMPACTOR",
                 new_file_key,
-                e,
-                retain_file_list
+                full_text_search_fields,
+                index_fields,
+                schema,
+                &mut reader,
             )
-        })?;
+            .await.map_err(|e| {
+                anyhow::anyhow!(
+                    "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                    new_file_key,
+                    e,
+                    retain_file_list
+                )
+            })?;
         new_file_meta.index_size = index_size as i64;
     }
-
-    Ok((new_file_key, new_file_meta, retain_file_list))
+    Ok(())
 }
 
 async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {

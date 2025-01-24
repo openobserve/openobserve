@@ -736,7 +736,7 @@ async fn merge_files(
         }
     };
 
-    // TODO: handle multiple files
+    // TODO: handle multiple files in ingester
     let buf = match buf {
         MergeParquetResult::Single(v) => v,
         MergeParquetResult::Multiple { .. } => {
