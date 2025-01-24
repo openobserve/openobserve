@@ -214,7 +214,6 @@ impl ExecutablePipeline {
         let mut node_tasks = Vec::new();
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
             let pl_id_cp = self.id.to_string();
-            let node_id_cp = node_id.to_string();
             let org_id_cp = org_id.to_string();
             let node = self.node_map.get(node_id).unwrap().clone();
             let node_receiver = node_receivers.remove(node_id).unwrap();
@@ -230,7 +229,6 @@ impl ExecutablePipeline {
             let task = tokio::spawn(async move {
                 process_node(
                     pl_id_cp,
-                    node_id_cp,
                     idx,
                     org_id_cp,
                     node,
@@ -484,7 +482,6 @@ impl Default for ExecutablePipelineTraceInputs {
 #[allow(clippy::too_many_arguments)]
 async fn process_node(
     pipeline_id: String,
-    node_id: String,
     node_idx: usize,
     org_id: String,
     node: ExecutableNode,
@@ -698,8 +695,7 @@ async fn process_node(
 
             let mut remote_stream = remote_stream.clone();
             remote_stream.org_id = org_id.into();
-            let writer =
-                get_pipeline_wal_writer(&pipeline_id, &node_id, remote_stream.clone()).await?;
+            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream.clone()).await?;
             if let Err(e) = writer.write_wal(records).await {
                 let err_msg = format!(
                     "DestinationNode error persisting data to be ingested externally: {}",
