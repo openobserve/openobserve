@@ -978,7 +978,7 @@ async fn send_partial_search_resp(
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
         results: Box::new(s_resp),
-        time_offset: 0,
+        time_offset: new_end_time,
         streaming_aggs: is_streaming_aggs,
     };
     log::info!(
