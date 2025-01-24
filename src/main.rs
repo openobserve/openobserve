@@ -30,6 +30,10 @@ use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
 use log::LevelFilter;
+#[cfg(feature = "enterprise")]
+use openobserve::handler::http::{
+    auth::script_server::validator as script_server_validator, request::script_server,
+};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -50,10 +54,7 @@ use openobserve::{
                 traces::TraceServer,
             },
         },
-        http::{
-            auth::script_server::validator as script_server_validator, request::script_server,
-            router::*,
-        },
+        http::router::*,
     },
     job, router,
     service::{db, metadata, search::SEARCH_SERVER, self_reporting},

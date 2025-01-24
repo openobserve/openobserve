@@ -122,7 +122,7 @@ where
     let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
     let key_regex = Regex::new(r"^[A-Z][A-Z0-9_]*$").unwrap();
 
-    for (key, _) in &map {
+    for key in map.keys() {
         if !key_regex.is_match(key) {
             return Err(serde::de::Error::custom(
                 "Environment variable keys must be uppercase and alphanumeric",

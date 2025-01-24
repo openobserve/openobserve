@@ -27,17 +27,16 @@ use regex::Regex;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
-#[cfg(feature = "enterprise")]
-use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta,
     meta::{
         authz::Authz,
         organization::DEFAULT_ORG,
         user::{AuthTokens, UserRole},
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::common::{meta, meta::ingestion::INGESTION_EP};
 
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
