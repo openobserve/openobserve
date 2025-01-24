@@ -390,7 +390,8 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            if metric.samples[end_index - 1].timestamp + offset_modifier <= eval_ts {
+            if end_index > 0 && metric.samples[end_index - 1].timestamp + offset_modifier <= eval_ts
+            {
                 let last_value = metric.samples[end_index - 1].value;
                 values.push(
                     // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
