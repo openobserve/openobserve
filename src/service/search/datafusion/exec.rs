@@ -15,10 +15,7 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use arrow::{
-    array::{AsArray, RecordBatch},
-    datatypes::Int64Type,
-};
+use arrow::array::{Int64Array, RecordBatch};
 use arrow_schema::Field;
 use config::{
     get_config,
@@ -652,7 +649,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
     let fun_str = if rule.function == Function::Last || rule.function == Function::First {
         format!(
-            "{}_value({} ORDER BY ASC{}) as {}",
+            "{}({} ORDER BY {} ASC) as {}",
             rule.function.fun(),
             VALUE_LABEL,
             cfg.common.column_timestamp,
@@ -676,7 +673,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
                 fields.join(", "),
                 fun_str,
                 HASH_LABEL,
-                cfg.common.column_timestamp,
+                TIMESTAMP_ALIAS,
             );
 
     let fields = schema
@@ -701,20 +698,29 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         TIMESTAMP_ALIAS,
         cfg.common.column_timestamp,
         sql,
-        cfg.common.column_timestamp
+        TIMESTAMP_ALIAS,
     )
 }
 
 fn get_first_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
-    let timestamp_field = record_batch.column_by_name(&cfg.common.column_timestamp);
-    let timestamp = timestamp_field.unwrap().as_primitive::<Int64Type>();
+    println!("\nrecord_batch: {:?}\n", record_batch.schema());
+    let timestamp = record_batch
+        .column_by_name(&cfg.common.column_timestamp)
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
     timestamp.value(0)
 }
 
 fn get_last_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
-    let timestamp_field = record_batch.column_by_name(&cfg.common.column_timestamp);
-    let timestamp = timestamp_field.unwrap().as_primitive::<Int64Type>();
+    let timestamp = record_batch
+        .column_by_name(&cfg.common.column_timestamp)
+        .unwrap()
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
     timestamp.value(timestamp.len() - 1)
 }

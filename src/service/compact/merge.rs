@@ -562,10 +562,6 @@ pub async fn merge_by_stream(
             }
             // delete duplicated files
             files_with_size.dedup_by(|a, b| a.key == b.key);
-            // partition files by size
-            if files_with_size.len() <= 1 {
-                return Ok(());
-            }
 
             let skip_group_files = stream_type == StreamType::Metrics
                 && get_largest_downsampling_rule(
@@ -573,9 +569,13 @@ pub async fn merge_by_stream(
                     files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
                 )
                 .is_some();
+
+            if files_with_size.len() <= 1 && !skip_group_files {
+                return Ok(());
+            }
+
             // group files need to merge
             let mut batch_groups = Vec::new();
-
             if skip_group_files {
                 batch_groups.push(MergeBatch {
                     batch_id: 0,
@@ -748,7 +748,13 @@ pub async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
-    if files_with_size.len() <= 1 {
+    let is_match_downsampling_rule = get_largest_downsampling_rule(
+        stream_name,
+        files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
+    )
+    .is_some();
+
+    if files_with_size.len() <= 1 && !is_match_downsampling_rule {
         return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
 
@@ -775,7 +781,7 @@ pub async fn merge_files(
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge
-    if new_file_list.len() <= 1 {
+    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
         return Ok((Vec::new(), Vec::new(), Vec::new()));
     }
 
@@ -786,7 +792,7 @@ pub async fn merge_files(
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
-    if new_file_list.len() <= 1 {
+    if new_file_list.len() <= 1 && !is_match_downsampling_rule {
         return Ok((Vec::new(), Vec::new(), retain_file_list));
     }
 
