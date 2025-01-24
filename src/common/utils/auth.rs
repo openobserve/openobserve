@@ -702,7 +702,6 @@ pub fn generate_presigned_url(
 }
 
 /// Returns false if Auth fails
-#[cfg(feature = "enterprise")]
 pub async fn check_permissions(
     object_id: Option<String>,
     org_id: &str,
@@ -719,7 +718,7 @@ pub async fn check_permissions(
 
         let object_id = match object_id {
             Some(id) => id,
-            None => format!("_all_{}", org_id),
+            None => format!("{}", org_id),
         };
 
         return crate::handler::http::auth::validator::check_permissions(
