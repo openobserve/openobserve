@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
-        :disable="isBreakdownFieldEmpty"
+        :disable="isBreakdownFieldEmpty || hasTimeShifts"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -64,7 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b> {{ t("dashboard.trellisTooltip") }}</b>
+                <b>
+                  {{
+                    hasTimeShifts
+                      ? t("dashboard.trellisTimeShiftTooltip")
+                      : t("dashboard.trellisTooltip")
+                  }}</b
+                >
               </q-tooltip>
             </div>
           </div>
@@ -87,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'number'"
           placeholder="Auto"
           data-test="trellis-chart-num-of-columns"
-          :disable="isBreakdownFieldEmpty"
+          :disable="isBreakdownFieldEmpty || hasTimeShifts"
           :min="1"
           :max="16"
           @update:model-value="
@@ -113,7 +119,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="bottom middle"
                   max-width="250px"
                 >
-                  <b> {{ t("dashboard.trellisTooltip") }}</b>
+                  <b>
+                    {{
+                      hasTimeShifts
+                        ? t("dashboard.trellisTimeShiftTooltip")
+                        : t("dashboard.trellisTooltip")
+                    }}</b
+                  >
                 </q-tooltip>
               </div>
             </div>
@@ -1742,6 +1754,9 @@ export default defineComponent({
     const timeShifts = [];
 
     const addTimeShift = () => {
+      if (dashboardPanelData.data.config.trellis.layout)
+        dashboardPanelData.data.config.trellis.layout = null;
+
       const newTimeShift = {
         offSet: "15m",
         data: {
@@ -1807,6 +1822,14 @@ export default defineComponent({
       );
     });
 
+    const hasTimeShifts = computed(() => {
+      return (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift?.length > 0
+      );
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1832,6 +1855,7 @@ export default defineComponent({
       trellisOptions,
       showTrellisConfig,
       isBreakdownFieldEmpty,
+      hasTimeShifts,
     };
   },
 });
