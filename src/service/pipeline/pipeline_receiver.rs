@@ -55,7 +55,6 @@ pub struct PipelineReceiver {
     org_id: String,
     reader: Reader<BufReader<File>>,
     file_position: FilePosition,
-    destination_name: String,
     pub pipeline_exporter: Option<PipelineExporter>,
     pub reader_header: wal::FileHeader,
 }
@@ -65,7 +64,6 @@ impl std::fmt::Debug for PipelineReceiver {
         f.debug_struct("FileReceiver")
             .field("path", &self.path)
             .field("org_id", &self.org_id)
-            .field("destination_name", &self.destination_name)
             .field("reader_header", &self.reader_header)
             .field("file_position", &self.get_file_position())
             .finish()
@@ -99,10 +97,6 @@ impl PipelineReceiver {
         let org_id = file_columns[file_columns.len() - 3];
 
         let reader_header = reader.header().clone();
-        let destination_name = reader_header
-            .get("destination_name")
-            .unwrap_or(&"".to_string())
-            .to_string();
 
         Ok(PipelineReceiver {
             path,
@@ -111,7 +105,6 @@ impl PipelineReceiver {
             file_position,
             pipeline_exporter: None,
             reader_header,
-            destination_name,
         })
     }
 
