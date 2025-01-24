@@ -718,7 +718,7 @@ pub async fn check_permissions(
 
         let object_id = match object_id {
             Some(id) => id,
-            None => format!("{}", org_id),
+            None => org_id.to_string(),
         };
 
         return crate::handler::http::auth::validator::check_permissions(
