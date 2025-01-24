@@ -20,13 +20,13 @@ use config::utils::json;
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
-#[cfg(feature = "enterprise")]
-use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
     meta::{
@@ -35,6 +35,8 @@ use crate::common::{
         user::{AuthTokens, UserRole},
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::common::{meta, meta::ingestion::INGESTION_EP};
 
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
@@ -359,7 +361,10 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
-            } else if method.eq("GET") && path_columns[1].starts_with("dashboards") {
+            } else if method.eq("GET")
+                && (path_columns[1].starts_with("dashboards")
+                    || path_columns[1].starts_with("actions"))
+            {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -417,6 +422,18 @@ impl FromRequest for AuthExtractor {
                         .get(path_columns[1])
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
+                )
+            } else if method.eq("GET")
+                && path_columns[1].eq("actions")
+                && path_columns[2].eq("download")
+            {
+                // To access actions download name, you need GET permission on actions
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
                 )
             } else {
                 // for other get/put requests on any entities such as templates,
@@ -477,6 +494,7 @@ impl FromRequest for AuthExtractor {
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
             if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
+                || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")
                 || path.contains("/format_query")
@@ -681,6 +699,62 @@ pub fn generate_presigned_url(
         "{}/auth/login?request_time={}&exp_in={}&auth={}",
         base_url, time, exp_in, auth
     )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_permissions(
+    _object_id: Option<String>,
+    _org_id: &str,
+    _user_id: &str,
+    _object_type: &str,
+    _method: &str,
+) -> bool {
+    false
+}
+
+/// Returns false if Auth fails
+#[cfg(feature = "enterprise")]
+pub async fn check_permissions(
+    object_id: Option<String>,
+    org_id: &str,
+    user_id: &str,
+    object_type: &str,
+    method: &str,
+) -> bool {
+    if !is_root_user(user_id) {
+        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+            Some(user) => user.clone(),
+            None => return false,
+        }
+        .clone();
+
+        let object_id = match object_id {
+            Some(id) => id,
+            None => org_id.to_string(),
+        };
+
+        return crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: method.to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(object_type)
+                        .map_or(object_type, |model| model.key),
+                    object_id
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            },
+            user.role,
+            user.is_external,
+        )
+        .await;
+    }
+    true
 }
 
 #[cfg(test)]

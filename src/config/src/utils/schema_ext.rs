@@ -40,7 +40,7 @@ impl SchemaExt for Schema {
 
     // ensure schema is compatible
     fn cloned_from(&self, schema: &Schema) -> Schema {
-        let schema_latest_map: HashMap<_, _> = schema
+        let latest_schema_map: HashMap<_, _> = schema
             .fields()
             .iter()
             .map(|field| (field.name(), field))
@@ -48,7 +48,7 @@ impl SchemaExt for Schema {
         let fields = self
             .fields()
             .iter()
-            .map(|f| match schema_latest_map.get(f.name()) {
+            .map(|f| match latest_schema_map.get(f.name()) {
                 Some(f) => (*f).clone(),
                 None => f.clone(),
             })

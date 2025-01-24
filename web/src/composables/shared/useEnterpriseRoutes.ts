@@ -31,6 +31,9 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 const Organizations = () =>
   import("@/components/iam/organizations/AppOrganizations.vue");
 
+const ActionScipts = () =>
+  import("@/components/actionScripts/ActionScipts.vue");
+
 import Users from "@/views/User.vue";
 
 const useEnterpriseRoutes = () => {
@@ -64,6 +67,14 @@ const useEnterpriseRoutes = () => {
   ];
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    routes.push({
+      path: "action-scripts",
+      name: "actionScripts",
+      component: ActionScipts,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
     routes[0].children.push(
       ...[
         {

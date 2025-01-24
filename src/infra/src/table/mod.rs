@@ -22,6 +22,7 @@ use crate::{
     dist_lock,
 };
 
+pub mod action_scripts;
 pub mod alerts;
 pub mod cipher;
 pub mod dashboards;
