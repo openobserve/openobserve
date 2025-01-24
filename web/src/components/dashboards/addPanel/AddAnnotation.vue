@@ -27,23 +27,29 @@
         />
 
         <div class="q-mt-md">
-          <div class="text-subtitle1 q-mb-sm">Select Panels</div>
           <q-select
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
-            use-chips
             stack-label
-            dense
-            outlined
             emit-value
             map-options
-            class="q-mt-sm"
-            :popup-content-class="'custom-select-popup'"
             @update:model-value="updateSelectedPanels"
             :placeholder="
               noPanelsSelected ? noPanelsMessage : 'Select panels...'
             "
+            :display-value="displayValue"
+            style="min-width: 150px"
+            filled
+            outlined
+            dense
+            label="Select Panels"
+            input-debounce="0"
+            behavior="menu"
+            use-input
+            class="textbox col no-case showLabelOnTop"
+            popup-no-route-dismiss
+            popup-content-style="z-index: 10001"
           >
             <template v-slot:option="{ opt, selected, toggleOption }">
               <q-item
@@ -55,23 +61,18 @@
               </q-item>
 
               <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                <q-item-section avatar>
+                <q-item-section side>
                   <q-checkbox
                     :model-value="selected"
                     @update:model-value="() => toggleOption(opt)"
+                    dense
+                    class="q-ma-none"
                   />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ opt.label }}</q-item-label>
                 </q-item-section>
               </q-item>
-            </template>
-
-            <template v-slot:selected-item="{ opt, index }">
-              <span v-if="index < 2" class="q-chip" :key="opt.value">{{
-                opt.label
-              }}</span>
-              <span v-if="index === 2" class="q-chip">+ more</span>
             </template>
           </q-select>
         </div>
@@ -162,18 +163,19 @@ const groupedPanels = ref({});
 const selectedPanels = ref([]);
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
-    { label: tab, isTab: true }, 
+    { label: tab, isTab: true },
     ...panels.map((panel) => ({
       label: panel.title,
       value: panel.id,
-      isTab: false, 
+      isTab: false,
     })),
   ]),
 );
 
-const noPanelsSelected = computed(() => selectedPanels.value.length === 0);
-const noPanelsMessage = "Annotations will be applied to all panels.";
-
+const displayValue = computed(() => {
+  // want like if no panel selected then show message like "Annotations will be applied to all panels."
+  // check if selected value is more than 2 than show ...+ {count of selected panels} more
+});
 const groupPanels = () => {
   groupedPanels.value = props.panelsList.reduce((acc, panel) => {
     const tabName = panel.tabName || "Unknown Tab";
@@ -277,10 +279,3 @@ const confirmDelete = async () => {
 const saveAnnotation = useLoading(handleSave);
 const deleteAnnotation = useLoading(confirmDelete);
 </script>
-
-<style scoped>
-.custom-select-popup {
-  max-height: 300px;
-  overflow-y: auto;
-}
-</style>
