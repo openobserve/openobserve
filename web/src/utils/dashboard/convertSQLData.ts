@@ -754,15 +754,13 @@ export const convertSQLData = async (
       let showAxisLabel = true;
 
       if (isHorizontalChart) {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.yAxis.length - gridData.gridNoOfCol <= index;
       } else {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       }
 
       // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
-      it.nameGap = showAxisLabel ? yAxisNameGap : 0;
+      it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
       it.axisLabel.margin = showAxisLabel ? 5 : 0;
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
