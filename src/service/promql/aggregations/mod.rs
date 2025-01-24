@@ -15,14 +15,13 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::{meta::promql::NAME_LABEL, FxIndexMap};
+use config::{meta::promql::NAME_LABEL, utils::sort::sort_float, FxIndexMap};
 use datafusion::error::{DataFusionError, Result};
-use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
+    value::{InstantValue, Label, Labels, LabelsExt, Sample, Value},
     Engine,
 };
 
@@ -113,7 +112,7 @@ pub fn labels_to_exclude(
 }
 
 fn eval_arithmetic_processor(
-    score_values: &mut HashMap<Signature, ArithmeticItem>,
+    score_values: &mut HashMap<u64, ArithmeticItem>,
     f_handler: fn(total: f64, val: f64) -> f64,
     sum_labels: &Labels,
     value: f64,
@@ -130,7 +129,7 @@ fn eval_arithmetic_processor(
 }
 
 fn eval_count_values_processor(
-    score_values: &mut HashMap<Signature, CountValuesItem>,
+    score_values: &mut HashMap<u64, CountValuesItem>,
     sum_labels: &Labels,
 ) {
     let sum_hash = sum_labels.signature();
@@ -144,7 +143,7 @@ fn eval_count_values_processor(
 }
 
 fn eval_std_dev_var_processor(
-    score_values: &mut HashMap<Signature, StatisticItems>,
+    score_values: &mut HashMap<u64, StatisticItems>,
     sum_labels: &Labels,
     value: f64,
 ) {
@@ -166,7 +165,7 @@ pub(crate) fn eval_arithmetic(
     data: &Value,
     f_name: &str,
     f_handler: fn(total: f64, val: f64) -> f64,
-) -> Result<Option<HashMap<Signature, ArithmeticItem>>> {
+) -> Result<Option<HashMap<u64, ArithmeticItem>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -247,7 +246,7 @@ pub async fn eval_top(
         }
     };
 
-    let mut score_values: FxIndexMap<Signature, Vec<TopItem>> = Default::default();
+    let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
             LabelModifier::Include(labels) => {
@@ -296,19 +295,16 @@ pub async fn eval_top(
     }
 
     let comparator = if is_bottom {
-        |a: &TopItem, b: &TopItem| a.value.partial_cmp(&b.value).unwrap()
+        |a: &TopItem, b: &TopItem| sort_float(&a.value, &b.value)
     } else {
-        |a: &TopItem, b: &TopItem| b.value.partial_cmp(&a.value).unwrap()
+        |a: &TopItem, b: &TopItem| sort_float(&b.value, &a.value)
     };
 
     let values = score_values
-        .values()
-        .flat_map(|items| {
-            items
-                .iter()
-                .sorted_by(|a, b| comparator(a, b))
-                .take(n)
-                .collect::<Vec<_>>()
+        .into_values()
+        .flat_map(|mut items| {
+            items.sort_by(comparator);
+            items.into_iter().take(n).collect::<Vec<_>>()
         })
         .map(|item| data[item.index].clone())
         .collect();
@@ -319,7 +315,7 @@ pub(crate) fn eval_std_dev_var(
     param: &Option<LabelModifier>,
     data: &Value,
     f_name: &str,
-) -> Result<Option<HashMap<Signature, StatisticItems>>> {
+) -> Result<Option<HashMap<u64, StatisticItems>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -361,7 +357,7 @@ pub(crate) fn eval_count_values(
     data: &Value,
     f_name: &str,
     label_name: &str,
-) -> Result<Option<HashMap<Signature, CountValuesItem>>> {
+) -> Result<Option<HashMap<u64, CountValuesItem>>> {
     let data = match data {
         Value::Vector(v) => v,
         Value::None => return Ok(None),
@@ -413,7 +409,7 @@ pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
 
 pub(crate) fn score_to_instant_value(
     timestamp: i64,
-    score_values: Option<HashMap<Signature, ArithmeticItem>>,
+    score_values: Option<HashMap<u64, ArithmeticItem>>,
 ) -> Vec<InstantValue> {
     let values = score_values
         .unwrap()
