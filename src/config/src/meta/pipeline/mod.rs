@@ -256,6 +256,16 @@ impl Pipeline {
             }
         }
     }
+
+    pub fn contains_remote_destination(&self, destination: &str) -> bool {
+        self.nodes.iter().any(|node| {
+            if let NodeData::RemoteStream(dest) = &node.data {
+                dest.destination_name == destination
+            } else {
+                false
+            }
+        })
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline

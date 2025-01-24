@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,19 +18,19 @@ use datafusion::error::{DataFusionError, Result};
 use crate::service::promql::{
     aggregations::prepare_vector,
     common::quantile,
-    value::{InstantValue, LabelsExt, Sample, Value},
+    value::{InstantValue, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
-pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: &Value) -> Result<Value> {
+pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: Value) -> Result<Value> {
     eval(data, phi_quantile, timestamp, false)
 }
 
 pub(crate) fn eval(
-    data: &Value,
+    data: Value,
     phi_quantile: f64,
     timestamp: i64,
-    keep_name_label: bool,
+    _keep_name_label: bool,
 ) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
@@ -48,17 +48,15 @@ pub(crate) fn eval(
     }
 
     let mut rate_values = Vec::with_capacity(data.len());
-    for metric in data {
-        let labels = if keep_name_label {
-            metric.labels.clone()
-        } else {
-            metric.labels.without_metric_name()
-        };
+    for mut metric in data {
+        let labels = std::mem::take(&mut metric.labels);
+        // if !keep_name_label {
+        //     labels = metric.labels.without_metric_name();
+        // };
 
+        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
         let input: Vec<f64> = metric.samples.iter().map(|x| x.value).collect();
-
         if let Some(value) = quantile(&input, phi_quantile) {
-            let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
             rate_values.push(InstantValue {
                 labels,
                 sample: Sample::new(eval_ts, value),
