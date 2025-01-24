@@ -18,14 +18,17 @@ use std::collections::HashMap;
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetActionInfoResponse {
     pub id: String,
     pub name: String,
+    #[serde(serialize_with = "serialize_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(serialize_with = "serialize_datetime")]
     pub last_run_at: DateTime<Utc>,
+    #[serde(serialize_with = "serialize_option_datetime")]
     pub last_successful_at: Option<DateTime<Utc>>,
     pub created_by: String,
     pub status: ActionStatus,
@@ -80,5 +83,27 @@ impl TryFrom<Action> for GetActionDetailsResponse {
             description: value.description,
             service_account: value.service_account,
         })
+    }
+}
+
+// Function to serialize DateTime<Utc> to Unix microseconds
+fn serialize_datetime<S>(dt: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_i64(dt.timestamp_micros())
+}
+
+// Function to serialize Option<DateTime<Utc>> to Unix microseconds
+fn serialize_option_datetime<S>(
+    dt: &Option<DateTime<Utc>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match dt {
+        Some(dt) => serializer.serialize_some(&dt.timestamp_micros()),
+        None => serializer.serialize_none(),
     }
 }
