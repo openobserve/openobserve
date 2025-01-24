@@ -278,10 +278,10 @@ const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
 const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
-const selectedDestination = ref(
+const selectedDestination: any = ref(
   pipelineObj.currentSelectedNodeData?.data?.destination_name
     ? {
-        label:pipelineObj.currentSelectedNodeData.data.destination_name,
+        label: pipelineObj.currentSelectedNodeData.data.destination_name,
         value: pipelineObj.currentSelectedNodeData.data.destination_name,
       }
     : "",
