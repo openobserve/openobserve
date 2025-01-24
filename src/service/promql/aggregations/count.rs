@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,17 +19,17 @@ use rayon::prelude::*;
 
 use crate::service::promql::value::{InstantValue, Sample, Value};
 
-pub fn count(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
+pub fn count(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "count", |_prev, _val| 0.0)?;
     if score_values.is_none() {
         return Ok(Value::None);
     }
     let values = score_values
         .unwrap()
-        .par_iter()
-        .map(|it| InstantValue {
-            labels: it.1.labels.clone(),
-            sample: Sample::new(timestamp, it.1.num as _),
+        .into_par_iter()
+        .map(|(_, mut v)| InstantValue {
+            labels: std::mem::take(&mut v.labels),
+            sample: Sample::new(timestamp, v.num as _),
         })
         .collect();
     Ok(Value::Vector(values))

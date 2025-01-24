@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use datafusion::error::{DataFusionError, Result};
 use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent
-pub(crate) fn absent(data: &Value, eval_ts: i64) -> Result<Value> {
+pub(crate) fn absent(data: Value, eval_ts: i64) -> Result<Value> {
     let _data = match data {
         Value::Vector(v) => v,
         Value::None => {

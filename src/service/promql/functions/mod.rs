@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,6 @@
 use datafusion::error::{DataFusionError, Result};
 use strum::EnumString;
 
-use super::value::LabelsExt;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod absent;
@@ -138,10 +137,10 @@ pub(crate) enum Func {
 }
 
 pub(crate) fn eval_idelta(
-    data: &Value,
+    data: Value,
     fn_name: &str,
-    fn_handler: fn(&RangeValue) -> Option<f64>,
-    keep_name_label: bool,
+    fn_handler: fn(RangeValue) -> Option<f64>,
+    _keep_name_label: bool,
 ) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
@@ -155,15 +154,14 @@ pub(crate) fn eval_idelta(
     };
 
     let mut rate_values = Vec::with_capacity(data.len());
-    for metric in data {
-        let labels = if keep_name_label {
-            metric.labels.clone()
-        } else {
-            metric.labels.without_metric_name()
-        };
+    for mut metric in data {
+        let labels = std::mem::take(&mut metric.labels);
+        // if !keep_name_label {
+        //     labels = labels.without_metric_name()
+        // };
 
+        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
         if let Some(value) = fn_handler(metric) {
-            let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
             rate_values.push(InstantValue {
                 labels,
                 sample: Sample::new(eval_ts, value),

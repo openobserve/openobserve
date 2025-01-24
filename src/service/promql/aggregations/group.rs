@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use promql_parser::parser::LabelModifier;
 use crate::service::promql::{aggregations::score_to_instant_value, value::Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
-pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
+pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "group", |_total, _val| 1.0)?;
     if score_values.is_none() {
         return Ok(Value::None);

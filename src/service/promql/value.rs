@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
 use config::{
-    meta::promql::NAME_LABEL,
-    utils::{
-        hash::{gxhash, Sum64},
-        json,
-        sort::sort_float,
-    },
+    utils::{json, sort::sort_float},
     FxIndexMap,
 };
 use hashbrown::HashSet;
@@ -41,13 +36,6 @@ pub type Labels = Vec<Arc<Label>>;
 
 /// Added functionalities on Labels
 pub trait LabelsExt {
-    /// Remove the metric name i.e. __name__ from the given label
-    ///
-    /// ```json
-    /// {"__name__": "my-metric", "job": "k8s"} -> {"job": "k8s"}
-    /// ```
-    fn without_metric_name(&self) -> Labels;
-
     /// Return the value of the label associated with this name of the label.
     fn get_value(&self, name: &str) -> String;
 
@@ -61,7 +49,7 @@ pub trait LabelsExt {
     fn keys(&self) -> Vec<String>;
 
     /// Without label, drops the given label name from the output.
-    fn without_label(&self, name: &str) -> Labels;
+    fn without_label(self, name: &str) -> Labels;
 
     /// Signature for the given set of labels
     fn signature(&self) -> u64;
@@ -79,15 +67,9 @@ pub trait LabelsExt {
 }
 
 impl LabelsExt for Labels {
-    fn without_label(&self, name: &str) -> Labels {
-        self.iter()
-            .filter(|label| label.name != name)
-            .cloned()
-            .collect()
-    }
-
-    fn without_metric_name(&self) -> Labels {
-        self.without_label(NAME_LABEL)
+    fn without_label(mut self, name: &str) -> Labels {
+        self.retain(|label| label.name != name);
+        self
     }
 
     fn get_value(&self, name: &str) -> String {
@@ -808,13 +790,15 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
-    let key = labels
+    let mut hasher = std::hash::DefaultHasher::new();
+    labels
         .iter()
         .filter(|item| !exclude_names.contains(&item.name.as_str()))
-        .map(|item| format!("{}:{}", item.name, item.value))
-        .collect::<Vec<String>>()
-        .join("|");
-    gxhash::new().sum64(&key)
+        .for_each(|item| {
+            hasher.write(item.name.as_bytes());
+            hasher.write(item.value.as_bytes());
+        });
+    hasher.finish()
 }
 
 #[cfg(test)]
@@ -849,10 +833,10 @@ mod tests {
         let labels: Labels = generate_test_labels();
 
         let sig = signature(&labels);
-        assert_eq!(sig, 7475913944712002188);
+        assert_eq!(sig, 17855692611899080986);
 
         let sig = signature_without_labels(&labels, &["a", "c"]);
-        assert_eq!(sig, 16794648939107156088);
+        assert_eq!(sig, 2422580394001170964);
 
         assert_eq!(signature(&labels), signature_without_labels(&labels, &[]));
     }

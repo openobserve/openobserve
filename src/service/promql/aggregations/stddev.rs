@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,19 +22,18 @@ use crate::service::promql::{
     value::{InstantValue, Sample, Value},
 };
 
-pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
+pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
     let score_values = super::eval_std_dev_var(param, data, "stddev")?;
     if score_values.is_none() {
         return Ok(Value::None);
     }
     let values = score_values
         .unwrap()
-        .par_iter()
-        .map(|it| {
-            let std_var =
-                std_deviation2(&it.1.values, it.1.current_mean, it.1.current_count).unwrap();
+        .into_par_iter()
+        .map(|(_, mut v)| {
+            let std_var = std_deviation2(&v.values, v.current_mean, v.current_count).unwrap();
             InstantValue {
-                labels: it.1.labels.clone(),
+                labels: std::mem::take(&mut v.labels),
                 sample: Sample::new(timestamp, std_var),
             }
         })

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
 use strum::EnumIter;
 
-use crate::service::promql::value::{InstantValue, LabelsExt, Sample, Value};
+use crate::service::promql::value::{InstantValue, Sample, Value};
 
 #[derive(Debug, EnumIter)]
 pub enum TimeOperationType {
@@ -64,39 +64,39 @@ impl TimeOperationType {
     }
 }
 
-pub(crate) fn minute(data: &Value) -> Result<Value> {
+pub(crate) fn minute(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Minute)
 }
 
-pub(crate) fn hour(data: &Value) -> Result<Value> {
+pub(crate) fn hour(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Hour)
 }
 
-pub(crate) fn month(data: &Value) -> Result<Value> {
+pub(crate) fn month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Month)
 }
 
-pub(crate) fn year(data: &Value) -> Result<Value> {
+pub(crate) fn year(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::Year)
 }
 
-pub(crate) fn day_of_month(data: &Value) -> Result<Value> {
+pub(crate) fn day_of_month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfMonth)
 }
 
-pub(crate) fn day_of_week(data: &Value) -> Result<Value> {
+pub(crate) fn day_of_week(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfWeek)
 }
 
-pub(crate) fn day_of_year(data: &Value) -> Result<Value> {
+pub(crate) fn day_of_year(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DayOfYear)
 }
 
-pub(crate) fn days_in_month(data: &Value) -> Result<Value> {
+pub(crate) fn days_in_month(data: Value) -> Result<Value> {
     exec(data, &TimeOperationType::DaysInMonth)
 }
 
-fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
+fn exec(data: Value, op: &TimeOperationType) -> Result<Value> {
     let instant_values = match data {
         Value::Vector(v) => v,
         _ => {
@@ -108,11 +108,11 @@ fn exec(data: &Value, op: &TimeOperationType) -> Result<Value> {
     };
 
     let out = instant_values
-        .par_iter()
-        .map(|instant| {
+        .into_par_iter()
+        .map(|mut instant| {
             let ts = op.get_component_from_ts(instant.sample.value as i64);
             InstantValue {
-                labels: instant.labels.without_metric_name(),
+                labels: std::mem::take(&mut instant.labels),
                 sample: Sample::new(instant.sample.timestamp, ts as f64),
             }
         })
