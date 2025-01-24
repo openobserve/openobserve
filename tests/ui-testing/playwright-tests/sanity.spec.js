@@ -12,7 +12,7 @@ async function login(page) {
 // await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  await page.getByText('Login as internal user').click();
+  //await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
