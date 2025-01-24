@@ -473,7 +473,13 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            let samples = metric.samples[start_index..end_index].to_vec();
+            let samples = metric.samples[start_index..end_index]
+                .iter()
+                .map(|v| Sample {
+                    timestamp: v.timestamp + offset_modifier,
+                    value: v.value,
+                })
+                .collect::<Vec<_>>();
             let exemplars = if self.ctx.query_exemplars {
                 metric.exemplars.as_ref().map(|v| {
                     v.iter()
