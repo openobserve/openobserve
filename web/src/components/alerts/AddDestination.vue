@@ -296,7 +296,7 @@ import {
   defineEmits,
   reactive,
 } from "vue";
-import type { Ref } from "vue";
+import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
@@ -311,16 +311,20 @@ import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-const props = withDefaults(
-  defineProps<{
-    templates: Template[] | [];
-    destination: DestinationPayload | null;
-    isAlerts: boolean;
-  }>(),
-  {
-    isAlerts: true,
+const props = defineProps({
+  templates: {
+    type: Array as PropType<Template[]>,
+    default: []
+  },
+  destination: {
+    type: Object as PropType<DestinationPayload | null>,
+    default: null
+  },
+  isAlerts: {
+    type: Boolean,
+    default: true
   }
-);
+});
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
 const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
