@@ -177,6 +177,10 @@ impl PipelineWalWriter {
         // query org_id stream_name stream_type from destination_name
         let mut header = wal::FileHeader::new();
         header.insert("pipeline_id".to_string(), pipeline_id);
+        header.insert(
+            "destination_name".to_string(),
+            remote_stream_params.destination_name.to_string(),
+        );
 
         wal::Writer::build(
             wal_file_dir,
