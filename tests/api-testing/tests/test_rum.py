@@ -293,7 +293,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
 
             response_payload = response_rum_data.json()
 
-            print("RUM verified geo data", response_payload)
+            print("RUM rumdataingestandsearch verified geo data", response_payload)
 
             assert (
                 len(response_payload["hits"]) > 0
@@ -390,7 +390,7 @@ def test_e2e_rumverifygeodata(create_session, base_url):
 
             response_payload = response_rum_data.json()
 
-            print("RUM verified geo data", response_payload)
+            print("RUM rumverifygeodata verified geo data", response_payload)
 
             assert len(response_payload["hits"]) > 0, "No results found in rum-logs"
             logs_exist = any(
