@@ -3355,6 +3355,15 @@ const useLogs = () => {
       ) {
         plusSign = "+";
       }
+
+      if (
+        searchObj.communicationMethod === "ws" &&
+        endCount < totalCount &&
+        !searchObj.meta.showHistogram
+      ) {
+        plusSign = "+";
+      }
+
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
