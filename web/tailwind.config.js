@@ -7,7 +7,7 @@ export default {
   prefix: "tw-",
   content: [
     "./index.html",
-    "./src/**/*.{vue,js,ts}", // path to all template files
+    "./src/**/*.{vue,js,ts,jsx,tsx}", // path to all template files
   ],
   theme: {
     extend: {
