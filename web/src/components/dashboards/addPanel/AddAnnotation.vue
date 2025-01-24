@@ -28,6 +28,8 @@
 
         <div class="q-mt-md">
           <q-select
+            hint="If no panel is selected, annotations will be applied to dashboard
+            by default."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
@@ -72,12 +74,6 @@
               </q-item>
             </template>
           </q-select>
-        </div>
-        <div class="q-mt-md">
-          <label class="q-mt-md"
-            >If no panel is selected, annotations will be applied to all panels
-            by default.</label
-          >
         </div>
         <div class="text-caption q-mt-sm">
           Timestamp: {{ annotationDateString }}
