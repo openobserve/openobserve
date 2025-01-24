@@ -20,7 +20,7 @@
         </div>
       </div>
       <div class="tw-text-lg tw-w-full add-script-title q-mr-md">
-        Add Action Script
+        Add Action
       </div>
       <q-form ref="addScriptForm" class="o2-input">
         <div class="tw-flex tw-items-center">

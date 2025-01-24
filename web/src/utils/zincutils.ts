@@ -17,7 +17,7 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4 } from "uuid";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
@@ -1006,3 +1006,11 @@ export const validateUrl = (val: string) => {
     return "Please provide correct URL.";
   }
 };
+
+export function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}

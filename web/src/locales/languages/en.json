@@ -180,7 +180,7 @@
     "report": "Reports",
     "pipeline": "Pipelines",
     "language": "Language",
-    "actions": "Action Scripts"
+    "actions": "Actions"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -1047,14 +1047,16 @@
     "testAction": "Test Action",
     "save": "Save",
     "name": "Action Name",
-    "header": "Action Scripts",
-    "add": "Create Action Script",
+    "header": "Actions",
+    "add": "Create Action",
     "deleteTitle": "Delete",
     "deleteText": "Are you sure you want to delete file ?",
     "uploadCodeZip": "Upload Code Zip",
-    "update":"Update Action Script",
+    "update":"Update Action",
     "type":"Execution Type",
-    "serviceAccount":"Service Account"
+    "serviceAccount":"Service Account",
+    "search": "Search Actions",
+    "timezone": "Timezone"
   },
   "cipherKey": {
     "header": "Cipher Keys",

@@ -243,10 +243,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <template v-if="frequency.type === 'Repeat'">
-                  <div class="flex items-center justify-start q-mt-md">
+                  <div class="flex items-center justify-start q-mt-md o2-input">
                     <div
                       data-test="add-action-script-schedule-custom-interval-input"
-                      class="o2-input q-mr-sm"
+                      class="q-mr-sm"
                       style="padding-top: 0; width: 320px"
                     >
                       <div class="q-mb-xs text-bold text-grey-8">
@@ -278,6 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </q-tooltip>
                         </q-icon>
                       </div>
+
                       <q-input
                         filled
                         v-model="frequency.cron"
@@ -297,6 +298,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
+                    <q-select
+                      data-test="add-action-script-timezone-select"
+                      v-model="formData.timezone"
+                      :options="['UTC']"
+                      :label="t('actions.timezone') + ' *'"
+                      :loading="isFetchingServiceAccounts"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="showLabelOnTop no-case"
+                      filled
+                      stack-label
+                      outlined
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      behavior="menu"
+                      disable
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      style="
+                        min-width: 250px !important;
+                        width: 250px !important;
+                      "
+                    />
                     <!-- <div class="o2-input">
                       <q-select
                         data-test="add-action-script-schedule-start-timezone-select"
@@ -1086,7 +1113,7 @@ const saveActionScript = async () => {
     .then(() => {
       q.notify({
         type: "positive",
-        message: `Report ${
+        message: `Action ${
           isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
         timeout: 3000,
@@ -1103,7 +1130,7 @@ const saveActionScript = async () => {
             error?.response?.data?.message ||
             `Error while ${
               isEditingActionScript.value ? "updating" : "saving"
-            } Action Script.`,
+            } Action.`,
           timeout: 4000,
         });
       }
@@ -1206,8 +1233,7 @@ const openCancelDialog = () => {
   }
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
-  dialog.value.message =
-    "Are you sure you want to cancel Action Script changes?";
+  dialog.value.message = "Are you sure you want to cancel Action changes?";
   dialog.value.okCallback = goToActionScripts;
 };
 const editFileToUpload = () => {
@@ -1267,8 +1293,7 @@ const handleActionScript = async () => {
         if (err.response.status != 403) {
           q.notify({
             type: "negative",
-            message:
-              err?.data?.message || "Error while fetching Action Script!",
+            message: err?.data?.message || "Error while fetching Action!",
             timeout: 4000,
           });
         }
