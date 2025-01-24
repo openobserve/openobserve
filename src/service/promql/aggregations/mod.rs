@@ -238,7 +238,6 @@ pub async fn eval_top(
         })
         .collect::<Vec<_>>();
 
-
     let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
@@ -404,13 +403,12 @@ pub(crate) fn score_to_instant_value(
     timestamp: i64,
     score_values: Option<HashMap<u64, ArithmeticItem>>,
 ) -> Vec<InstantValue> {
-    let values = score_values
+    score_values
         .unwrap()
         .into_par_iter()
         .map(|(_, mut v)| InstantValue {
             labels: std::mem::take(&mut v.labels),
             sample: Sample::new(timestamp, v.value),
         })
-        .collect();
-    values
+        .collect()
 }
