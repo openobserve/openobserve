@@ -4,7 +4,8 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const TIMED_ANNOTATION_PANELS_ANNOTATION_ID_IDX: &str = "timed_annotation_panels_annotation_id_idx";
-const TIMED_ANNOTATION_PANELS_PANEL_ID_IDX: &str = "timed_annotation_panels_panel_id_idx";
+const TIMED_ANNOTATION_PANELS_ANNOTATION_ID_PANEL_ID_IDX: &str =
+    "timed_annotation_panels_annotation_id_panel_id_idx";
 const TIMED_ANNOTATION_PANELS_ANNOTATION_ID_FK: &str = "fk_timed_annotation_panels_annotation_id";
 
 #[async_trait::async_trait]
@@ -14,7 +15,9 @@ impl MigrationTrait for Migration {
         manager
             .create_index(create_index_annotation_id_stmt())
             .await?;
-        manager.create_index(create_index_panel_id_stmt()).await?;
+        manager
+            .create_index(create_unique_index_composite_key_stmt())
+            .await?;
         Ok(())
     }
 
@@ -29,7 +32,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
-                    .name(TIMED_ANNOTATION_PANELS_PANEL_ID_IDX)
+                    .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_PANEL_ID_IDX)
                     .to_owned(),
             )
             .await?;
@@ -82,13 +85,15 @@ fn create_index_annotation_id_stmt() -> IndexCreateStatement {
         .to_owned()
 }
 
-/// Statement to create an index on panel_id
-fn create_index_panel_id_stmt() -> IndexCreateStatement {
+/// Statement to create a unique index on composite key (timed_annotation_id, panel_id)
+fn create_unique_index_composite_key_stmt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(TIMED_ANNOTATION_PANELS_PANEL_ID_IDX)
+        .name(TIMED_ANNOTATION_PANELS_ANNOTATION_ID_PANEL_ID_IDX)
         .table(TimedAnnotationPanels::Table)
+        .col(TimedAnnotationPanels::TimedAnnotationId)
         .col(TimedAnnotationPanels::PanelId)
+        .unique()
         .to_owned()
 }
 
