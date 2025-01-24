@@ -13,21 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(btree_cursors)]
+use o2_enterprise::enterprise::cipher::http_repr::HttpKey;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[cfg(feature = "enterprise")]
-pub mod cipher;
-pub mod cli;
-pub mod common;
-pub mod handler;
-pub mod job;
-pub mod router;
-pub mod service;
+pub mod registry;
 
-#[cfg(feature = "enterprise")]
-pub mod super_cluster_queue;
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct KeyAddRequest {
+    pub name: String,
+    pub key: HttpKey,
+}
 
-pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/ua_regex/regexes.yaml"
-));
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KeyGetResponse {
+    pub name: String,
+    pub key: HttpKey,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KeyInfo {
+    pub name: String,
+    pub key: HttpKey,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KeyListResponse {
+    pub keys: Vec<KeyInfo>,
+}

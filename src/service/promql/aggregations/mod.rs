@@ -238,6 +238,7 @@ pub async fn eval_top(
         })
         .collect::<Vec<_>>();
 
+
     let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {

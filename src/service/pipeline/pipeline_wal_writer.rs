@@ -54,27 +54,31 @@ static PIPELINE_WAL_WRITER_MAP: Lazy<Arc<RwLock<HashMap<String, Arc<PipelineWalW
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 pub async fn get_pipeline_wal_writer(
-    pipeline_id: String,
+    pipeline_id: &str,
     remote_stream_params: RemoteStreamParams,
 ) -> Result<Arc<PipelineWalWriter>> {
+    let key = format!("{pipeline_id}-{}", remote_stream_params.destination_name);
     let mut map = PIPELINE_WAL_WRITER_MAP.write().await;
-    if let Some(writer) = map.get(&pipeline_id) {
+    if let Some(writer) = map.get(&key) {
         Ok(writer.clone())
     } else {
-        let pipeline = db::pipeline::get_by_id(pipeline_id.as_str())
+        let pipeline = db::pipeline::get_by_id(pipeline_id)
             .await
             .map_err(|e| Error::Message(format!("get_pipeline_wal_writer fail: {e}")))?;
 
-        let pipeline_source = pipeline.source.clone();
-        let writer =
-            PipelineWalWriter::new(pipeline_id.clone(), pipeline.source, remote_stream_params)?;
+        let is_realtime = matches!(&pipeline.source, PipelineSource::Realtime(_));
+        let writer = PipelineWalWriter::new(
+            pipeline_id.to_string(),
+            pipeline.source,
+            remote_stream_params,
+        )?;
         let writer = Arc::new(writer);
-        map.insert(pipeline_id, writer.clone());
+        map.insert(key, writer.clone());
 
         // only realtime wal-file must notify file wather
         // because scheduled pipeline will not write to real wal file
         // we only notify file watcher when rename the tmp file to real file successfully
-        if let PipelineSource::Realtime(_) = pipeline_source {
+        if is_realtime {
             // notify the pipeline_file_watcher begin to read entry.
             let wal_writer = writer.wal_writer.write().await;
             let path = wal_writer.path();
@@ -89,6 +93,7 @@ pub async fn get_pipeline_wal_writer(
 async fn notify_file_watcher(path: PathBuf) {
     let watcher = FILE_WATCHER_NOTIFY.write().await;
     if let Some(watcher) = watcher.clone() {
+        log::debug!("notify file watcher to watch newfile: {:?}", path);
         if let Err(e) = watcher.send(WatcherEvent::NewFile(path.clone())).await {
             log::error!("pipeline_wal_writer notify_file_watcher error: {}", e);
         }
@@ -117,7 +122,7 @@ pub async fn check_ttl() -> ingester::errors::Result<()> {
             "pipeline_wal_writer exec check_ttl, motified elapsed: {:?}",
             ts.elapsed().as_millis()
         );
-        let _ = w.rotate(0).await;
+        let _ = w.rotate(0, false).await;
     }
 
     Ok(())
@@ -209,7 +214,7 @@ impl PipelineWalWriter {
             .map_err(|e| Error::Message(format!("write_wal entry into bytes error : {}", e)))?;
 
         // check rotation
-        if let Err(err) = self.rotate(bytes_entries.len()).await {
+        if let Err(err) = self.rotate(bytes_entries.len(), false).await {
             log::error!("rotate error : {err}");
             return Err(err);
         }
@@ -221,12 +226,12 @@ impl PipelineWalWriter {
         let res = writer
             .sync()
             .map_err(|e| Error::WalFileError(e.to_string()));
-
+        let path = writer.path().clone();
+        let current_position = writer.current_position();
         if let PipelineSource::Scheduled(_) = self.pipeline_source_type {
             // rename tmp remote wal file to remote wal file
             // scheduled pipeline will not write to real wal file, so rename the tmp file to remote
             // file
-            let path = writer.path().clone();
             let path_str = path.to_str().unwrap_or_default();
             // Replace the segment
             let new_path_str = path_str.replace(
@@ -247,19 +252,25 @@ impl PipelineWalWriter {
             );
             fs::rename(writer.path(), persist_path.clone()).map_err(|e| {
                 Error::Message(format!(
-                    "rename to persist_path fail: {}, error: {e}",
+                    "rename {path_str} to persist_path {} fail, error: {e}",
                     persist_path.display()
                 ))
             })?;
-            // notify file watcher
+            // notify file watcher watch persist_path
             notify_file_watcher(persist_path).await;
+            // notify file watcher stop watch tmp wal file
+            // everytime query stream should write just one wal file, and next time use a new wal
+            // drop writer lock and then force rotate
+            drop(writer);
+            // force rotate
+            self.rotate(0, true).await?;
         }
 
         log::debug!(
             "Writing WAL for pipeline: {}, wal_file_path: {}, wal_file_postion:{:?}, data: {:?}",
             self.pipeline_id,
-            writer.path().clone().display(),
-            writer.current_position(),
+            path.display(),
+            current_position,
             data
         );
 
@@ -301,12 +312,12 @@ impl PipelineWalWriter {
         path
     }
 
-    async fn rotate(&self, entry_bytes_size: usize) -> Result<()> {
+    async fn rotate(&self, entry_bytes_size: usize, force_rotate: bool) -> Result<()> {
         let wal_writer = self.wal_writer.read().await;
         let metadata = wal_writer.metadata()?;
         let ts = get_metadata_motified(&metadata);
 
-        if !self.check_wal_threshold(wal_writer.size(), entry_bytes_size, ts) {
+        if !force_rotate && !self.check_wal_threshold(wal_writer.size(), entry_bytes_size, ts) {
             return Ok(());
         }
         drop(wal_writer);

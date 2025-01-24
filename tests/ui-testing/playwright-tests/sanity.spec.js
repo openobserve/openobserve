@@ -12,6 +12,9 @@ async function login(page) {
 // await page.getByText('Login as internal user').click();
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
+
+  // await page.getByText('Login as internal user').click();  // Commented out as it is not required
+  
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -957,9 +960,11 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(6000);
     await page.getByRole('cell', { name: 'Trace ID' }).click();
     // Locate the row using a known static value like the SQL query
-    const row = page.locator('tr:has-text("select histogram")');
+    // const row = page.locator('tr:has-text("select histogram")');
+    // Locate the row using a known static value, ignoring case sensitivity
+    const row = page.locator('tr').filter({ hasText: /select histogram/i });
     // Click the button inside the located row
-  await row.locator('button.q-btn').nth(0).click();
+    await row.locator('button.q-btn').nth(0).click();
     await page.getByRole('button', { name: 'Logs' }).click();
     await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click()
     await expect(page).toHaveURL(/stream_type=logs/)
@@ -995,4 +1000,5 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
 
   });
+
 });
