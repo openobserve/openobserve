@@ -26,16 +26,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             } else {
                 infra::table::action_scripts::add(&action).await?;
             }
-
-            // let cluster_coordinator = get_coordinator().await;
-            // cluster_coordinator
-            //     .put(
-            //         &"/action_scripts/",
-            //         bytes::Bytes::new(), // no actual data, the receiver can query the db
-            //         true,
-            //         None,
-            //     )
-            //     .await?;
         }
         ActionScriptsMessage::Delete { org_id, action_id } => {
             // TODO Cleanup the zip file from s3 if it exists
