@@ -212,7 +212,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
                     http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Destination is in use for alert {}", alert.name),
+                    anyhow::anyhow!("Destination is currently used by alert {}", alert.name),
                 ));
             }
         }
@@ -224,7 +224,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             if pl.contains_remote_destination(name) {
                 return Err((
                     http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Destination is in use for pipeline {}", pl.name),
+                    anyhow::anyhow!("Destination is currently used by pipeline {}", pl.name),
                 ));
             }
         }
