@@ -703,11 +703,11 @@ pub fn generate_presigned_url(
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn check_permissions(
-    object_id: Option<String>,
-    org_id: &str,
-    user_id: &str,
-    object_type: &str,
-    method: &str,
+    _object_id: Option<String>,
+    _org_id: &str,
+    _user_id: &str,
+    _object_type: &str,
+    _method: &str,
 ) -> bool {
     false
 }
