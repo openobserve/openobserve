@@ -292,6 +292,9 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
             ), f"Failed to retrieve rum-data, got = {got}, expected = {expected}, {response_rum_data.content}"
 
             response_payload = response_rum_data.json()
+
+            print("RUM verified geo data", response_payload)
+
             assert (
                 len(response_payload["hits"]) > 0
             ), f"No data found, {response_rum_data.content}"
@@ -386,6 +389,8 @@ def test_e2e_rumverifygeodata(create_session, base_url):
             ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
 
             response_payload = response_rum_data.json()
+
+            print("RUM verified geo data", response_payload)
 
             assert len(response_payload["hits"]) > 0, "No results found in rum-logs"
             logs_exist = any(
