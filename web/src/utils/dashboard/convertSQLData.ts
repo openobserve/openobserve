@@ -2125,6 +2125,14 @@ export const convertSQLData = async (
 
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
+
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         if (
           hoveredSeriesState?.value &&
           panelSchema.id &&
@@ -2160,6 +2168,7 @@ export const convertSQLData = async (
         }
 
         const hoverText: string[] = [];
+
         name.forEach((it: any) => {
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
@@ -2283,6 +2292,13 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
@@ -2522,6 +2538,11 @@ const largestLabel = (data: any) => {
   }, "");
 
   return largestlabel;
+};
+
+const showTrellisConfig = (type: string) => {
+  const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
+  return supportedTypes.has(type);
 };
 
 /**
