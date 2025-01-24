@@ -20,6 +20,7 @@ use config::utils::json;
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
