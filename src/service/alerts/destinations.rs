@@ -37,7 +37,7 @@ pub async fn save(
             if destination.url.is_empty() {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination URL needs to be specified"),
+                    anyhow::anyhow!("Destination URL needs to be specified"),
                 ));
             }
         }
@@ -45,7 +45,7 @@ pub async fn save(
             if destination.emails.is_empty() {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Atleast one alert destination email is required"),
+                    anyhow::anyhow!("At least one alert destination email is required"),
                 ));
             }
             let mut lowercase_emails = vec![];
@@ -105,20 +105,20 @@ pub async fn save(
         return Err((
             http::StatusCode::BAD_REQUEST,
             anyhow::anyhow!(
-                "Alert destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+                "Destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
             ),
         ));
     }
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name is required"),
+            anyhow::anyhow!("Destination name is required"),
         ));
     }
     if destination.name.contains('/') {
         return Err((
             http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name cannot contain '/'"),
+            anyhow::anyhow!("Destination name cannot contain '/'"),
         ));
     }
 
@@ -138,7 +138,7 @@ pub async fn save(
             if create {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination already exists"),
+                    anyhow::anyhow!("Destination already exists"),
                 ));
             }
         }
@@ -146,7 +146,7 @@ pub async fn save(
             if !create {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination not found"),
+                    anyhow::anyhow!("Destination not found"),
                 ));
             }
         }
@@ -166,7 +166,7 @@ pub async fn save(
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
     db::alerts::destinations::get(org_id, name)
         .await
-        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
+        .map_err(|_| anyhow::anyhow!("Destination not found"))
 }
 
 pub async fn get_with_template(
@@ -212,17 +212,28 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
                     http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
+                    anyhow::anyhow!("Destination is currently used by alert {}", alert.name),
                 ));
             }
         }
     }
     drop(cacher);
 
+    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
+        for pl in pls {
+            if pl.contains_remote_destination(name) {
+                return Err((
+                    http::StatusCode::CONFLICT,
+                    anyhow::anyhow!("Destination is currently used by pipeline {}", pl.name),
+                ));
+            }
+        }
+    }
+
     if db::alerts::destinations::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Alert destination not found {}", name),
+            anyhow::anyhow!("Destination not found {}", name),
         ));
     }
 
