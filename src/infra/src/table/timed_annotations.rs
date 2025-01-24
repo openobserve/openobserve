@@ -471,7 +471,158 @@ pub async fn get_one(
     Ok(timed_annotation)
 }
 
+// Update db using `TimedAnnotation` if panels or tags is empty it should delete the old
+// entries
 pub async fn update(
+    dashboard_id: &str,
+    timed_annotation: TimedAnnotation,
+) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database(only for sqlite)
+    let _lock = get_lock().await;
+
+    // Initialize the ORM client
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let txn = client.begin().await?;
+
+    // Step 1: Resolve the user-facing `dashboard_id` to the primary key
+    let dashboard_record = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .one(&txn)
+        .await?
+        .ok_or_else(|| {
+            errors::Error::DbError(errors::DbError::KeyNotExists(format!(
+                "Dashboard '{}' not found",
+                dashboard_id
+            )))
+        })?;
+
+    let dashboard_pk = dashboard_record.id;
+
+    let timed_annotation_id = timed_annotation
+        .annotation_id
+        .ok_or_else(|| errors::Error::Message("Annotation ID is required".to_string()))?;
+
+    // Step 2: Build the update query
+    let mut update_query = timed_annotations::Entity::update_many()
+        .filter(timed_annotations::Column::DashboardId.eq(dashboard_pk))
+        .filter(timed_annotations::Column::Id.eq(timed_annotation_id.clone()));
+
+    // start_time
+    update_query = update_query.col_expr(
+        timed_annotations::Column::StartTime,
+        Expr::value(timed_annotation.start_time),
+    );
+
+    // end_time
+    if let Some(end_time) = timed_annotation.end_time {
+        update_query =
+            update_query.col_expr(timed_annotations::Column::EndTime, Expr::value(end_time));
+    } else {
+        update_query = update_query.col_expr(
+            timed_annotations::Column::EndTime,
+            Expr::value(sea_orm::Value::Json(None)),
+        );
+    }
+
+    // title
+    update_query = update_query.col_expr(
+        timed_annotations::Column::Title,
+        Expr::value(timed_annotation.title),
+    );
+
+    // text
+    if let Some(text) = timed_annotation.text {
+        update_query = update_query.col_expr(timed_annotations::Column::Text, Expr::value(text));
+    } else {
+        update_query = update_query.col_expr(
+            timed_annotations::Column::Text,
+            Expr::value(sea_orm::Value::Json(None)),
+        );
+    }
+
+    // tags
+    let tags_json = serde_json::to_value(&timed_annotation.tags).map_err(|e| {
+        let err_msg = format!("Failed to serialize tags: {}", e);
+        log::error!("{}", err_msg);
+        errors::Error::Message(err_msg)
+    })?;
+    update_query = update_query.col_expr(timed_annotations::Column::Tags, Expr::value(tags_json));
+
+    // Step 3: Execute the update query
+    update_query.exec(&txn).await?;
+
+    // Step 4: Handle panels
+    if timed_annotation.panels.is_empty() {
+        // Delete old panels
+        timed_annotation_panels::Entity::delete_many()
+            .filter(
+                timed_annotation_panels::Column::TimedAnnotationId.eq(timed_annotation_id.clone()),
+            )
+            .exec(&txn)
+            .await?;
+    } else {
+        // Update panels
+        let panel_ids: Vec<_> = timed_annotation
+            .panels
+            .iter()
+            .map(|id| id.clone())
+            .collect();
+        let existing_panels: Vec<String> = timed_annotation_panels::Entity::find()
+            .filter(
+                timed_annotation_panels::Column::TimedAnnotationId.eq(timed_annotation_id.clone()),
+            )
+            .all(&txn)
+            .await?
+            .into_iter()
+            .map(|panel| panel.panel_id)
+            .collect();
+
+        let panels_to_delete: Vec<_> = existing_panels
+            .iter()
+            .filter(|id| !panel_ids.contains(id))
+            .cloned()
+            .collect();
+        let panels_to_add: Vec<_> = panel_ids
+            .iter()
+            .filter(|id| !existing_panels.contains(id))
+            .cloned()
+            .collect();
+
+        if !panels_to_delete.is_empty() {
+            timed_annotation_panels::Entity::delete_many()
+                .filter(
+                    Condition::all()
+                        .add(
+                            timed_annotation_panels::Column::TimedAnnotationId
+                                .eq(timed_annotation_id.clone()),
+                        )
+                        .add(timed_annotation_panels::Column::PanelId.is_in(panels_to_delete)),
+                )
+                .exec(&txn)
+                .await?;
+        }
+
+        for panel_id in panels_to_add {
+            let panel_record = timed_annotation_panels::ActiveModel {
+                id: Set(ider::uuid()),
+                timed_annotation_id: Set(timed_annotation_id.clone()),
+                panel_id: Set(panel_id),
+            };
+
+            timed_annotation_panels::Entity::insert(panel_record)
+                .exec(&txn)
+                .await?;
+        }
+    }
+
+    // Commit the transaction
+    txn.commit().await?;
+
+    Ok(())
+}
+
+pub async fn _update(
     dashboard_id: &str,
     timed_annotation_id: &str,
     timed_annotation: TimedAnnotationUpdate,

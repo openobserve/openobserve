@@ -51,11 +51,9 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         }
         DashboardMessage::TimedAnnotationUpdate {
             dashboard_id,
-            timed_annotation_id,
             timed_annotation,
         } => {
-            table::timed_annotations::update(&dashboard_id, &timed_annotation_id, timed_annotation)
-                .await?;
+            table::timed_annotations::update(&dashboard_id, timed_annotation).await?;
         }
         DashboardMessage::TimedAnnotationDelete {
             dashboard_id,

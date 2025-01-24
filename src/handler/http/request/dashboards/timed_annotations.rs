@@ -17,7 +17,7 @@ use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::timed_annotations::{
-    ListTimedAnnotationsQuery, TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
+    ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
 
 use crate::{
@@ -213,7 +213,7 @@ pub async fn update_annotations(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
-    let req: TimedAnnotationUpdate = serde_json::from_slice(&body)?;
+    let req: TimedAnnotation = serde_json::from_slice(&body)?;
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }

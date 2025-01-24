@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::timed_annotations::{
-    TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
-};
+use config::meta::timed_annotations::{TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq};
 use infra::table;
 
 #[tracing::instrument]
@@ -87,57 +85,12 @@ pub async fn delete_timed_annotations(
 pub async fn update_timed_annotations(
     dashboard_id: &str,
     timed_annotation_id: &str,
-    req: &TimedAnnotationUpdate,
+    req: &TimedAnnotation,
 ) -> Result<TimedAnnotation, anyhow::Error> {
-    table::timed_annotations::update(dashboard_id, timed_annotation_id, req.clone()).await?;
+    table::timed_annotations::update(dashboard_id, req.clone()).await?;
     #[cfg(feature = "enterprise")]
-    super_cluster::emit_timed_annotation_put_event(dashboard_id, timed_annotation_id, req.clone())
-        .await?;
+    super_cluster::emit_timed_annotation_put_event(dashboard_id, req.clone()).await?;
 
-    if let Some(new_panels) = &req.panels {
-        let existing_panels =
-            table::timed_annotation_panels::get_panels(timed_annotation_id).await?;
-
-        let panels_to_delete: Vec<String> = existing_panels
-            .iter()
-            .filter(|panel| !new_panels.contains(panel))
-            .cloned()
-            .collect();
-
-        if !panels_to_delete.is_empty() {
-            table::timed_annotation_panels::delete_many_panels(
-                timed_annotation_id,
-                panels_to_delete.clone(),
-            )
-            .await?;
-            #[cfg(feature = "enterprise")]
-            super_cluster::emit_timed_annotation_panels_delete_event(
-                timed_annotation_id,
-                panels_to_delete,
-            )
-            .await?;
-        }
-
-        let panels_to_add: Vec<String> = new_panels
-            .iter()
-            .filter(|panel| !existing_panels.contains(panel))
-            .cloned()
-            .collect();
-
-        if !panels_to_add.is_empty() {
-            table::timed_annotation_panels::insert_many_panels(
-                timed_annotation_id,
-                panels_to_add.clone(),
-            )
-            .await?;
-            #[cfg(feature = "enterprise")]
-            super_cluster::emit_timed_annotation_panels_put_event(
-                timed_annotation_id,
-                panels_to_add,
-            )
-            .await?;
-        }
-    }
     let updated_record =
         table::timed_annotations::get_one(dashboard_id, timed_annotation_id).await?;
 
@@ -162,7 +115,6 @@ pub async fn delete_timed_annotation_panels(
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::meta::timed_annotations::TimedAnnotationUpdate;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
     use super::TimedAnnotation;
@@ -185,13 +137,11 @@ mod super_cluster {
     /// Sends event to super cluster queue for a new timed annotation entry.    
     pub async fn emit_timed_annotation_put_event(
         dashboard_id: &str,
-        timed_annotation_id: &str,
-        timed_annotation: TimedAnnotationUpdate,
+        timed_annotation: TimedAnnotation,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::timed_annotations_put(
                 dashboard_id,
-                timed_annotation_id,
                 timed_annotation,
             )
             .await
@@ -216,8 +166,9 @@ mod super_cluster {
         Ok(())
     }
 
+    // TODO: remove if not required
     /// Sends event to super cluster queue for a new timed annotation panels entry.
-    pub async fn emit_timed_annotation_panels_put_event(
+    pub async fn _emit_timed_annotation_panels_put_event(
         timed_annotation_id: &str,
         panels: Vec<String>,
     ) -> Result<(), infra::errors::Error> {
