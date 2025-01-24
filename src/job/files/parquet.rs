@@ -658,7 +658,7 @@ async fn merge_files(
         ),
         None => (Vec::new(), false),
     };
-    let _latest_schema = if !defined_schema_fields.is_empty() {
+    let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
@@ -754,7 +754,28 @@ async fn merge_files(
     let buf = Bytes::from(buf);
     storage::put(&new_file_key, buf.clone()).await?;
 
+    // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+        return Ok((new_file_key, new_file_meta, retain_file_list));
+    }
+
+    // skip index generation if no fields to index
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
         return Ok((new_file_key, new_file_meta, retain_file_list));
     }
 
