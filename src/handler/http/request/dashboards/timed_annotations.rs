@@ -200,6 +200,10 @@ pub async fn update_annotations(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
     let req: TimedAnnotationUpdate = serde_json::from_slice(&body)?;
+    if let Err(validation_err) = req.validate() {
+        return Ok(MetaHttpResponse::bad_request(validation_err));
+    }
+
     match timed_annotations::update_timed_annotations(&dashboard_id, &timed_annotation_id, &req)
         .await
     {

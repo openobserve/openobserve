@@ -51,3 +51,33 @@ pub struct TimedAnnotationUpdate {
     pub tags: Option<Vec<String>>,
     pub panels: Option<Vec<String>>,
 }
+
+impl TimedAnnotationUpdate {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.start_time.is_none()
+            && self.end_time.is_none()
+            && self.title.is_none()
+            && self.text.is_none()
+            && self.tags.is_none()
+            && self.panels.is_none()
+        {
+            return Err("At least one field must be present".to_string());
+        }
+
+        // Validate `panels` if provided
+        if let Some(panels) = &self.panels {
+            if panels.is_empty() {
+                return Err("panels cannot be empty".to_string());
+            }
+        }
+
+        // Validate `tags` if provided
+        if let Some(tags) = &self.tags {
+            if tags.is_empty() {
+                return Err("tags cannot be empty".to_string());
+            }
+        }
+
+        Ok(())
+    }
+}
