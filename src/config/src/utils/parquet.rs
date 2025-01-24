@@ -86,6 +86,41 @@ pub fn new_parquet_writer<'a>(
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
 
+pub fn new_parquet_writer_without_metadata<'a>(
+    buf: &'a mut Vec<u8>,
+    schema: &'a Arc<Schema>,
+    bloom_filter_fields: &'a [String],
+) -> AsyncArrowWriter<&'a mut Vec<u8>> {
+    let cfg = get_config();
+    let mut writer_props = WriterProperties::builder()
+        .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
+        .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
+        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
+        .set_compression(Compression::ZSTD(Default::default()))
+        .set_column_dictionary_enabled(
+            cfg.common.column_timestamp.as_str().into(),
+            false,
+        )
+        .set_column_encoding(
+            cfg.common.column_timestamp.as_str().into(),
+            Encoding::DELTA_BINARY_PACKED,
+        );
+
+    if cfg.common.bloom_filter_enabled {
+        let mut fields = bloom_filter_fields.to_vec();
+        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+        fields.sort();
+        fields.dedup();
+        for field in fields {
+            writer_props = writer_props
+                .set_column_bloom_filter_enabled(field.as_str().into(), true)
+                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP);
+        }
+    }
+    let writer_props = writer_props.build();
+    AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+}
+
 pub async fn write_recordbatch_to_parquet(
     schema: Arc<Schema>,
     record_batches: &[RecordBatch],

@@ -2200,7 +2200,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.compact.metrics_downsampling_rules.is_empty() {
         let rules = cfg.compact.metrics_downsampling_rules.split(',');
         for rule in rules {
-            let (regex, function, offest, step) = rule.split(':').collect_tuple().expect("invalid downsampling rule");
+            let (regex, function, offest, step) = rule
+                .split(':')
+                .collect_tuple()
+                .expect("invalid downsampling rule");
             if !regex.is_empty() {
                 let _ = Regex::new(regex).expect("invalid regex for downsampling");
             }
@@ -2305,7 +2308,10 @@ fn get_seconds_from_string(s: &str) -> i64 {
         "h" => num * 3600,
         "d" => num * 86400,
         "s" => num,
-        _ => panic!("invalid unit for downsampling: {}, only support s, m, h, d", unit),
+        _ => panic!(
+            "invalid unit for downsampling: {}, only support s, m, h, d",
+            unit
+        ),
     }
 }
 

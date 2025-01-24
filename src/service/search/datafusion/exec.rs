@@ -19,7 +19,9 @@ use arrow_schema::Field;
 use config::{
     get_config,
     meta::{
-        promql::{get_largest_downsampling_rule, Function, HASH_LABEL, VALUE_LABEL},
+        promql::{
+            get_largest_downsampling_rule, DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL,
+        },
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
@@ -69,6 +71,15 @@ use crate::service::{
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
+const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
+
+pub enum MergeParquetResult {
+    Single(Vec<u8>),
+    Multiple {
+        bufs: Vec<Vec<u8>>,
+        original_sizes: Vec<i64>,
+    },
+}
 
 pub async fn merge_parquet_files(
     stream_type: StreamType,
@@ -77,9 +88,23 @@ pub async fn merge_parquet_files(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-) -> Result<(Arc<Schema>, Vec<u8>)> {
+) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+
+    if stream_type == StreamType::Metrics {
+        let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
+        if let Some(rule) = rule {
+            return merge_parquet_files_with_downsampling(
+                schema,
+                tables,
+                bloom_filter_fields,
+                metadata,
+                rule,
+            )
+            .await;
+        }
+    }
 
     // get all sorted data
     let sql = if stream_type == StreamType::Index {
@@ -106,8 +131,6 @@ pub async fn merge_parquet_files(
             fields_str,
             cfg.common.column_timestamp
         )
-    } else if stream_type == StreamType::Metrics {
-        generate_downsampling_sql(stream_name, metadata, &schema)
     } else {
         format!(
             "SELECT * FROM tbl ORDER BY {} DESC",
@@ -160,7 +183,67 @@ pub async fn merge_parquet_files(
         start.elapsed().as_millis()
     );
 
-    Ok((schema, buf))
+    Ok((schema, MergeParquetResult::Single(buf)))
+}
+
+pub async fn merge_parquet_files_with_downsampling(
+    schema: Arc<Schema>,
+    tables: Vec<Arc<dyn TableProvider>>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+    rule: &DownsamplingRule,
+) -> Result<(Arc<Schema>, MergeParquetResult)> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let sql = generate_downsampling_sql(&schema, rule);
+
+    // create datafusion context
+    let sort_by_timestamp_desc = true;
+    let target_partitions = cfg.limit.cpu_num;
+    let ctx =
+        prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
+    // register union table
+    let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);
+    ctx.register_table("tbl", union_table)?;
+
+    let plan = ctx.state().create_logical_plan(&sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    let schema = physical_plan.schema();
+
+    // write result to parquet file
+    let mut buf = Vec::new();
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
+    loop {
+        match batch_stream.try_next().await {
+            Ok(Some(batch)) => {
+                if let Err(e) = writer.write(&batch).await {
+                    log::error!("merge_parquet_files write Error: {}", e);
+                    return Err(e.into());
+                }
+            }
+            Ok(None) => {
+                break;
+            }
+            Err(e) => {
+                log::error!("merge_parquet_files execute stream Error: {}", e);
+                return Err(e);
+            }
+        }
+    }
+    // writer.append_key_value_metadata();
+    writer.close().await?;
+
+    ctx.deregister_table("tbl")?;
+    drop(ctx);
+
+    log::debug!(
+        "merge_parquet_files took {} ms",
+        start.elapsed().as_millis()
+    );
+
+    Ok((schema, MergeParquetResult::Single(buf)))
 }
 
 pub fn create_session_config(
@@ -488,64 +571,75 @@ async fn get_cpu_and_mem_limit(
     Ok((target_partitions, memory_size))
 }
 
-fn generate_downsampling_sql(
-    stream_name: &str,
-    metadata: &FileMeta,
-    schema: &Arc<Schema>,
-) -> String {
+fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
     let cfg = get_config();
-    let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
-    if let Some(rule) = rule {
-        let step = rule.step;
-        // let fun = rule.function.fun();
-        let fields = schema
-            .fields()
-            .iter()
-            .filter_map(|f| {
-                if f.name() != HASH_LABEL
-                    && f.name() != VALUE_LABEL
-                    && f.name() != &cfg.common.column_timestamp
-                {
-                    Some(format!("max({}) as {}", f.name(), f.name()))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+    let step = rule.step;
+    let fields = schema
+        .fields()
+        .iter()
+        .filter_map(|f| {
+            if f.name() != HASH_LABEL
+                && f.name() != VALUE_LABEL
+                && f.name() != &cfg.common.column_timestamp
+            {
+                Some(format!("max({}) as {}", f.name(), f.name()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
-        let fun_str = if rule.function == Function::Last || rule.function == Function::First {
-            format!(
-                "{}_value({} ORDER BY ASC{}) as {}",
-                rule.function.fun(),
-                VALUE_LABEL,
-                cfg.common.column_timestamp,
-                VALUE_LABEL
-            )
-        } else {
-            format!(
-                "{}({}) as {}",
-                rule.function.fun(),
-                VALUE_LABEL,
-                VALUE_LABEL
-            )
-        };
+    let fun_str = if rule.function == Function::Last || rule.function == Function::First {
+        format!(
+            "{}_value({} ORDER BY ASC{}) as {}",
+            rule.function.fun(),
+            VALUE_LABEL,
+            cfg.common.column_timestamp,
+            VALUE_LABEL
+        )
+    } else {
+        format!(
+            "{}({}) as {}",
+            rule.function.fun(),
+            VALUE_LABEL,
+            VALUE_LABEL
+        )
+    };
 
-        return format!(
-                "SELECT {}, date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00')) as {}, {}, {} FROM tbl GROUP BY {}, {} ORDER BY {} DESC",
+    let sql = format!(
+                "SELECT {}, date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00')) as {}, {}, {} FROM tbl GROUP BY {}, {}",
                 HASH_LABEL,
                 step,
                 cfg.common.column_timestamp,
-                cfg.common.column_timestamp,
+                TIMESTAMP_ALIAS,
                 fields.join(", "),
                 fun_str,
                 HASH_LABEL,
                 cfg.common.column_timestamp,
-                cfg.common.column_timestamp,
             );
-    }
 
+    let fields = schema
+        .fields()
+        .iter()
+        .filter_map(|f| {
+            if f.name() != HASH_LABEL
+                && f.name() != VALUE_LABEL
+                && f.name() != &cfg.common.column_timestamp
+            {
+                Some(f.name().to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
     format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
+        "SELECT {}, {}, {}, {} AS {} FROM ({}) ORDER BY {} DESC",
+        HASH_LABEL,
+        VALUE_LABEL,
+        fields.join(", "),
+        TIMESTAMP_ALIAS,
+        cfg.common.column_timestamp,
+        sql,
         cfg.common.column_timestamp
     )
 }

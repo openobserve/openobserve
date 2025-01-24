@@ -63,7 +63,10 @@ use crate::{
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
-        search::{datafusion::exec, DATAFUSION_RUNTIME},
+        search::{
+            datafusion::exec::{self, MergeParquetResult},
+            DATAFUSION_RUNTIME,
+        },
         stream,
     },
 };
@@ -943,7 +946,14 @@ pub async fn merge_files(
         }
     };
 
-    new_file_meta.compressed_size = buf.len() as i64;
+    // TODO: handle multiple files
+    let buf = match buf {
+        MergeParquetResult::Single(v) => v,
+        MergeParquetResult::Multiple { .. } => {
+            panic!("merge_parquet_files error: multiple files");
+        }
+    };
+
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: compressed_size is 0"
