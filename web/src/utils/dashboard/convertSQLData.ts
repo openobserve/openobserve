@@ -2424,7 +2424,7 @@ export const convertSQLData = async (
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
         const total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
-            sum + currentSeries?.data[i] ?? 0,
+            sum + (currentSeries?.data[i] ?? 0),
           0,
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
