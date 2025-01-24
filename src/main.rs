@@ -182,6 +182,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     // init script server
+    #[cfg(feature = "enterprise")]
     if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
     {
         log::info!("Starting script server");
@@ -899,6 +900,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // metrics
@@ -998,6 +1000,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
 pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
     cfg.service(
