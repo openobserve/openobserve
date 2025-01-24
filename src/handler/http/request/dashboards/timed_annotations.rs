@@ -195,7 +195,7 @@ pub async fn delete_annotations(
         ("Authorization" = [])
     ),
     request_body(
-        content = TimedAnnotationUpdate,
+        content = TimedAnnotation,
         description = "Timed annotation update request payload",
         content_type = "application/json",
     ),
@@ -213,7 +213,9 @@ pub async fn update_annotations(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id, timed_annotation_id) = path.into_inner();
-    let req: TimedAnnotation = serde_json::from_slice(&body)?;
+    let mut req: TimedAnnotation = serde_json::from_slice(&body)?;
+    // ensure the annotation id is always set for update
+    req.annotation_id = Some(timed_annotation_id.clone());
     if let Err(validation_err) = req.validate() {
         return Ok(MetaHttpResponse::bad_request(validation_err));
     }
