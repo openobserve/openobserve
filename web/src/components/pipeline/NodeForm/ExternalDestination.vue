@@ -284,7 +284,7 @@ const selectedDestination: any = ref(
         label: pipelineObj.currentSelectedNodeData.data.destination_name,
         value: pipelineObj.currentSelectedNodeData.data.destination_name,
       }
-    : "",
+    : { label: "", value: "" },
 );
 const destinations = ref([]);
 
