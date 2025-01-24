@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             class="q-ml-auto q-mb-xs no-border tw-w-[350px]"
-            :placeholder="t('common.search')"
+            :placeholder="t('actions.search')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -153,8 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Delete Action Script"
-      message="Are you sure you want to delete Action Script?"
+      title="Delete Action"
+      message="Are you sure you want to delete Action?"
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -268,6 +268,7 @@ import {
   getImageURL,
   getUUID,
   verifyOrganizationStatus,
+  convertUnixToQuasarFormat,
 } from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
@@ -291,7 +292,7 @@ interface ActionScriptList {
 
 // import alertList from "./alerts";
 
-// TODO code clean up needs to be done 
+// TODO code clean up needs to be done
 export default defineComponent({
   name: "AlertList",
   components: {
@@ -416,7 +417,7 @@ export default defineComponent({
     const getActionScripts = () => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading action scripts...",
+        message: "Please wait while loading actions...",
       });
       actions
         .list(store.state.selectedOrganization.identifier)
@@ -438,12 +439,17 @@ export default defineComponent({
               name: data.name,
               uuid: data.uuid,
               created_by: data.created_by,
-              created_at: data.created_at,
-              last_run_at: data.last_run_at,
-              last_successful_at: data.last_successful_at,
+              created_at: data.created_at
+                ? convertUnixToQuasarFormat(data.created_at)
+                : "-",
+              last_run_at: data.last_run_at
+                ? convertUnixToQuasarFormat(data.last_run_at)
+                : "-",
+              last_successful_at: data.last_successful_at
+                ? convertUnixToQuasarFormat(data.last_successful_at)
+                : "-",
               status: data.status,
               execution_details_type: data.execution_details_type,
-
             };
           });
           actionsScriptRows.value.forEach((alert: ActionScriptList) => {
@@ -465,10 +471,9 @@ export default defineComponent({
           dismiss();
           $q.notify({
             type: "negative",
-            message: "Error while pulling action scripts.",
+            message: "Error while pulling Actions.",
             timeout: 2000,
           });
-          
         });
     };
     const getAlertByName = (id: string) => {
@@ -543,14 +548,6 @@ export default defineComponent({
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
-
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-    }
 
     const addAlert = () => {
       showAddActionScriptDialog.value = true;
