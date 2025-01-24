@@ -148,18 +148,24 @@ impl PipelineReceiver {
         let pipeline_id = self.reader_header.get("pipeline_id").ok_or(Error::Message(
             "get_stream_endpoint get pipeline_id fail".to_string(),
         ))?;
+        let node_id = self.reader_header.get("node_id").ok_or(Error::Message(
+            "get_stream_endpoint get node_id fail".to_string(),
+        ))?;
 
-        let pipeline = db::pipeline::get_by_id(pipeline_id.as_str())
+        let pipeline = db::pipeline::get_by_id(pipeline_id)
             .await
             .map_err(|e| Error::Message(format!("get_stream_endpoint get pipeline fail: {e}")))?;
 
-        let destination_name = pipeline.nodes.iter().find_map(|node| {
-            if let config::meta::pipeline::components::NodeData::RemoteStream(remote) = &node.data {
-                Some(remote.destination_name.to_string())
-            } else {
-                None
-            }
-        });
+        let destination_name = pipeline
+            .nodes
+            .iter()
+            .find(|node| node.id == *node_id)
+            .and_then(|node| match &node.data {
+                config::meta::pipeline::components::NodeData::RemoteStream(remote) => {
+                    Some(remote.destination_name.to_string())
+                }
+                _ => None,
+            });
 
         if destination_name.is_none() {
             return Err(Error::Message("destination_name not found".to_string()));

@@ -55,7 +55,7 @@ static PIPELINE_WAL_WRITER_MAP: Lazy<Arc<RwLock<HashMap<String, Arc<PipelineWalW
 
 pub async fn get_pipeline_wal_writer(
     pipeline_id: &str,
-    node_id: usize,
+    node_id: &str,
     remote_stream_params: RemoteStreamParams,
 ) -> Result<Arc<PipelineWalWriter>> {
     let key = format!("{pipeline_id}-{node_id}");
@@ -70,6 +70,7 @@ pub async fn get_pipeline_wal_writer(
         let is_realtime = matches!(&pipeline.source, PipelineSource::Realtime(_));
         let writer = PipelineWalWriter::new(
             pipeline_id.to_string(),
+            node_id.to_string(),
             pipeline.source,
             remote_stream_params,
         )?;
@@ -130,6 +131,7 @@ pub async fn check_ttl() -> ingester::errors::Result<()> {
 
 pub struct PipelineWalWriter {
     pub pipeline_id: String,
+    pub node_id: String,
     pub pipeline_source_type: PipelineSource,
     pub remote_stream_params: RemoteStreamParams,
     pub wal_writer: Arc<RwLock<wal::Writer>>,
@@ -139,6 +141,7 @@ pub struct PipelineWalWriter {
 impl PipelineWalWriter {
     pub fn new(
         pipeline_id: String,
+        node_id: String,
         pipeline_source_type: PipelineSource,
         remote_stream_params: RemoteStreamParams,
     ) -> Result<Self> {
@@ -151,6 +154,7 @@ impl PipelineWalWriter {
         let wal_id = next_seq.fetch_add(1, Ordering::SeqCst).to_string();
         let writer = Self::wal_writer_build(
             pipeline_id.to_string(),
+            node_id.to_string(),
             wal_file_dir,
             remote_stream_params.clone(),
             wal_id,
@@ -160,6 +164,7 @@ impl PipelineWalWriter {
 
         Ok(Self {
             pipeline_id,
+            node_id,
             pipeline_source_type,
             remote_stream_params,
             wal_writer,
@@ -169,6 +174,7 @@ impl PipelineWalWriter {
 
     pub fn wal_writer_build(
         pipeline_id: String,
+        node_id: String,
         wal_file_dir: PathBuf,
         remote_stream_params: RemoteStreamParams,
         wal_id: String,
@@ -177,6 +183,7 @@ impl PipelineWalWriter {
         // query org_id stream_name stream_type from destination_name
         let mut header = wal::FileHeader::new();
         header.insert("pipeline_id".to_string(), pipeline_id);
+        header.insert("node_id".to_string(), node_id);
         header.insert(
             "destination_name".to_string(),
             remote_stream_params.destination_name.to_string(),
@@ -329,6 +336,7 @@ impl PipelineWalWriter {
 
         let new_wal_writer = Self::wal_writer_build(
             self.pipeline_id.clone(),
+            self.node_id.clone(),
             wal_dir,
             self.remote_stream_params.clone(),
             wal_id.to_string(),
