@@ -89,6 +89,7 @@ pub async fn get_pipeline_wal_writer(
 async fn notify_file_watcher(path: PathBuf) {
     let watcher = FILE_WATCHER_NOTIFY.write().await;
     if let Some(watcher) = watcher.clone() {
+        log::debug!("notify file watcher to watch newfile: {:?}", path);
         if let Err(e) = watcher.send(WatcherEvent::NewFile(path.clone())).await {
             log::error!("pipeline_wal_writer notify_file_watcher error: {}", e);
         }
