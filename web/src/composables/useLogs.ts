@@ -4738,6 +4738,8 @@ const useLogs = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
+      searchObj.data.isOperationCancelled = false;
+
       showCancelSearchNotification();
       setCancelSearchError();
     }
@@ -5201,7 +5203,8 @@ const useLogs = () => {
     }
 
     if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram") searchObj.loadingHistogram = false;
+    if (payload.type === "histogram" || payload.type === "pageCount")
+      searchObj.loadingHistogram = false;
     searchObj.data.isOperationCancelled = false;
   };
 
@@ -5328,6 +5331,8 @@ const useLogs = () => {
     }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+
+    searchObj.loadingHistogram = true;
 
     const requestId = initializeWebSocketConnection(payload);
 
