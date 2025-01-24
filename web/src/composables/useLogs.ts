@@ -4670,6 +4670,7 @@ const useLogs = () => {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
         showCancelSearchNotification();
+        setCancelSearchError();
         return;
       }
 
@@ -4741,6 +4742,7 @@ const useLogs = () => {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       showCancelSearchNotification();
+      setCancelSearchError();
     }
   };
 
@@ -5216,6 +5218,7 @@ const useLogs = () => {
     // 20009 is the code for query cancelled
     if (code === 20009) {
       showCancelSearchNotification();
+      setCancelSearchError();
     }
 
     if (trace_id) removeTraceId(trace_id);
@@ -5346,6 +5349,26 @@ const useLogs = () => {
       position: "bottom",
       timeout: 4000,
     });
+  };
+
+  const setCancelSearchError = () => {
+    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
+      searchObj.data.queryResults.hits = [];
+    }
+
+    if (!searchObj.data?.queryResults?.hits?.length) {
+      searchObj.data.errorMsg = "";
+      searchObj.data.errorCode = 0;
+    }
+
+    if (
+      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
+      searchObj.data.queryResults?.hits?.length &&
+      !searchObj.data.queryResults?.aggs?.length
+    ) {
+      searchObj.data.histogram.errorMsg =
+        "Histogram search query was cancelled";
+    }
   };
 
   const handlePageCountError = (err: any) => {
