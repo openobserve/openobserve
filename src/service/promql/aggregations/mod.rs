@@ -230,14 +230,7 @@ pub async fn eval_top(
         }
     };
 
-    let data_for_labels = data
-        .iter()
-        .map(|item| InstantValue {
-            labels: item.labels.clone(),
-            sample: Sample::new(item.sample.timestamp, item.sample.value),
-        })
-        .collect::<Vec<_>>();
-
+    let data_for_labels = data.clone();
     let mut score_values: FxIndexMap<u64, Vec<TopItem>> = Default::default();
     match modifier {
         Some(v) => match v {
