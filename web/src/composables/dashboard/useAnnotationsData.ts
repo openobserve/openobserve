@@ -8,6 +8,7 @@ export const useAnnotationsData = (
   organization: any,
   dashboardId: any,
   panelId: string,
+  folderId: string,
 ) => {
   // show annotation button
   const isAddAnnotationMode = ref(false);
@@ -73,7 +74,7 @@ export const useAnnotationsData = (
 
   const editAnnotation = (annotation: any) => {
     console.log("Editing annotation:", annotation);
-    
+
     annotationToAddEdit.value = annotation;
     showAddAnnotationDialog();
   };
@@ -142,7 +143,7 @@ export const useAnnotationsData = (
 
   const fetchAllPanels = async () => {
     try {
-      const dashboardData = await getDashboard(store, dashboardId);
+      const dashboardData = await getDashboard(store, dashboardId, folderId);
 
       const processedPanels = processTabPanels(dashboardData);
 

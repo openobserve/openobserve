@@ -400,6 +400,7 @@ export default defineComponent({
       store.state.selectedOrganization?.identifier,
       dashboardId.value,
       panelSchema.value.id,
+      folderId.value,
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
