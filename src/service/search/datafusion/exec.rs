@@ -15,6 +15,10 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use arrow::{
+    array::{AsArray, RecordBatch},
+    datatypes::Int64Type,
+};
 use arrow_schema::Field;
 use config::{
     get_config,
@@ -25,7 +29,10 @@ use config::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
+    utils::{
+        parquet::{new_parquet_writer, new_parquet_writer_without_metadata},
+        schema_ext::SchemaExt,
+    },
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -56,6 +63,7 @@ use hashbrown::HashMap;
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config, search::WorkGroup,
 };
+use parquet::file::metadata::KeyValue;
 
 use super::{
     file_type::{FileType, GetExt},
@@ -77,7 +85,7 @@ pub enum MergeParquetResult {
     Single(Vec<u8>),
     Multiple {
         bufs: Vec<Vec<u8>>,
-        original_sizes: Vec<i64>,
+        file_metas: Vec<FileMeta>,
     },
 }
 
@@ -99,7 +107,6 @@ pub async fn merge_parquet_files(
                 schema,
                 tables,
                 bloom_filter_fields,
-                metadata,
                 rule,
             )
             .await;
@@ -190,7 +197,6 @@ pub async fn merge_parquet_files_with_downsampling(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
-    metadata: &FileMeta,
     rule: &DownsamplingRule,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
@@ -212,28 +218,85 @@ pub async fn merge_parquet_files_with_downsampling(
     let schema = physical_plan.schema();
 
     // write result to parquet file
-    let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut bufs = Vec::new();
+    let mut file_metas = Vec::new();
+    let mut max_ts = 0;
+
+    let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
+    let mut file_meta = FileMeta::default();
+    let mut writer = new_parquet_writer_without_metadata(&mut buf, &schema, bloom_filter_fields);
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
             Ok(Some(batch)) => {
+                if file_meta.min_ts == 0 {
+                    file_meta.min_ts = get_first_timestamp(&batch);
+                }
+                file_meta.original_size += batch.get_array_memory_size() as i64;
+                file_meta.records += batch.num_rows() as i64;
+                max_ts = get_last_timestamp(&batch);
+                if file_meta.original_size > cfg.compact.max_file_size as i64 {
+                    file_meta.max_ts = max_ts;
+                    writer.append_key_value_metadata(KeyValue::new(
+                        "min_ts".to_string(),
+                        file_meta.min_ts.to_string(),
+                    ));
+                    writer.append_key_value_metadata(KeyValue::new(
+                        "max_ts".to_string(),
+                        file_meta.max_ts.to_string(),
+                    ));
+                    writer.append_key_value_metadata(KeyValue::new(
+                        "records".to_string(),
+                        file_meta.records.to_string(),
+                    ));
+                    writer.append_key_value_metadata(KeyValue::new(
+                        "original_size".to_string(),
+                        file_meta.original_size.to_string(),
+                    ));
+                    writer.close().await?;
+                    bufs.push(std::mem::take(&mut buf));
+                    file_metas.push(file_meta);
+
+                    // reset for next file
+                    buf.clear();
+                    file_meta = FileMeta::default();
+                    writer =
+                        new_parquet_writer_without_metadata(&mut buf, &schema, bloom_filter_fields);
+                }
                 if let Err(e) = writer.write(&batch).await {
                     log::error!("merge_parquet_files write Error: {}", e);
                     return Err(e.into());
                 }
             }
-            Ok(None) => {
-                break;
-            }
+            Ok(None) => break,
             Err(e) => {
                 log::error!("merge_parquet_files execute stream Error: {}", e);
                 return Err(e);
             }
         }
     }
-    // writer.append_key_value_metadata();
-    writer.close().await?;
+    if file_meta.original_size > 0 {
+        file_meta.max_ts = max_ts;
+        writer.append_key_value_metadata(KeyValue::new(
+            "min_ts".to_string(),
+            file_meta.min_ts.to_string(),
+        ));
+        writer.append_key_value_metadata(KeyValue::new(
+            "max_ts".to_string(),
+            file_meta.max_ts.to_string(),
+        ));
+        writer.append_key_value_metadata(KeyValue::new(
+            "records".to_string(),
+            file_meta.records.to_string(),
+        ));
+        writer.append_key_value_metadata(KeyValue::new(
+            "original_size".to_string(),
+            file_meta.original_size.to_string(),
+        ));
+        writer.close().await?;
+        bufs.push(std::mem::take(&mut buf));
+        file_metas.push(file_meta);
+    }
 
     ctx.deregister_table("tbl")?;
     drop(ctx);
@@ -243,7 +306,7 @@ pub async fn merge_parquet_files_with_downsampling(
         start.elapsed().as_millis()
     );
 
-    Ok((schema, MergeParquetResult::Single(buf)))
+    Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
 }
 
 pub fn create_session_config(
@@ -642,4 +705,18 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         sql,
         cfg.common.column_timestamp
     )
+}
+
+fn get_first_timestamp(record_batch: &RecordBatch) -> i64 {
+    let cfg = get_config();
+    let timestamp_field = record_batch.column_by_name(&cfg.common.column_timestamp);
+    let timestamp = timestamp_field.unwrap().as_primitive::<Int64Type>();
+    timestamp.value(0)
+}
+
+fn get_last_timestamp(record_batch: &RecordBatch) -> i64 {
+    let cfg = get_config();
+    let timestamp_field = record_batch.column_by_name(&cfg.common.column_timestamp);
+    let timestamp = timestamp_field.unwrap().as_primitive::<Int64Type>();
+    timestamp.value(timestamp.len() - 1)
 }
