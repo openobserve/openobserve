@@ -35,9 +35,6 @@
             emit-value
             map-options
             @update:model-value="updateSelectedPanels"
-            :placeholder="
-              noPanelsSelected ? noPanelsMessage : 'Select panels...'
-            "
             :display-value="displayValue"
             style="min-width: 150px"
             filled
@@ -76,7 +73,12 @@
             </template>
           </q-select>
         </div>
-
+        <div class="q-mt-md">
+          <label class="q-mt-md"
+            >If no panel is selected, annotations will be applied to all panels
+            by default.</label
+          >
+        </div>
         <div class="text-caption q-mt-sm">
           Timestamp: {{ annotationDateString }}
         </div>
@@ -161,6 +163,7 @@ const annotationData = ref(
 
 const groupedPanels = ref({});
 const selectedPanels = ref([]);
+
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
     { label: tab, isTab: true },
@@ -173,9 +176,22 @@ const groupedPanelsOptions = computed(() =>
 );
 
 const displayValue = computed(() => {
-  // want like if no panel selected then show message like "Annotations will be applied to all panels."
-  // check if selected value is more than 2 than show ...+ {count of selected panels} more
+  if (!selectedPanels.value.length) {
+    return "All Panels";
+  }
+  const selectedTitles = selectedPanels.value.map((panelId) => {
+    const panel = props.panelsList.find((p) => p.id === panelId);
+    return panel?.title || "Unknown";
+  });
+
+  if (selectedTitles.length > 2) {
+    return `${selectedTitles.slice(0, 2).join(", ")}... + ${
+      selectedTitles.length - 2
+    } more`;
+  }
+  return selectedTitles.join(", ");
 });
+
 const groupPanels = () => {
   groupedPanels.value = props.panelsList.reduce((acc, panel) => {
     const tabName = panel.tabName || "Unknown Tab";
@@ -203,6 +219,7 @@ watch(
   },
   { immediate: true },
 );
+
 const isEditMode = computed(() => !!annotationData?.value?.annotation_id);
 
 const annotationDateString = computed(() => {
