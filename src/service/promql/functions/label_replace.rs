@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use crate::service::promql::value::{InstantValue, Label, LabelsExt, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_replace
 pub(crate) fn label_replace(
-    data: &Value,
+    data: Value,
     dest_label: &str,
     replacement: &str,
     source_label: &str,
@@ -50,21 +50,21 @@ pub(crate) fn label_replace(
         .map_err(|_e| DataFusionError::NotImplemented("Invalid regex found".into()))?;
 
     let rate_values: Vec<InstantValue> = data
-        .par_iter()
-        .map(|instant| {
+        .into_par_iter()
+        .map(|mut instant| {
+            let mut labels = std::mem::take(&mut instant.labels);
             let labels = if replacement.is_empty() {
-                instant.labels.without_label(dest_label)
+                labels.without_label(dest_label)
             } else {
-                let label_value = instant.labels.get_value(source_label);
+                let label_value = labels.get_value(source_label);
                 let output_value = re.replace_all(&label_value, replacement);
-                let mut new_labels = instant.labels.clone();
                 if output_value != label_value {
-                    new_labels.push(Arc::new(Label {
+                    labels.push(Arc::new(Label {
                         name: dest_label.to_string(),
                         value: output_value.to_string(),
                     }));
                 }
-                new_labels
+                labels
             };
             InstantValue {
                 labels,
