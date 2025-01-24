@@ -4850,6 +4850,11 @@ const useLogs = () => {
         }
       }
 
+      // We are storing time_offset for the context of pagecount, to get the partial pagecount
+      if (searchObj.data.queryResults) {
+        searchObj.data.queryResults.time_offset = response.content?.time_offset;
+      }
+
       // If its a pagination request, then append
       if (!isPagination) {
         searchObj.data.queryResults.pagination = [];
@@ -5293,12 +5298,14 @@ const useLogs = () => {
     }
 
     searchObj.data.countErrorMsg = "";
-    queryReq.query.size = searchObj.data.queryResults.total;
+    queryReq.query.size = 0;
     delete queryReq.query.from;
     delete queryReq.query.quick_mode;
     queryReq.query["sql_mode"] = "full";
 
     queryReq.query.track_total_hits = true;
+
+    queryReq.query.end_time = searchObj.data.queryResults.time_offset;
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
 
