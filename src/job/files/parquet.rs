@@ -1416,12 +1416,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8)
-                .is_some()
-        })
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
@@ -1431,7 +1425,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     }
 
     // add fields to tantivy schema
-    if !fts_fields.is_empty() {
+    if !full_text_search_fields.is_empty() {
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
@@ -1472,13 +1466,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
         // process full text search fields
         for column_name in tantivy_fields.iter() {
-            let column_data = match inverted_idx_batch
-                .column_by_name(column_name)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-            {
-                Some(column_data) => column_data,
+            let column_data = match inverted_idx_batch.column_by_name(column_name) {
+                Some(column_data) => match column_data.as_any().downcast_ref::<StringArray>() {
+                    Some(column_data) => column_data,
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &StringArray::from(vec![""; num_rows])
+                    }
+                },
                 None => {
                     // generate empty array to ensure the tantivy and parquet have same rows
                     &StringArray::from(vec![""; num_rows])
