@@ -14,11 +14,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationReq {
     pub timed_annotations: Vec<TimedAnnotation>,
+}
+
+impl TimedAnnotationReq {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.timed_annotations.is_empty() {
+            return Err("timed_annotations cannot be empty".to_string());
+        }
+
+        self.timed_annotations
+            .iter()
+            .map(|annotation| annotation.validate())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -37,15 +52,52 @@ pub struct TimedAnnotation {
     pub panels: Vec<String>,
 }
 
+impl TimedAnnotation {
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(end_time) = self.end_time {
+            if end_time <= self.start_time {
+                return Err("end time must be greater than start time".to_string());
+            }
+        }
+
+        if self.title.is_empty() {
+            return Err("title cannot be empty".to_string());
+        }
+
+        if !self.panels.is_empty() {
+            if self.panels.iter().any(|panel| panel.is_empty()) {
+                return Err("panel cannot be empty".to_string());
+            }
+        }
+        if !self.tags.is_empty() {
+            if self.tags.iter().any(|tag| tag.is_empty()) {
+                return Err("tag cannot be empty".to_string());
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationDelete {
     pub annotation_ids: Vec<String>,
 }
 
+impl TimedAnnotationDelete {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.annotation_ids.is_empty() {
+            return Err("annotation_ids cannot be empty".to_string());
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimedAnnotationUpdate {
     pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
+    pub end_time: Option<Option<i64>>,
     pub title: Option<String>,
     pub text: Option<String>,
     pub tags: Option<Vec<String>>,
@@ -64,6 +116,14 @@ impl TimedAnnotationUpdate {
             return Err("At least one field must be present".to_string());
         }
 
+        if let Some(end_time) = self.end_time {
+            if let Some(end_time) = end_time {
+                if end_time <= self.start_time.unwrap() {
+                    return Err("end time must be greater than start time".to_string());
+                }
+            }
+        }
+
         // Validate `panels` if provided
         if let Some(panels) = &self.panels {
             if panels.is_empty() {
@@ -79,5 +139,31 @@ impl TimedAnnotationUpdate {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
+#[serde(rename_all = "snake_case")]
+#[into_params(rename_all = "snake_case")]
+pub struct ListTimedAnnotationsQuery {
+    pub panels: Option<String>,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+impl ListTimedAnnotationsQuery {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.start_time >= self.end_time {
+            return Err("start time must be less than end time".to_string());
+        }
+
+        Ok(())
+    }
+
+    pub fn get_panels(&self) -> Option<Vec<String>> {
+        self.panels
+            .as_ref()
+            .map(|panels| panels.split(',').map(|panel| panel.to_string()).collect())
     }
 }

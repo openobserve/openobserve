@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::timed_annotations::{
-    TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
+    ListTimedAnnotationsQuery, TimedAnnotationDelete, TimedAnnotationReq, TimedAnnotationUpdate,
 };
 
 use crate::{
@@ -56,6 +56,9 @@ pub async fn create_annotations(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
     let req = serde_json::from_slice::<TimedAnnotationReq>(&body)?;
+    if let Err(validation_err) = req.validate() {
+        return Ok(MetaHttpResponse::bad_request(validation_err));
+    }
 
     match timed_annotations::create_timed_annotations(&dashboard_id, req).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
@@ -102,13 +105,20 @@ pub async fn create_annotations(
 #[get("/{org_id}/dashboards/{dashboard_id}/annotations")]
 pub async fn get_annotations(
     path: web::Path<(String, String)>,
-    query: web::Query<HashMap<String, String>>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
-    let (panels, start_time, end_time) = match get_query_params(query) {
-        Ok(params) => params,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e.to_string())),
+    let Ok(query) = web::Query::<ListTimedAnnotationsQuery>::from_query(req.query_string()) else {
+        return Ok(MetaHttpResponse::bad_request(
+            "Error parsing query parameters".to_string(),
+        ));
     };
+    let query = query.into_inner();
+    if let Err(validation_err) = query.validate() {
+        return Ok(MetaHttpResponse::bad_request(validation_err));
+    }
+
+    let (panels, start_time, end_time) = (query.get_panels(), query.start_time, query.end_time);
 
     match timed_annotations::get_timed_annotations(&dashboard_id, panels, start_time, end_time)
         .await
@@ -156,6 +166,10 @@ pub async fn delete_annotations(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, dashboard_id) = path.into_inner();
     let req: TimedAnnotationDelete = serde_json::from_slice(&body)?;
+    if let Err(validation_err) = req.validate() {
+        return Ok(MetaHttpResponse::bad_request(validation_err));
+    }
+
     match timed_annotations::delete_timed_annotations(&dashboard_id, req).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
@@ -225,22 +239,22 @@ pub async fn update_annotations(
     delete,
     tag = "Dashboards",
     context_path = "/api",
-    operation_id = "DeleteAnnotationPanels",
+    operation_id = "RemoveTimedAnnotationFromPanel",
     path = "/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}",
     security(
         ("Authorization" = [])
     ),
     request_body(
         content = Vec<String>,
-        description = "Timed annotation delete request payload",
+        description = "IDs of dashboard panels from which to remove the timed annotation",
         content_type = "application/json",
     ),
     responses(
         (
             status = 200,
-            description = "Timed annotation panels deleted successfully"
+            description = "Removed timed annotation from dashboard panels successfully"
         ),
-        (status = 500, description = "Failed to delete timed annotation panels", content_type = "application/json")
+        (status = 500, description = "Failed to remove timed annotation from panels", content_type = "application/json")
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}")]
@@ -250,6 +264,11 @@ pub async fn delete_annotation_panels(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, _dashboard_id, timed_annotation_id) = path.into_inner();
     let panels: Vec<String> = serde_json::from_slice(&body)?;
+    if panels.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(
+            "panels cannot be empty".to_string(),
+        ));
+    }
     match timed_annotations::delete_timed_annotation_panels(&timed_annotation_id, panels).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(e) => {
@@ -262,23 +281,4 @@ pub async fn delete_annotation_panels(
             )
         }
     }
-}
-
-fn get_query_params(
-    query: web::Query<HashMap<String, String>>,
-) -> anyhow::Result<(Option<Vec<String>>, i64, i64)> {
-    let panels = query
-        .get("panels")
-        .map(|p| p.split(',').map(|s| s.to_string()).collect());
-    let start_time = query
-        .get("start_time")
-        .ok_or_else(|| anyhow::anyhow!("start_time is required"))?
-        .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid start_time"))?;
-    let end_time = query
-        .get("end_time")
-        .ok_or_else(|| anyhow::anyhow!("end_time is required"))?
-        .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid end_time"))?;
-    Ok((panels, start_time, end_time))
 }
