@@ -1068,7 +1068,6 @@ export default defineComponent({
         this.updateViewObj.view_id,
         this.updateViewObj.view_name,
       );
-      dismiss();
       return;
     },
     downloadRangeData() {
