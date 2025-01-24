@@ -64,15 +64,12 @@ impl TimedAnnotation {
             return Err("title cannot be empty".to_string());
         }
 
-        if !self.panels.is_empty() {
-            if self.panels.iter().any(|panel| panel.is_empty()) {
-                return Err("panel cannot be empty".to_string());
-            }
+        if !self.panels.is_empty() && self.panels.iter().any(|panel| panel.is_empty()) {
+            return Err("panel cannot be empty".to_string());
         }
-        if !self.tags.is_empty() {
-            if self.tags.iter().any(|tag| tag.is_empty()) {
-                return Err("tag cannot be empty".to_string());
-            }
+
+        if !self.tags.is_empty() && self.tags.iter().any(|tag| tag.is_empty()) {
+            return Err("tag cannot be empty".to_string());
         }
 
         Ok(())
@@ -116,11 +113,12 @@ impl TimedAnnotationUpdate {
             return Err("At least one field must be present".to_string());
         }
 
-        if let Some(end_time) = self.end_time {
-            if let Some(end_time) = end_time {
-                if end_time <= self.start_time.unwrap() {
-                    return Err("end time must be greater than start time".to_string());
-                }
+        if let Some(Some(end_time)) = self.end_time {
+            let Some(start_time) = self.start_time else {
+                return Err("start time must be present when end_time is specified".to_string());
+            };
+            if end_time <= start_time {
+                return Err("end time must be greater than start time".to_string());
             }
         }
 
