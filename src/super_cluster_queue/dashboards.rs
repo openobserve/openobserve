@@ -41,9 +41,13 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         DashboardMessage::TimedAnnotationCreate {
             dashboard_id,
             timed_annotation,
-            use_given_id,
         } => {
-            table::timed_annotations::add(&dashboard_id, timed_annotation, use_given_id).await?;
+            table::timed_annotations::add(
+                &dashboard_id,
+                timed_annotation,
+                true, // always true for super cluster
+            )
+            .await?;
         }
         DashboardMessage::TimedAnnotationPut {
             dashboard_id,

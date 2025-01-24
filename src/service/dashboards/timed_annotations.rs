@@ -31,7 +31,6 @@ pub async fn create_timed_annotations(
         match super_cluster::emit_timed_annotation_create_event(
             dashboard_id,
             timed_annotation.clone(),
-            true,
         )
         .await
         {
@@ -171,13 +170,11 @@ mod super_cluster {
     pub async fn emit_timed_annotation_create_event(
         dashboard_id: &str,
         timed_annotation: TimedAnnotation,
-        use_given_id: bool,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::timed_annotations_create(
                 dashboard_id,
                 timed_annotation,
-                use_given_id,
             )
             .await
             .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
