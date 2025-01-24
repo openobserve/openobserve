@@ -42,10 +42,13 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
     }
     drop(r);
 
-    let value = match db::get(&key).await {
+    let mut value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
+    if value.is_empty() {
+        value = String::from("0");
+    }
     let (offset, node) = if value.contains(';') {
         let mut parts = value.split(';');
         let offset: i64 = parts.next().unwrap().parse().unwrap();

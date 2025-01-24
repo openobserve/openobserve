@@ -26,7 +26,7 @@ use rayon::prelude::*;
 
 use crate::service::promql::{
     binaries::scalar_binary_operations,
-    value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
+    value::{signature, InstantValue, Label, LabelsExt, Sample, Value},
 };
 
 // DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric
@@ -122,7 +122,7 @@ fn vector_or(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) -
         return Ok(Value::Vector(left.to_vec()));
     }
 
-    let lhs_sig: HashSet<Signature> = left
+    let lhs_sig: HashSet<u64> = left
         .par_iter()
         .map(|item| signature(&item.labels))
         .collect();
@@ -164,7 +164,7 @@ fn vector_unless(
         return Ok(Value::Vector(left.to_vec()));
     }
     // Generate all the signatures from the right hand.
-    let rhs_sig: HashSet<Signature> = right
+    let rhs_sig: HashSet<u64> = right
         .par_iter()
         .map(|item| signature(&item.labels))
         .collect();
@@ -200,7 +200,7 @@ fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) 
         ));
     }
 
-    let rhs_sig: HashSet<Signature> = right
+    let rhs_sig: HashSet<u64> = right
         .par_iter()
         .map(|item| signature(&item.labels))
         .collect();
@@ -214,7 +214,7 @@ fn vector_and(expr: &BinaryExpr, left: &[InstantValue], right: &[InstantValue]) 
         })
         .map(|instant| InstantValue {
             labels: instant.labels.without_metric_name(),
-            sample: instant.sample,
+            sample: instant.sample.clone(),
         })
         .collect();
 
@@ -258,7 +258,7 @@ fn vector_arithmetic_operators(
     };
 
     // Get the hash for the labels on the right
-    let rhs_sig: HashMap<Signature, InstantValue> = right
+    let rhs_sig: HashMap<u64, InstantValue> = right
         .par_iter()
         .map(|instant| {
             let signature = labels_to_compare(&instant.labels).signature();

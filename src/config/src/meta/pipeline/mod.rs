@@ -355,7 +355,7 @@ fn dfs_traversal_check(
     if !graph.contains_key(current_id) {
         // Ensure leaf nodes are Stream nodes
         if let Some(node_data) = node_map.get(current_id) {
-            if !matches!(node_data, NodeData::Stream(_)) {
+            if !matches!(node_data, NodeData::Stream(_) | NodeData::RemoteStream(_)) {
                 return Err(anyhow!("All leaf nodes must be StreamNode"));
             }
         } else {

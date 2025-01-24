@@ -64,6 +64,7 @@ impl From<AlertError> for HttpResponse {
             AlertError::ResolveStreamNameError(_) => MetaHttpResponse::internal_error(value),
             AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
             AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
+            AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
         }
     }
 }

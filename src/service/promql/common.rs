@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::sort::sort_float;
+
 use super::value::Sample;
 
 /// Calculate mean over a slice of f64s
@@ -90,7 +92,7 @@ pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
     }
 
     let mut sorted_data = data.to_vec();
-    sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted_data.sort_by(sort_float);
 
     let n = sorted_data.len();
     let index = (quantile * (n - 1) as f64) as usize;
