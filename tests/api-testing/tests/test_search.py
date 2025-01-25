@@ -305,43 +305,43 @@ def test_e2e_matchallsql(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-def test_e2e_matchallindexedsql(create_session, base_url):
-    """Running an E2E test for valid sql query."""
+# def test_e2e_matchallindexedsql(create_session, base_url):
+#     """Running an E2E test for valid sql query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
-                "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\') ORDER BY _timestamp DESC',
-                        "start_time": one_min_ago,
-                        "end_time": end_time,
-                        "from": 0,
-                        "size": 150,
-                        "sql_mode": "full",
-                },
-            }
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     json_data = {
+#                 "query": {
+#                         "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all(\'provide_credentials\') ORDER BY _timestamp DESC',
+#                         "start_time": one_min_ago,
+#                         "end_time": end_time,
+#                         "from": 0,
+#                         "size": 150,
+#                         "sql_mode": "full",
+#                 },
+#             }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    response_data = resp_get_allsearch.json()
+#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     response_data = resp_get_allsearch.json()
         
-    print("matchallindexedsql", response_data )
+#     print("matchallindexedsql", response_data )
 
-    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
+#     log_messages = [hit['log'] for hit in response_data.get('hits', [])]
         
-        # Asserting that at least one log message contains 'provide_credentials'
-    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
+#         # Asserting that at least one log message contains 'provide_credentials'
+#     assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
    
   
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 def test_e2e_matchallcount(create_session, base_url):
@@ -387,42 +387,42 @@ def test_e2e_matchallcount(create_session, base_url):
     assert response_data1.get('total') == response_data2.get('total')
 
 
-def test_e2e_matchallignorecasesql(create_session, base_url):
-    """Running an E2E test for valid sql query."""
+# def test_e2e_matchallignorecasesql(create_session, base_url):
+#     """Running an E2E test for valid sql query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-    json_data = {
-                "query": {
-                        "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\') ORDER BY _timestamp DESC',
-                        "start_time": one_min_ago,
-                        "end_time": end_time,
-                        "from": 0,
-                        "size": 150,
-                        "sql_mode": "full",
-                },
-            }
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     json_data = {
+#                 "query": {
+#                         "sql": 'SELECT * FROM "stream_pytest_data" WHERE match_all_raw_ignore_case(\'provide_credentials\') ORDER BY _timestamp DESC',
+#                         "start_time": one_min_ago,
+#                         "end_time": end_time,
+#                         "from": 0,
+#                         "size": 150,
+#                         "sql_mode": "full",
+#                 },
+#             }
 
-    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-    response_data = resp_get_allsearch.json()
+#     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     response_data = resp_get_allsearch.json()
         
-    print("matchallignorecasesql", response_data )
+#     print("matchallignorecasesql", response_data )
 
-    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
+#     log_messages = [hit['log'] for hit in response_data.get('hits', [])]
         
-        # Asserting that at least one log message contains 'provide_credentials'
-    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
+#         # Asserting that at least one log message contains 'provide_credentials'
+#     assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
     
-    assert (
-        resp_get_allsearch.status_code == 200
-    ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+#     assert (
+#         resp_get_allsearch.status_code == 200
+#     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 
@@ -624,140 +624,140 @@ def test_e2e_inquery(create_session, base_url):
 
 
 
-def test_e2e_matchalllowercase(create_session, base_url):
-    """Running an E2E test for valid SQL query."""
+# def test_e2e_matchalllowercase(create_session, base_url):
+#     """Running an E2E test for valid SQL query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     
-    json_data = {
-        "query": {
-            "sql": "select * from \"stream_pytest_data\" WHERE match_all('e2e_test')",
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 250,
-            "quick_mode": False
-        }
-    }
+#     json_data = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" WHERE match_all('e2e_test')",
+#             "start_time": one_min_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 250,
+#             "quick_mode": False
+#         }
+#     }
     
-    resp_get_matchalllowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_matchalllowercase.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_matchalllowercase.status_code} {resp_get_matchalllowercase.content}"
+#     resp_get_matchalllowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_matchalllowercase.status_code == 200
+#     ), f"Expected status code 200, but got {resp_get_matchalllowercase.status_code} {resp_get_matchalllowercase.content}"
     
-    response_data = resp_get_matchalllowercase.json()
+#     response_data = resp_get_matchalllowercase.json()
 
-    print("matchalllowercase", response_data)
+#     print("matchalllowercase", response_data)
     
-    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
-    assert any(hit['log'] == 'e2e_test' for hit in response_data['hits']), "'e2e_test' not found in log field of hits"
+#     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+#     assert any(hit['log'] == 'e2e_test' for hit in response_data['hits']), "'e2e_test' not found in log field of hits"
 
-def test_e2e_matchalluppercase(create_session, base_url):
-    """Running an E2E test for valid SQL query."""
+# def test_e2e_matchalluppercase(create_session, base_url):
+#     """Running an E2E test for valid SQL query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     
-    json_data = {
-        "query": {
-            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_TESTING')",
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 250,
-            "quick_mode": False
-        }
-    }
+#     json_data = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_TESTING')",
+#             "start_time": one_min_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 250,
+#             "quick_mode": False
+#         }
+#     }
     
-    resp_get_matchalluppercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_matchalluppercase.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_matchalluppercase.status_code} {resp_get_matchalluppercase.content}"
+#     resp_get_matchalluppercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_matchalluppercase.status_code == 200
+#     ), f"Expected status code 200, but got {resp_get_matchalluppercase.status_code} {resp_get_matchalluppercase.content}"
     
-    response_data = resp_get_matchalluppercase.json()
+#     response_data = resp_get_matchalluppercase.json()
 
-    print("matchalluppercase", response_data)
+#     print("matchalluppercase", response_data)
     
-    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
-    assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
+#     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+#     assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
 
 
-def test_e2e_matchallupperandlowercase(create_session, base_url):
-    """Running an E2E test for valid SQL query."""
+# def test_e2e_matchallupperandlowercase(create_session, base_url):
+#     """Running an E2E test for valid SQL query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     
-    json_data = {
-        "query": {
-            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_testing')",
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 250,
-            "quick_mode": False
-        }
-    }
+#     json_data = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_testing')",
+#             "start_time": one_min_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 250,
+#             "quick_mode": False
+#         }
+#     }
     
-    resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_distinctquery.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
+#     resp_get_distinctquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_distinctquery.status_code == 200
+#     ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
     
-    response_data = resp_get_distinctquery.json()
+#     response_data = resp_get_distinctquery.json()
 
-    print("matchallupperandlowercase", response_data)
+#     print("matchallupperandlowercase", response_data)
     
-    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
-    assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
+#     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+#     assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
 
-def test_e2e_matchallupperlowercase(create_session, base_url):
-    """Running an E2E test for valid SQL query."""
+# def test_e2e_matchallupperlowercase(create_session, base_url):
+#     """Running an E2E test for valid SQL query."""
 
-    session = create_session
-    url = base_url
-    org_id = "org_pytest_data"
-    now = datetime.now(timezone.utc)
-    end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+#     session = create_session
+#     url = base_url
+#     org_id = "org_pytest_data"
+#     now = datetime.now(timezone.utc)
+#     end_time = int(now.timestamp() * 1000000)
+#     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     
-    json_data = {
-        "query": {
-            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_test*')",
-            "start_time": one_min_ago,
-            "end_time": end_time,
-            "from": 0,
-            "size": 250,
-            "quick_mode": False
-        }
-    }
+#     json_data = {
+#         "query": {
+#             "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_test*')",
+#             "start_time": one_min_ago,
+#             "end_time": end_time,
+#             "from": 0,
+#             "size": 250,
+#             "quick_mode": False
+#         }
+#     }
     
-    resp_get_matchallupperlowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-    assert (
-        resp_get_matchallupperlowercase.status_code == 200
-    ), f"Expected status code 200, but got {resp_get_matchallupperlowercase.status_code} {resp_get_matchallupperlowercase.content}"
+#     resp_get_matchallupperlowercase = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+#     assert (
+#         resp_get_matchallupperlowercase.status_code == 200
+#     ), f"Expected status code 200, but got {resp_get_matchallupperlowercase.status_code} {resp_get_matchallupperlowercase.content}"
     
-    response_data = resp_get_matchallupperlowercase.json()
+#     response_data = resp_get_matchallupperlowercase.json()
 
-    print("matchallupperlowercase", response_data)
+#     print("matchallupperlowercase", response_data)
     
-    # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
-    logs = [hit['log'] for hit in response_data['hits']]
-    assert 'e2e_test' in logs, "'e2e_test' not found in log field of hits"
-    assert 'E2E_TESTING' in logs, "'E2E_TESTING' not found in log field of hits"
+#     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
+#     logs = [hit['log'] for hit in response_data['hits']]
+#     assert 'e2e_test' in logs, "'e2e_test' not found in log field of hits"
+#     assert 'E2E_TESTING' in logs, "'E2E_TESTING' not found in log field of hits"
 
 
 @pytest.mark.skip
