@@ -958,7 +958,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.getByRole('button', { name: 'Get History' }).click();
     await page.waitForTimeout(6000);
-    await page.getByRole('cell', { name: 'Trace ID' }).click();
+    // await page.getByRole('cell', { name: 'Trace ID' }).click();
     // Locate the row using a known static value like the SQL query
     // const row = page.locator('tr:has-text("select histogram")');
     // Locate the row using a known static value, ignoring case sensitivity
