@@ -101,9 +101,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    // tokio::task::spawn(async move { run_generate_job().await });
-    // tokio::task::spawn(async move { run_generate_old_data_job().await });
-    // tokio::task::spawn(async move { run_generate_downsampling_job().await });
+    tokio::task::spawn(async move { run_generate_job().await });
+    tokio::task::spawn(async move { run_generate_old_data_job().await });
+    tokio::task::spawn(async move { run_generate_downsampling_job().await });
     tokio::task::spawn(async move { run_merge(tx).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });

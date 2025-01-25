@@ -949,6 +949,24 @@ pub async fn merge_files(
         }
     };
 
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
+    }
+
     let mut new_file_keys = Vec::new();
     let mut new_file_metas = Vec::new();
     match buf {
@@ -975,7 +993,7 @@ pub async fn merge_files(
             let buf = Bytes::from(buf);
             storage::put(&new_file_key, buf.clone()).await?;
 
-            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
+            if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                 // generate inverted index
                 generate_inverted_index(
                     org_id,
@@ -1010,7 +1028,7 @@ pub async fn merge_files(
                 let buf = Bytes::from(buf);
                 storage::put(&new_file_key, buf.clone()).await?;
 
-                if cfg.common.inverted_index_enabled && stream_type.is_basic_type() {
+                if cfg.common.inverted_index_enabled && stream_type.is_basic_type() && need_index {
                     // generate inverted index
                     generate_inverted_index(
                         org_id,
@@ -1056,26 +1074,6 @@ async fn generate_inverted_index(
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-
-    // skip index generation if no fields to index
-    let latest_schema_fields = latest_schema
-        .fields()
-        .iter()
-        .map(|f| f.name())
-        .collect::<HashSet<_>>();
-    let need_index = full_text_search_fields
-        .iter()
-        .chain(index_fields.iter())
-        .any(|f| latest_schema_fields.contains(f));
-    if !need_index {
-        log::debug!(
-            "skip index generation for stream: {}/{}/{}",
-            org_id,
-            stream_type,
-            stream_name
-        );
-        return Ok(());
-    }
 
     // generate parquet format inverted index
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
