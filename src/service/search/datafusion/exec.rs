@@ -665,16 +665,16 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
     };
 
     let sql = format!(
-                "SELECT {}, date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00')) as {}, {}, {} FROM tbl GROUP BY {}, {}",
-                HASH_LABEL,
-                step,
-                cfg.common.column_timestamp,
-                TIMESTAMP_ALIAS,
-                fields.join(", "),
-                fun_str,
-                HASH_LABEL,
-                TIMESTAMP_ALIAS,
-            );
+        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
+        HASH_LABEL,
+        step,
+        cfg.common.column_timestamp,
+        TIMESTAMP_ALIAS,
+        fields.join(", "),
+        fun_str,
+        HASH_LABEL,
+        TIMESTAMP_ALIAS,
+    );
 
     let fields = schema
         .fields()
@@ -704,7 +704,6 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 fn get_first_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
-    println!("\nrecord_batch: {:?}\n", record_batch.schema());
     let timestamp = record_batch
         .column_by_name(&cfg.common.column_timestamp)
         .unwrap()
