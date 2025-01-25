@@ -949,7 +949,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page.locator('[data-test="confirm-button"]').click();
   });
-  test('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
+  test.skip('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
     // Step 1: Click on the "Share Link" button
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();

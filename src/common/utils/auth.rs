@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Debug;
+
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 use base64::Engine;
@@ -181,7 +183,7 @@ impl FromRequest for UserEmail {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AuthExtractor {
     pub auth: String,
     pub method: String,
