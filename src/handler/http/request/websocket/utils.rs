@@ -219,6 +219,13 @@ impl WsClientEvents {
     }
 }
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -229,7 +236,7 @@ pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: Box<config::meta::search::Response>,
-        time_offset: i64,
+        time_offset: TimeOffset,
         streaming_aggs: bool,
     },
     #[cfg(feature = "enterprise")]
