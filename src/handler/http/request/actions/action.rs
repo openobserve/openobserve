@@ -23,11 +23,8 @@ use futures::{StreamExt, TryStreamExt};
 use futures_util::stream::{self};
 use infra::table::action_scripts;
 use o2_enterprise::enterprise::actions::action_manager::{
-    delete_app_from_target_cluster, serve_file_from_s3, update_app_on_target_cluster,
-};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::action_manager::{
-    get_action_details, get_actions, register_app,
+    delete_app_from_target_cluster, get_action_details, get_actions, register_app,
+    serve_file_from_s3, update_app_on_target_cluster,
 };
 use svix_ksuid::Ksuid;
 
