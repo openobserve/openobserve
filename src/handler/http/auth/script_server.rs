@@ -13,12 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod auth;
-mod auth_tests;
-pub mod functions;
-pub mod http;
-pub mod jwt;
-pub mod redirect_response;
-pub mod stream;
-pub mod websocket;
-pub mod zo_logger;
+use actix_web::{dev::ServiceRequest, Error};
+use actix_web_httpauth::extractors::basic::BasicAuth;
+use config::get_config;
+
+pub async fn validator(
+    req: ServiceRequest,
+    credentials: BasicAuth,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let cfg = get_config();
+    if !credentials.user_id().eq(&cfg.auth.script_server_token) {
+        return Err((actix_web::error::ErrorUnauthorized("auth incorrect"), req));
+    }
+    Ok(req)
+}
