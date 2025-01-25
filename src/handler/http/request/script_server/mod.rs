@@ -15,7 +15,6 @@
 
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use config::meta::actions::action::DeployActionRequest;
-#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::app_deployer::APP_DEPLOYER;
 
 #[post("/{org_id}/v1/job")]
