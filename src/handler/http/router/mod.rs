@@ -48,7 +48,7 @@ pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
-fn get_cors() -> Rc<Cors> {
+pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
         .allowed_headers(vec![
@@ -518,7 +518,14 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(keys::delete)
         .service(keys::save)
         .service(keys::list)
-        .service(keys::update);
+        .service(keys::update)
+        .service(search::job::query_status)
+        .service(actions::action::get_action_from_id)
+        .service(actions::action::list_actions)
+        .service(actions::action::upload_zipped_action)
+        .service(actions::action::update_action_details)
+        .service(actions::action::serve_action_zip)
+        .service(actions::action::delete_action);
 
     svc.service(service);
 }
