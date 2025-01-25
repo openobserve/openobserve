@@ -809,7 +809,7 @@ pub async fn merge_files(
     }
 
     // get latest version of schema
-    let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -821,16 +821,16 @@ pub async fn merge_files(
         ),
         None => (Vec::new(), false),
     };
-    let schema_latest = if !defined_schema_fields.is_empty() {
-        let schema_latest = SchemaCache::new(schema_latest);
-        let schema_latest = generate_schema_for_defined_schema_fields(
-            &schema_latest,
+    let latest_schema = if !defined_schema_fields.is_empty() {
+        let latest_schema = SchemaCache::new(latest_schema);
+        let latest_schema = generate_schema_for_defined_schema_fields(
+            &latest_schema,
             &defined_schema_fields,
             need_original,
         );
-        schema_latest.schema().as_ref().clone()
+        latest_schema.schema().as_ref().clone()
     } else {
-        schema_latest
+        latest_schema
     };
 
     // read schema from parquet file and group files by schema
@@ -857,10 +857,10 @@ pub async fn merge_files(
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
-    let schema_latest = Arc::new(schema_latest.retain(all_fields));
-    let mut schema_latest_fields = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_fields.insert(field.name(), field);
+    let latest_schema = Arc::new(latest_schema.retain(all_fields));
+    let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_fields.insert(field.name(), field);
     }
 
     // generate datafusion tables
@@ -878,10 +878,10 @@ pub async fn merge_files(
             target_partitions: 2,
         };
 
-        let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
+        let diff_fields = generate_schema_diff(&schema, &latest_schema_fields)?;
         let table = match exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             true,
@@ -908,14 +908,14 @@ pub async fn merge_files(
     let start = std::time::Instant::now();
     let merge_result = {
         let stream_name = stream_name.to_string();
-        let schema_latest = schema_latest.clone();
+        let latest_schema = latest_schema.clone();
         let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 exec::merge_parquet_files(
                     stream_type,
                     &stream_name,
-                    schema_latest,
+                    latest_schema,
                     tables,
                     &bloom_filter_fields,
                     &new_file_meta,
@@ -937,7 +937,7 @@ pub async fn merge_files(
                 "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
                 e,
                 files,
-                schema_latest
+                latest_schema
             );
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
         }
@@ -1050,6 +1050,27 @@ async fn generate_inverted_index(
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
+
+    // skip index generation if no fields to index
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
+        return Ok(());
+    }
+
     // generate parquet format inverted index
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
@@ -1350,13 +1371,13 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
 // generate parquet file compact schema
 fn generate_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, anyhow::Error> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }

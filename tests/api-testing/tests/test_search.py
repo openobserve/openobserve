@@ -1,3 +1,4 @@
+
 import json
 import requests
 import pytest
@@ -330,6 +331,7 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     response_data = resp_get_allsearch.json()
         
+    print("matchallindexedsql", response_data )
 
     log_messages = [hit['log'] for hit in response_data.get('hits', [])]
         
@@ -411,6 +413,7 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
     response_data = resp_get_allsearch.json()
         
+    print("matchallignorecasesql", response_data )
 
     log_messages = [hit['log'] for hit in response_data.get('hits', [])]
         
@@ -648,6 +651,8 @@ def test_e2e_matchalllowercase(create_session, base_url):
     ), f"Expected status code 200, but got {resp_get_matchalllowercase.status_code} {resp_get_matchalllowercase.content}"
     
     response_data = resp_get_matchalllowercase.json()
+
+    print("matchalllowercase", response_data)
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     assert any(hit['log'] == 'e2e_test' for hit in response_data['hits']), "'e2e_test' not found in log field of hits"
@@ -679,6 +684,8 @@ def test_e2e_matchalluppercase(create_session, base_url):
     ), f"Expected status code 200, but got {resp_get_matchalluppercase.status_code} {resp_get_matchalluppercase.content}"
     
     response_data = resp_get_matchalluppercase.json()
+
+    print("matchalluppercase", response_data)
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
@@ -711,6 +718,8 @@ def test_e2e_matchallupperandlowercase(create_session, base_url):
     ), f"Expected status code 200, but got {resp_get_distinctquery.status_code} {resp_get_distinctquery.content}"
     
     response_data = resp_get_distinctquery.json()
+
+    print("matchallupperandlowercase", response_data)
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     assert any(hit['log'] == 'E2E_TESTING' for hit in response_data['hits']), "'E2E_TESTING' not found in log field of hits"
@@ -742,6 +751,8 @@ def test_e2e_matchallupperlowercase(create_session, base_url):
     ), f"Expected status code 200, but got {resp_get_matchallupperlowercase.status_code} {resp_get_matchallupperlowercase.content}"
     
     response_data = resp_get_matchallupperlowercase.json()
+
+    print("matchallupperlowercase", response_data)
     
     # Assertion to check if 'e2e_test' is present in the 'log' field of any hit
     logs = [hit['log'] for hit in response_data['hits']]
@@ -1095,4 +1106,3 @@ def test_e2e_floatvalue(create_session, base_url):
         resp_get_inquery.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_inquery.status_code} {resp_get_inquery.content}"
     response_data = resp_get_inquery.json()
-

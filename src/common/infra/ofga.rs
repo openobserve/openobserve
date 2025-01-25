@@ -47,6 +47,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_migrate_index_streams = false;
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
+    let mut need_action_scripts_migration = false;
     let mut existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
@@ -116,6 +117,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_6 = version_compare::Version::from("0.0.6").unwrap();
         let v0_0_8 = version_compare::Version::from("0.0.8").unwrap();
         let v0_0_9 = version_compare::Version::from("0.0.9").unwrap();
+        let v0_0_10 = version_compare::Version::from("0.0.10").unwrap();
         if meta_version > v0_0_4 && existing_model_version < v0_0_5 {
             need_migrate_index_streams = true;
         }
@@ -124,6 +126,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
         if meta_version > v0_0_8 && existing_model_version < v0_0_9 {
             need_cipher_keys_migration = true;
+        }
+        if meta_version > v0_0_9 && existing_model_version < v0_0_10 {
+            need_action_scripts_migration = true;
         }
     }
 
@@ -206,6 +211,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_cipher_keys_migration {
                         get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
+                    }
+                    if need_action_scripts_migration {
+                        get_ownership_all_org_tuple(org_name, "actions", &mut tuples);
                     }
                     if need_pipeline_migration {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);

@@ -105,7 +105,7 @@ pub async fn search(
     if schema_versions.is_empty() {
         return Ok((vec![], ScanStats::new()));
     }
-    let schema_latest_id = schema_versions.len() - 1;
+    let latest_schema_id = schema_versions.len() - 1;
 
     // get file list
     let mut files = file_list.to_vec();
@@ -179,7 +179,7 @@ pub async fn search(
                 )));
             }
         };
-        files_group.insert(schema_latest_id, files);
+        files_group.insert(latest_schema_id, files);
     } else {
         scan_stats.files = files.len() as i64;
         for file in files.iter() {
@@ -203,7 +203,7 @@ pub async fn search(
                         file.meta.max_ts
                     );
                     // HACK: use the latest version if not found in schema versions
-                    schema_latest_id
+                    latest_schema_id
                 }
             };
             let group = files_group.entry(schema_ver_id).or_default();
@@ -265,15 +265,15 @@ pub async fn search(
     };
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
@@ -294,10 +294,10 @@ pub async fn search(
             target_partitions,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
         let table = exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             sorted_by_time,

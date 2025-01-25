@@ -179,7 +179,8 @@
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
-    "language": "Language"
+    "language": "Language",
+    "actions": "Actions"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -903,7 +904,12 @@
     "owner": "Owner",
     "title": "Title",
     "createFunction": "Create Function",
-    "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline."
+    "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
+    "createdBy":"Created By",
+    "createdAt":"Created At",
+    "lastRunAt":"Last Run At",
+    "lastSuccessfulAt":"Last Successfull At",
+    "status":"Status"
   },
   "alert_templates": {
     "header": "Templates",
@@ -1036,6 +1042,21 @@
   "traces": {
     "viewLogs": "View Logs",
     "backToLogs": "Back to Logs"
+  },
+  "actions": {
+    "testAction": "Test Action",
+    "save": "Save",
+    "name": "Action Name",
+    "header": "Actions",
+    "add": "Create Action",
+    "deleteTitle": "Delete",
+    "deleteText": "Are you sure you want to delete file ?",
+    "uploadCodeZip": "Upload Code Zip",
+    "update":"Update Action",
+    "type":"Execution Type",
+    "serviceAccount":"Service Account",
+    "search": "Search Actions",
+    "timezone": "Timezone"
   },
   "cipherKey": {
     "header": "Cipher Keys",
