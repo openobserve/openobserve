@@ -581,4 +581,235 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
     ), f"Expected 404, but got {resp_ver_cipher_staticAkeylessTink.status_code} {resp_ver_cipher_staticAkeylessTink.content}"
 
 
+def test_cipher_dfcAkeyless(create_session, base_url):
+    """Running an E2E test for create, update and delete cipher_keys with DFC Akeyless cipher."""
+    session = create_session
+    org_id = "default"
+
+    # Create a unique cipher name
+    while True:
+        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        payload_dfcAkeyless = {
+            "name": cipher_name,
+            "key": {
+                "store": {
+                    "type": "akeyless",
+                    "akeyless": {
+                        "base_url": "https://api.akeyless.io",
+                        "access_id": "p-c7k3ogiwk1z9am",
+                        "auth": {
+                            "type": "access_key",
+                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "ldap": {"username": "", "password": ""}
+                        },
+                        "store": {
+                            "type": "dfc",
+                            "static_secret": "",
+                            "dfc": {"name": "SimpleD", "iv": "", "encrypted_data": "AQAAAAEIA/91MOt1+9F2zKvm7aav7CcMIAJRjiRXWp5nG4KbqByWjqUZIqbtQYtZjs+I0CcftLfoc/Vn/1knPUVXZ+KTv/O4IvnjmMFk6r9zBTaSUEAW/QtO8Ap6RCnGLGVeyh8YS/4ugm3YOwM2G9Xw/FyQWVCbrMD6JN0FetyJ4IPd+11E"}
+                        }
+                    },
+                    "local": ""
+                },
+                "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
+            },
+            "isUpdate": False
+        }
+
+    # Attempt to create the cipher key
+        resp_create_cipher_dfcAkeyless = session.post(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload_dfcAkeyless
+        )
+        print(resp_create_cipher_dfcAkeyless.content)
+
+        if resp_create_cipher_dfcAkeyless.status_code == 200:
+            break  # Exit the loop if the key is created successfully
+        elif resp_create_cipher_dfcAkeyless.status_code == 400:
+            continue  # Key already exists, try again
+        else:
+            assert False, f"Unexpected error: {resp_create_cipher_dfcAkeyless.status_code} {resp_create_cipher_dfcAkeyless.content}"
+
+    # Get created cipher key
+    resp_get_cipher_dfcAkeyless = session.get(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    )
+    print(resp_get_cipher_dfcAkeyless.content)
+
+    assert (
+        resp_get_cipher_dfcAkeyless.status_code == 200
+    ), f"Expected 200, but got {resp_get_cipher_dfcAkeyless.status_code} {resp_get_cipher_dfcAkeyless.content}"
+
+    # Update created cipher key
+    payload_up_dfcAkeyless = {
+        "name": cipher_name,
+        "key": {
+            "store": {
+                "type": "akeyless",
+                "akeyless": {
+                    "base_url": "https://api.akeyless.io",
+                    "access_id": "p-************am",
+                    "auth": {
+                        "type": "access_key",
+                        "access_key": "tT5/Q**********************************5VFc=",
+                        "ldap": {"username": "", "password": ""}
+                    },
+                    "store": {
+                        "type": "dfc",
+                        "static_secret": "",
+                        "dfc": {"name": "SimpleUpdatedDFC", "iv": "", "encrypted_data": "AQAAAAEIAbJfEaOmJpfW+2SUcfjA1sNItdO03NbtFGY+R2wMWVndCSh61yUrauCW+7KX8L1m5PZX538Yk1ME8olTCb5lauz01jJzMa8eI5fWtTMcR8GMN5NqW6/Cm6xODSWr3n6rpPaMChNDPdj6Ek+5mLjFQhsyz7Dp17fGMC7bSbA="}
+                    }
+                },
+                "local": ""
+            },
+            "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
+        },
+        "isUpdate": True
+    }
+
+    # Update the cipher key using the correct URL
+    resp_update_cipher_dfcAkeyless = session.put(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}", json=payload_up_dfcAkeyless
+    )
+    print(resp_update_cipher_dfcAkeyless.content)
+
+    assert (
+        resp_update_cipher_dfcAkeyless.status_code == 200
+    ), f"Expected 200, but got {resp_update_cipher_dfcAkeyless.status_code} {resp_update_cipher_dfcAkeyless.content}"
+
+
+
+    resp_delete_cipher_dfcAkeyless = session.delete(
+            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+        )
+    
+    print(resp_delete_cipher_dfcAkeyless.content)
+    
+    assert (
+            resp_delete_cipher_dfcAkeyless.status_code == 200
+        ), f"Expected 200, but got {resp_delete_cipher_dfcAkeyless.status_code} {resp_delete_cipher_dfcAkeyless.content}"
+
+    # Verify deleted cipher key
+    resp_ver_cipher_dfcAkeyless = session.get(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    )
+    print(resp_ver_cipher_dfcAkeyless.content)
+
+    assert (
+        resp_ver_cipher_dfcAkeyless.status_code == 404
+    ), f"Expected 404, but got {resp_ver_cipher_dfcAkeyless.status_code} {resp_ver_cipher_dfcAkeyless.content}"
+
+def test_cipher_dfcAkeylessTink(create_session, base_url):
+    """Running an E2E test for create, update and delete cipher_keys with DFC Akeyless Tink cipher."""
+    session = create_session
+    org_id = "default"
+
+    # Create a unique cipher name
+    while True:
+        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        payload_dfcAkeylessTink = {
+            "name": cipher_name,
+            "key": {
+                "store": {
+                    "type": "akeyless",
+                    "akeyless": {
+                        "base_url": "https://api.akeyless.io",
+                        "access_id": "p-c7k3ogiwk1z9am",
+                        "auth": {
+                            "type": "access_key",
+                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "ldap": {"username": "", "password": ""}
+                        },
+                        "store": {
+                            "type": "dfc",
+                            "static_secret": "",
+                            "dfc": {"name": "tinkdfc", "iv": "", "encrypted_data": "AQAAAAEIAXHhRTxldOCOdVHsr4KT8U4whBeTiU/fiBZNQrdB4EnkSz8veFm2zpxxghemMW7cTq38nxKFwmwwMQ/Q+uc/f+GgN6lJdmLYw5copxgrLaOxGy8suEll//mKDwVRp79LiL8SEn5/tOuqGTM7QNPQFiOaPbGm2VjGMV+p0laIf05/fkQVKhLB1zxZQU0aUHpbbise0m0Ew/0m5+i9QRuA4yxM35X30J79nY3WohP4B6zcGBYGSdqZ2aRJqY+CW27Uso4/5wZ0wM1OOMB0NFJ8b3kwZgF5AKOaD/v1dSjrwOiEJeCb1eqqoSMu+9Uh+GRmqHf6IiC70wYwb1RGHDk8G0o2ESEXSbht3eQUEIdl0JUfyDSKe11a81VkIka3BNx/X0Sl/P2W6Bh8i2hrsxDQSzJ/2pErqDak3r8Vc3COQZU6pix8EyBmU3af72Z+jKRv4epZaQ=="}
+                        }
+                    },
+                    "local": ""
+                },
+                "mechanism": {"type": "tink_keyset", "simple_algorithm": "aes-256-siv"}
+            },
+            "isUpdate": False
+        }
+
+    # Attempt to create the cipher key
+        resp_create_cipher_dfcAkeylessTink = session.post(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload_dfcAkeylessTink
+        )
+        print(resp_create_cipher_dfcAkeylessTink.content)
+
+        if resp_create_cipher_dfcAkeylessTink.status_code == 200:
+            break  # Exit the loop if the key is created successfully
+        elif resp_create_cipher_dfcAkeylessTink.status_code == 400:
+            continue  # Key already exists, try again
+        else:
+            assert False, f"Unexpected error: {resp_create_cipher_dfcAkeylessTink.status_code} {resp_create_cipher_dfcAkeylessTink.content}"
+
+    # Get created cipher key
+    resp_get_cipher_dfcAkeylessTink = session.get(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    )
+    print(resp_get_cipher_dfcAkeylessTink.content)
+
+    assert (
+        resp_get_cipher_dfcAkeylessTink.status_code == 200
+    ), f"Expected 200, but got {resp_get_cipher_dfcAkeylessTink.status_code} {resp_get_cipher_dfcAkeylessTink.content}"
+
+    # Update created cipher key
+    payload_up_dfcAkeylessTink = {
+        "name": cipher_name,
+        "key": {
+            "store": {
+                "type": "akeyless",
+                "akeyless": {
+                    "base_url": "https://api.akeyless.io",
+                    "access_id": "p-************am",
+                    "auth": {
+                        "type": "access_key",
+                        "access_key": "tT5/Q**********************************5VFc=",
+                        "ldap": {"username": "", "password": ""}
+                    },
+                    "store": {
+                        "type": "dfc",
+                        "static_secret": "",
+                        "dfc": {"name": "tinkUpDFC", "iv": "", "encrypted_data": "AQAAAAEIAYJ44b2lLPUHw8RwCfILD9wr/u6xDvBN7yaO65c0iUcJpxB4kepFpOq1ehqmxsZIyeeqy+n9CZXRqub6tTd1J33nxqP0LOi6n/pZT4fu2OcOE55ikgQRCxaRonwSF4GowD/49RphA8YqCjlAePRLa6xWbnOntfgkWQ+wZ1+dlAePIrY2sH43wREvMG301C+bTYgl8KnlPtf0hDqFt1CAj3/Mzd2XNEWxE+lLax6nNS+SVM2kz3DyE7kNgoropH/+rfAxUFyckDBgIQf32ud62LZhA3qaXvKowgmrxlSKPxmEiJ7hJgmJYWGcyf2EqZHcPjKXvP19lyYU64lNsRMDjna63YtrO8bsrnj6qdFWGKuUIdmOZq9pdnH50c9TpCE3CcmiBnpVOZd2jevIPe1Cn4G4ws35weNDbACDAPe7WODRUWjaWFJD1U/zRZ/Exc8mFFSvJA=="}
+                    }
+                },
+                "local": ""
+            },
+            "mechanism": {"type": "tink_keyset", "simple_algorithm": "aes-256-siv"}
+        },
+        "isUpdate": True
+    }
+
+    # Update the cipher key using the correct URL
+    resp_update_cipher_dfcAkeylessTink = session.put(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}", json=payload_up_dfcAkeylessTink
+    )
+    print(resp_update_cipher_dfcAkeylessTink.content)
+
+    assert (
+        resp_update_cipher_dfcAkeylessTink.status_code == 200
+    ), f"Expected 200, but got {resp_update_cipher_dfcAkeylessTink.status_code} {resp_update_cipher_dfcAkeylessTink.content}"
+
+
+
+    resp_delete_cipher_dfcAkeylessTink = session.delete(
+            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+        )
+    
+    print(resp_delete_cipher_dfcAkeylessTink.content)
+    
+    assert (
+            resp_delete_cipher_dfcAkeylessTink.status_code == 200
+        ), f"Expected 200, but got {resp_delete_cipher_dfcAkeylessTink.status_code} {resp_delete_cipher_dfcAkeylessTink.content}"
+
+    # Verify deleted cipher key
+    resp_ver_cipher_dfcAkeylessTink = session.get(
+        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    )
+    print(resp_ver_cipher_dfcAkeylessTink.content)
+
+    assert (
+        resp_ver_cipher_dfcAkeylessTink.status_code == 404
+    ), f"Expected 404, but got {resp_ver_cipher_dfcAkeylessTink.status_code} {resp_ver_cipher_dfcAkeylessTink.content}"
 
