@@ -233,7 +233,7 @@ test.describe("Cipher Keys for security", () => {
           // Navigate to Cipher Key Management
           await cipherKeys.navigateToCipherKeyTab();
       
-          // Add Cipher Key
+          // Add Cipher Keys 
           
           await cipherKeys.addCipherKey();
           await cipherKeys.addCipherKeyName(cipherName);
