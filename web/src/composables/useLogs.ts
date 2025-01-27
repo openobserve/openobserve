@@ -3905,7 +3905,7 @@ const useLogs = () => {
 
   const enableRefreshInterval = (value: number) => {
     return (
-      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
     );
   };
 

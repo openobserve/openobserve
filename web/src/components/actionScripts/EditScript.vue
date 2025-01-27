@@ -968,7 +968,7 @@ const validateFrequency = (value: string) => {
       !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
     ) {
       const minInterval =
-        Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
+        Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
       cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
       return;
     }
