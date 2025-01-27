@@ -61,10 +61,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
             Box::new(m20250121_120000_create_cipher_table::Migration),
             Box::new(m20250122_000001_create_table_action_scripts::Migration),
-            Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
-            Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
-            Box::new(m20250121_120000_create_cipher_table::Migration),
-            Box::new(m20250122_000001_create_table_action_scripts::Migration),
             Box::new(m20250128_000001_create_reports_table::Migration),
         ]
     }
