@@ -175,7 +175,7 @@ class="padding-none" />
             {{ t("menu.slack") }}
           </q-tooltip>
         </q-btn>
-        <q-btn round flat dense :ripple="false">
+        <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
           <div class="row items-center no-wrap">
             <q-icon
               name="help_outline"
@@ -220,7 +220,7 @@ class="padding-none" />
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item to="/about">
+              <q-item to="/about" data-test="menu-link-about-item">
                 <q-item-section>
                   <q-item-label>
                     {{ t(`menu.about`) }}
