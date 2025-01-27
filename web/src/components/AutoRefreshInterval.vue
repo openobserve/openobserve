@@ -159,7 +159,7 @@ export default defineComponent({
       },
       set(value) {
         if (isDisabled(value)) {
-          return 0;
+          emit("update:modelValue", 0);
         }
 
         emit("update:modelValue", Number(value));

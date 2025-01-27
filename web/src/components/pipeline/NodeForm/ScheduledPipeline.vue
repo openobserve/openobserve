@@ -753,7 +753,6 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
-import { c } from "vite/dist/node/types.d-aGj9QkWt";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1220,9 +1219,9 @@ const validateFrequency = () => {
 };
 
 const isValidInterval = (value: number) => {
-  return (
-    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
-  );
+  const minInterval =
+    Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+  return value >= minInterval;
 };
 
 defineExpose({
