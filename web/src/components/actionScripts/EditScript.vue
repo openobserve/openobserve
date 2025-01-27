@@ -113,13 +113,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             header-nav
           >
             <q-step
-              data-test="add-action-script-select-dashboard-step"
+              data-test="add-action-script-step-1"
               :name="1"
               title="Upload Script Zip"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
-              <div class="flex items-center o2-input">
+              <div
+                data-test="add-action-script-file-input"
+                class="flex items-center o2-input"
+              >
                 <q-file
                   v-if="!isEditingActionScript || formData.fileNameToShow == ''"
                   ref="fileInput"
@@ -158,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ formData.fileNameToShow }}
                   <q-btn
-                    data-test="edit-action-script-step1-continue-btn"
+                    data-test="add-action-script-edit-file-btn"
                     @click="editFileToUpload"
                     icon="edit"
                     no-caps
@@ -194,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
-              data-test="add-action-script-select-schedule-step"
+              data-test="add-action-script-step-2"
               :name="2"
               title="Schedule"
               icon="schedule"
@@ -205,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="font-size: 14px"
                   class="text-bold text-grey-8 q-mb-sm"
+                  data-test="add-action-script-frequency-title"
                 >
                   Frequency
                 </div>
@@ -235,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="frequency.type === 'Once'"
                   class="flex justify-start items-center q-mt-md"
+                  data-test="add-action-script-frequency-info"
                 >
                   <q-icon name="event" class="q-mr-sm" />
                   <div style="font-size: 14px">
@@ -245,13 +250,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="frequency.type === 'Repeat'">
                   <div class="flex items-center justify-start q-mt-md o2-input">
                     <div
-                      data-test="add-action-script-schedule-custom-interval-input"
+                      data-test="add-action-script-cron-input"
                       class="q-mr-sm"
                       style="padding-top: 0; width: 320px"
                     >
-                      <div class="q-mb-xs text-bold text-grey-8">
+                      <div
+                        class="q-mb-xs text-bold text-grey-8"
+                        data-test="add-action-script-cron-expression-title"
+                      >
                         {{ t("reports.cronExpression") + " *" }}
                         <q-icon
+                          data-test="add-action-script-cron-info"
                           :name="outlinedInfo"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
@@ -354,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
-              data-test="add-action-script-select-serice-account-step"
+              data-test="add-action-script-step-3"
               :name="3"
               title="Select Service Account"
               :icon="outlinedDashboard"
@@ -363,7 +372,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex items-center o2-input">
                 <div class="o2-input service-account-selector">
-                  <div class="q-mb-xs text-bold text-grey-8">
+                  <div
+                    data-test="add-action-script-service-account-title"
+                    class="q-mb-xs text-bold text-grey-8"
+                  >
                     {{ t("actions.serviceAccount") + " *" }}
                     <q-icon
                       :name="outlinedInfo"
@@ -417,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-sm"
                 />
                 <q-btn
-                  data-test="add-action-script-step4-back-btn"
+                  data-test="add-action-script-step3-back-btn"
                   @click="step = 2"
                   flat
                   color="primary"
@@ -428,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-stepper-navigation>
             </q-step>
             <q-step
-              data-test="add-action-script-select-schedule-step"
+              data-test="add-action-script-step-4"
               :name="4"
               title="Environmental Variables"
               icon="lock"
@@ -439,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(header, index) in environmentalVariables"
                 :key="header.uuid"
                 class="row q-col-gutter-sm o2-input"
+                data-test="add-action-script-env-variable"
               >
                 <div class="col-5 q-ml-none">
                   <q-input
