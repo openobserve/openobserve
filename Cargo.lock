@@ -6210,6 +6210,7 @@ dependencies = [
  "time",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "tonic 0.12.3",
  "tracing",
  "tracing-appender",
