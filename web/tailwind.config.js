@@ -7,7 +7,9 @@ export default {
   prefix: "tw-",
   content: [
     "./index.html",
-    "./src/**/*.{vue,js,ts,jsx,tsx}", // path to all template files
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+    "./src/**/*.html",
+    "./src/**/*.{js,jsx,ts,tsx,vue}",
   ],
   theme: {
     extend: {
@@ -22,4 +24,4 @@ export default {
     },
   },
   plugins: [typography],
-};
+}
