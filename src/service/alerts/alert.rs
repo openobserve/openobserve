@@ -148,6 +148,10 @@ pub enum AlertError {
     /// enterprise mode using the validator.
     #[error("PermittedAlertsValidator# {0}")]
     PermittedAlertsValidator(String),
+
+    /// Not support save destination remote pipeline for alert so far
+    #[error("Not support save destination {0} type for alert so far")]
+    NotSupportedAlertDestinationType(DestinationType),
 }
 
 pub async fn save(
@@ -281,11 +285,20 @@ async fn prepare_alert(
         return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
-        if db::alerts::destinations::get(org_id, dest).await.is_err() {
-            return Err(AlertError::AlertDestinationNotFound {
-                dest: dest.to_string(),
-            });
-        };
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if d.is_remote_pipeline() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(
+                        d.destination_type,
+                    ));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
     }
 
     // before saving alert check alert context attributes
@@ -823,6 +836,11 @@ async fn send_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
+        DestinationType::RemotePipeline => {
+            // do nothing
+            log::warn!("Remote pipeline destination not supported in send_notification");
+            Ok("".to_string())
+        }
     }
 }
 
@@ -1014,7 +1032,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
 
         resp = resp
             .replace("{org_name}", &alert.org_id)
-            .replace("{stream_type}", &alert.stream_type.to_string())
+            .replace("{stream_type}", alert.stream_type.as_str())
             .replace("{stream_name}", &alert.stream_name)
             .replace("{alert_name}", &alert.name)
             .replace("{alert_type}", alert_type)
@@ -1232,7 +1250,7 @@ async fn process_dest_template(
 
     let mut resp = tpl
         .replace("{org_name}", &alert.org_id)
-        .replace("{stream_type}", &alert.stream_type.to_string())
+        .replace("{stream_type}", alert.stream_type.as_str())
         .replace("{stream_name}", &alert.stream_name)
         .replace("{alert_name}", &alert.name)
         .replace("{alert_type}", alert_type)

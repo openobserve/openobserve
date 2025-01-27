@@ -54,8 +54,12 @@ pub async fn is_digest_different(
     local_file_path: &str,
     remote_sha256sum_path: &str,
 ) -> Result<bool, anyhow::Error> {
-    let response = reqwest::get(remote_sha256sum_path).await?;
-    let remote_file_sha = response.text().await?;
+    let remote_file_sha = if !remote_sha256sum_path.to_lowercase().starts_with("http") {
+        remote_sha256sum_path.to_string()
+    } else {
+        let response = reqwest::get(remote_sha256sum_path).await?;
+        response.text().await?
+    };
     let local_file_sha = try_digest(Path::new(local_file_path)).unwrap_or_default();
     Ok(remote_file_sha.trim() != local_file_sha.trim())
 }

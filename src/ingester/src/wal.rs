@@ -47,7 +47,7 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     let cfg = config::get_config();
     // 1. get all .lock files
-    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join("logs");
+    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(crate::WAL_DIR_DEFAULT_PREFIX);
     // create wal dir if not exists
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),

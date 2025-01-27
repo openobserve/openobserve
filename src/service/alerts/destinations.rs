@@ -149,6 +149,17 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     }
     drop(cacher);
 
+    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
+        for pl in pls {
+            if pl.contains_remote_destination(name) {
+                return Err((
+                    http::StatusCode::CONFLICT,
+                    anyhow::anyhow!("Destination is currently used by pipeline {}", pl.name),
+                ));
+            }
+        }
+    }
+
     db::alerts::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
     Ok(())

@@ -511,10 +511,12 @@ export default defineComponent({
                   variable.isLoading === false &&
                   variable.isVariableLoadingPending === false
                 ) {
+                  if (variable.type === "dynamic_filters") {
+                    // ignore dynamic filters
+                  }
                   // replace it's value in the query if it is dependent on query context
-
-                  if (Array.isArray(variable.value)) {
-                    const arrayValues = variable.value
+                  else if (Array.isArray(variable?.value)) {
+                    const arrayValues = variable?.value
                       .map((value: any) => {
                         return `'${escapeSingleQuotes(value)}'`;
                       })

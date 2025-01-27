@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <div v-else style="display: flex; flex-direction: row">
               <input
+                :class="store.state.theme === 'dark' ? 'bg-grey-10' : ''"
                 v-model="editTabObj.data.name"
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"
@@ -380,6 +381,7 @@ export default defineComponent({
       selectedTabIdToEdit,
       currentDashboardData,
       refreshRequired,
+      store
     };
   },
 });

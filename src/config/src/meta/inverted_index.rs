@@ -61,7 +61,7 @@ impl std::fmt::Display for InvertedIndexTantivyMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InvertedIndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,

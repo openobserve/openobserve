@@ -186,7 +186,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &stream_name,
                         TS_PARSE_FAILED,
                     ])
@@ -226,7 +226,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &stream_name,
                         TRANSFORM_FAILED,
                     ])
@@ -280,7 +280,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                                 metrics::INGEST_ERRORS
                                     .with_label_values(&[
                                         org_id,
-                                        StreamType::Logs.to_string().as_str(),
+                                        StreamType::Logs.as_str(),
                                         &stream_name,
                                         TS_PARSE_FAILED,
                                     ])
@@ -351,7 +351,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -360,7 +360,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .inc();
 

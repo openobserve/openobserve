@@ -22,10 +22,11 @@ use arrow::{array::Int64Array, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use config::utils::record_batch_ext::{convert_json_to_record_batch, RecordBatchExt};
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::errors::*;
-
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub stream: Arc<str>,
     pub schema: Option<Arc<Schema>>,

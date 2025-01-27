@@ -74,7 +74,10 @@
     "unsavedTitle": "Unsaved Changes",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
     "cancelTitle": "Cancel Changes",
-    "cancelMessage": "Are you sure you want to cancel the changes?"
+    "cancelMessage": "Are you sure you want to cancel the changes?",
+    "back": "Back",
+    "save": "Save",
+    "update": "Update"
   },
   "search": {
     "metrics": "Metrics",
@@ -176,7 +179,8 @@
     "iam": "IAM",
     "report": "Reports",
     "pipeline": "Pipelines",
-    "language": "Language"
+    "language": "Language",
+    "actions": "Actions"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -732,7 +736,8 @@
     "trellisLayout": "Trellis Layout",
     "numOfColumns": "Columns per Row",
     "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout",
-    "communityDashboard": "Community Dashboards"
+    "communityDashboard": "Community Dashboards",
+    "trellisTimeShiftTooltip": "Trellis is not supported for Time Shift Comparison (Comparison Against). Please remove Time Shift Comparison to enable Trellis Layout"
   },
   "panel": {
     "header": "Panel",
@@ -900,7 +905,12 @@
     "owner": "Owner",
     "title": "Title",
     "createFunction": "Create Function",
-    "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline."
+    "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
+    "createdBy":"Created By",
+    "createdAt":"Created At",
+    "lastRunAt":"Last Run At",
+    "lastSuccessfulAt":"Last Successfull At",
+    "status":"Status"
   },
   "alert_templates": {
     "header": "Templates",
@@ -920,7 +930,7 @@
     "body": "Body"
   },
   "alert_destinations": {
-    "header": "Destinations",
+    "header": "Alert Destinations",
     "add": "Add Destination",
     "edit": "Edit",
     "search": "Search destination",
@@ -938,6 +948,9 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify"
+  },
+  "pipeline_destinations": {
+    "header":"Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",
@@ -981,7 +994,8 @@
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
-    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "cipherKeys": "Cipher Keys"
   },
   "reports": {
     "header": "Reports",
@@ -1029,5 +1043,47 @@
   "traces": {
     "viewLogs": "View Logs",
     "backToLogs": "Back to Logs"
+  },
+  "actions": {
+    "testAction": "Test Action",
+    "save": "Save",
+    "name": "Action Name",
+    "header": "Actions",
+    "add": "Create Action",
+    "deleteTitle": "Delete",
+    "deleteText": "Are you sure you want to delete file ?",
+    "uploadCodeZip": "Upload Code Zip",
+    "update":"Update Action",
+    "type":"Execution Type",
+    "serviceAccount":"Service Account",
+    "search": "Search Actions",
+    "timezone": "Timezone"
+  },
+  "cipherKey": {
+    "header": "Cipher Keys",
+    "add": "Add Cipher Key",
+    "search": "Search Cipher Key",
+    "update": "Update Cipher Key",
+    "name": "Name",
+    "type": "Type",
+    "step1": "Key Store Details",
+    "step2": "Encryption Mechanism",
+    "secret": "Secret",
+    "baseURL": "Base URL",
+    "accessId": "Access ID",
+    "authenticationType": "Authentication",
+    "accessKey": "Access Key",
+    "ldapUsername": "LDAP Username",
+    "ldapPassword": "LDAP Password",
+    "secretType": "Secret Type",
+    "staticSecretName": "Name",
+    "dfcName": "DFC Name",
+    "dfcIV": "DFC IV",
+    "dfcEncryptedData": "DFC Encrypted Data",
+    "providerType": "Type",
+    "algorithm": "Algorithm",
+    "storeType": "Store Type",
+    "mechanismType": "Mechanism Type",
+    "actions": "Actions"
   }
 }

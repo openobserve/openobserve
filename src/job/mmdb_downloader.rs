@@ -105,7 +105,6 @@ async fn run_download_files() {
         update_maxmind_table(&asn_fname).await;
         update_maxmind_table(&city_fname).await;
         update_maxmind_client().await;
-        log::info!("Maxmind client initialized");
         Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
     } else {
         if download_asn_files {

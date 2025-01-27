@@ -52,12 +52,12 @@ pub mod enterprise_utils {
 
         // If the user is external, check permissions
         if user.is_external {
-            let stream_type_str = stream_type.to_string();
+            let stream_type_str = stream_type.as_str();
             let o2_type = format!(
                 "{}:{}",
                 OFGA_MODELS
-                    .get(stream_type_str.as_str())
-                    .map_or(stream_type_str.as_str(), |model| model.key),
+                    .get(stream_type_str)
+                    .map_or(stream_type_str, |model| model.key),
                 stream_name
             );
 
@@ -219,6 +219,13 @@ impl WsClientEvents {
     }
 }
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -229,7 +236,7 @@ pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: Box<config::meta::search::Response>,
-        time_offset: i64,
+        time_offset: TimeOffset,
         streaming_aggs: bool,
     },
     #[cfg(feature = "enterprise")]

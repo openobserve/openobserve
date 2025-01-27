@@ -88,7 +88,7 @@ impl RemoteScanNodes {
             index_condition,
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
             match_all_keys: self.match_all_keys.clone(),
-            index_optimize_mode: self.index_optimize_mode.map(|x| x.into()),
+            index_optimize_mode: self.index_optimize_mode.clone().map(|x| x.into()),
         };
 
         let super_cluster_info = SuperClusterInfo {

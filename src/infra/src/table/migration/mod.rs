@@ -38,6 +38,8 @@ mod m20250115_132500_populate_templates_table;
 mod m20250115_133700_populate_destinations_table;
 mod m20250115_153005_delete_metas_destinations;
 mod m20250115_172300_delete_metas_templates;
+mod m20250121_120000_create_cipher_table;
+mod m20250122_000001_create_table_action_scripts;
 
 pub struct Migrator;
 
@@ -68,6 +70,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250115_102300_create_destinations_table::Migration),
             Box::new(m20250115_133700_populate_destinations_table::Migration),
             // Box::new(m20250115_153005_delete_metas_destinations::Migration),
+            Box::new(m20250121_120000_create_cipher_table::Migration),
+            Box::new(m20250122_000001_create_table_action_scripts::Migration),
         ]
     }
 }

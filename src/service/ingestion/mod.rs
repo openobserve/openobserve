@@ -119,7 +119,7 @@ pub fn apply_vrl_fn(
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &format!("{:?}", stream_name),
                         TRANSFORM_FAILED,
                     ])
@@ -136,7 +136,7 @@ pub fn apply_vrl_fn(
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     org_id,
-                    StreamType::Logs.to_string().as_str(),
+                    StreamType::Logs.as_str(),
                     &format!("{:?}", stream_name),
                     TRANSFORM_FAILED,
                 ])

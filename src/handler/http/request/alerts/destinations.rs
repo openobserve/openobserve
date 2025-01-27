@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 
@@ -139,6 +139,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("dst_type" = Option<DestinationType>, Query, description = "Destination type filter, default is all but not include remote_pipeline type"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
@@ -148,15 +149,22 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
 #[get("/{org_id}/alerts/destinations")]
 async fn list_destinations(
     path: web::Path<String>,
-    _req: HttpRequest,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let dst_type = query.get("dst_type").unwrap_or(&"".to_string()).to_string();
+    let dst_type = if dst_type.is_empty() {
+        None
+    } else {
+        Some(DestinationType::from(dst_type.as_str()))
+    };
 
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
+        let user_id = req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
             user_id.to_str().unwrap(),

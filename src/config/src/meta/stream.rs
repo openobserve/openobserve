@@ -64,7 +64,7 @@ impl StreamType {
         )
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
@@ -118,6 +118,13 @@ pub struct StreamParams {
     pub org_id: faststr::FastStr,
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(default)]
+pub struct RemoteStreamParams {
+    pub org_id: faststr::FastStr,
+    pub destination_name: faststr::FastStr,
 }
 
 impl Default for StreamParams {

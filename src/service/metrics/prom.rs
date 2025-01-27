@@ -161,7 +161,7 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 "",
-                &StreamType::Metrics.to_string(),
+                StreamType::Metrics.as_str(),
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -170,7 +170,7 @@ pub async fn remote_write(
                 "200",
                 org_id,
                 "",
-                &StreamType::Metrics.to_string(),
+                StreamType::Metrics.as_str(),
             ])
             .inc();
         return Ok(());
@@ -265,7 +265,7 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         "",
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -274,7 +274,7 @@ pub async fn remote_write(
                         "200",
                         org_id,
                         "",
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                     ])
                     .inc();
                 return Ok(());
@@ -411,7 +411,7 @@ pub async fn remote_write(
         for (mut value, timestamp) in json_data {
             let val_map = value.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
-            val_map.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
                 cfg.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
@@ -527,7 +527,7 @@ pub async fn remote_write(
 
         // write to file
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
@@ -560,7 +560,7 @@ pub async fn remote_write(
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -569,7 +569,7 @@ pub async fn remote_write(
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 

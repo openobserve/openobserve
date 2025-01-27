@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.1"
+version = "0.14.3"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -66,6 +66,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
+async-walkdir.workspace = true
 awc = { version = "3.5", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -154,6 +155,7 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+tempfile.workspace = true
 uaparser = "0.6.1"
 url.workspace = true
 utoipa.workspace = true
@@ -169,8 +171,11 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
+wal.workspace = true
+tokio-util = "0.7.13"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -204,6 +209,7 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
@@ -304,7 +310,7 @@ sea-orm-migration = { version = "1.1.0", features = [
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
 sha256 = "1.4.0"
 snafu = "0.7.5"
@@ -363,3 +369,4 @@ utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "3d16e345232bb3cb9b104ee6461e9dd0b4c361da" }
 vrl = { version = "0.19.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"
+zip = "2.2.2"
