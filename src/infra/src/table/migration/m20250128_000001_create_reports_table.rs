@@ -164,12 +164,14 @@ fn create_report_dashboards_table_statement() -> TableCreateStatement {
                     .name(REPORT_DASHBOARDS_REPORTS_FK)
                     .from(ReportDashboards::Table, ReportDashboards::ReportId)
                     .to(Reports::Table, Reports::Id)
+                    .on_delete(ForeignKeyAction::Cascade)
         ) 
         .foreign_key(
             sea_query::ForeignKey::create()
                     .name(REPORT_DASHBOARDS_DASHBOARDS_FK)
                     .from(ReportDashboards::Table, ReportDashboards::DashboardId)
                     .to(Dashboards::Table, Dashboards::Id)
+                    .on_delete(ForeignKeyAction::Cascade)
         )
         .to_owned()
 }
