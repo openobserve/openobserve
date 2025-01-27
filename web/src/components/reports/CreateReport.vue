@@ -1468,19 +1468,23 @@ const validateReportData = async () => {
 
 const validateFrequency = () => {
   cronError.value = "";
-
   if (frequency.value.type === "cron") {
-    const intervalInSecs = getCronIntervalDifferenceInSeconds(
-      frequency.value.cron,
-    );
+    try {
+      const intervalInSecs = getCronIntervalDifferenceInSeconds(
+        frequency.value.cron,
+      );
 
-    if (
-      typeof intervalInSecs === "number" &&
-      !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-    ) {
-      const minInterval =
-        Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
-      cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+      if (
+        typeof intervalInSecs === "number" &&
+        !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
+      ) {
+        const minInterval =
+          Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
+        cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+        return;
+      }
+    } catch (err) {
+      cronError.value = "Invalid cron expression!";
       return;
     }
   }

@@ -1028,7 +1028,7 @@ export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
     // Calculate the difference in milliseconds
     return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
   } catch (err) {
-    return null;
+    throw new Error("Invalid cron expression");
   }
 }
 

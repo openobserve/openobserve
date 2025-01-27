@@ -960,16 +960,20 @@ const validateActionScriptData = async () => {
 const validateFrequency = (value: string) => {
   cronError.value = "";
 
-  const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
+  try {
+    const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
 
-  if (
-    typeof intervalInSecs === "number" &&
-    !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-  ) {
-    const minInterval =
-      Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
-    cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
-    return;
+    if (
+      typeof intervalInSecs === "number" &&
+      !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
+    ) {
+      const minInterval =
+        Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
+      cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return;
+    }
+  } catch (err) {
+    cronError.value = "Invalid cron expression!";
   }
 };
 
