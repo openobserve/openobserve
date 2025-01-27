@@ -5,11 +5,15 @@ import { expect } from '@playwright/test';
 export class AboutPage {
     constructor(page) {
         this.page = page;
+        this.helpPageMenu = page.locator('[data-test="menu-link-help-item"]');
         this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
+        // this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
 
     }
+    async clickHelpMenu() {
+        await this.helpPageMenu.click();
+    }
     async gotoAboutPage() {
-
         await this.aboutPageMenu.click();
 
     }

@@ -175,7 +175,7 @@ class="padding-none" />
             {{ t("menu.slack") }}
           </q-tooltip>
         </q-btn>
-        <q-btn round flat dense :ripple="false">
+        <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
           <div class="row items-center no-wrap">
             <q-icon
               name="help_outline"
