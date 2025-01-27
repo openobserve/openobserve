@@ -1026,7 +1026,8 @@ onBeforeMount(async () => {
         if (err.response.status != 403) {
           q.notify({
             type: "negative",
-            message: err?.data?.message || "Error while fetching report!",
+            message:
+              err.response?.data?.message || "Error while fetching report!",
             timeout: 4000,
           });
         }
