@@ -73,8 +73,6 @@ export const useAnnotationsData = (
   };
 
   const editAnnotation = (annotation: any) => {
-    console.log("Editing annotation:", annotation);
-
     annotationToAddEdit.value = annotation;
     showAddAnnotationDialog();
   };
@@ -133,8 +131,6 @@ export const useAnnotationsData = (
           }));
 
         allPanels.push(...tabPanels);
-      } else {
-        console.log(`Tab "${tabName}" has no panels`);
       }
     });
 
@@ -148,16 +144,6 @@ export const useAnnotationsData = (
       const processedPanels = processTabPanels(dashboardData);
 
       panelsList.value = processedPanels;
-
-      console.log(
-        "Processed Panels:",
-        processedPanels.map((p) => ({
-          id: p.id,
-          title: p.title,
-          tabName: p.tabName,
-          type: p.type,
-        })),
-      );
     } catch (error) {
       console.error("Error fetching panels:", error);
       panelsList.value = [];

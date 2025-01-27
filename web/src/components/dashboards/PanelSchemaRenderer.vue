@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseleave="hidePopupsAndOverlays"
       >
         <div
-          class=" q-px-sm q-py-xs"
+          class="q-px-sm q-py-xs"
           style="
             display: flex;
             flex-direction: row;
@@ -478,7 +478,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      console.log("panelsList", panelsList.value);
       panelsList.value = panelsList.value;
     });
 
@@ -783,8 +782,6 @@ export default defineComponent({
       ) {
         const description = params?.data?.annotationDetails?.text;
         if (description) {
-          console.log("annotationDetails", params?.data?.annotationDetails);
-
           selectedAnnotationData.value = params?.data?.annotationDetails;
           // temporarily show the popup to calculate its dimensions
           annotationPopupRef.value.style.display = "block";
@@ -802,10 +799,6 @@ export default defineComponent({
           annotationPopupRef.value.style.top = offSetValues.top + 5 + "px";
           annotationPopupRef.value.style.left = offSetValues.left + 5 + "px";
           if (selectedAnnotationData.value) {
-            console.log(
-              "annotationDetails selectedAnnotationData",
-              selectedAnnotationData.value,
-            );
             annotationPopupRef.value.style.display = "block";
           } else {
             hidePopupsAndOverlays();
