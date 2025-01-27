@@ -111,10 +111,14 @@ pub async fn get_with_template(
     name: &str,
 ) -> Result<(Destination, Template), DestinationError> {
     let dest = get(org_id, name).await?;
-    let template = db::alerts::templates::get(org_id, name)
-        .await
-        .map_err(|_| DestinationError::TemplateNotFound)?;
-    Ok((dest, template))
+    if let Module::Alert { template, .. } = &dest.module {
+        let template = db::alerts::templates::get(org_id, template)
+            .await
+            .map_err(|_| DestinationError::TemplateNotFound)?;
+        Ok((dest, template))
+    } else {
+        Err(DestinationError::TemplateNotFound)
+    }
 }
 
 pub async fn list(

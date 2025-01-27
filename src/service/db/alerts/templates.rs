@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     common::{
-        infra::config::{ALERTS_DESTINATIONS, ALERTS_TEMPLATES},
+        infra::config::{ALERTS_TEMPLATES, DESTINATIONS},
         meta::organization::DEFAULT_ORG,
     },
     service::db,
@@ -99,7 +99,7 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
-    for dest in ALERTS_DESTINATIONS.iter() {
+    for dest in DESTINATIONS.iter() {
         let d = dest.value();
         if (dest.key().starts_with(org_id) || dest.key().starts_with(DEFAULT_ORG))
             && matches!(&d.module, Module::Alert { template, .. } if template.eq(name))

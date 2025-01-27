@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(
             &create_destinations_template_id_destination_id_idx_stmnt()
                 .to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "destinations_template_id_destination_id_idx" ON "destinations" ("template_id", "id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "destinations_id_org_name_idx" ON "destinations" ("id", "name", "org")"#
         );
     }
 
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(
             &create_destinations_template_id_destination_id_idx_stmnt()
                 .to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `destinations_template_id_destination_id_idx` ON `destinations` (`template_id`, `id`)"#
+            r#"CREATE UNIQUE INDEX `destinations_id_org_name_idx` ON `destinations` (`id`, `name`, `org`)"#
         );
     }
 
@@ -166,7 +166,7 @@ mod tests {
         assert_eq!(
             &create_destinations_template_id_destination_id_idx_stmnt()
                 .to_string(SqliteQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "destinations_template_id_destination_id_idx" ON "destinations" ("template_id", "id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "destinations_id_org_name_idx" ON "destinations" ("id", "name", "org")"#
         );
     }
 }

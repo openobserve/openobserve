@@ -67,7 +67,7 @@ pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<Alert>>> = Lazy::new(Defau
 pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, db_scheduler::Trigger>> =
     Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
-pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
+pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);

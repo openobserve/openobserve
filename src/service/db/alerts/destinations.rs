@@ -19,7 +19,7 @@ use config::meta::destinations::Destination;
 use infra::table;
 use itertools::Itertools;
 
-use crate::{common::infra::config::ALERTS_DESTINATIONS, service::db};
+use crate::{common::infra::config::DESTINATIONS, service::db};
 
 // db cache watcher prefix
 const DESTINATION_WATCHER_PREFIX: &str = "/destinations/";
@@ -62,7 +62,7 @@ pub enum DestinationError {
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
     let map_key = format!("{org_id}/{name}");
-    if let Some(val) = ALERTS_DESTINATIONS.get(&map_key) {
+    if let Some(val) = DESTINATIONS.get(&map_key) {
         return Ok(val.value().clone());
     }
     table::destinations::get(org_id, name)
@@ -130,7 +130,7 @@ pub async fn list(
     org_id: &str,
     module: Option<&str>,
 ) -> Result<Vec<Destination>, DestinationError> {
-    let cache = ALERTS_DESTINATIONS.clone();
+    let cache = DESTINATIONS.clone();
     if !cache.is_empty() {
         let org_filter = format!("{org_id}/");
         return Ok(cache
@@ -191,11 +191,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                ALERTS_DESTINATIONS.insert(format!("{org_id}/{name}"), item_value);
+                DESTINATIONS.insert(format!("{org_id}/{name}"), item_value);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(DESTINATION_WATCHER_PREFIX).unwrap();
-                ALERTS_DESTINATIONS.remove(item_key);
+                DESTINATIONS.remove(item_key);
             }
             db::Event::Empty => {}
         }
@@ -207,9 +207,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let all_dest = table::destinations::list_all().await?;
     for dest in all_dest {
         let item_key = format!("{}/{}", dest.org_id, dest.name);
-        ALERTS_DESTINATIONS.insert(item_key, dest);
+        DESTINATIONS.insert(item_key, dest);
     }
-    log::info!("{} destinations Cached", ALERTS_DESTINATIONS.len());
+    log::info!("{} destinations Cached", DESTINATIONS.len());
     Ok(())
 }
 
