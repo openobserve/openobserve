@@ -142,7 +142,7 @@ pub async fn merge_parquet_files(
             cfg.common.column_timestamp
         )
     };
-    log::info!("merge_parquet_files sql: {}", sql);
+    log::debug!("merge_parquet_files sql: {}", sql);
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -202,6 +202,8 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let sql = generate_downsampling_sql(&schema, rule);
 
+    log::debug!("merge_parquet_files_with_downsampling sql: {}", sql);
+
     // create datafusion context
     let sort_by_timestamp_desc = true;
     let target_partitions = cfg.limit.cpu_num;
@@ -247,13 +249,16 @@ pub async fn merge_parquet_files_with_downsampling(
                         new_parquet_writer_without_metadata(&mut buf, &schema, bloom_filter_fields);
                 }
                 if let Err(e) = writer.write(&batch).await {
-                    log::error!("merge_parquet_files write Error: {}", e);
+                    log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
                     return Err(e.into());
                 }
             }
             Ok(None) => break,
             Err(e) => {
-                log::error!("merge_parquet_files execute stream Error: {}", e);
+                log::error!(
+                    "merge_parquet_files_with_downsampling execute stream Error: {}",
+                    e
+                );
                 return Err(e);
             }
         }
@@ -270,7 +275,7 @@ pub async fn merge_parquet_files_with_downsampling(
     drop(ctx);
 
     log::debug!(
-        "merge_parquet_files took {} ms",
+        "merge_parquet_files_with_downsampling took {} ms",
         start.elapsed().as_millis()
     );
 

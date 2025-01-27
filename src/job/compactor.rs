@@ -180,7 +180,7 @@ async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
             get_config().compact.downsampling_interval,
         ))
         .await;
-        log::info!("[COMPACTOR] Running generate downsampling job");
+        log::debug!("[COMPACTOR] Running generate downsampling job");
         if let Err(e) = compact::run_generate_downsampling_job().await {
             log::error!("[COMPACTOR] run generate downsampling job error: {e}");
         }
