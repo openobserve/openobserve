@@ -85,24 +85,14 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         .super_cluster
         .enabled
     {
-        match config::utils::json::to_vec(&saved) {
-            Err(e) => {
-                log::error!(
-                    "[Destination] error serializing the destination for super_cluster event: {}",
-                    e
-                );
-            }
-            Ok(value_vec) => {
-                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
-                    &event_key,
-                    value_vec.into(),
-                )
-                .await
-                {
-                    log::error!("[Destination] error triggering super cluster event to add destination to cache: {e}");
-                }
-            }
-        };
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
+            &event_key,
+            saved.clone(),
+        )
+        .await
+        {
+            log::error!("[Destination] error triggering super cluster event to add destination to cache: {e}");
+        }
     }
 
     Ok(saved)
@@ -124,8 +114,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         .super_cluster
         .enabled
     {
-        if let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::destinations_delete(&event_key).await
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
+            &event_key, org_id, name,
+        )
+        .await
         {
             log::error!("[Destination] error triggering super cluster event to remove destination from cache: {e}");
         }

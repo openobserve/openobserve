@@ -83,24 +83,16 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
         .super_cluster
         .enabled
     {
-        match config::utils::json::to_vec(&saved) {
-            Err(e) => {
-                log::error!(
-                    "[Template] error serializing the template for super_cluster event: {}",
-                    e
-                );
-            }
-            Ok(value_vec) => {
-                if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
-                    &event_key,
-                    value_vec.into(),
-                )
-                .await
-                {
-                    log::error!("[Template] error triggering super cluster event to add template to cache: {e}");
-                }
-            }
-        };
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
+            &event_key,
+            saved.clone(),
+        )
+        .await
+        {
+            log::error!(
+                "[Template] error triggering super cluster event to add template to cache: {e}"
+            );
+        }
     }
 
     Ok(saved)
@@ -131,8 +123,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
         .super_cluster
         .enabled
     {
-        if let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::templates_delete(&event_key).await
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
+            &event_key, org_id, name,
+        )
+        .await
         {
             log::error!("[Template] error triggering super cluster event to remove template from cache: {e}");
         }
