@@ -39,7 +39,7 @@ use crate::{
         cluster,
         promql::{DownsamplingRule, Function},
     },
-    utils::{cgroup, file::get_file_meta},
+    utils::{cgroup, file::get_file_meta, time::parse_milliseconds},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -198,10 +198,11 @@ pub static METRICS_DOWNSAMPLING_RULES: Lazy<Vec<DownsamplingRule>> = Lazy::new(|
         .metrics_downsampling_rules
         .split(',')
         .filter_map(|s| {
+            let s = s.trim();
             if s.is_empty() {
                 return None;
             }
-            let (rule, function, offest, step) = s.split(':').collect_tuple().unwrap();
+            let (rule, function, offset, step) = s.split(':').collect_tuple().unwrap();
             let rule = if rule.is_empty() {
                 None
             } else {
@@ -215,7 +216,7 @@ pub static METRICS_DOWNSAMPLING_RULES: Lazy<Vec<DownsamplingRule>> = Lazy::new(|
             Some(DownsamplingRule {
                 rule,
                 function,
-                offest: get_seconds_from_string(offest),
+                offset: get_seconds_from_string(offset),
                 step: get_seconds_from_string(step),
             })
         })
@@ -2285,37 +2286,51 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // if cfg.metrics_downsampling_rules is not empty, then run downsampling job
     // 1. split cfg.metrics_downsampling_rules by comma to get each rules
-    // 2. split each rule by : to get regex:function:interval:offest
+    // 2. split each rule by : to get pattern:function:interval:offest
     if !cfg.compact.metrics_downsampling_rules.is_empty() {
-        let rules = cfg.compact.metrics_downsampling_rules.split(',');
+        let rules = cfg
+            .compact
+            .metrics_downsampling_rules
+            .split(',')
+            .map(|s| s.trim())
+            .collect::<Vec<&str>>();
         for rule in rules {
-            let (regex, function, offest, step) = rule
-                .split(':')
-                .collect_tuple()
-                .expect("invalid downsampling rule");
+            let (regex, function, offset, step) = rule.split(':').collect_tuple().expect(
+                "invalid downsampling rule, downsampling rule must be pattern:function:offest:step",
+            );
             if !regex.is_empty() {
                 let _ = Regex::new(regex).expect("invalid regex for downsampling");
             }
             if !function.is_empty() {
                 let _ = Function::from(function);
             }
-            if offest.is_empty() {
-                return Err(anyhow::anyhow!("offest is required for downsampling"));
+            if offset.len() <= 1 {
+                return Err(anyhow::anyhow!("offset is required for downsampling"));
             }
-            if step.is_empty() {
+            if step.len() <= 1 {
                 return Err(anyhow::anyhow!("step is required for downsampling"));
             }
-            // to do check the interval and offset is valid
-            let offest = get_seconds_from_string(offest);
+            // check the interval and offset is valid
+            let offset = get_seconds_from_string(offset);
             let step = get_seconds_from_string(step);
-            if step > 86400 || 86400 % step != 0 {
+            if offset < 86400 {
                 return Err(anyhow::anyhow!(
-                    "downsampling step must be a multiple of 24h and less than 24h"
+                    "downsampling offset must be greater than or equal to 1 day"
                 ));
             }
-            if offest % step != 0 {
+            if offset % 86400 != 0 {
                 return Err(anyhow::anyhow!(
-                    "downsampling offest must be a multiple of step"
+                    "downsampling offset must be a multiple of day"
+                ));
+            }
+            if step > 86400 || 86400 % step != 0 {
+                return Err(anyhow::anyhow!(
+                    "downsampling step must be divisible by 1 day and less than or equal to 1 day"
+                ));
+            }
+            if offset % step != 0 {
+                return Err(anyhow::anyhow!(
+                    "downsampling offset must be a multiple of step"
                 ));
             }
         }
@@ -2437,18 +2452,10 @@ pub fn get_cluster_name() -> String {
 }
 
 fn get_seconds_from_string(s: &str) -> i64 {
-    let (num, unit) = s.split_at(s.len() - 1);
-    let num = num.parse::<i64>().unwrap();
-    match unit {
-        "m" => num * 60,
-        "h" => num * 3600,
-        "d" => num * 86400,
-        "s" => num,
-        _ => panic!(
-            "invalid unit for downsampling: {}, only support s(second), m(minute), h(hour), d(day)",
-            unit
-        ),
-    }
+    let milliseconds = parse_milliseconds(s).expect(
+        "invalid time format for downsampling: only support s(second), m(minute), h(hour), d(day)",
+    );
+    milliseconds as i64 / 1000
 }
 
 fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {

@@ -262,7 +262,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                         &org_id,
                         stream_type,
                         &stream_name,
-                        (rule.offest, rule.step),
+                        (rule.offset, rule.step),
                     )
                     .await
                     {
@@ -271,7 +271,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                             &org_id,
                             stream_type,
                             &stream_name,
-                            (rule.offest, rule.step),
+                            (rule.offset, rule.step),
                             offset,
                             None,
                         )
@@ -296,24 +296,22 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if rule.is_match(&stream_name) {
-                    if let Err(e) = merge::generate_downsampling_job_by_stream_and_rule(
-                        &org_id,
+                if let Err(e) = merge::generate_downsampling_job_by_stream_and_rule(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    (rule.offset, rule.step),
+                )
+                .await
+                {
+                    log::error!(
+                        "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
+                        org_id,
                         stream_type,
-                        &stream_name,
-                        (rule.offest, rule.step),
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{}/{}/{}] rule: {:?} error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            rule,
-                            e
-                        );
-                    }
+                        stream_name,
+                        rule,
+                        e
+                    );
                 }
             }
         }

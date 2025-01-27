@@ -778,6 +778,8 @@ mod tests {
                 job_run_timeout: i64::default(),
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
+                downsampling_interval: i64::default(),
+                metrics_downsampling_rules: String::default(),
             },
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),

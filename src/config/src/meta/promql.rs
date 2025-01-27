@@ -235,14 +235,14 @@ pub enum Function {
 
 impl From<&str> for Function {
     fn from(s: &str) -> Self {
-        match s {
-            "avg" | "AVG" => Self::Avg,
-            "sum" | "SUM" => Self::Sum,
-            "count" | "COUNT" => Self::Count,
-            "min" | "MIN" => Self::Min,
-            "max" | "MAX" => Self::Max,
-            "last" | "LAST" => Self::Last,
-            "first" | "FIRST" => Self::First,
+        match s.to_lowercase().as_str() {
+            "avg" => Self::Avg,
+            "sum" => Self::Sum,
+            "count" => Self::Count,
+            "min" => Self::Min,
+            "max" => Self::Max,
+            "last" => Self::Last,
+            "first" => Self::First,
             _ => panic!("invalid downsampling function: {}", s),
         }
     }
@@ -270,7 +270,7 @@ impl Function {
 pub struct DownsamplingRule {
     pub rule: Option<Regex>,
     pub function: Function,
-    pub offest: i64, // seconds
+    pub offset: i64, // seconds
     pub step: i64,   // seconds
 }
 
@@ -292,8 +292,8 @@ pub fn get_matching_downsampling_rules(stream_name: &str) -> Vec<&'static Downsa
         .collect::<Vec<_>>();
 
     // if a timestamp is in multiple rules, order by offset in descending order
-    downsampling_rules.sort_by(|a, b| a.offest.cmp(&b.offest).reverse());
-    downsampling_rules.dedup_by(|a, b| a.offest == b.offest);
+    downsampling_rules.sort_by(|a, b| b.offset.cmp(&a.offset));
+    downsampling_rules.dedup_by(|a, b| a.offset == b.offset);
     downsampling_rules
 }
 
@@ -305,7 +305,7 @@ pub fn get_largest_downsampling_rule(
     let downsampling_rules = get_matching_downsampling_rules(stream_name);
     let mut rule = None;
     for r in downsampling_rules {
-        if chrono::Utc::now().timestamp_micros() - r.offest * 1_000_000 > max_ts {
+        if chrono::Utc::now().timestamp_micros() - r.offset * 1_000_000 > max_ts {
             rule = Some(r);
             break;
         }
