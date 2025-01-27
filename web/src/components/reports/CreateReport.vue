@@ -1430,6 +1430,7 @@ const validateReportData = async () => {
 
   if (formData.value.frequency.type === "cron") {
     try {
+      cronError.value = "";
       cronParser.parseExpression(frequency.value.cron);
       validateFrequency();
     } catch (err) {
@@ -1438,7 +1439,7 @@ const validateReportData = async () => {
     }
   }
 
-  if (cronError.value) {
+  if (formData.value.frequency.type === "cron" && cronError.value) {
     step.value = 2;
     return;
   }

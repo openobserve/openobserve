@@ -295,7 +295,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'Field is required!',
                         ]"
                         dense
+                        debounce="300"
                         style="width: 100%"
+                        @update:model-value="validateFrequency(frequency.cron)"
                       />
                     </div>
                     <q-select
@@ -324,255 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         width: 250px !important;
                       "
                     />
-                    <!-- <div class="o2-input">
-                      <q-select
-                        data-test="add-action-script-schedule-start-timezone-select"
-                        v-model="scheduling.timezone"
-                        :options="filteredTimezone"
-                        @blur="
-                          timezone =
-                            timezone == ''
-                              ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                              : timezone
-                        "
-                        use-input
-                        @filter="timezoneFilterFn"
-                        input-debounce="0"
-                        dense
-                        filled
-                        emit-value
-                        fill-input
-                        hide-selected
-                        :label="t('logStream.timezone') + ' *'"
-                        :display-value="`Timezone: ${timezone}`"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        class="timezone-select showLabelOnTop"
-                        stack-label
-                        outlined
-                        style="width: 300px"
-                      />
-                    </div> -->
                   </div>
                 </template>
-                <!-- <template v-else>
-                  <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
-                    <div
-                      class="tw-flex tw-justify-center tw-align-center"
-                      style="
-                        border: 1px solid #d7d7d7;
-                        width: fit-content;
-                        border-radius: 2px;
-                      "
-                    >
-                      <template v-for="visual in timeTabs" :key="visual.value">
-                        <q-btn
-                          :data-test="`add-action-script-schedule-${visual.value}-btn`"
-                          :color="
-                            visual.value === selectedTimeTab ? 'primary' : ''
-                          "
-                          :flat="
-                            visual.value === selectedTimeTab ? false : true
-                          "
-                          dense
-                          no-caps
-                          size="12px"
-                          class="q-px-md visual-selection-btn"
-                          style="padding-top: 4px; padding-bottom: 4px"
-                          @click="selectedTimeTab = visual.value"
-                        >
-                          {{ visual.label }}</q-btn
-                        >
-                      </template>
-                    </div>
-                    <q-icon
-                      name="info_outline"
-                      class="cursor-pointer q-ml-sm"
-                      size="16px"
-                    >
-                      <q-tooltip
-                        anchor="center end"
-                        self="center left"
-                        class="tw-text-[12px]"
-                      >
-                        "Schedule Now" will schedule the report using the
-                        current date, time, and timezone.<br />
-                        In "Schedule Later" you can customize the date, time,
-                        and timezone.
-                      </q-tooltip>
-                    </q-icon>
-                  </div>
-
-                  <div
-                    v-if="frequency.type === 'custom'"
-                    class="flex items-start justify-start q-mt-md"
-                  >
-                    <div
-                      data-test="add-action-script-schedule-custom-interval-input"
-                      class="o2-input q-mr-sm"
-                      style="padding-top: 0; width: 160px"
-                    >
-                      <q-input
-                        filled
-                        v-model="frequency.custom.interval"
-                        label="Repeat every *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        type="number"
-                        outlined
-                        dense
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="width: 100%"
-                      />
-                    </div>
-
-                    <div
-                      data-test="add-action-script-schedule-custom-frequency-select"
-                      class="o2-input"
-                      style="padding-top: 0; width: 160px"
-                    >
-                      <q-select
-                        v-model="frequency.custom.period"
-                        :options="customFrequencyOptions"
-                        :label="'Frequency *'"
-                        :popup-content-style="{ textTransform: 'capitalize' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                        filled
-                        emit-value
-                        stack-label
-                        dense
-                        behavior="menu"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="width: 100% !important"
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    data-test="add-action-script-schedule-send-later-section"
-                    v-if="selectedTimeTab === 'scheduleLater'"
-                    class="flex items-center justify-start q-mt-md"
-                  >
-                    <div
-                      data-test="add-action-script-schedule-start-date-input"
-                      class="o2-input q-mr-sm"
-                    >
-                      <q-input
-                        filled
-                        v-model="scheduling.date"
-                        label="Start Date *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        :rules="[
-                          (val: any) =>
-                            /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
-                              val,
-                            ) || 'Date format is incorrect!',
-                        ]"
-                        stack-label
-                        outlined
-                        dense
-                        style="width: 160px"
-                      >
-                        <template v-slot:append>
-                          <q-icon name="event" class="cursor-pointer">
-                            <q-popup-proxy
-                              cover
-                              transition-show="scale"
-                              transition-hide="scale"
-                            >
-                              <q-date
-                                v-model="scheduling.date"
-                                mask="DD-MM-YYYY"
-                              >
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup="true"
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-date>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </div>
-                    <div
-                      data-test="add-action-script-schedule-start-time-input"
-                      class="o2-input q-mr-sm"
-                    >
-                      <q-input
-                        filled
-                        v-model="scheduling.time"
-                        label="Start Time *"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        mask="time"
-                        :rules="['time']"
-                        stack-label
-                        outlined
-                        dense
-                        style="width: 160px"
-                      >
-                        <template v-slot:append>
-                          <q-icon name="access_time" class="cursor-pointer">
-                            <q-popup-proxy
-                              cover
-                              transition-show="scale"
-                              transition-hide="scale"
-                            >
-                              <q-time v-model="scheduling.time">
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup="true"
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </div>
-                    <div class="o2-input">
-                      <q-select
-                        data-test="add-action-script-schedule-start-timezone-select"
-                        v-model="scheduling.timezone"
-                        :options="filteredTimezone"
-                        @blur="
-                          timezone =
-                            timezone == ''
-                              ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                              : timezone
-                        "
-                        use-input
-                        @filter="timezoneFilterFn"
-                        input-debounce="0"
-                        dense
-                        filled
-                        emit-value
-                        fill-input
-                        hide-selected
-                        :label="t('logStream.timezone') + ' *'"
-                        :display-value="`Timezone: ${timezone}`"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        class="timezone-select showLabelOnTop"
-                        stack-label
-                        outlined
-                        style="width: 300px"
-                      />
-                    </div>
-                  </div>
-                </template> -->
               </div>
 
               <q-stepper-navigation>
@@ -608,18 +363,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex items-center o2-input">
                 <div class="o2-input service-account-selector">
+                  <div class="q-mb-xs text-bold text-grey-8">
+                    {{ t("actions.serviceAccount") + " *" }}
+                    <q-icon
+                      :name="outlinedInfo"
+                      size="17px"
+                      class="q-ml-xs cursor-pointer"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-5'
+                          : 'text-grey-7'
+                      "
+                    >
+                      <q-tooltip anchor="center right" self="center left">
+                        <span style="font-size: 14px">
+                          Make sure service account has permissions to access
+                          Actions.
+                        </span>
+                      </q-tooltip>
+                    </q-icon>
+                  </div>
                   <q-select
                     data-test="add-action-script-service-account-select"
                     v-model="formData.service_account"
                     :options="filteredServiceAccounts"
-                    :label="t('actions.serviceAccount') + ' *'"
                     :loading="isFetchingServiceAccounts"
                     :popup-content-style="{ textTransform: 'lowercase' }"
                     color="input-border"
                     bg-color="input-bg"
-                    class="q-py-sm showLabelOnTop no-case"
+                    class="q-py-sm no-case"
                     filled
-                    stack-label
                     outlined
                     dense
                     use-input
@@ -790,6 +563,7 @@ import {
   getUUID,
   useLocalTimezone,
   isValidResourceName,
+  getCronIntervalDifferenceInSeconds,
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
@@ -842,10 +616,6 @@ const defaultActionScript = {
 
 const { t } = useI18n();
 const router = useRouter();
-
-const isCachedReport = ref(false);
-
-const showInfoTooltip = ref(false);
 
 const fileInput = ref(null);
 
@@ -1148,13 +918,18 @@ const validateActionScriptData = async () => {
 
   if (formData.value.execution_details === "Repeat") {
     try {
-      cronParser.parseExpression(frequency.value.cron);
       cronError.value = "";
+      cronParser.parseExpression(frequency.value.cron);
+      validateFrequency(frequency.value.cron);
     } catch (err) {
       cronError.value = "Invalid cron expression!";
-      step.value = 2;
       return;
     }
+  }
+
+  if (formData.value.execution_details === "Repeat" && cronError.value) {
+    step.value = 2;
+    return;
   }
 
   if (!formData.value.execution_details) {
@@ -1166,6 +941,26 @@ const validateActionScriptData = async () => {
   //   step.value = 2;
   //   return;
   // }
+};
+
+const validateFrequency = (value: string) => {
+  cronError.value = "";
+
+  const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
+
+  if (typeof intervalInSecs === "number" && !isValidInterval(intervalInSecs)) {
+    const minInterval = Number(
+      store.state?.zoConfig?.min_auto_refresh_interval,
+    );
+    cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+    return;
+  }
+};
+
+const isValidInterval = (value: number) => {
+  return (
+    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
+  );
 };
 
 const goToActionScripts = () => {
@@ -1180,6 +975,7 @@ const goToActionScripts = () => {
 const setupEditingActionScript = async (report: any) => {
   formData.value = {
     ...report,
+    timezone: report.timezone || "UTC",
   };
   formData.value.fileNameToShow = report.zip_file_name;
 
