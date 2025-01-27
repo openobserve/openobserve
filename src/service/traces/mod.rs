@@ -491,6 +491,10 @@ pub async fn handle_otlp_request(
                             .get(&cfg.common.column_timestamp)
                             .and_then(|ts| ts.as_i64())
                         else {
+                            log::error!(
+                                "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                            );
+                            partial_success.rejected_spans += 1;
                             continue;
                         };
                         let (ts_data, _) = json_data_by_stream
