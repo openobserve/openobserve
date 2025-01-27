@@ -209,7 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           top: 0px;
           left: 0px;
           display: none;
-          text-wrap: nowrap;
+          width: 200px;
+          text-wrap: wrap;
           z-index: 9999999;
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -217,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @mouseleave="hidePopupsAndOverlays"
       >
         <div
-          class="drilldown-item q-px-sm q-py-xs"
+          class=" q-px-sm q-py-xs"
           style="
             display: flex;
             flex-direction: row;
@@ -709,7 +710,9 @@ export default defineComponent({
       if (drilldownPopUpRef.value) {
         drilldownPopUpRef.value.style.display = "none";
       }
-
+      if (annotationPopupRef.value) {
+        annotationPopupRef.value.style.display = "none";
+      }
       isCursorOverPanel.value = false;
     };
 
@@ -796,16 +799,14 @@ export default defineComponent({
           );
 
           // Apply calculated offsets to the annotation popup
-          annotationPopupRef.value.style.top = `${offSetValues.top}px`;
-          annotationPopupRef.value.style.left = `${offSetValues.left}px`;
+          annotationPopupRef.value.style.top = offSetValues.top + 5 + "px";
+          annotationPopupRef.value.style.left = offSetValues.left + 5 + "px";
           if (selectedAnnotationData.value) {
             console.log(
               "annotationDetails selectedAnnotationData",
               selectedAnnotationData.value,
             );
-            setTimeout(() => {
-              annotationPopupRef.value.style.display = "none";
-            }, 5000);
+            annotationPopupRef.value.style.display = "block";
           } else {
             hidePopupsAndOverlays();
           }
