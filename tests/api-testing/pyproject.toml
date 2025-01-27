@@ -8,6 +8,8 @@ dependencies = [
     "pytest-pretty>=1.2.0",
     "requests>=2.31.0",
     "ruff>=0.1.8",
+    "tink>=1.10.0",
+    "protobuf>=5.29.3",
 ]
 readme = "README.md"
 requires-python = ">= 3.11"
