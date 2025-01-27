@@ -3829,9 +3829,21 @@ const useLogs = () => {
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
-    if (queryParams.refresh) {
+
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
@@ -3878,6 +3890,12 @@ const useLogs = () => {
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
+  };
+
+  const enableRefreshInterval = (value: number) => {
+    return (
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 5)
+    );
   };
 
   const showNotification = () => {
