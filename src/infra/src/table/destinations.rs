@@ -150,12 +150,15 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destin
     }
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<destinations::Destination>, Error> {
+pub async fn list(
+    org_id: &str,
+    module: Option<&str>,
+) -> Result<Vec<destinations::Destination>, Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let destinations = list_models(client, Some(org_id))
+    let destinations = list_models(client, Some(org_id), module)
         .await?
         .into_iter()
         .map(|(model, template)| model.try_into(template))
@@ -168,7 +171,7 @@ pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let destinations = list_models(client, None)
+    let destinations = list_models(client, None, None)
         .await?
         .into_iter()
         .map(|(model, template)| model.try_into(template))
@@ -207,10 +210,15 @@ async fn get_model_and_template(
 async fn list_models(
     db: &DatabaseConnection,
     org_id: Option<&str>,
+    module: Option<&str>,
 ) -> Result<Vec<(Model, Option<String>)>, sea_orm::DbErr> {
     let mut query = Entity::find().find_also_related(templates::Entity);
     if let Some(org) = org_id {
         query = query.filter(Column::Org.eq(org));
+    }
+    if let Some(module) = module {
+        let module = module.to_lowercase();
+        query = query.filter(Column::Module.eq(&module));
     }
     Ok(query
         .order_by(Column::Name, sea_orm::Order::Asc)

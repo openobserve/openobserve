@@ -28,6 +28,12 @@ pub struct Destination {
     pub module: Module,
 }
 
+impl Destination {
+    pub fn is_alert_destinations(&self) -> bool {
+        matches!(&self.module, Module::Alert { .. })
+    }
+}
+
 #[derive(Serialize, Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Module {
@@ -38,6 +44,16 @@ pub enum Module {
     Pipeline {
         endpoint: Endpoint,
     },
+}
+
+impl std::fmt::Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Module::Alert { .. } => "alert",
+            Module::Pipeline { .. } => "pipeline",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]

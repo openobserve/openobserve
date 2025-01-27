@@ -19,8 +19,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const DESTINATIONS_TEMPLATES_FK: &str = "destinations_templates_fk";
-const DESTINATIONS_TEMPLATE_ID_DESTINATION_ID_IDX: &str =
-    "destinations_template_id_destination_id_idx";
+const DESTINATIONS_ID_NAME_ORG_IDX: &str = "destinations_id_org_name_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -36,11 +35,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(
-                Index::drop()
-                    .name(DESTINATIONS_TEMPLATE_ID_DESTINATION_ID_IDX)
-                    .to_owned(),
-            )
+            .drop_index(Index::drop().name(DESTINATIONS_ID_NAME_ORG_IDX).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(Destinations::Table).to_owned())
@@ -74,10 +69,13 @@ fn create_destinations_table_statement() -> TableCreateStatement {
 fn create_destinations_template_id_destination_id_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
-        .name(DESTINATIONS_TEMPLATE_ID_DESTINATION_ID_IDX)
+        .name(DESTINATIONS_ID_NAME_ORG_IDX)
         .table(Destinations::Table)
-        .col(Destinations::TemplateId)
+        // .col(Destinations::TemplateId)
         .col(Destinations::Id)
+        .col(Destinations::Name)
+        .col(Destinations::Org)
+        .unique()
         .to_owned() // not unique since template_id is nullable for pipeline destinations
 }
 

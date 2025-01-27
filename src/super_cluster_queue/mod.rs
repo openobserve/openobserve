@@ -30,10 +30,8 @@ mod templates;
 
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue, PipelinesQueue,
-    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue,
-    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
+    PipelinesQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins

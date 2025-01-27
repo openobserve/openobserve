@@ -151,7 +151,7 @@ pub enum AlertError {
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
-    NotSupportedAlertDestinationType(DestinationType),
+    NotSupportedAlertDestinationType(Module),
 }
 
 pub async fn save(
@@ -287,10 +287,8 @@ async fn prepare_alert(
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
-                if d.is_remote_pipeline() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(
-                        d.destination_type,
-                    ));
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
                 }
             }
             Err(_) => {
@@ -836,11 +834,6 @@ async fn send_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
-        DestinationType::RemotePipeline => {
-            // do nothing
-            log::warn!("Remote pipeline destination not supported in send_notification");
-            Ok("".to_string())
-        }
     }
 }
 

@@ -119,9 +119,10 @@ pub async fn get_with_template(
 
 pub async fn list(
     org_id: &str,
+    module: Option<&str>,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Destination>, DestinationError> {
-    Ok(db::alerts::destinations::list(org_id)
+    Ok(db::alerts::destinations::list(org_id, module)
         .await?
         .into_iter()
         .filter(|dest| {
@@ -143,7 +144,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     for (stream_key, alerts) in cacher.iter() {
         for alert in alerts.iter() {
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
-                return Err(DestinationError::InUse(alert.name.to_string()));
+                return Err(DestinationError::UsedByAlert(alert.name.to_string()));
             }
         }
     }
@@ -152,10 +153,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
         for pl in pls {
             if pl.contains_remote_destination(name) {
-                return Err((
-                    http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Destination is currently used by pipeline {}", pl.name),
-                ));
+                return Err(DestinationError::UsedByPipeline(pl.name));
             }
         }
     }

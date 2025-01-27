@@ -54,8 +54,10 @@ pub enum DestinationError {
     AlreadyExists,
     #[error("Destination not found")]
     NotFound,
-    #[error("Destination is in use for alert {0}")]
-    InUse(String),
+    #[error("Destination is currently used by alert: {0}")]
+    UsedByAlert(String),
+    #[error("Destination is currently used by pipeline: {0}")]
+    UsedByPipeline(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
@@ -132,20 +134,34 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     Ok(())
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Destination>, DestinationError> {
+pub async fn list(
+    org_id: &str,
+    module: Option<&str>,
+) -> Result<Vec<Destination>, DestinationError> {
     let cache = ALERTS_DESTINATIONS.clone();
     if !cache.is_empty() {
+        let org_filter = format!("{org_id}/");
         return Ok(cache
             .iter()
             .filter_map(|dest| {
                 let k = dest.key();
-                (k.starts_with(&format!("{org_id}/"))).then(|| dest.value().clone())
+                if k.starts_with(&org_filter) {
+                    let dest = dest.value().clone();
+                    if let Some(module) = module {
+                        let module = module.to_lowercase();
+                        (dest.module.to_string() == module).then_some(dest)
+                    } else {
+                        Some(dest)
+                    }
+                } else {
+                    None
+                }
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
     }
 
-    Ok(table::destinations::list(org_id).await?)
+    Ok(table::destinations::list(org_id, module).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

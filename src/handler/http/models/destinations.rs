@@ -72,45 +72,50 @@ impl From<meta_dest::Destination> for Destination {
 }
 
 impl Destination {
-    pub fn into(self, org_id: &str) -> Result<meta_dest::Destination, DestinationError> {
-        if let Some(template) = self.template {
-            let destination_type = match self.destination_type {
-                DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
-                    recipients: self.emails,
-                }),
-                DestinationType::Http => meta_dest::DestinationType::Http(meta_dest::Endpoint {
+    pub fn into(self, org_id: String) -> Result<meta_dest::Destination, DestinationError> {
+        match self.template {
+            Some(template) if !template.is_empty() => {
+                let destination_type = match self.destination_type {
+                    DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
+                        recipients: self.emails,
+                    }),
+                    DestinationType::Http => {
+                        meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                            url: self.url,
+                            method: self.method,
+                            skip_tls_verify: self.skip_tls_verify,
+                            headers: self.headers,
+                        })
+                    }
+                    DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
+                        sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
+                        aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
+                    }),
+                };
+                Ok(meta_dest::Destination {
+                    id: None,
+                    org_id,
+                    name: self.name,
+                    module: meta_dest::Module::Alert {
+                        template,
+                        destination_type,
+                    },
+                })
+            }
+            _ => {
+                let endpoint = meta_dest::Endpoint {
                     url: self.url,
                     method: self.method,
                     skip_tls_verify: self.skip_tls_verify,
                     headers: self.headers,
-                }),
-                DestinationType::Sns => meta_dest::DestinationType::Sns(meta_dest::AwsSns {
-                    sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
-                    aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
-                }),
-            };
-            Ok(meta_dest::Destination {
-                id: None,
-                org_id: org_id.to_string(),
-                name: self.name,
-                module: meta_dest::Module::Alert {
-                    template,
-                    destination_type,
-                },
-            })
-        } else {
-            let endpoint = meta_dest::Endpoint {
-                url: self.url,
-                method: self.method,
-                skip_tls_verify: self.skip_tls_verify,
-                headers: self.headers,
-            };
-            Ok(meta_dest::Destination {
-                id: None,
-                org_id: org_id.to_string(),
-                name: self.name,
-                module: meta_dest::Module::Pipeline { endpoint },
-            })
+                };
+                Ok(meta_dest::Destination {
+                    id: None,
+                    org_id,
+                    name: self.name,
+                    module: meta_dest::Module::Pipeline { endpoint },
+                })
+            }
         }
     }
 }
@@ -193,8 +198,8 @@ impl From<&str> for DestinationType {
     fn from(value: &str) -> Self {
         match value.to_lowercase().as_str() {
             "email" => DestinationType::Email,
-            "http" => DestinationType::Http,
-            _ => DestinationType::Sns,
+            "sns" => DestinationType::Sns,
+            _ => DestinationType::Http,
         }
     }
 }

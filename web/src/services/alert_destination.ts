@@ -33,13 +33,13 @@ const destination = {
     page_size,
     desc,
     sort_by,
-    dst_type,
+    module,
   }: any) => {
     // Construct the base URL with required parameters
     let url = `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`;
-    // Append dst_type if it is defined
-    if (dst_type) {
-      url += `&dst_type=${dst_type}`;
+    // Append module if it is defined
+    if (module) {
+      url += `&module=${module}`;
     }
     return http().get(url);
   },

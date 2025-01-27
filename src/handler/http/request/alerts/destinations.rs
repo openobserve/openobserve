@@ -25,12 +25,11 @@ use crate::{
 
 impl From<DestinationError> for HttpResponse {
     fn from(value: DestinationError) -> Self {
-        match value {
-            DestinationError::InUse(e) => MetaHttpResponse::conflict(DestinationError::InUse(e)),
-            DestinationError::InfraError(e) => {
-                MetaHttpResponse::internal_error(DestinationError::InfraError(e))
-            }
-            DestinationError::NotFound => MetaHttpResponse::not_found(DestinationError::NotFound),
+        match &value {
+            DestinationError::UsedByAlert(_) => MetaHttpResponse::conflict(value),
+            DestinationError::UsedByPipeline(_) => MetaHttpResponse::conflict(value),
+            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            DestinationError::NotFound => MetaHttpResponse::not_found(value),
             other_err => MetaHttpResponse::bad_request(other_err),
         }
     }
@@ -59,12 +58,13 @@ pub async fn save_destination(
     dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let dest = match dest.into_inner().into(&org_id) {
+    let dest = match dest.into_inner().into(org_id) {
         Ok(dest) => dest,
         Err(e) => return Ok(e.into()),
     };
+    log::warn!("dest module is alert: {}", dest.is_alert_destinations());
     match destinations::save("", dest, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Ok(_) => Ok(MetaHttpResponse::ok("Destination saved")),
         Err(e) => Ok(e.into()),
     }
 }
@@ -93,12 +93,12 @@ pub async fn update_destination(
     dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let dest = match dest.into_inner().into(&org_id) {
+    let dest = match dest.into_inner().into(org_id) {
         Ok(dest) => dest,
         Err(e) => return Ok(e.into()),
     };
     match destinations::save(&name, dest, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Ok(_) => Ok(MetaHttpResponse::ok("Destination updated")),
         Err(e) => Ok(e.into()),
     }
 }
@@ -139,7 +139,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("dst_type" = Option<DestinationType>, Query, description = "Destination type filter, default is all but not include remote_pipeline type"),
+        ("module" = Option<String>, Query, description = "Destination module filter, none, alert, or pipeline"),
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
@@ -153,12 +153,7 @@ async fn list_destinations(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let dst_type = query.get("dst_type").unwrap_or(&"".to_string()).to_string();
-    let dst_type = if dst_type.is_empty() {
-        None
-    } else {
-        Some(DestinationType::from(dst_type.as_str()))
-    };
+    let module = query.get("module").map(|s| s.as_str());
 
     let mut _permitted = None;
     // Get List of allowed objects
@@ -185,7 +180,7 @@ async fn list_destinations(
         // Get List of allowed objects ends
     }
 
-    match destinations::list(&org_id, _permitted).await {
+    match destinations::list(&org_id, module, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(
             data.into_iter().map(Destination::from).collect::<Vec<_>>(),
         )),
