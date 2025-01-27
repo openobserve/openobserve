@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.refreshInterval"
               :trigger="true"
               :min-refresh-interval="
-                store.state?.zoConfig?.min_auto_refresh_interval || 5
+                store.state?.zoConfig?.min_auto_refresh_interval ?? 0
               "
               @update:model-value="onRefreshIntervalUpdate"
               @trigger="$emit('onAutoIntervalTrigger')"

@@ -118,7 +118,7 @@ export default defineComponent({
     },
     minRefreshInterval: {
       type: Number,
-      default: 5,
+      default: 0,
     },
   },
   emits: ["update:modelValue", "trigger"],
@@ -158,6 +158,10 @@ export default defineComponent({
         return props.modelValue;
       },
       set(value) {
+        if (isDisabled(value)) {
+          return 0;
+        }
+
         emit("update:modelValue", Number(value));
       },
     });
