@@ -30,11 +30,11 @@ mod m20241217_155000_populate_alerts_table;
 mod m20241222_085111_search_jobs;
 mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
-mod m20250108_151600_create_reports_table;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
 mod m20250121_120000_create_cipher_table;
 mod m20250122_000001_create_table_action_scripts;
+mod m20250128_000001_create_reports_table;
 
 pub struct Migrator;
 
@@ -61,7 +61,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
             Box::new(m20250121_120000_create_cipher_table::Migration),
             Box::new(m20250122_000001_create_table_action_scripts::Migration),
-            Box::new(m20250108_151600_create_reports_table::Migration),
+            Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
+            Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
+            Box::new(m20250121_120000_create_cipher_table::Migration),
+            Box::new(m20250122_000001_create_table_action_scripts::Migration),
+            Box::new(m20250128_000001_create_reports_table::Migration),
         ]
     }
 }
