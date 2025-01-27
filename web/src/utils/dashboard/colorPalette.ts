@@ -286,7 +286,7 @@ export const getSeriesColor = (
   chartMax: number,
 ): string | null => {
   if (!colorCfg) {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return classicColorPalette[getSeriesHash(seriesName?.toString() ?? "")];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -297,7 +297,7 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return classicColorPalette[getSeriesHash(seriesName)];
+    return classicColorPalette[getSeriesHash(seriesName?.toString() ?? "")];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {

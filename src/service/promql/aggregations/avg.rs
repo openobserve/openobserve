@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,17 +19,17 @@ use rayon::prelude::*;
 
 use crate::service::promql::value::{InstantValue, Sample, Value};
 
-pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
+pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result<Value> {
     let score_values = super::eval_arithmetic(param, data, "avg", |total, val| total + val)?;
     if score_values.is_none() {
         return Ok(Value::None);
     }
     let values = score_values
         .unwrap()
-        .par_iter()
-        .map(|v| InstantValue {
-            labels: v.1.labels.clone(),
-            sample: Sample::new(timestamp, v.1.value / v.1.num as f64),
+        .into_par_iter()
+        .map(|(_, mut v)| InstantValue {
+            labels: std::mem::take(&mut v.labels),
+            sample: Sample::new(timestamp, v.value / v.num as f64),
         })
         .collect();
     Ok(Value::Vector(values))

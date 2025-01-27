@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -395,7 +395,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             (
-                sig.clone(),
+                sig,
                 RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
             )
         })
@@ -411,16 +411,18 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
     let mut merged_data = HashMap::new();
-    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::new();
+    let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric
             .iter()
             .map(|l| Arc::new(Label::from(l)))
             .collect();
-        let sample: Sample = ser.sample.as_ref().unwrap().into();
-        merged_data.insert(signature(&labels), sample);
-        merged_metrics.insert(signature(&labels), labels);
+        if let Some(sample) = ser.sample.as_ref() {
+            let sample: Sample = sample.into();
+            merged_data.insert(signature(&labels), sample);
+            merged_metrics.insert(signature(&labels), labels);
+        }
     }
     let merged_data = merged_data
         .into_iter()
@@ -472,9 +474,9 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
     let merged_data = merged_data
         .into_iter()
         .map(|(sig, exemplars)| {
-            let mut exemplars: Vec<Exemplar> = exemplars
+            let mut exemplars: Vec<Arc<Exemplar>> = exemplars
                 .into_iter()
-                .map(|(_ts, v)| v.into())
+                .map(|(_ts, v)| Arc::new(v.into()))
                 .collect::<Vec<_>>();
             exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)
