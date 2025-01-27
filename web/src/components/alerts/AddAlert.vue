@@ -1150,7 +1150,6 @@ export default defineComponent({
       if (input.trigger_condition.frequency_type === "cron") {
         try {
           cronParser.parseExpression(input.trigger_condition.cron);
-          scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
         } catch (err) {
           console.log(err);
           scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
@@ -1158,7 +1157,15 @@ export default defineComponent({
         }
       }
 
-      if (scheduledAlertRef.value.cronJobError.value) {
+      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
+
+      if (scheduledAlertRef.value.cronJobError) {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: scheduledAlertRef.value.cronJobError,
+            timeout: 1500,
+          });
         return false;
       }
 
