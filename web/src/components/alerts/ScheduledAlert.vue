@@ -1341,7 +1341,11 @@ const toggleExpandFunctionError = () => {
   isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
 };
 
-const validateFrequency = (frequency) => {
+const validateFrequency = (frequency: {
+  frequency_type: string;
+  cron: string;
+  frequency: number;
+}) => {
   if (frequency.frequency_type === "cron") {
     const intervalInSecs = getCronIntervalDifferenceInSeconds(frequency.cron);
 
