@@ -192,19 +192,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            v-if="drilldown.name"
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
             <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
           </div>
-          <div v-else-if="drilldown.description">
-            {{ drilldown.description }}
-          </div>
         </div>
       </div>
-
+      <div
+        style="
+          border: 1px solid gray;
+          border-radius: 4px;
+          padding: 3px;
+          position: absolute;
+          top: 0px;
+          left: 0px;
+          display: none;
+          text-wrap: nowrap;
+          z-index: 9999999;
+        "
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        ref="annotationPopupRef"
+        @mouseleave="hidePopupsAndOverlays"
+      >
+        <div
+          class="drilldown-item q-px-sm q-py-xs"
+          style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            position: relative;
+          "
+        >
+          <span>{{ selectedAnnotationData.text }}</span>
+        </div>
+      </div>
       <!-- Annotation Dialog -->
       <AddAnnotation
         v-if="isAddAnnotationDialogVisible"
@@ -348,7 +371,10 @@ export default defineComponent({
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
+    const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+    const annotationPopupRef = ref(null);
+
     const chartPanelStyle = ref({
       height: "100%",
       width: "100%",
@@ -726,9 +752,8 @@ export default defineComponent({
 
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
-
     const onChartClick = async (params: any, ...args: any) => {
-      // check for annotations add mode
+      // Check for annotations add mode
       if (allowAnnotationsAdd.value) {
         // check if it is markline or markarea component click, than handle it differently
         if (
@@ -748,46 +773,42 @@ export default defineComponent({
         }
       }
 
-      // Check for markline or markdown component click and display description
+      // Check for markLine or markArea click to display annotation popup
       if (
         params?.componentType == "markLine" ||
         params?.componentType == "markArea"
       ) {
         const description = params?.data?.annotationDetails?.text;
         if (description) {
-          console.log("Displaying annotation description:", description);
+          console.log("annotationDetails", params?.data?.annotationDetails);
 
-          // Temporarily show the popup to calculate its dimensions
-          drilldownPopUpRef.value.style.display = "block";
-          drilldownArray.value = [{ description: description }];
+          selectedAnnotationData.value = params?.data?.annotationDetails;
+          // temporarily show the popup to calculate its dimensions
+          annotationPopupRef.value.style.display = "block";
 
-          // Offset calculation for position
-          const offSetValues = {
-            left: params?.event?.offsetX,
-            top: params?.event?.offsetY,
-          };
-
-          // Wait for DOM update
+          // wait for the next DOM update cycle before calculating the dimensions
           await nextTick();
+          const offSetValues = calculatePopupOffset(
+            params?.event?.offsetX,
+            params?.event?.offsetY,
+            annotationPopupRef,
+            chartPanelRef,
+          );
 
-          // Adjust position if the popup goes out of bounds
-          if (
-            offSetValues.top + drilldownPopUpRef.value.offsetHeight >
-            chartPanelRef.value.offsetHeight
-          ) {
-            offSetValues.top -= drilldownPopUpRef.value.offsetHeight;
+          // Apply calculated offsets to the annotation popup
+          annotationPopupRef.value.style.top = `${offSetValues.top}px`;
+          annotationPopupRef.value.style.left = `${offSetValues.left}px`;
+          if (selectedAnnotationData.value) {
+            console.log(
+              "annotationDetails selectedAnnotationData",
+              selectedAnnotationData.value,
+            );
+            setTimeout(() => {
+              annotationPopupRef.value.style.display = "none";
+            }, 5000);
+          } else {
+            hidePopupsAndOverlays();
           }
-          if (
-            offSetValues.left + drilldownPopUpRef.value.offsetWidth >
-            chartPanelRef.value.offsetWidth
-          ) {
-            offSetValues.left -= drilldownPopUpRef.value.offsetWidth;
-          }
-
-          // Apply calculated offsets to the popup
-          drilldownPopUpRef.value.style.top = `${offSetValues.top}px`;
-          drilldownPopUpRef.value.style.left = `${offSetValues.left}px`;
-          return;
         }
       }
 
@@ -825,26 +846,15 @@ export default defineComponent({
       // wait for the next DOM update cycle before calculating the dimensions
       await nextTick();
 
-      // if not enough space to show drilldown at the bottom, show it above the cursor
-      if (
-        offSetValues.top + drilldownPopUpRef.value.offsetHeight >
-        chartPanelRef.value.offsetHeight
-      ) {
-        offSetValues.top =
-          offSetValues.top - drilldownPopUpRef.value.offsetHeight;
-      }
-      if (
-        offSetValues.left + drilldownPopUpRef.value.offsetWidth >
-        chartPanelRef.value.offsetWidth
-      ) {
-        // if not enough space on the right, show the popup to the left of the cursor
-        offSetValues.left =
-          offSetValues.left - drilldownPopUpRef.value.offsetWidth;
-      }
+      const drilldownOffset = calculatePopupOffset(
+        offSetValues.left,
+        offSetValues.top,
+        drilldownPopUpRef,
+        chartPanelRef,
+      );
 
-      // 24 px takes panel header height
-      drilldownPopUpRef.value.style.top = offSetValues?.top + 5 + "px";
-      drilldownPopUpRef.value.style.left = offSetValues?.left + 5 + "px";
+      drilldownPopUpRef.value.style.top = drilldownOffset.top + 5 + "px";
+      drilldownPopUpRef.value.style.left = drilldownOffset.left + 5 + "px";
 
       // if drilldownArray has at least one element then only show the drilldown pop up
       if (drilldownArray.value.length > 0) {
@@ -853,6 +863,28 @@ export default defineComponent({
         // hide the popup if there's no drilldown
         hidePopupsAndOverlays();
       }
+    };
+
+    // Helper function to calculate popup offset
+    const calculatePopupOffset = (offsetX, offsetY, popupRef, containerRef) => {
+      let offSetValues = { left: offsetX, top: offsetY };
+
+      if (popupRef.value) {
+        if (
+          offSetValues.top + popupRef.value.offsetHeight >
+          containerRef.value.offsetHeight
+        ) {
+          offSetValues.top -= popupRef.value.offsetHeight;
+        }
+        if (
+          offSetValues.left + popupRef.value.offsetWidth >
+          containerRef.value.offsetWidth
+        ) {
+          offSetValues.left -= popupRef.value.offsetWidth;
+        }
+      }
+
+      return offSetValues;
     };
 
     const { showErrorNotification } = useNotifications();
@@ -1355,8 +1387,10 @@ export default defineComponent({
       onChartClick,
       onDataZoom,
       drilldownArray,
+      selectedAnnotationData,
       openDrilldown,
       drilldownPopUpRef,
+      annotationPopupRef,
       hidePopupsAndOverlays,
       chartPanelClass,
       chartPanelHeight,
