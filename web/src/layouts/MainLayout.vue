@@ -220,7 +220,7 @@ class="padding-none" />
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item to="/about">
+              <q-item to="/about" data-test="menu-link-about-item">
                 <q-item-section>
                   <q-item-label>
                     {{ t(`menu.about`) }}

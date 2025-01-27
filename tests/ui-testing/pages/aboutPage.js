@@ -5,7 +5,7 @@ import { expect } from '@playwright/test';
 export class AboutPage {
     constructor(page) {
         this.page = page;
-        this.aboutPageMenu = page.locator('[data-test="menu-link-\\/about-item"]');
+        this.aboutPageMenu = page.locator('[data-test="menu-link-about-item"]');
 
     }
     async gotoAboutPage() {
