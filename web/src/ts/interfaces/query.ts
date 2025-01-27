@@ -51,6 +51,7 @@ export interface WebSocketSearchResponse {
       new_end_time?: number;
       scan_size?: number;
     };
+    streaming_aggs?: boolean;
   };
 }
 

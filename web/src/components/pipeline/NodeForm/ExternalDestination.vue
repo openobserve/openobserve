@@ -65,9 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
           </q-select>
           </div>
-          <div class="col-12 q-pb-md"></div>
-          <div v-if="createNewDestination" class="col-12 q-py-xs">
+          <q-form
+            ref="destinationForm"
+            @submit="
+              createNewDestination ? createDestination() : saveDestination()
+            "
+          >
+          <div class="col-12 q-py-xs">
             <q-input
+            v-if="createNewDestination"
               data-test="add-destination-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
@@ -88,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
-
           <div v-if="createNewDestination" class="col-12 q-py-xs">
             <q-input
               data-test="add-destination-url-input"
@@ -205,9 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-        </div>
-      </div>
-      <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start q-mt-lg">
         <q-btn
           data-test="add-destination-cancel-btn"
           v-close-popup="true"
@@ -224,10 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mb-md text-bold no-border q-ml-md"
           color="secondary"
           padding="sm xl"
-          @click="createNewDestination ? createDestination() : saveDestination()"
+          type="submit"
           no-caps
         />
       </div>
+        </q-form>
+        </div>
+      </div>
+
     </q-page>
   </div>
 </template>
@@ -276,6 +283,7 @@ const formData: Ref<DestinationData> = ref({
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
+const destinationForm = ref(null);
 const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
 const selectedDestination: any = ref(
@@ -329,6 +337,7 @@ const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
 const createDestination = () => {
+  
   if (!isValidDestination.value) {
     q.notify({
       type: "negative",
@@ -466,7 +475,10 @@ const saveDestination = () => {
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (!selectedDestination.value) {
+  if (
+    selectedDestination.value.hasOwnProperty("value") &&
+    selectedDestination.value.value === ""
+  ) {
     q.notify({
       message: "Please select External destination from the list",
       color: "negative",
