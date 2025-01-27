@@ -464,7 +464,7 @@ async fn create_proxy_request(
             }
         })
         .collect::<Vec<_>>();
-    // send query
+    // create request
     let mut req = if new_url.full_url.starts_with("https://") {
         create_http_client()
             .unwrap()
