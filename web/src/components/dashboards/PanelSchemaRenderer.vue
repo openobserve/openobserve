@@ -192,11 +192,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
+            v-if="drilldown.name"
             @click="openDrilldown(index)"
             style="cursor: pointer; display: flex; align-items: center"
           >
             <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
             <span>{{ drilldown.name }}</span>
+          </div>
+          <div v-else-if="drilldown.description">
+            {{ drilldown.description }}
           </div>
         </div>
       </div>
@@ -728,7 +732,6 @@ export default defineComponent({
       if (allowAnnotationsAdd.value) {
         // check if it is markline or markarea component click, than handle it differently
         if (
-          allowAnnotationsAdd.value &&
           isAddAnnotationMode.value &&
           (params?.componentType == "markLine" ||
             params?.componentType == "markArea")
@@ -741,6 +744,49 @@ export default defineComponent({
             params?.data?.[0] || params?.data?.time || params?.data?.name,
             null,
           );
+          return;
+        }
+      }
+
+      // Check for markline or markdown component click and display description
+      if (
+        params?.componentType == "markLine" ||
+        params?.componentType == "markArea"
+      ) {
+        const description = params?.data?.annotationDetails?.text;
+        if (description) {
+          console.log("Displaying annotation description:", description);
+
+          // Temporarily show the popup to calculate its dimensions
+          drilldownPopUpRef.value.style.display = "block";
+          drilldownArray.value = [{ description: description }];
+
+          // Offset calculation for position
+          const offSetValues = {
+            left: params?.event?.offsetX,
+            top: params?.event?.offsetY,
+          };
+
+          // Wait for DOM update
+          await nextTick();
+
+          // Adjust position if the popup goes out of bounds
+          if (
+            offSetValues.top + drilldownPopUpRef.value.offsetHeight >
+            chartPanelRef.value.offsetHeight
+          ) {
+            offSetValues.top -= drilldownPopUpRef.value.offsetHeight;
+          }
+          if (
+            offSetValues.left + drilldownPopUpRef.value.offsetWidth >
+            chartPanelRef.value.offsetWidth
+          ) {
+            offSetValues.left -= drilldownPopUpRef.value.offsetWidth;
+          }
+
+          // Apply calculated offsets to the popup
+          drilldownPopUpRef.value.style.top = `${offSetValues.top}px`;
+          drilldownPopUpRef.value.style.left = `${offSetValues.left}px`;
           return;
         }
       }
