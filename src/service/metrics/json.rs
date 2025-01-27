@@ -91,6 +91,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
 
+    let cfg = config::get_config();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
         // JSON Flattening
@@ -154,6 +155,22 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             }
             continue;
         }
+
+        // check timestamp
+        let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
+            None => chrono::Utc::now().timestamp_micros(),
+            Some(json::Value::Number(s)) => {
+                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
+            }
+            Some(_) => {
+                return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+            }
+        };
+        // reset time
+        record.insert(
+            cfg.common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
 
         let record = json::Value::Object(record.to_owned());
 
@@ -238,7 +255,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
     }
 
-    let cfg = config::get_config();
     for (stream_name, json_data) in json_data_by_stream {
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -272,31 +288,24 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
             let record = record.as_object_mut().unwrap();
 
-            // check timestamp & value
-            let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
-                None => chrono::Utc::now().timestamp_micros(),
-                Some(json::Value::Number(s)) => {
-                    time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
-                }
-                Some(_) => {
-                    return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-                }
-            };
+            // check value
             let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
                 json::Value::Number(s) => s.as_f64().unwrap(),
                 _ => {
                     return Err(anyhow::anyhow!("invalid value, need to be number"));
                 }
             };
-            // reset time & value
-            record.insert(
-                cfg.common.column_timestamp.clone(),
-                json::Value::Number(timestamp.into()),
-            );
+            // reset value
             record.insert(
                 VALUE_LABEL.to_string(),
                 json::Number::from_f64(value).unwrap().into(),
             );
+
+            let timestamp = record
+                .get(&cfg.common.column_timestamp)
+                .and_then(|ts| ts.as_i64())
+                .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
+
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
