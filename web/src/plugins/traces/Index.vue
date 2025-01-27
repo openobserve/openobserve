@@ -944,7 +944,7 @@ export default defineComponent({
           Object.keys(importantFields).forEach((rowName) => {
             if (fields[rowName] == undefined) {
               fields[rowName] = {};
-              const formattedName = rowName === "duration" ? `${rowName} (us)` : rowName;
+              const formattedName = rowName === "duration" ? `${rowName} (µs)` : rowName;
               searchObj.data.stream.selectedStreamFields.push({
                 name: formattedName,
                 ftsKey: ftsKeys.has(rowName),
