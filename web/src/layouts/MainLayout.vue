@@ -220,6 +220,13 @@ class="padding-none" />
                   </q-item-label>
                 </q-item-section>
               </q-item>
+              <q-item to="/about">
+                <q-item-section>
+                  <q-item-label>
+                    {{ t(`menu.about`) }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
             </q-list>
           </q-menu>
         </q-btn>
@@ -688,12 +695,6 @@ export default defineComponent({
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
-      },
-      {
-        title: t("menu.about"),
-        icon: outlinedFormatListBulleted,
-        link: "/about",
-        name: "about",
       },
     ]);
 
