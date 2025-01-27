@@ -265,14 +265,7 @@ async fn default_proxy(
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     // send query
-    let req = if new_url.full_url.starts_with("https://") {
-        create_http_client()
-            .unwrap()
-            .request_from(req.full_url().to_string(), req.head())
-            .address(new_url.node_addr.parse().unwrap())
-    } else {
-        client.request_from(&new_url.full_url, req.head())
-    };
+    let req = create_proxy_request(client, req, &new_url).await?;
     let mut resp = match req.send_stream(payload).await {
         Ok(resp) => resp,
         Err(e) => {
@@ -362,14 +355,7 @@ async fn proxy_querier_by_body(
         .replace("https://", "");
 
     // send query
-    let req = if new_url.full_url.starts_with("https://") {
-        create_http_client()
-            .unwrap()
-            .request_from(req.full_url().to_string(), req.head())
-            .address(new_url.node_addr.parse().unwrap())
-    } else {
-        client.request_from(&new_url.full_url, req.head())
-    };
+    let req = create_proxy_request(client, req, &new_url).await?;
     let resp = if let Some(payload) = payload {
         req.send_form(&payload).await
     } else {
@@ -458,6 +444,43 @@ async fn proxy_ws(
         );
         Ok(HttpResponse::NotFound().body("WebSocket is disabled"))
     }
+}
+
+async fn create_proxy_request(
+    client: web::Data<awc::Client>,
+    req: HttpRequest,
+    new_url: &URLDetails,
+) -> actix_web::Result<awc::ClientRequest, Error> {
+    // get cookies
+    let cookies = req
+        .head()
+        .headers
+        .iter()
+        .filter_map(|(key, value)| {
+            if key.as_str() == "cookie" {
+                Some(value.to_str().unwrap_or("").to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    // send query
+    let mut req = if new_url.full_url.starts_with("https://") {
+        create_http_client()
+            .unwrap()
+            .request_from(req.full_url().to_string(), req.head())
+            .address(new_url.node_addr.parse().unwrap())
+    } else {
+        client.request_from(&new_url.full_url, req.head())
+    };
+    // set cookies
+    if !cookies.is_empty() {
+        req.headers_mut().insert(
+            actix_web::http::header::COOKIE,
+            actix_http::header::HeaderValue::from_str(&cookies.join("; ")).unwrap(),
+        );
+    }
+    Ok(req)
 }
 
 pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
