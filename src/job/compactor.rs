@@ -175,6 +175,9 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 
 /// Generate downsampling job for compactor
 async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
+    if get_config().compact.metrics_downsampling_rules.is_empty() {
+        return Ok(());
+    }
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.downsampling_interval,
@@ -243,6 +246,9 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
 }
 
 async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
+    if get_config().compact.metrics_downsampling_rules.is_empty() {
+        return Ok(());
+    }
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.sync_to_db_interval,
