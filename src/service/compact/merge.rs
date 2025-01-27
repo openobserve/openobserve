@@ -765,9 +765,10 @@ pub async fn merge_files(
     let mut new_file_list = Vec::new();
     let cfg = get_config();
     for file in files_with_size.iter() {
-        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
+        if (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
             || new_compressed_file_size + file.meta.compressed_size
-                > cfg.compact.max_file_size as i64
+                > cfg.compact.max_file_size as i64)
+            && !is_match_downsampling_rule
         {
             break;
         }
