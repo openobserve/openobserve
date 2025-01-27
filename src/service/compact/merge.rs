@@ -384,7 +384,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
                 .unwrap()
                 * 3
                 + day_micros(1)
-        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset 
+        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset
     {
         return Ok(()); // the time is future, just wait
     }
