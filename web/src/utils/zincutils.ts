@@ -23,6 +23,7 @@ import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
 import store from "../stores";
+import cronParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -1013,4 +1014,20 @@ export function convertUnixToQuasarFormat(unixMicroseconds: any) {
   const dateToFormat = new Date(unixSeconds * 1000);
   const formattedDate = dateToFormat.toISOString();
   return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
+export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
+  } catch (err) {
+    return null;
+  }
 }

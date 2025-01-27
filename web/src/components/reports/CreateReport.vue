@@ -420,6 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ]"
                         dense
                         style="width: 100%"
+                        debounce="400"
+                        @update:model-value="validateFrequency"
                       />
                     </div>
                     <div class="o2-input">
@@ -832,6 +834,7 @@ import {
   getUUID,
   useLocalTimezone,
   isValidResourceName,
+  getCronIntervalDifferenceInSeconds,
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
@@ -1019,14 +1022,13 @@ onBeforeMount(async () => {
         originalReportData.value = JSON.stringify(formData.value);
       })
       .catch((err) => {
-        if(err.response.status != 403){
+        if (err.response.status != 403) {
           q.notify({
-          type: "negative",
-          message: err?.data?.message || "Error while fetching report!",
-          timeout: 4000,
+            type: "negative",
+            message: err?.data?.message || "Error while fetching report!",
+            timeout: 4000,
           });
         }
-        
       })
       .finally(() => {
         isFetchingReport.value = false;
@@ -1105,7 +1107,7 @@ const setDashboardOptions = (id: string) => {
         "",
         store.state.selectedOrganization.identifier,
         id,
-        ""
+        "",
       )
       .then((response: any) => {
         response.data.dashboards
@@ -1127,7 +1129,7 @@ const setDashboardOptions = (id: string) => {
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
-            }
+            },
           );
 
         resolve(true);
@@ -1149,7 +1151,7 @@ const setDashboardTabOptions = (dashboardId: any) => {
 
   dashboardTabOptions.value =
     dashboardOptions.value.filter(
-      (dashboard) => dashboard.value === dashboardId
+      (dashboard) => dashboard.value === dashboardId,
     )[0].tabs || defaultTabs;
 
   options.value["tabs"] = [...dashboardTabOptions.value];
@@ -1204,7 +1206,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -1233,7 +1235,7 @@ const addDashboardVariable = () => {
 const removeDashboardVariable = (variable: any) => {
   formData.value.dashboards[0].variables =
     formData.value.dashboards[0].variables.filter(
-      (_variable: any) => _variable.id !== variable.id
+      (_variable: any) => _variable.id !== variable.id,
     );
 };
 
@@ -1293,7 +1295,7 @@ const saveReport = async () => {
   const convertedDateTime = convertDateToTimestamp(
     scheduling.value.date,
     scheduling.value.time,
-    scheduling.value.timezone
+    scheduling.value.timezone,
   );
 
   reportPayload.start = convertedDateTime.timestamp;
@@ -1372,17 +1374,17 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
-      if(error.response.status != 403){
+      if (error.response.status != 403) {
         q.notify({
-        type: "negative",
-        message:
-          error?.response?.data?.message ||
-          `Error while ${
-            isEditingReport.value ? "updating" : "saving"
-          } report.`,
-        timeout: 4000,
+          type: "negative",
+          message:
+            error?.response?.data?.message ||
+            `Error while ${
+              isEditingReport.value ? "updating" : "saving"
+            } report.`,
+          timeout: 4000,
         });
-      } 
+      }
     })
     .finally(() => {
       dismiss();
@@ -1429,12 +1431,16 @@ const validateReportData = async () => {
   if (formData.value.frequency.type === "cron") {
     try {
       cronParser.parseExpression(frequency.value.cron);
-      cronError.value = "";
+      validateFrequency();
     } catch (err) {
       cronError.value = "Invalid cron expression!";
-      step.value = 2;
       return;
     }
+  }
+
+  if (cronError.value) {
+    step.value = 2;
+    return;
   }
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
@@ -1450,12 +1456,39 @@ const validateReportData = async () => {
   if (
     !formData.value.title ||
     !/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
-      emails.value
+      emails.value,
     )
   ) {
     step.value = 3;
     return;
   }
+};
+
+const validateFrequency = () => {
+  cronError.value = "";
+
+  if (frequency.value.type === "cron") {
+    const intervalInSecs = getCronIntervalDifferenceInSeconds(
+      frequency.value.cron,
+    );
+
+    if (
+      typeof intervalInSecs === "number" &&
+      !isValidInterval(intervalInSecs)
+    ) {
+      const minInterval = Number(
+        store.state?.zoConfig?.min_auto_refresh_interval,
+      );
+      cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return;
+    }
+  }
+};
+
+const isValidInterval = (value: number) => {
+  return (
+    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
+  );
 };
 
 const goToReports = () => {
@@ -1476,7 +1509,7 @@ const onFilterOptions = (type: string, val: String, update: Function) => {
     dashboardOptions.value = filterOptions(
       options.value[type] || [],
       val,
-      update
+      update,
     );
   }
 
@@ -1484,7 +1517,7 @@ const onFilterOptions = (type: string, val: String, update: Function) => {
     dashboardTabOptions.value = filterOptions(
       dashboardTabOptions.value,
       val,
-      update
+      update,
     );
   }
 };
@@ -1569,7 +1602,7 @@ const setupEditingReport = async (report: any) => {
   // Check if folder is present in the options and set the folder
   if (
     folderOptions.value.some(
-      (folder) => folder.value === report.dashboards[0].folder
+      (folder) => folder.value === report.dashboards[0].folder,
     )
   ) {
     formData.value.dashboards[0].folder = report.dashboards[0].folder;
@@ -1585,7 +1618,7 @@ const setupEditingReport = async (report: any) => {
   // Check if dashboard is present in the options and set the dashboard
   if (
     dashboardOptions.value.some(
-      (dashboard) => dashboard.value === report.dashboards[0].dashboard
+      (dashboard) => dashboard.value === report.dashboards[0].dashboard,
     )
   ) {
     formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
@@ -1602,7 +1635,7 @@ const setupEditingReport = async (report: any) => {
 
   // Check if tab is present in the options and set the tab
   const tab = dashboardTabOptions.value.filter(
-    (tab) => tab.value === report.dashboards[0].tabs[0]
+    (tab) => tab.value === report.dashboards[0].tabs[0],
   )[0];
 
   if (tab) {

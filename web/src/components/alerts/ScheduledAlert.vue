@@ -509,6 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     min="1"
                     style="background: none"
+                    debounce="300"
                     @update:model-value="updateTrigger"
                   />
                 </div>
@@ -586,6 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 min="1"
                 style="background: none"
+                debounce="300"
                 @update:model-value="updateTrigger"
               />
             </div>
@@ -732,6 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="triggerData.frequency_type"
                 :true-value="'cron'"
                 :false-value="'minutes'"
+                @update:model-value="updateTrigger"
               />
             </div>
           </div>
@@ -828,6 +831,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ) || 1
                 "
                 style="background: none"
+                debounce="300"
                 @update:model-value="updateTrigger"
               />
               <div v-else class="tw-flex tw-items-center o2-input">
@@ -841,6 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   stack-label
                   outlined
+                  debounce="300"
                   @update:model-value="updateTrigger"
                 />
                 <q-select
@@ -892,12 +897,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
               (triggerData.frequency_type == 'cron' &&
-                (triggerData.cron == '' || !triggerData.timezone))
+                (triggerData.cron == '' || !triggerData.timezone)) ||
+              cronJobError
             "
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
           >
-            Field is required!
+            {{ cronJobError || "Field is required!" }}
           </div>
         </div>
       </div>
@@ -915,7 +921,11 @@ import {
   outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
+import {
+  getImageURL,
+  useLocalTimezone,
+  getCronIntervalDifferenceInSeconds,
+} from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 
@@ -1005,6 +1015,8 @@ const fnEditorRef = ref<any>(null);
 
 const filteredTimezone: any = ref([]);
 
+const cronJobError = ref("");
+
 const getNumericColumns = computed(() => {
   if (
     _isAggregationEnabled.value &&
@@ -1074,6 +1086,9 @@ const updateQueryValue = (value: string) => {
 };
 
 const updateTrigger = () => {
+  cronJobError.value = "";
+  validateFrequency(triggerData.value);
+
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
 };
@@ -1326,9 +1341,46 @@ const toggleExpandFunctionError = () => {
   isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
 };
 
+const validateFrequency = (frequency) => {
+  if (frequency.frequency_type === "cron") {
+    const intervalInSecs = getCronIntervalDifferenceInSeconds(frequency.cron);
+
+    if (
+      typeof intervalInSecs === "number" &&
+      !isValidInterval(intervalInSecs)
+    ) {
+      const minInterval = Number(
+        store.state?.zoConfig?.min_auto_refresh_interval,
+      );
+      cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return;
+    }
+  }
+
+  if (frequency.frequency_type === "minutes") {
+    const intervalInMins = Math.ceil(
+      store.state?.zoConfig?.min_auto_refresh_interval / 60,
+    );
+
+    if (frequency.frequency < intervalInMins) {
+      cronJobError.value =
+        "Frequency should be greater than " + (intervalInMins - 1);
+      return;
+    }
+  }
+};
+
+const isValidInterval = (value: number) => {
+  return (
+    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
+  );
+};
+
 defineExpose({
   tab,
   validateInputs,
+  cronJobError,
+  validateFrequency,
 });
 </script>
 

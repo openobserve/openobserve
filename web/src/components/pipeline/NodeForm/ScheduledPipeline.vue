@@ -563,11 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 dense
                 filled
-                :min="
-                  Math.ceil(
-                    store.state?.zoConfig?.min_auto_refresh_interval / 60,
-                  ) || 1
-                "
+                min="1"
                 style="background: none"
                 @update:model-value="updateFrequency"
               />
@@ -748,11 +744,16 @@ import {
   outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
+import {
+  getImageURL,
+  useLocalTimezone,
+  getCronIntervalDifferenceInSeconds,
+} from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
+import { c } from "vite/dist/node/types.d-aGj9QkWt";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -901,6 +902,10 @@ const updateTrigger = () => {
 };
 
 const updateFrequency = async () => {
+  cronJobError.value = "";
+
+  validateFrequency();
+
   triggerData.value.period = Number(triggerData.value.frequency);
 
   emits("update:trigger", triggerData.value);
@@ -930,9 +935,12 @@ function convertCronToMinutes(cronExpression: string) {
 }
 
 const updateCron = () => {
+  cronJobError.value = "";
+
   let minutes = 0;
   try {
     minutes = convertCronToMinutes(triggerData.value.cron);
+    validateFrequency();
 
     if (minutes < 0) return;
 
@@ -1117,12 +1125,14 @@ const onBlurQueryEditor = () => {
 };
 
 const validateInputs = (notify: boolean = true) => {
+  validateFrequency();
+
   if (cronJobError.value) {
     notify &&
       q.notify({
         type: "negative",
-        message: "Invalid cron expression",
-        timeout: 1500,
+        message: cronJobError.value,
+        timeout: 2000,
       });
     return false;
   }
@@ -1176,6 +1186,43 @@ const validateInputs = (notify: boolean = true) => {
   }
 
   return true;
+};
+
+const validateFrequency = () => {
+  if (triggerData.value.frequency_type === "cron") {
+    const intervalInSecs = getCronIntervalDifferenceInSeconds(
+      triggerData.value.cron,
+    );
+
+    if (
+      typeof intervalInSecs === "number" &&
+      !isValidInterval(intervalInSecs)
+    ) {
+      const minInterval = Number(
+        store.state?.zoConfig?.min_auto_refresh_interval,
+      );
+      cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+      return;
+    }
+  }
+
+  if (triggerData.value.frequency_type === "minutes") {
+    const intervalInMins = Math.ceil(
+      store.state?.zoConfig?.min_auto_refresh_interval / 60,
+    );
+
+    if (triggerData.value.frequency < intervalInMins) {
+      cronJobError.value =
+        "Frequency should be greater than " + (intervalInMins - 1);
+      return;
+    }
+  }
+};
+
+const isValidInterval = (value: number) => {
+  return (
+    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
+  );
 };
 
 defineExpose({

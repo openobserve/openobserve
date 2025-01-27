@@ -494,6 +494,7 @@ import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import cronParser from "cron-parser";
 
 const defaultValue: any = () => {
   return {
@@ -1143,6 +1144,21 @@ export default defineComponent({
             message: "Threshold should not be empty",
             timeout: 1500,
           });
+        return false;
+      }
+
+      if (input.trigger_condition.frequency_type === "cron") {
+        try {
+          cronParser.parseExpression(input.trigger_condition.cron);
+          scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
+        } catch (err) {
+          console.log(err);
+          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
+          return;
+        }
+      }
+
+      if (scheduledAlertRef.value.cronJobError.value) {
         return false;
       }
 
