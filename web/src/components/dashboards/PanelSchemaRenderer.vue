@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 100%; height: 100%" @mouseleave="hidePopupsAndOverlays" @mouseenter="showPopupsAndOverlays">
+  <div
+    style="width: 100%; height: 100%"
+    @mouseleave="hidePopupsAndOverlays"
+    @mouseenter="showPopupsAndOverlays"
+  >
     <div
       ref="chartPanelRef"
       style="height: 100%; position: relative"
@@ -349,7 +353,7 @@ export default defineComponent({
     const isCursorOverPanel = ref(false);
     const showPopupsAndOverlays = () => {
       isCursorOverPanel.value = true;
-    }
+    };
 
     // get refs from props
     const {
@@ -722,21 +726,21 @@ export default defineComponent({
     const onChartClick = async (params: any, ...args: any) => {
       // check for annotations add mode
       if (allowAnnotationsAdd.value) {
-        if (isAddAnnotationMode.value) {
-          handleAddAnnotation(
-            params?.data?.[0] || params?.data?.time || params?.data?.name,
-            null,
-          );
-          return;
-        }
-
         // check if it is markline or markarea component click, than handle it differently
         if (
           allowAnnotationsAdd.value &&
+          isAddAnnotationMode.value &&
           (params?.componentType == "markLine" ||
             params?.componentType == "markArea")
         ) {
           editAnnotation(params?.data?.annotationDetails);
+          return;
+        } else if (isAddAnnotationMode.value) {
+          // handle add annotation
+          handleAddAnnotation(
+            params?.data?.[0] || params?.data?.time || params?.data?.name,
+            null,
+          );
           return;
         }
       }
