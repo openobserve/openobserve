@@ -359,11 +359,15 @@ pub async fn handle_otlp_request(
                 let span_status_for_spanmetric = local_val.span_status.clone();
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
+                // add timestamp
+                value.as_object_mut().unwrap().insert(
+                    cfg.common.column_timestamp.clone(),
+                    json::Value::Number(timestamp.into()),
+                );
 
                 if executable_pipeline.is_some() {
                     stream_pipeline_inputs.add_input(
                         value,
-                        timestamp,
                         service_name.to_owned(),
                         span.name,
                         span_status_for_spanmetric,
@@ -377,7 +381,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let mut record_val = match value.take() {
+                    let record_val = match value.take() {
                         json::Value::Object(mut v) => {
                             // build span metrics item
                             let sm = crate::job::metrics::TraceMetricsItem {
@@ -411,11 +415,6 @@ pub async fn handle_otlp_request(
                         }
                     };
 
-                    // add timestamp
-                    record_val.insert(
-                        cfg.common.column_timestamp.clone(),
-                        json::Value::Number(timestamp.into()),
-                    );
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
                         .or_insert((Vec::new(), None));
@@ -429,7 +428,6 @@ pub async fn handle_otlp_request(
     if let Some(exec_pl) = &executable_pipeline {
         let (
             records,
-            timestamps,
             services,
             span_names,
             span_status_for_spanmetrics,
@@ -456,7 +454,7 @@ pub async fn handle_otlp_request(
 
                     for (idx, mut res) in stream_pl_results {
                         // get json object
-                        let mut record_val = match res.take() {
+                        let record_val = match res.take() {
                             json::Value::Object(mut v) => {
                                 // build span metrics item
                                 let sm = crate::job::metrics::TraceMetricsItem {
@@ -489,12 +487,12 @@ pub async fn handle_otlp_request(
                             }
                         };
 
-                        // add timestamp
-                        let timestamp = timestamps[idx];
-                        record_val.insert(
-                            cfg.common.column_timestamp.clone(),
-                            json::Value::Number(timestamp.into()),
-                        );
+                        let Some(timestamp) = record_val
+                            .get(&cfg.common.column_timestamp)
+                            .and_then(|ts| ts.as_i64())
+                        else {
+                            continue;
+                        };
                         let (ts_data, _) = json_data_by_stream
                             .entry(traces_stream_name.to_string())
                             .or_insert((Vec::new(), None));
