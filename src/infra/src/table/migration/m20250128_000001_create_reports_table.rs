@@ -45,6 +45,17 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+        .drop_index(
+            Index::drop()
+                .name(REPORT_DASHBOARDS_DASHBOARD_ID_IDX)
+                .table(ReportDashboards::Table)
+                .to_owned(),
+        )
+        .await?;
+        manager
+            .drop_table(Table::drop().table(ReportDashboards::Table).to_owned())
+            .await?;
+        manager
             .drop_index(
                 Index::drop()
                     .name(REPORTS_FOLDER_ID_IDX)
