@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
-            :label="t('settings.generalLabel')"
+            :label="t('settings.enterpriseTitle')"
             content-class="tab_content"
           />
           <q-route-tab

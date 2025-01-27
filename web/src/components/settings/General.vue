@@ -16,54 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div>
-    <div class="q-px-md q-py-md">
-      <div class="text-body1 text-bold">
-        {{ t("settings.generalPageTitle") }}
-      </div>
-    </div>
-    <q-separator />
-    <div class="q-w-md q-mx-lg">
-      <q-form @submit.stop="onSubmit.execute">
-        <q-input
-          v-model.number="scrapeIntereval"
-          type="number"
-          min="0"
-          :label="t('settings.scrapintervalLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Scrape interval is required']"
-          :lazy-rules="true"
-        />
-
-        <q-toggle
-          v-if="store.state.zoConfig.websocket_enabled"
-          v-model="enableWebsocketSearch"
-          :label="t('settings.enableWebsocketSearch')"
-          data-test="general-settings-enable-websocket"
-          class="q-py-md showLabelOnTop"
-        />
-        <span>&nbsp;</span>
-
-        <div class="flex justify-start">
-          <q-btn
-            data-test="dashboard-add-submit"
-            :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border"
-            color="secondary"
-            type="submit"
-            no-caps
-            size="md"
-          />
-        </div>
-      </q-form>
-    </div>
+  <div class="q-pb-md">    
     <div id="enterpriseFeature" v-if="config.isEnterprise == 'true'">
       <div class="q-px-md q-py-md">
         <div class="text-body1 text-bold">

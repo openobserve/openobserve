@@ -62,7 +62,23 @@
         </template>
       </q-input>
     </div>
-
+    <div data-test="scrap-interval-input-btn" class="span-id-field-name o2-input">
+      <q-input
+        v-model.number="scrapeIntereval"
+        type="number"
+        min="0"
+        :label="t('settings.scrapintervalLabel')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        :rules="[(val: any) => !!val || 'Scrape interval is required']"
+        :lazy-rules="true"
+      />
+    </div>
     <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
       <q-toggle
         data-test="add-toggle-ingestion-btn"
@@ -78,7 +94,19 @@
       >
       </q-toggle>
     </div>
-
+    <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+      <q-toggle
+        v-if="store.state.zoConfig.websocket_enabled"
+        v-model="enableWebsocketSearch"
+        :label="t('settings.enableWebsocketSearch')"
+        data-test="general-settings-enable-websocket"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+      />
+    </div>
     <div class="flex justify-start q-mt-lg">
       <q-btn
         data-test="add-alert-cancel-btn"
@@ -104,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
@@ -130,7 +158,23 @@ const toggleIngestionLogs = ref(
   store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
     false,
 );
+const scrapeIntereval = ref(
+      store.state?.organizationData?.organizationSettings?.scrape_interval ??
+        15,
+);
+const enableWebsocketSearch = ref(
+      store.state?.organizationData?.organizationSettings
+        ?.enable_websocket_search ?? false,
+    );
 
+onActivated(() => {
+  scrapeIntereval.value =
+    store.state?.organizationData?.organizationSettings?.scrape_interval ??
+    15;
+  enableWebsocketSearch.value =
+    store.state?.organizationData?.organizationSettings
+      ?.enable_websocket_search ?? false;
+});
 const isValidRoleName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
   // Check if the role name is valid
@@ -159,6 +203,8 @@ const saveOrgSettings = async () => {
         trace_id_field_name: traceIdFieldName.value,
         span_id_field_name: spanIdFieldName.value,
         toggle_ingestion_logs: toggleIngestionLogs.value,
+        scrape_interval: scrapeIntereval.value,
+        enable_websocket_search: enableWebsocketSearch.value,
       },
     );
 
@@ -167,6 +213,8 @@ const saveOrgSettings = async () => {
       trace_id_field_name: traceIdFieldName.value,
       span_id_field_name: spanIdFieldName.value,
       toggle_ingestion_logs: toggleIngestionLogs.value,
+      scrape_interval: scrapeIntereval.value,
+      enable_websocket_search: enableWebsocketSearch.value,
     });
 
     q.notify({
