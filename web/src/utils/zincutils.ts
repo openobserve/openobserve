@@ -17,7 +17,7 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4 } from "uuid";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
@@ -506,7 +506,7 @@ export const formatSizeFromMB = (sizeInMB: string) => {
 };
 
 export const addCommasToNumber = (number: number) => {
-  if (number === null || number === undefined) return '0';
+  if (number === null || number === undefined) return "0";
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
@@ -988,3 +988,29 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
+export const maxLengthCharValidation = (
+  val: string = "",
+  char_length: number = 50,
+) => {
+  return (
+    (val && val.length <= char_length) ||
+    `Maximum ${char_length} characters allowed`
+  );
+};
+
+export const validateUrl = (val: string) => {
+  try {
+    const url = new URL(val); // Built-in URL constructor
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (error) {
+    return "Please provide correct URL.";
+  }
+};
+
+export function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
