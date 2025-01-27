@@ -577,6 +577,7 @@ import {
   useLocalTimezone,
   isValidResourceName,
   getCronIntervalDifferenceInSeconds,
+  isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
@@ -961,19 +962,15 @@ const validateFrequency = (value: string) => {
 
   const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
 
-  if (typeof intervalInSecs === "number" && !isValidInterval(intervalInSecs)) {
-    const minInterval = Number(
-      store.state?.zoConfig?.min_auto_refresh_interval,
-    );
+  if (
+    typeof intervalInSecs === "number" &&
+    !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
+  ) {
+    const minInterval =
+      Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 1;
     cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
     return;
   }
-};
-
-const isValidInterval = (value: number) => {
-  return (
-    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
-  );
 };
 
 const goToActionScripts = () => {

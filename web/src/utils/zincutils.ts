@@ -1031,3 +1031,11 @@ export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
     return null;
   }
 }
+
+export function isAboveMinRefreshInterval(
+  value: number,
+  config: { min_auto_refresh_interval?: string | number },
+) {
+  const minInterval = Number(config?.min_auto_refresh_interval) ?? 1;
+  return value >= minInterval;
+}

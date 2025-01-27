@@ -925,6 +925,7 @@ import {
   getImageURL,
   useLocalTimezone,
   getCronIntervalDifferenceInSeconds,
+  isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -1351,7 +1352,7 @@ const validateFrequency = (frequency: {
 
     if (
       typeof intervalInSecs === "number" &&
-      !isValidInterval(intervalInSecs)
+      !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
     ) {
       const minInterval = Number(
         store.state?.zoConfig?.min_auto_refresh_interval,
@@ -1372,12 +1373,6 @@ const validateFrequency = (frequency: {
       return;
     }
   }
-};
-
-const isValidInterval = (value: number) => {
-  return (
-    value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) ?? 0)
-  );
 };
 
 defineExpose({
