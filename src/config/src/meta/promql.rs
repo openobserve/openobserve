@@ -243,7 +243,7 @@ impl From<&str> for Function {
             "max" | "MAX" => Self::Max,
             "last" | "LAST" => Self::Last,
             "first" | "FIRST" => Self::First,
-            _ => panic!("invalid function: {}", s),
+            _ => panic!("invalid downsampling function: {}", s),
         }
     }
 }
@@ -305,7 +305,6 @@ pub fn get_largest_downsampling_rule(
     let downsampling_rules = get_matching_downsampling_rules(stream_name);
     let mut rule = None;
     for r in downsampling_rules {
-        // TODO: align the timestamps to day level or hour level
         if chrono::Utc::now().timestamp_micros() - r.offest * 1_000_000 > max_ts {
             rule = Some(r);
             break;

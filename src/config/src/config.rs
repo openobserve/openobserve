@@ -2283,7 +2283,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
 
-    // TODO: avoid conflict with compactor and flatten compactor
     // if cfg.metrics_downsampling_rules is not empty, then run downsampling job
     // 1. split cfg.metrics_downsampling_rules by comma to get each rules
     // 2. split each rule by : to get regex:function:interval:offest
@@ -2293,9 +2292,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             let (regex, function, offest, step) = rule
                 .split(':')
                 .collect_tuple()
-                .expect("downsampling invalid downsampling rule");
+                .expect("invalid downsampling rule");
             if !regex.is_empty() {
-                let _ = Regex::new(regex).expect("downsampling invalid regex for downsampling");
+                let _ = Regex::new(regex).expect("invalid regex for downsampling");
             }
             if !function.is_empty() {
                 let _ = Function::from(function);
@@ -2311,7 +2310,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             let step = get_seconds_from_string(step);
             if step > 86400 || 86400 % step != 0 {
                 return Err(anyhow::anyhow!(
-                    "downsampling step must be a multiple of 24 hours"
+                    "downsampling step must be a multiple of 24h and less than 24h"
                 ));
             }
             if offest % step != 0 {
@@ -2446,7 +2445,7 @@ fn get_seconds_from_string(s: &str) -> i64 {
         "d" => num * 86400,
         "s" => num,
         _ => panic!(
-            "invalid unit for downsampling: {}, only support s, m, h, d",
+            "invalid unit for downsampling: {}, only support s(second), m(minute), h(hour), d(day)",
             unit
         ),
     }

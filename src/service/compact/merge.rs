@@ -370,10 +370,11 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
         .with_ymd_and_hms(time_now.year(), time_now.month(), time_now.day(), 0, 0, 0)
         .unwrap()
         .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time
+    // must wait for at least 3 * max_file_retention_time + 1 day
     // -- first period: the last hour local file upload to storage, write file list
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of
+    // -- 1 day, downsampling is in day level
     // max_file_retention_time
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
@@ -383,6 +384,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
                 .unwrap()
                 * 3
                 + day_micros(1)
+        || time_now.timestamp_micros() - rule.0 * 1_000_000 < offset 
     {
         return Ok(()); // the time is future, just wait
     }
