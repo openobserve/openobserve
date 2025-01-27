@@ -770,7 +770,16 @@ export default defineComponent({
       const params = route.query;
 
       if (params.refresh) {
-        refreshInterval.value = parseDuration(params.refresh);
+        const refreshInSecs = parseDuration(params.refresh);
+        if (store.state?.zoConfig?.min_auto_refresh_interval) {
+          if (
+            refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval
+          ) {
+            refreshInterval.value = 0;
+          } else {
+            refreshInterval.value = refreshInSecs;
+          }
+        }
       }
 
       // check if timezone query params exist
