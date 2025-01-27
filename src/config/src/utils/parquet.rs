@@ -105,7 +105,7 @@ pub fn new_parquet_writer_without_metadata<'a>(
             cfg.common.column_timestamp.as_str().into(),
             Encoding::DELTA_BINARY_PACKED,
         );
-    
+
     // TODO: set bf_ndv
     if cfg.common.bloom_filter_enabled {
         let mut fields = bloom_filter_fields.to_vec();
