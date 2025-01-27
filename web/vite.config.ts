@@ -29,7 +29,6 @@ import visualizer from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
-import tailwindcss from "@tailwindcss/vite";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -106,7 +105,6 @@ export default defineConfig({
   },
   base: "./",
   plugins: [
-    tailwindcss(),
     vue({
       template: { transformAssetUrls },
     }),
