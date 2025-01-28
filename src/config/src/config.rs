@@ -1225,7 +1225,7 @@ pub struct Limit {
     pub max_query_range_for_sa: i64,
     #[env_config(
         name = "ZO_TEXT_DATA_TYPE",
-        default = "LONGTEXT",
+        default = "longtext",
         help = "Default data type for LongText compliant DB's"
     )]
     pub db_text_data_type: String,
