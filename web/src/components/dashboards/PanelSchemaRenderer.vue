@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           top: 0px;
           left: 0px;
           display: none;
-          width: 200px;
+          max-width: 200px;
           text-wrap: wrap;
           z-index: 9999999;
         "
@@ -756,112 +756,97 @@ export default defineComponent({
     // need to save click event params, to open drilldown
     let drilldownParams: any = [];
     const onChartClick = async (params: any, ...args: any) => {
-      // Check for annotations add mode
+      // Check if we have both drilldown and annotation at the same point
+      const hasAnnotation =
+        params?.componentType === "markLine" ||
+        params?.componentType === "markArea";
+      const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
+
+      // If in annotation add mode, handle that first
       if (allowAnnotationsAdd.value) {
-        // check if it is markline or markarea component click, than handle it differently
-        if (
-          isAddAnnotationMode.value &&
-          (params?.componentType == "markLine" ||
-            params?.componentType == "markArea")
-        ) {
-          editAnnotation(params?.data?.annotationDetails);
-          return;
-        } else if (isAddAnnotationMode.value) {
-          // handle add annotation
-          handleAddAnnotation(
-            params?.data?.[0] || params?.data?.time || params?.data?.name,
-            null,
-          );
+        if (isAddAnnotationMode.value) {
+          if (hasAnnotation) {
+            editAnnotation(params?.data?.annotationDetails);
+          } else {
+            handleAddAnnotation(
+              params?.data?.[0] || params?.data?.time || params?.data?.name,
+              null,
+            );
+          }
           return;
         }
       }
 
-      // Check for markLine or markArea click to display annotation popup
-      if (
-        params?.componentType == "markLine" ||
-        params?.componentType == "markArea"
-      ) {
+      // Store click parameters for drilldown
+      if (hasDrilldown) {
+        drilldownParams = [params, args];
+        drilldownArray.value = panelSchema.value.config.drilldown ?? [];
+      }
+
+      // Calculate offset values based on chart type
+      let offsetValues = { left: 0, top: 0 };
+      if (panelSchema.value.type === "table") {
+        offsetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
+        offsetValues.left += params?.offsetX;
+        offsetValues.top += params?.offsetY;
+      } else {
+        offsetValues.left = params?.event?.offsetX;
+        offsetValues.top = params?.event?.offsetY;
+      }
+
+      // Handle popup displays with priority
+      if (hasDrilldown) {
+        // Show drilldown popup first
+        drilldownPopUpRef.value.style.display = "block";
+        await nextTick();
+
+        const drilldownOffset = calculatePopupOffset(
+          offsetValues.left,
+          offsetValues.top,
+          drilldownPopUpRef,
+          chartPanelRef,
+        );
+
+        drilldownPopUpRef.value.style.top = drilldownOffset.top + 5 + "px";
+        drilldownPopUpRef.value.style.left = drilldownOffset.left + 5 + "px";
+      } else if (hasAnnotation) {
+        // Only show annotation popup if there's no drilldown
         const description = params?.data?.annotationDetails?.text;
         if (description) {
           selectedAnnotationData.value = params?.data?.annotationDetails;
-          // temporarily show the popup to calculate its dimensions
           annotationPopupRef.value.style.display = "block";
 
-          // wait for the next DOM update cycle before calculating the dimensions
           await nextTick();
-          const offSetValues = calculatePopupOffset(
-            params?.event?.offsetX,
-            params?.event?.offsetY,
+
+          const annotationOffset = calculatePopupOffset(
+            offsetValues.left,
+            offsetValues.top,
             annotationPopupRef,
             chartPanelRef,
           );
 
-          // Apply calculated offsets to the annotation popup
-          annotationPopupRef.value.style.top = offSetValues.top + 5 + "px";
-          annotationPopupRef.value.style.left = offSetValues.left + 5 + "px";
-          if (selectedAnnotationData.value) {
-            annotationPopupRef.value.style.display = "block";
-          } else {
-            hidePopupsAndOverlays();
-          }
+          annotationPopupRef.value.style.top = annotationOffset.top + 5 + "px";
+          annotationPopupRef.value.style.left =
+            annotationOffset.left + 5 + "px";
         }
       }
 
+      // Hide popups if no content to display
       if (
-        !panelSchema.value.config.drilldown ||
-        panelSchema.value.config.drilldown.length == 0
+        !hasDrilldown &&
+        (!hasAnnotation || !params?.data?.annotationDetails?.text)
       ) {
-        return;
-      }
-
-      drilldownParams = [params, args];
-
-      // drilldownarrayref offset values
-      let offSetValues = { left: 0, top: 0 };
-
-      // if type is table, calculate offset
-      if (panelSchema.value.type == "table") {
-        offSetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
-
-        // also, add offset of clicked position
-        offSetValues.left += params?.offsetX;
-        offSetValues.top += params?.offsetY;
-      } else {
-        // for all other charts
-        offSetValues.left = params?.event?.offsetX;
-        offSetValues.top = params?.event?.offsetY;
-      }
-
-      // set drilldown array, to show list of drilldowns
-      drilldownArray.value = panelSchema.value.config.drilldown ?? [];
-
-      // temporarily show the popup to calculate its dimensions
-      drilldownPopUpRef.value.style.display = "block";
-
-      // wait for the next DOM update cycle before calculating the dimensions
-      await nextTick();
-
-      const drilldownOffset = calculatePopupOffset(
-        offSetValues.left,
-        offSetValues.top,
-        drilldownPopUpRef,
-        chartPanelRef,
-      );
-
-      drilldownPopUpRef.value.style.top = drilldownOffset.top + 5 + "px";
-      drilldownPopUpRef.value.style.left = drilldownOffset.left + 5 + "px";
-
-      // if drilldownArray has at least one element then only show the drilldown pop up
-      if (drilldownArray.value.length > 0) {
-        drilldownPopUpRef.value.style.display = "block";
-      } else {
-        // hide the popup if there's no drilldown
         hidePopupsAndOverlays();
       }
     };
 
     // Helper function to calculate popup offset
-    const calculatePopupOffset = (offsetX: any, offsetY: any, popupRef: any, containerRef: any) => {
+    const calculatePopupOffset = (
+      offsetX: any,
+      offsetY: any,
+      popupRef: any,
+      containerRef: any,
+    ) => {
       let offSetValues = { left: offsetX, top: offsetY };
 
       if (popupRef.value) {
