@@ -652,6 +652,7 @@ export const convertSQLData = async (
           ...series,
           xAxisIndex: index,
           yAxisIndex: index,
+          zlevel: 2,
         };
         options.series.push(updatedSeries);
 
@@ -662,6 +663,7 @@ export const convertSQLData = async (
           data: [[convertedTimeStampToDataFormat, null]],
           markArea: getSeriesMarkArea(),
           markLine: getAnnotationMarkLine(),
+          zlevel: 1,
         });
 
         if (index > 0) {
@@ -1245,6 +1247,7 @@ export const convertSQLData = async (
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
+      zlevel: 2,
     };
   };
 
@@ -2580,6 +2583,7 @@ export const convertSQLData = async (
       data: [[convertedTimeStampToDataFormat, null]],
       markLine: getAnnotationMarkLine(),
       markArea: getSeriesMarkArea(),
+      zlevel: 1,
     });
   }
 
