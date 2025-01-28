@@ -601,7 +601,7 @@ export default defineComponent({
         // get the dashboard
         const urlData = url.value.trim() ? url.value.trim() : "";
 
-        if (!urlData) {
+        if (!urlData && !jsonStr.value) {
           showErrorNotification("Please Enter a URL for import");
           return;
         }
