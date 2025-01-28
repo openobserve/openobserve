@@ -277,6 +277,7 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
+          dst_type: "http",
         })
         .then((res) => {
           res.data = res.data.filter(

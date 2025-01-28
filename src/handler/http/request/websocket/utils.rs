@@ -51,37 +51,35 @@ pub mod enterprise_utils {
             .clone();
 
         // If the user is external, check permissions
-        if user.is_external {
-            let stream_type_str = stream_type.as_str();
-            let o2_type = format!(
-                "{}:{}",
-                OFGA_MODELS
-                    .get(stream_type_str)
-                    .map_or(stream_type_str, |model| model.key),
-                stream_name
-            );
+        let stream_type_str = stream_type.as_str();
+        let o2_type = format!(
+            "{}:{}",
+            OFGA_MODELS
+                .get(stream_type_str)
+                .map_or(stream_type_str, |model| model.key),
+            stream_name
+        );
 
-            let auth_extractor = AuthExtractor {
-                auth: "".to_string(),
-                method: "GET".to_string(),
-                o2_type,
-                org_id: org_id.to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-            };
+        let auth_extractor = AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type,
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+        };
 
-            let has_permission = crate::handler::http::auth::validator::check_permissions(
-                user_id,
-                auth_extractor,
-                user.role,
-                user.is_external,
-            )
-            .await;
+        let has_permission = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            auth_extractor,
+            user.role,
+            user.is_external,
+        )
+        .await;
 
-            if !has_permission {
-                return Err("Unauthorized Access".to_string());
-            }
-        }
+        if !has_permission {
+            return Err("Unauthorized Access".to_string());
+        };
 
         Ok(())
     }
@@ -219,6 +217,13 @@ impl WsClientEvents {
     }
 }
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -229,7 +234,7 @@ pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: Box<config::meta::search::Response>,
-        time_offset: i64,
+        time_offset: TimeOffset,
         streaming_aggs: bool,
     },
     #[cfg(feature = "enterprise")]

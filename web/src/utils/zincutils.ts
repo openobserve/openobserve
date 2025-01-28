@@ -17,12 +17,13 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4 } from "uuid";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
 import store from "../stores";
+import cronParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -1006,3 +1007,35 @@ export const validateUrl = (val: string) => {
     return "Please provide correct URL.";
   }
 };
+
+export function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
+export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
+  } catch (err) {
+    throw new Error("Invalid cron expression");
+  }
+}
+
+export function isAboveMinRefreshInterval(
+  value: number,
+  config: { min_auto_refresh_interval?: string | number },
+) {
+  const minInterval = Number(config?.min_auto_refresh_interval) || 1;
+  return value >= minInterval;
+}

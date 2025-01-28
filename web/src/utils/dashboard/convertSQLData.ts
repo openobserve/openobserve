@@ -624,9 +624,11 @@ export const convertSQLData = async (
       // Calculate grid layout for trellis charts
       const gridData = getTrellisGrid(
         chartPanelRef.value.offsetWidth,
+        chartPanelRef.value.offsetHeight,
         options.series.length,
         yAxisNameGap,
         customCols,
+        panelSchema.config?.axis_width,
       );
 
       options.grid = gridData.gridArray;
@@ -741,39 +743,59 @@ export const convertSQLData = async (
     yAxisNameGap: number,
     gridData: null | any = null,
   ) => {
-    const maxYValue = formatUnitValue(
-      getUnitValue(
-        Math.max(
-          ...yAxisKeys.map((key: any) => getAxisDataFromKey(key)).flat(),
-        ),
-        panelSchema.config?.unit,
-        panelSchema.config?.unit_custom,
-        panelSchema.config?.decimals,
+    const maxYValue = getUnitValue(
+      Math.max(
+        ...yAxisKeys
+          .map((key: any) => getAxisDataFromKey(key))
+          .flat()
+          .filter((value: any) => typeof value === "number"),
       ),
+      panelSchema.config?.unit,
+      panelSchema.config?.unit_custom,
+      panelSchema.config?.decimals,
     );
 
-    // Update yAxis label properties for each chart yAxis based on the grid position
+    // Some units, currencies are formatted with , separator, we need to remove it and convert it to valid number
+    maxYValue.value = maxYValue.value.replace(",", "");
+
+    const [num, decimals] = maxYValue.value.split(".");
+
+    //  The purpose of addMaxValue is to ensure that the maxYValue.value is in a valid numeric format before updating the yAxis properties. By doing this check, the code ensures that only valid numeric values are used to set the max property of the yAxis, preventing potential errors or invalid configurations.
+    // Summary
+    // addMaxValue is a boolean that verifies if maxYValue.value is a valid numeric string.
+    // It ensures that the max property of the yAxis is only updated with valid numeric values.
+    const addMaxValue =
+      maxYValue.value ===
+      parseInt(num) + (decimals === undefined ? "" : `.${decimals}`);
+
     options.yAxis.forEach((it: any, index: number) => {
-      it.max = maxYValue;
+      if (addMaxValue) {
+        it.max = maxYValue.value;
+      }
+
       it.axisLabel = {
-        formatter: function (value: number) {
-          // Force two decimal places for all charts
-          return value.toFixed(2);
+        formatter: function (value: any) {
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            ),
+          );
         },
       };
 
       let showAxisLabel = true;
 
       if (isHorizontalChart) {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.yAxis.length - gridData.gridNoOfCol <= index;
       } else {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       }
 
       // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
-      it.nameGap = showAxisLabel ? yAxisNameGap : 0;
+      it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
       it.axisLabel.margin = showAxisLabel ? 5 : 0;
       it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
       it.nameTextStyle.fontSize = 12;
@@ -798,9 +820,7 @@ export const convertSQLData = async (
       if (isHorizontalChart) {
         showAxisLabel = index % gridData.gridNoOfCol === 0;
       } else {
-        showAxisLabel =
-          index >=
-          gridData.gridNoOfRow * gridData.gridNoOfCol - gridData.gridNoOfCol;
+        showAxisLabel = options.xAxis.length - gridData.gridNoOfCol <= index;
       }
 
       it.axisTick.length = showAxisLabel ? 5 : 0;
@@ -1419,7 +1439,13 @@ export const convertSQLData = async (
           : {},
       );
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length)
+      if (
+        (panelSchema.type === "line" ||
+          panelSchema.type == "area" ||
+          panelSchema.type == "scatter") &&
+        panelSchema.config.trellis?.layout &&
+        breakDownKeys.length
+      )
         updateTrellisConfig();
 
       break;
@@ -1669,10 +1695,6 @@ export const convertSQLData = async (
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
-
       break;
     }
     case "heatmap": {
@@ -1859,27 +1881,21 @@ export const convertSQLData = async (
       // get second x axis key
       options.series = getSeries({ barMinHeight: 1 });
 
-      if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-        updateTrellisConfig();
-      }
-
       const temp = options.xAxis;
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      if (!panelSchema.config.trellis?.layout) {
-        const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
-          return Math.max(acc, it.axisLabel.width || 0);
-        }, 0);
+      const maxYaxisWidth = options.yAxis.reduce((acc: number, it: any) => {
+        return Math.max(acc, it.axisLabel.width || 0);
+      }, 0);
 
-        options.yAxis.map((it: any) => {
-          it.nameGap =
-            Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
-            10;
-        });
+      options.yAxis.map((it: any) => {
+        it.nameGap =
+          Math.min(calculateWidthText(largestLabel(it.data)), maxYaxisWidth) +
+          10;
+      });
 
-        options.xAxis.nameGap = 25;
-      }
+      options.xAxis.nameGap = 25;
 
       break;
     }
@@ -2169,6 +2185,14 @@ export const convertSQLData = async (
 
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
+
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         if (
           hoveredSeriesState?.value &&
           panelSchema.id &&
@@ -2204,6 +2228,7 @@ export const convertSQLData = async (
         }
 
         const hoverText: string[] = [];
+
         name.forEach((it: any) => {
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
@@ -2327,6 +2352,13 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
+        if (
+          showTrellisConfig(panelSchema.type) &&
+          panelSchema.config.trellis?.layout &&
+          breakDownKeys.length
+        )
+          name = [name[0]];
+
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
@@ -2588,6 +2620,11 @@ const largestLabel = (data: any) => {
   }, "");
 
   return largestlabel;
+};
+
+const showTrellisConfig = (type: string) => {
+  const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
+  return supportedTypes.has(type);
 };
 
 /**
