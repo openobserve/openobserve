@@ -949,13 +949,20 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].joins ?? [];
 
+        // joins streams
+        // main stream + all join streams
         const joinsStreams = [
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream,
-          ...joins
-            .map((join: any) => join.stream)
-            .filter((stream: any) => stream),
+          {
+            stream:
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream,
+            streamAlias:
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.stream,
+          },
+          ...joins.filter((stream: any) => stream?.stream),
         ];
 
         // loop on all the streams
@@ -963,7 +970,10 @@ export default defineComponent({
         // create grouped object with stream name and fields
         groupedFields.value = await Promise.all(
           joinsStreams.map(async (stream: any) => {
-            return await loadStreamFields(stream);
+            return {
+              ...(await loadStreamFields(stream?.stream)),
+              stream_alias: stream?.streamAlias,
+            };
           }),
         );
       },
@@ -985,6 +995,7 @@ export default defineComponent({
           flattenedFields.push({
             ...field,
             stream: group.name,
+            streamAlias: group.stream_alias,
             isGroup: false,
           });
         });
