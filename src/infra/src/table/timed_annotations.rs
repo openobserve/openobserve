@@ -563,11 +563,7 @@ pub async fn update(
             .await?;
     } else {
         // Update panels
-        let panel_ids: Vec<_> = timed_annotation
-            .panels
-            .iter()
-            .map(|id| id.clone())
-            .collect();
+        let panel_ids: Vec<_> = timed_annotation.panels.iter().cloned().collect();
         let existing_panels: Vec<String> = timed_annotation_panels::Entity::find()
             .filter(
                 timed_annotation_panels::Column::TimedAnnotationId.eq(timed_annotation_id.clone()),
