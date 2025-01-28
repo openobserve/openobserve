@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::table::cipher::{self, ListFilter};
 use o2_enterprise::enterprise::cipher::CipherData;
 
-use crate::cipher::registry::REGISTRY;
+use crate::{
+    cipher::registry::REGISTRY,
+    table::cipher::{self, ListFilter},
+};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     log::info!("retrieving and caching cipher keys in memory");

@@ -4824,7 +4824,6 @@ dependencies = [
 name = "infra"
 version = "0.1.0"
 dependencies = [
- "aes-siv",
  "ahash 0.8.11",
  "anyhow",
  "async-nats",
@@ -4847,10 +4846,8 @@ dependencies = [
  "parking_lot",
  "reqwest",
  "sea-orm",
- "sea-orm-migration",
  "serde",
  "serde_json",
- "sha1",
  "sqlx",
  "svix-ksuid",
  "thiserror 1.0.69",
@@ -6114,6 +6111,7 @@ dependencies = [
  "actix-web-prometheus",
  "actix-web-rust-embed-responder",
  "actix-ws",
+ "aes-siv",
  "ahash 0.8.11",
  "anyhow",
  "argon2",
@@ -6135,6 +6133,7 @@ dependencies = [
  "chrono",
  "clap",
  "cloudevents-sdk",
+ "collapse",
  "config",
  "console-subscriber",
  "cron",
@@ -6192,13 +6191,16 @@ dependencies = [
  "rustls 0.23.20",
  "rustls-pemfile 2.2.0",
  "sea-orm",
+ "sea-orm-migration",
  "segment",
  "serde",
  "serde_json",
+ "sha1",
  "sha256",
  "snafu 0.7.5",
  "snap",
  "sqlparser",
+ "sqlx",
  "strum",
  "svix-ksuid",
  "sysinfo",
@@ -8083,9 +8085,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-cli"
-version = "1.1.2"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "653da4aba23cb596bf03d6f5faad274c74852c8ef014171a4fb9518032377105"
+checksum = "0e6e0e741bfdf434e6f6aadab156ba4d439e78c9449048698d98fa377871224a"
 dependencies = [
  "chrono",
  "clap",
@@ -8114,9 +8116,9 @@ dependencies = [
 
 [[package]]
 name = "sea-orm-migration"
-version = "1.1.2"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b271c0dd7729623d8debb5f017806f066902e3c287f08dc5ff312c3277dc6f"
+checksum = "c0bb76ba314552ce15e3a24778cf9c116fc1225fa406e48b0a36e5a3cdbc1e21"
 dependencies = [
  "async-trait",
  "clap",
@@ -8178,9 +8180,9 @@ dependencies = [
 
 [[package]]
 name = "sea-schema"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aab1592d17860a9a8584d9b549aebcd06f7bdc3ff615f71752486ba0b05b1e6e"
+checksum = "0ef5dd7848c993f3789d09a2616484c72c9330cae2b048df59d8c9b8c0343e95"
 dependencies = [
  "futures",
  "sea-query",

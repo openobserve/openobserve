@@ -27,7 +27,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             match actual_message {
                 KeysMessage::Delete { name, org } => {
                     log::info!("[SUPER_CLUSTER:DB] deleting key {}/{}", org, name);
-                    infra::table::cipher::remove(&org, EntryKind::CipherKey, &name).await?;
+                    crate::table::cipher::remove(&org, EntryKind::CipherKey, &name).await?;
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .delete(&format!("/cipher_keys/{}/{}", org, name), false, true, None)
@@ -37,7 +37,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     log::info!("[SUPER_CLUSTER:DB] adding key {}/{}", entry.org, entry.name);
                     let org = entry.org.clone();
                     let name = entry.name.clone();
-                    match infra::table::cipher::add(entry).await {
+                    match crate::table::cipher::add(entry).await {
                         Ok(_) => {}
                         // this is the case when the cluster sending the message also receives
                         // and processes it. Because message will be delivered to all clients,
@@ -64,7 +64,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     );
                     let org = entry.org.clone();
                     let name = entry.name.clone();
-                    infra::table::cipher::update(entry).await?;
+                    crate::table::cipher::update(entry).await?;
                     let cluster_coordinator = get_coordinator().await;
                     cluster_coordinator
                         .put(

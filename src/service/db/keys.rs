@@ -29,7 +29,7 @@ use crate::{cipher::registry::REGISTRY, service::db};
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 
 pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
-    match infra::table::cipher::add(entry.clone()).await {
+    match crate::table::cipher::add(entry.clone()).await {
         Ok(_) => {}
         Err(errors::Error::DbError(DbError::UniqueViolation)) => {
             return Err(anyhow::anyhow!("Key with given name already exists"));
@@ -73,7 +73,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
-    infra::table::cipher::update(entry.clone()).await?;
+    crate::table::cipher::update(entry.clone()).await?;
 
     // specifically for cipher keys, we need to notify of this addition
     if entry.kind == EntryKind::CipherKey {
@@ -111,7 +111,7 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
 }
 
 pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors::Error> {
-    infra::table::cipher::remove(org, kind, name).await?;
+    crate::table::cipher::remove(org, kind, name).await?;
     // specifically for cipher keys, we need to notify of this deletion
     if kind == EntryKind::CipherKey {
         // trigger watch event by putting value to cluster coordinator
@@ -167,9 +167,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(prefix).unwrap();
                 let (org, name) = item_key.split_once("/").unwrap();
-                let item = match infra::table::cipher::get_data(
+                let item = match crate::table::cipher::get_data(
                     org,
-                    infra::table::cipher::EntryKind::CipherKey,
+                    crate::table::cipher::EntryKind::CipherKey,
                     name,
                 )
                 .await

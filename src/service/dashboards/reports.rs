@@ -32,7 +32,7 @@ use config::{
 };
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
-use infra::table;
+use crate::table;
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,

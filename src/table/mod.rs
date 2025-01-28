@@ -14,13 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::get_config;
-use migration::Migrator;
-use sea_orm_migration::MigratorTrait;
-
-use crate::{
+use infra::{
     db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE},
     dist_lock,
 };
+use migration::Migrator;
+use sea_orm_migration::MigratorTrait;
 
 pub mod action_scripts;
 pub mod alerts;
@@ -100,8 +99,8 @@ pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sq
 #[macro_export]
 macro_rules! orm_err {
     ($e:expr) => {
-        Err($crate::errors::Error::DbError(
-            $crate::errors::DbError::SeaORMError($e.to_string()),
+        Err(infra::errors::Error::DbError(
+            infra::errors::DbError::SeaORMError($e.to_string()),
         ))
     };
 }

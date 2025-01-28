@@ -25,7 +25,7 @@ use config::{
     },
     utils::json,
 };
-use infra::table::entity::search_jobs::Model as JobModel;
+use crate::table::entity::search_jobs::Model as JobModel;
 use tracing::Span;
 
 use crate::{

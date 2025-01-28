@@ -23,6 +23,7 @@ pub mod handler;
 pub mod job;
 pub mod router;
 pub mod service;
+pub mod table;
 
 #[cfg(feature = "enterprise")]
 pub mod super_cluster_queue;

@@ -16,15 +16,15 @@
 use aes_siv::{siv::Aes256Siv, KeyInit};
 use base64::{prelude::BASE64_STANDARD, Engine};
 use config::get_config;
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors,
+};
 use once_cell::sync::Lazy;
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
 use super::{entity::cipher_keys::*, get_lock};
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors,
-};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryKind {

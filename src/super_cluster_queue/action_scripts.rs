@@ -21,15 +21,15 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     match action_scripts_message {
         ActionScriptsMessage::Put { action } => {
             // TODO Cleanup the zip file from s3 if it exists
-            if infra::table::action_scripts::contains(&action.id.unwrap().to_string()).await? {
-                infra::table::action_scripts::update(&action).await?;
+            if crate::table::action_scripts::contains(&action.id.unwrap().to_string()).await? {
+                crate::table::action_scripts::update(&action).await?;
             } else {
-                infra::table::action_scripts::add(&action).await?;
+                crate::table::action_scripts::add(&action).await?;
             }
         }
         ActionScriptsMessage::Delete { org_id, action_id } => {
             // TODO Cleanup the zip file from s3 if it exists
-            infra::table::action_scripts::remove(&org_id, &action_id).await?;
+            crate::table::action_scripts::remove(&org_id, &action_id).await?;
         }
     }
     Ok(())

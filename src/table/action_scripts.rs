@@ -17,19 +17,18 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use config::meta::actions::action::{Action, ActionStatus, ExecutionDetailsType};
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors::{self, DbError, Error},
+};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Schema, Set, Unchanged,
 };
 
 use super::{
-    entity::action_scripts::{ActiveModel, Model},
+    entity::action_scripts::{ActiveModel, Column, Entity, Model},
     get_lock,
-};
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, DbError, Error},
-    table::entity::action_scripts::{Column, Entity},
 };
 
 impl TryFrom<Model> for Action {

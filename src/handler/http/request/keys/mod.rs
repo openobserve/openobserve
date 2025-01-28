@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use infra::table::cipher::CipherEntry;
+use crate::table::cipher::CipherEntry;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::cipher::{http_repr::merge_updates, Cipher, CipherData};
 
@@ -96,7 +96,7 @@ pub async fn save(
             created_by: user_id.to_string(),
             name: req.name.clone(),
             data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
+            kind: crate::table::cipher::EntryKind::CipherKey,
         })
         .await
         {
@@ -143,9 +143,9 @@ pub async fn get(
     {
         let (org_id, key_name) = path.into_inner();
 
-        let kdata = match infra::table::cipher::get_data(
+        let kdata = match crate::table::cipher::get_data(
             &org_id,
-            infra::table::cipher::EntryKind::CipherKey,
+            crate::table::cipher::EntryKind::CipherKey,
             &key_name,
         )
         .await
@@ -192,12 +192,12 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
     {
         let org_id = path.into_inner();
 
-        let filter = infra::table::cipher::ListFilter {
+        let filter = crate::table::cipher::ListFilter {
             org: Some(org_id),
-            kind: Some(infra::table::cipher::EntryKind::CipherKey),
+            kind: Some(crate::table::cipher::EntryKind::CipherKey),
         };
 
-        let kdata = match infra::table::cipher::list_filtered(filter, None).await {
+        let kdata = match crate::table::cipher::list_filtered(filter, None).await {
             Ok(list) => list,
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
@@ -247,7 +247,7 @@ pub async fn delete(
         let (org_id, key_name) = path.into_inner();
         match crate::service::db::keys::remove(
             &org_id,
-            infra::table::cipher::EntryKind::CipherKey,
+            crate::table::cipher::EntryKind::CipherKey,
             &key_name,
         )
         .await
@@ -328,9 +328,9 @@ pub async fn update(
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         };
 
-        let kdata = match infra::table::cipher::get_data(
+        let kdata = match crate::table::cipher::get_data(
             &org_id,
-            infra::table::cipher::EntryKind::CipherKey,
+            crate::table::cipher::EntryKind::CipherKey,
             &key_name,
         )
         .await
@@ -365,7 +365,7 @@ pub async fn update(
             created_by: user_id.to_string(),
             name: req.name,
             data: serde_json::to_string(&cd).unwrap(),
-            kind: infra::table::cipher::EntryKind::CipherKey,
+            kind: crate::table::cipher::EntryKind::CipherKey,
         })
         .await
         {

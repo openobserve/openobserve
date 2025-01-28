@@ -21,7 +21,7 @@ use bytes::Bytes;
 use config::meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest};
 use futures::{StreamExt, TryStreamExt};
 use futures_util::stream::{self};
-use infra::table::action_scripts;
+use crate::table::action_scripts;
 use o2_enterprise::enterprise::actions::action_manager::{
     delete_app_from_target_cluster, get_action_details, get_actions, register_app,
     serve_file_from_s3, update_app_on_target_cluster,

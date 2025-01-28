@@ -29,7 +29,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 record.stream_name,
                 record.field_name
             );
-            infra::table::distinct_values::add(record).await?;
+            crate::table::distinct_values::add(record).await?;
         }
         MessageType::DistinctValuesDelete(true) => {
             let val: BatchDeleteMessage = serde_json::from_slice(&msg.value.unwrap())?;
@@ -38,7 +38,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 val.origin_type,
                 val.id
             );
-            infra::table::distinct_values::batch_remove(val.origin_type, &val.id).await?;
+            crate::table::distinct_values::batch_remove(val.origin_type, &val.id).await?;
         }
         MessageType::DistinctValuesDelete(false) => {
             let record: DistinctFieldRecord = serde_json::from_slice(&msg.value.unwrap())?;
@@ -48,7 +48,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 record.stream_name,
                 record.field_name
             );
-            infra::table::distinct_values::remove(record).await?;
+            crate::table::distinct_values::remove(record).await?;
         }
         _ => {
             log::error!(

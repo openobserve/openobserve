@@ -27,11 +27,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if original_url.is_empty() {
                 return Err(Error::Message("Invalid message value".to_string()));
             }
-            infra::table::short_urls::add(&short_id, &original_url).await?;
+            crate::table::short_urls::add(&short_id, &original_url).await?;
         }
         MessageType::ShortUrlDelete => {
             let short_id = parse_key(&msg.key)?;
-            infra::table::short_urls::remove(&short_id).await?;
+            crate::table::short_urls::remove(&short_id).await?;
         }
         _ => {
             log::error!(
