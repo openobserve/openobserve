@@ -22,7 +22,6 @@ import Index from "@/plugins/logs/Index.vue";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
-import "plotly.js";
 import searchService from "@/services/search";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import router from "../../helpers/router";

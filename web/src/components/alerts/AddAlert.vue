@@ -53,7 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+          <q-form
+            class="add-alert-form"
+            data-test="add-alert-form"
+            ref="addAlertForm"
+            @submit="onSubmit"
+          >
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
@@ -1462,6 +1467,7 @@ export default defineComponent({
     },
 
     async onSubmit() {
+      console.log("here it is");
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       // made the isAlertSaving to true to disable the save button
@@ -1548,7 +1554,7 @@ export default defineComponent({
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();

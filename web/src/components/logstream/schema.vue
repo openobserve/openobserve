@@ -603,7 +603,6 @@ class="indexDetailsContainer" style="height: 100vh">
                       : t("logStream.addSchemaField")
                   }}
                 </q-btn>
-                {{   }}
                 <q-btn
                   v-bind:disable="
                   !selectedFields.length &&  (!selectedDateFields.length) 
@@ -1099,6 +1098,8 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
+          console.log('here it is')
+
           loadingState.value = false;
           console.log(err);
         });
@@ -1555,8 +1556,6 @@ export default defineComponent({
       
       return `${day}-${month}-${year}`; // Return formatted date
     }
-
-
 
 
 
