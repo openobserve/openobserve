@@ -1,4 +1,4 @@
-// Vitest Snapshot v1
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Search Result > Should render the q-virtual-scroll component with the correct props and call the 'onScroll' method when the 'virtual-scroll' event is emitted 1`] = `
 "<div class=\\"q-markup-table q-table__container q-table__card q-table--horizontal-separator q-table--no-wrap q-virtual-scroll q-virtual-scroll--vertical scroll\\" data-test=\\"logs-search-result-logs-table\\" id=\\"searchGridComponent\\" tabindex=\\"0\\" data-v-ae03aa38=\\"\\" style=\\"height: calc(100vh - 0px);\\">
