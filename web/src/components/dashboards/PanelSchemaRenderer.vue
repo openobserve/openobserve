@@ -375,7 +375,7 @@ export default defineComponent({
     const drilldownArray: any = ref([]);
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
-    const annotationPopupRef = ref(null);
+    const annotationPopupRef: any = ref(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -861,7 +861,7 @@ export default defineComponent({
     };
 
     // Helper function to calculate popup offset
-    const calculatePopupOffset = (offsetX, offsetY, popupRef, containerRef) => {
+    const calculatePopupOffset = (offsetX: any, offsetY: any, popupRef: any, containerRef: any) => {
       let offSetValues = { left: offsetX, top: offsetY };
 
       if (popupRef.value) {
