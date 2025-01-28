@@ -712,33 +712,34 @@ export default defineComponent({
       url.value = "";
     };
     const importDashboard = () => {
-      try{
+      try {
         dashboardErrorsToDisplay.value = [];
-      const jsonObj = JSON.parse(jsonStr.value);
-      if (Array.isArray(jsonObj)) {
-        jsonObj.forEach((input, index) => {
-          validateBasicInputs(input, index);
-        });
-      } else {
-        validateBasicInputs(jsonObj);
-      }
-      if (dashboardErrorsToDisplay.value.length > 0) {
-        return;
-      }
-      if (activeTab.value === "import_json_file") {
-        if (jsonFiles.value == undefined) {
-          importFromJsonStr();
+        const jsonObj = JSON.parse(jsonStr.value);
+        if (Array.isArray(jsonObj)) {
+          jsonObj.forEach((input, index) => {
+            // migrate to new schema
+            const convertedSchema = convertDashboardSchemaVersion(input);
+            validateBasicInputs(convertedSchema, index);
+          });
         } else {
-          importFiles();
+          const convertedSchema = convertDashboardSchemaVersion(input);
+          validateBasicInputs(convertedSchema);
         }
-      } else {
-        importFromUrl();
-      }
-      }
-      catch(e){
+        if (dashboardErrorsToDisplay.value.length > 0) {
+          return;
+        }
+        if (activeTab.value === "import_json_file") {
+          if (jsonFiles.value == undefined) {
+            importFromJsonStr();
+          } else {
+            importFiles();
+          }
+        } else {
+          importFromUrl();
+        }
+      } catch (e) {
         showErrorNotification("Failed to Import Dashboard");
       }
- 
     };
     const validateBasicInputs = (input, index = 0) => {
       if (input.title === "" || typeof input.title !== "string") {
