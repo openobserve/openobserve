@@ -778,7 +778,6 @@ mod legacy_entities {
             pub is_real_time: bool,
             pub destinations: Json,
             pub context_attributes: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub row_template: Option<String>,
             #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
@@ -788,13 +787,10 @@ mod legacy_entities {
             pub last_satisfied_at: Option<i64>,
             pub query_type: i16,
             pub query_conditions: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_sql: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_promql: Option<String>,
             pub query_promql_condition: Option<Json>,
             pub query_aggregation: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_vrl_function: Option<String>,
             pub query_search_event_type: Option<i16>,
             pub query_multi_time_range: Option<Json>,
@@ -922,7 +918,6 @@ mod new_entities {
             pub is_real_time: bool,
             pub destinations: Json,
             pub context_attributes: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub row_template: Option<String>,
             #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
@@ -932,13 +927,10 @@ mod new_entities {
             pub last_satisfied_at: Option<i64>,
             pub query_type: i16,
             pub query_conditions: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_sql: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_promql: Option<String>,
             pub query_promql_condition: Option<Json>,
             pub query_aggregation: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_vrl_function: Option<String>,
             pub query_search_event_type: Option<i16>,
             pub query_multi_time_range: Option<Json>,
