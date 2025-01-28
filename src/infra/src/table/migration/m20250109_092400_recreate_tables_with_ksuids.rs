@@ -509,6 +509,7 @@ mod new_alerts {
     use sea_orm::QueryOrder;
 
     use super::*;
+    use crate::table::migration::get_text_type;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
     const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
         "alerts_org_stream_type_stream_name_name_idx_2";
@@ -560,6 +561,7 @@ mod new_alerts {
 
     /// Statement to create the alerts table.
     pub fn create_alerts_table_statement() -> TableCreateStatement {
+        let text_type = get_text_type();
         Table::create()
         .table(Alerts::Table)
         .if_not_exists()
@@ -584,7 +586,7 @@ mod new_alerts {
         .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
         .col(ColumnDef::new(Alerts::Destinations).json().not_null())
         .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).text().null())
+        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(text_type)).null())
         .col(ColumnDef::new(Alerts::Description).text().null())
         .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
         .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
@@ -595,15 +597,15 @@ mod new_alerts {
             ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
         )
         .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).text().null())
-        .col(ColumnDef::new(Alerts::QueryPromql).text().null())
+        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(text_type)).null())
+        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(text_type)) .null())
         .col(
             ColumnDef::new(Alerts::QueryPromqlCondition)
                 .json()
                 .null(),
         )
         .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).text().null())
+        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(text_type)).null())
         .col(
             ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
         )
