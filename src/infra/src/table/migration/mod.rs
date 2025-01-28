@@ -61,11 +61,10 @@ impl MigratorTrait for Migrator {
     }
 }
 
-pub fn get_text_type() -> &'static str {
+pub fn get_text_type() -> String {
     let db_type = config::get_config().common.meta_store.as_str().into();
-
     match db_type {
-        MetaStore::MySQL => config::get_config().limit.db_text_data_type.as_str().into(),
-        _ => "TEXT",
+        MetaStore::MySQL => config::get_config().limit.db_text_data_type.clone(),
+        _ => "TEXT".to_string(),
     }
 }

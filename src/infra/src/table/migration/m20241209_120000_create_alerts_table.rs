@@ -90,7 +90,7 @@ fn create_alerts_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
         .col(ColumnDef::new(Alerts::Destinations).json().not_null())
         .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(text_type)).null())
+        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(&text_type)).null())
         .col(ColumnDef::new(Alerts::Description).text().null())
         .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
         .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
@@ -101,15 +101,15 @@ fn create_alerts_table_statement() -> TableCreateStatement {
             ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
         )
         .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(text_type)) .null())
-        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(text_type)).null())
+        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(&text_type)) .null())
+        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(&text_type)).null())
         .col(
             ColumnDef::new(Alerts::QueryPromqlCondition)
                 .json()
                 .null(),
         )
         .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(text_type)).null())
+        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(&text_type)).null())
         .col(
             ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
         )

@@ -55,7 +55,7 @@ fn create_table_stmt() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(SearchJobs::Payload)
-                .custom(Alias::new(text_type))
+                .custom(Alias::new(&text_type))
                 .not_null(),
         )
         .col(
