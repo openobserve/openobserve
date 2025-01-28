@@ -220,6 +220,7 @@ class="padding-none" />
                   </q-item-label>
                 </q-item-section>
               </q-item>
+              <q-separator />
               <q-item to="/about" data-test="menu-link-about-item">
                 <q-item-section>
                   <q-item-label>
