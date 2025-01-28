@@ -447,6 +447,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
               :trigger="true"
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval ?? 0
+              "
               @update:model-value="onRefreshIntervalUpdate"
               @trigger="$emit('onAutoIntervalTrigger')"
             />
@@ -804,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!saveViewLoader"
             unelevated
             no-caps
-            :label="t('confirmDialog.ok')"
+            :label="t('common.save')"
             color="primary"
             class="text-bold"
             @click="handleSavedView"
