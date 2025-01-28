@@ -3671,7 +3671,8 @@ const useLogs = () => {
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
+        router.currentRoute.value.name == "logs" &&
+        enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
@@ -3697,6 +3698,16 @@ const useLogs = () => {
         }
       } else {
         clearInterval(store.state.refreshIntervalID);
+      }
+
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs" &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+        clearInterval(store.state.refreshIntervalID);
+        store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
       console.log("Error while refreshing data", e);
@@ -3829,9 +3840,21 @@ const useLogs = () => {
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
-    if (queryParams.refresh) {
+
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
@@ -3878,6 +3901,12 @@ const useLogs = () => {
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
+  };
+
+  const enableRefreshInterval = (value: number) => {
+    return (
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
+    );
   };
 
   const showNotification = () => {
@@ -5461,6 +5490,7 @@ const useLogs = () => {
     extractValueQuery,
     initialQueryPayload,
     refreshPagination,
+    enableRefreshInterval,
   };
 };
 
