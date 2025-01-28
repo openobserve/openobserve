@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-subtitle2 text-bold q-mr-sm"  
                   :class="{
                   highlighted: isHighlighted(index),
+                  'tw-text-gray-900': store.state.theme === 'dark' && isHighlighted(index),
                   'current-match': currentSelectedValue === index, // Current match class
               }">
                 {{ span.serviceName }}

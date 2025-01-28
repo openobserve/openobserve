@@ -467,10 +467,10 @@ export default defineComponent({
         // Highlight text in string values
         const regex = new RegExp(`(${props.searchQuery})`, 'gi');
         if(preserveString){
-          return `"${value.replace(regex, (match) => `<span class="highlight">${match}</span>`)}"`;
+          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`)}"`;
         }
         else{
-          return value.replace(regex, (match) => `<span class="highlight">${match}</span>`);
+          return value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`);
         }
 
       } else if (Array.isArray(value)) {
