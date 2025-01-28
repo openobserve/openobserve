@@ -1,5 +1,7 @@
 use sea_orm_migration::prelude::*;
 
+use super::get_text_type;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -20,6 +22,7 @@ impl MigrationTrait for Migration {
 
 /// Statement to create table.
 fn create_table_stmt() -> TableCreateStatement {
+    let text_type = get_text_type();
     Table::create()
         .table(SearchJobs::Table)
         .if_not_exists()
@@ -50,7 +53,11 @@ fn create_table_stmt() -> TableCreateStatement {
                 .string_len(256)
                 .not_null(),
         )
-        .col(ColumnDef::new(SearchJobs::Payload).text().not_null())
+        .col(
+            ColumnDef::new(SearchJobs::Payload)
+                .custom(Alias::new(&text_type))
+                .not_null(),
+        )
         .col(
             ColumnDef::new(SearchJobs::StartTime)
                 .big_integer()
