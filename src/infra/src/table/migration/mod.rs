@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::meta_store::MetaStore;
 pub use sea_orm_migration::prelude::*;
 
 mod m20241114_000001_create_folders_table;
@@ -61,5 +62,14 @@ impl MigratorTrait for Migrator {
             Box::new(m20250121_120000_create_cipher_table::Migration),
             Box::new(m20250122_000001_create_table_action_scripts::Migration),
         ]
+    }
+}
+
+pub fn get_text_type() -> &'static str {
+    let db_type = config::get_config().common.meta_store.as_str().into();
+
+    match db_type {
+        MetaStore::MySQL => config::get_config().limit.db_text_data_type.as_str().into(),
+        _ => "TEXT",
     }
 }
