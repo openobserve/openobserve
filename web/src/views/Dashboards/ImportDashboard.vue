@@ -410,6 +410,9 @@ export default defineComponent({
 
               // Check if all files have been processed
               if (fileContents.length === newVal.length) {
+                // migrate to new schema
+                const convertedSchema =
+                  convertDashboardSchemaVersion(jsonObject);
                 jsonStr.value = JSON.stringify(fileContents, null, 2);
               }
             } catch (error) {
@@ -421,29 +424,57 @@ export default defineComponent({
       }
     });
 
-    watch(jsonStr, (newVal) => {
+    watch(
+      jsonStr,
+      (newVal) => {
         if (newVal) {
           try {
             // If newVal is an object, stringify it directly
             if (typeof newVal === "object") {
-              jsonStr.value = JSON.stringify(newVal, null, 2);
+              if (Array.isArray(newVal)) {
+                const dashboards = [];
+                newVal?.forEach((item) => {
+                  // migrate to new schema
+                  const convertedSchema = convertDashboardSchemaVersion(item);
+                  dashboards.push(convertedSchema);
+                });
+
+                jsonStr.value = JSON.stringify(dashboards, null, 2);
+              } else {
+                // migrate to new schema
+                const convertedSchema = convertDashboardSchemaVersion(newVal);
+                jsonStr.value = JSON.stringify(convertedSchema, null, 2);
+              }
             } else if (typeof newVal === "string") {
               // Only parse it if it's a string
               const jsonObject = JSON.parse(newVal);
-              jsonStr.value = JSON.stringify(jsonObject, null, 2);
+              if (Array.isArray(jsonObject)) {
+                const dashboards = [];
+                jsonObject.forEach((item) => {
+                  // migrate to new schema
+                  const convertedSchema = convertDashboardSchemaVersion(item);
+                  dashboards.push(convertedSchema);
+                });
+
+                jsonStr.value = JSON.stringify(dashboards, null, 2);
+              } else {
+                // migrate to new schema
+                const convertedSchema =
+                  convertDashboardSchemaVersion(jsonObject);
+                jsonStr.value = JSON.stringify(convertedSchema, null, 2);
+              }
             }
           } catch (error) {
             showErrorNotification("Invalid JSON format");
           }
         }
-        if(newVal == ""){
+        if (newVal == "") {
           jsonFiles.value = null;
           url.value = "";
         }
-      });
-
-
-
+      },
+      { deep: true },
+    );
 
     watch(url, async (newVal) => {
       try {
@@ -465,6 +496,10 @@ export default defineComponent({
               response.headers["content-type"].includes("application/json") ||
               response.headers["content-type"].includes("text/plain")
             ) {
+              // migrate to new schema
+              const convertedSchema = convertDashboardSchemaVersion(
+                response.data,
+              );
               jsonStr.value = JSON.stringify(response.data, null, 2);
             } else {
               showErrorNotification("Invalid JSON format in the URL");
