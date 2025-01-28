@@ -337,11 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @add-field-to-table="addFieldToTable"
                   />
                 </template>
-
-                <FlexRender
-                  :render="cell.column.columnDef.cell"
-                  :props="cell.getContext()"
-                />
+                {{ cell.renderValue() }}
               </td>
             </template>
           </tr>

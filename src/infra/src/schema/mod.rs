@@ -280,6 +280,13 @@ pub fn unwrap_partition_time_level(
     }
 }
 
+pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    settings
+        .as_ref()
+        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .unwrap_or_default()
+}
+
 pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = SQL_FULL_TEXT_SEARCH_FIELDS.clone();
     match settings {
@@ -352,6 +359,10 @@ pub async fn merge(
     schema: &Schema,
     min_ts: Option<i64>,
 ) -> Result<Option<(Schema, Vec<Field>)>> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(None);
+    }
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
     let inferred_schema = schema.clone();
@@ -465,6 +476,10 @@ pub async fn update_setting(
     stream_type: StreamType,
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(());
+    }
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     db.get_for_update(

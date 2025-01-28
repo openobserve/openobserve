@@ -37,7 +37,7 @@ pub async fn save(
             if destination.url.is_empty() {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination URL needs to be specified"),
+                    anyhow::anyhow!("Destination URL needs to be specified"),
                 ));
             }
         }
@@ -45,7 +45,7 @@ pub async fn save(
             if destination.emails.is_empty() {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Atleast one alert destination email is required"),
+                    anyhow::anyhow!("At least one alert destination email is required"),
                 ));
             }
             let mut lowercase_emails = vec![];
@@ -86,6 +86,14 @@ pub async fn save(
                 ));
             }
         }
+        DestinationType::RemotePipeline => {
+            if destination.url.is_empty() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Remote pipeline URL needs to be specified"),
+                ));
+            }
+        }
     }
 
     if !name.is_empty() {
@@ -97,26 +105,27 @@ pub async fn save(
         return Err((
             http::StatusCode::BAD_REQUEST,
             anyhow::anyhow!(
-                "Alert destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
+                "Destination name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
             ),
         ));
     }
     if destination.name.is_empty() {
         return Err((
             http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name is required"),
+            anyhow::anyhow!("Destination name is required"),
         ));
     }
     if destination.name.contains('/') {
         return Err((
             http::StatusCode::BAD_REQUEST,
-            anyhow::anyhow!("Alert destination name cannot contain '/'"),
+            anyhow::anyhow!("Destination name cannot contain '/'"),
         ));
     }
 
-    if db::alerts::templates::get(org_id, &destination.template)
-        .await
-        .is_err()
+    if destination.destination_type != DestinationType::RemotePipeline
+        && db::alerts::templates::get(org_id, &destination.template)
+            .await
+            .is_err()
     {
         return Err((
             http::StatusCode::BAD_REQUEST,
@@ -129,7 +138,7 @@ pub async fn save(
             if create {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination already exists"),
+                    anyhow::anyhow!("Destination already exists"),
                 ));
             }
         }
@@ -137,7 +146,7 @@ pub async fn save(
             if !create {
                 return Err((
                     http::StatusCode::BAD_REQUEST,
-                    anyhow::anyhow!("Alert destination not found"),
+                    anyhow::anyhow!("Destination not found"),
                 ));
             }
         }
@@ -157,7 +166,7 @@ pub async fn save(
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
     db::alerts::destinations::get(org_id, name)
         .await
-        .map_err(|_| anyhow::anyhow!("Alert destination not found"))
+        .map_err(|_| anyhow::anyhow!("Destination not found"))
 }
 
 pub async fn get_with_template(
@@ -172,28 +181,28 @@ pub async fn get_with_template(
 pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    dst_type: Option<DestinationType>,
 ) -> Result<Vec<Destination>, anyhow::Error> {
-    match db::alerts::destinations::list(org_id).await {
-        Ok(destinations) => {
-            let mut result = Vec::new();
-            for dest in destinations {
-                if permitted.is_none()
-                    || permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("destination:{}", dest.name))
-                    || permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("destination:_all_{}", org_id))
-                {
-                    result.push(dest);
-                }
-            }
-            Ok(result)
-        }
-        Err(e) => Err(e),
-    }
+    let destinations = db::alerts::destinations::list(org_id).await?;
+    let is_target_type = |dest: &Destination| match dst_type {
+        None => true,
+        Some(DestinationType::RemotePipeline) => dest.is_remote_pipeline(),
+        _ => !dest.is_remote_pipeline(),
+    };
+
+    let has_permission = |dest: &Destination| {
+        permitted.as_ref().map_or(true, |perms| {
+            perms.contains(&format!("destination:{}", dest.name))
+                || perms.contains(&format!("destination:_all_{}", org_id))
+        })
+    };
+
+    let result = destinations
+        .into_iter()
+        .filter(|dest| is_target_type(dest) && has_permission(dest))
+        .collect();
+
+    Ok(result)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
@@ -203,17 +212,28 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
                     http::StatusCode::CONFLICT,
-                    anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
+                    anyhow::anyhow!("Destination is currently used by alert {}", alert.name),
                 ));
             }
         }
     }
     drop(cacher);
 
+    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
+        for pl in pls {
+            if pl.contains_remote_destination(name) {
+                return Err((
+                    http::StatusCode::CONFLICT,
+                    anyhow::anyhow!("Destination is currently used by pipeline {}", pl.name),
+                ));
+            }
+        }
+    }
+
     if db::alerts::destinations::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Alert destination not found {}", name),
+            anyhow::anyhow!("Destination not found {}", name),
         ));
     }
 

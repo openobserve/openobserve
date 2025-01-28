@@ -18,12 +18,12 @@ use config::{
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
     },
 };
 use infra::{
     db::{connect_to_orm, ORM_CLIENT},
-    table::{self, folders::FolderType},
+    table,
 };
 
 use crate::common::{
@@ -36,12 +36,17 @@ use crate::common::{
 pub enum FolderError {
     /// An error that occurs while interacting with the database through the
     /// [infra] crate.
-    #[error("InfraError# {0}")]
+    #[error("InfraError# Internal error")]
     InfraError(#[from] infra::errors::Error),
 
     /// An error that occurs when trying to set a folder name to the empty string.
     #[error("Folder name cannot be empty")]
     MissingName,
+
+    /// An error that occurs when trying to create a folder with a name
+    /// that already exists in the same organization.
+    #[error("Folder with this name already exists in this organization")]
+    FolderNameAlreadyExists,
 
     /// An error that occurs when trying to update the special "default" folder.
     #[error("Can't update default folder")]
@@ -90,8 +95,33 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    // Check if there is already a folder with the same name in the organization
+    if get_folder_by_name(org_id, &folder.name, folder_type)
+        .await
+        .is_ok()
+    {
+        return Err(FolderError::FolderNameAlreadyExists);
+    }
+
+    let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
+            org_id,
+            _id,
+            &folder.folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
+
     Ok(folder)
 }
 
@@ -107,7 +137,28 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    let folder = table::folders::put(org_id, folder, folder_type).await?;
+    if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await {
+        if existing_folder.folder_id != folder_id {
+            return Err(FolderError::FolderNameAlreadyExists);
+        }
+    }
+    let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
+            org_id,
+            folder_id,
+            folder_type,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|d| !d.is_empty()),
+        )
+        .await;
+    }
+
     Ok(folder)
 }
 
@@ -150,6 +201,17 @@ pub async fn get_folder(
 }
 
 #[tracing::instrument()]
+pub async fn get_folder_by_name(
+    org_id: &str,
+    folder_name: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get_by_name(org_id, folder_name, folder_type)
+        .await?
+        .ok_or(FolderError::NotFound)
+}
+
+#[tracing::instrument()]
 pub async fn delete_folder(
     org_id: &str,
     folder_id: &str,
@@ -179,6 +241,20 @@ pub async fn delete_folder(
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
     remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+            org_id,
+            folder_id,
+            folder_type,
+        )
+        .await;
+    }
+
     Ok(())
 }
 

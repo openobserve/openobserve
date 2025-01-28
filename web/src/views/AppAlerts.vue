@@ -58,6 +58,7 @@ export default defineComponent({
       destinationService
         .list({
           org_identifier: store.state.selectedOrganization.identifier,
+          dst_type: "http",
         })
         .then((res) => (destinations.value = res.data));
       // }

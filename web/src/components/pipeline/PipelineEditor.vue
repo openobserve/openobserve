@@ -129,6 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pipelineObj.dialog.name === 'stream'"
         @cancel:hideform="resetDialog"
       />
+      <ExternalDestination
+        v-if="pipelineObj.dialog.name === 'remote_stream'"
+        @cancel:hideform="resetDialog"
+       />
+      
     </div>
   </q-dialog>
   <confirm-dialog
@@ -154,6 +159,7 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
+  watch,
   ref,
   type Ref,
 } from "vue";
@@ -174,13 +180,17 @@ import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 import { MarkerType } from "@vue-flow/core";
+import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
+
+import config from "@/aws-exports";
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
@@ -337,7 +347,7 @@ const nodeTypes: any = [
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
-  },
+  }
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
@@ -388,8 +398,18 @@ const dialog = ref({
 });
 
 onBeforeMount(() => {
+  if (config.isEnterprise == "true") {
+    nodeTypes.push({
+      label: "Remote",
+      subtype: "remote_stream",
+      io_type: "output",
+      icon: "img:" + externalOutputImage,
+      tooltip: "Destination: External Destination Node",
+      isSectionHeader: false,
+    });
+  }
   const route = router.currentRoute.value;
-  if (route.name == "pipelineEditor") {
+  if (route.name == "pipelineEditor" && route.query.id) {
     getPipeline();
     pipelineObj.isEditPipeline = true;
   } else {
@@ -401,11 +421,21 @@ onBeforeMount(() => {
 
 onMounted(() => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  const { path, query } = router.currentRoute.value; 
+    if (path.includes("edit") && !query.id) {
+      router.push({
+        name:"pipelines",
+        query:{
+          org_identifier: store.state.selectedOrganization.identifier
+        }
+      })
+    }
 });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
 });
+
 
 let forceSkipBeforeUnloadListener = false;
 

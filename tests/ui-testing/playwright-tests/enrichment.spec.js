@@ -157,7 +157,7 @@ test.describe("Enrichment data testcases", () => {
     await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-  test.skip("should upload an enrichment table under functions with VRL", async ({
+  test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -286,6 +286,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
   
     // Explore the uploaded table
     await page.getByRole("button", { name: "Explore" }).click();
+    await page.locator('[data-test="date-time-btn"]').click();
+    await expect(page.getByRole('cell', { name: 'Start time' })).toBeVisible()
     await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page.waitForTimeout(3000);

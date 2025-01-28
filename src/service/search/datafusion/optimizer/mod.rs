@@ -17,6 +17,8 @@ use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
+#[cfg(feature = "enterprise")]
+use cipher::{RewriteCipherCall, RewriteCipherKey};
 use datafusion::optimizer::{
     common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -41,6 +43,8 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
+#[cfg(feature = "enterprise")]
+pub mod cipher;
 pub mod join_reorder;
 pub mod limit_join_right_side;
 pub mod rewrite_histogram;
@@ -81,12 +85,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         // ************************************
     }
 
-    if cfg.common.feature_join_right_side_max_rows > 0 {
-        rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.common.feature_join_right_side_max_rows,
-        )));
-    }
-
     rules.push(Arc::new(EliminateNestedUnion::new()));
     rules.push(Arc::new(SimplifyExpressions::new()));
     rules.push(Arc::new(UnwrapCastInComparison::new()));
@@ -116,6 +114,19 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+    #[cfg(feature = "enterprise")]
+    rules.push(Arc::new(RewriteCipherCall::new()));
+    #[cfg(feature = "enterprise")]
+    rules.push(Arc::new(RewriteCipherKey::new(&sql.org_id)));
+
+    // should after ExtractEquijoinPredicate, because LimitJoinRightSide will
+    // require the join's on columns
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
+    }
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after

@@ -1486,7 +1486,12 @@ const useLogs = () => {
       // else use organization settings
       const shouldUseWebSocket = isWebSocketEnabled();
 
-      searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
+      const isMultiStreamSearch =
+        searchObj.data.stream.selectedStream.length > 1 &&
+        !searchObj.meta.sqlMode;
+
+      searchObj.communicationMethod =
+        shouldUseWebSocket && !isMultiStreamSearch ? "ws" : "http";
 
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);
@@ -3350,6 +3355,15 @@ const useLogs = () => {
       ) {
         plusSign = "+";
       }
+
+      if (
+        searchObj.communicationMethod === "ws" &&
+        endCount < totalCount &&
+        !searchObj.meta.showHistogram
+      ) {
+        plusSign = "+";
+      }
+
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
@@ -3657,7 +3671,8 @@ const useLogs = () => {
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
+        router.currentRoute.value.name == "logs" &&
+        enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
@@ -3683,6 +3698,16 @@ const useLogs = () => {
         }
       } else {
         clearInterval(store.state.refreshIntervalID);
+      }
+
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs" &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+        clearInterval(store.state.refreshIntervalID);
+        store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
       console.log("Error while refreshing data", e);
@@ -3815,9 +3840,21 @@ const useLogs = () => {
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
-    if (queryParams.refresh) {
+
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
@@ -3864,6 +3901,12 @@ const useLogs = () => {
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
+  };
+
+  const enableRefreshInterval = (value: number) => {
+    return (
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
+    );
   };
 
   const showNotification = () => {
@@ -4655,7 +4698,6 @@ const useLogs = () => {
     try {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
-        showCancelSearchNotification();
         return;
       }
 
@@ -4671,7 +4713,6 @@ const useLogs = () => {
           use_cache: (window as any).use_cache ?? true,
         },
       });
-      // cancelQuery();
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4705,7 +4746,8 @@ const useLogs = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          searchPartitionMap[payload.traceId] > 1,
+          !response.content?.streaming_aggs &&
+            searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
         );
       }
 
@@ -4725,7 +4767,10 @@ const useLogs = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
+      searchObj.data.isOperationCancelled = false;
+
       showCancelSearchNotification();
+      setCancelSearchError();
     }
   };
 
@@ -4774,10 +4819,15 @@ const useLogs = () => {
 
       if (searchObj.meta.sqlMode) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.total =
-            searchAggData.total + response.content?.results?.total;
           searchAggData.hasAggregation = true;
           searchObj.meta.resultGrid.showPagination = false;
+
+          if (response.content?.streaming_aggs) {
+            searchAggData.total = response.content?.results?.total;
+          } else {
+            searchAggData.total =
+              searchAggData.total + response.content?.results?.total;
+          }
         }
       }
 
@@ -4814,16 +4864,34 @@ const useLogs = () => {
           searchObj.data.queryResults.scan_size +=
             response.content.results.scan_size;
         } else {
-          if (isPagination) {
+          if (response.content?.streaming_aggs) {
+            if (!Object.keys(searchObj.data.queryResults)?.length) {
+              searchObj.data.queryResults = response.content.results;
+            } else {
+              searchObj.data.queryResults.hits = response.content.results.hits;
+              searchObj.data.queryResults.total =
+                response.content.results.total;
+
+              searchObj.data.queryResults.took += response.content.results.took;
+              searchObj.data.queryResults.scan_size +=
+                response.content.results.scan_size;
+            }
+          } else if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
             searchObj.data.queryResults.from = response.content.results.from;
             searchObj.data.queryResults.scan_size =
               response.content.results.scan_size;
             searchObj.data.queryResults.took = response.content.results.took;
+            searchObj.data.queryResults.total = response.content.results.total;
           } else {
             searchObj.data.queryResults = response.content.results;
           }
         }
+      }
+
+      // We are storing time_offset for the context of pagecount, to get the partial pagecount
+      if (searchObj.data.queryResults) {
+        searchObj.data.queryResults.time_offset = response.content?.time_offset;
       }
 
       // If its a pagination request, then append
@@ -4834,8 +4902,6 @@ const useLogs = () => {
       if (isPagination) refreshPagination(true);
 
       processPostPaginationData();
-
-      searchObj.loading = false;
 
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
@@ -5110,6 +5176,9 @@ const useLogs = () => {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
+
+      showCancelSearchNotification();
+      setCancelSearchError();
       return;
     }
 
@@ -5163,7 +5232,8 @@ const useLogs = () => {
     }
 
     if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram") searchObj.loadingHistogram = false;
+    if (payload.type === "histogram" || payload.type === "pageCount")
+      searchObj.loadingHistogram = false;
     searchObj.data.isOperationCancelled = false;
   };
 
@@ -5180,6 +5250,7 @@ const useLogs = () => {
     // 20009 is the code for query cancelled
     if (code === 20009) {
       showCancelSearchNotification();
+      setCancelSearchError();
     }
 
     if (trace_id) removeTraceId(trace_id);
@@ -5263,6 +5334,13 @@ const useLogs = () => {
   };
 
   const getPageCountThroughSocket = async (queryReq: any) => {
+    if (
+      searchObj.data.queryResults.total >
+      queryReq.query.from + queryReq.query.size
+    ) {
+      return;
+    }
+
     searchObj.data.countErrorMsg = "";
     queryReq.query.size = 0;
     delete queryReq.query.from;
@@ -5271,7 +5349,19 @@ const useLogs = () => {
 
     queryReq.query.track_total_hits = true;
 
+    if (
+      searchObj.data?.queryResults?.time_offset?.start_time &&
+      searchObj.data?.queryResults?.time_offset?.end_time
+    ) {
+      queryReq.query.start_time =
+        searchObj.data.queryResults.time_offset.start_time;
+      queryReq.query.end_time =
+        searchObj.data.queryResults.time_offset.end_time;
+    }
+
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+
+    searchObj.loadingHistogram = true;
 
     const requestId = initializeWebSocketConnection(payload);
 
@@ -5301,6 +5391,26 @@ const useLogs = () => {
       position: "bottom",
       timeout: 4000,
     });
+  };
+
+  const setCancelSearchError = () => {
+    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
+      searchObj.data.queryResults.hits = [];
+    }
+
+    if (!searchObj.data?.queryResults?.hits?.length) {
+      searchObj.data.errorMsg = "";
+      searchObj.data.errorCode = 0;
+    }
+
+    if (
+      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
+      searchObj.data.queryResults?.hits?.length &&
+      !searchObj.data.queryResults?.aggs?.length
+    ) {
+      searchObj.data.histogram.errorMsg =
+        "Histogram search query was cancelled";
+    }
   };
 
   const handlePageCountError = (err: any) => {
@@ -5380,6 +5490,7 @@ const useLogs = () => {
     extractValueQuery,
     initialQueryPayload,
     refreshPagination,
+    enableRefreshInterval,
   };
 };
 

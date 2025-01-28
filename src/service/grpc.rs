@@ -41,19 +41,11 @@ pub(crate) async fn get_ingester_channel() -> Result<(String, Channel), tonic::S
 }
 
 async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let cfg = get_config();
     let nodes = cluster::get_cached_online_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
-        if !cfg.route.ingester_srv_url.is_empty() {
-            Ok(format!(
-                "http://{}:{}",
-                cfg.route.ingester_srv_url, cfg.grpc.port
-            ))
-        } else {
-            Err(tonic::Status::internal(
-                "No online ingester nodes".to_string(),
-            ))
-        }
+        Err(tonic::Status::internal(
+            "No online ingester nodes".to_string(),
+        ))
     } else {
         let nodes = nodes.unwrap();
         let node = get_rand_element(&nodes);

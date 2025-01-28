@@ -359,11 +359,15 @@ pub async fn handle_otlp_request(
                 let span_status_for_spanmetric = local_val.span_status.clone();
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
+                // add timestamp
+                value.as_object_mut().unwrap().insert(
+                    cfg.common.column_timestamp.clone(),
+                    json::Value::Number(timestamp.into()),
+                );
 
                 if executable_pipeline.is_some() {
                     stream_pipeline_inputs.add_input(
                         value,
-                        timestamp,
                         service_name.to_owned(),
                         span.name,
                         span_status_for_spanmetric,
@@ -377,7 +381,7 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let mut record_val = match value.take() {
+                    let record_val = match value.take() {
                         json::Value::Object(mut v) => {
                             // build span metrics item
                             let sm = crate::job::metrics::TraceMetricsItem {
@@ -405,17 +409,12 @@ pub async fn handle_otlp_request(
                             return Ok(HttpResponse::InternalServerError().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    "stream did not receive a valid json objectt".into(),
+                                    "stream did not receive a valid json object".into(),
                                 ),
                             ));
                         }
                     };
 
-                    // add timestamp
-                    record_val.insert(
-                        cfg.common.column_timestamp.clone(),
-                        json::Value::Number(timestamp.into()),
-                    );
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
                         .or_insert((Vec::new(), None));
@@ -429,7 +428,6 @@ pub async fn handle_otlp_request(
     if let Some(exec_pl) = &executable_pipeline {
         let (
             records,
-            timestamps,
             services,
             span_names,
             span_status_for_spanmetrics,
@@ -456,7 +454,7 @@ pub async fn handle_otlp_request(
 
                     for (idx, mut res) in stream_pl_results {
                         // get json object
-                        let mut record_val = match res.take() {
+                        let record_val = match res.take() {
                             json::Value::Object(mut v) => {
                                 // build span metrics item
                                 let sm = crate::job::metrics::TraceMetricsItem {
@@ -489,12 +487,16 @@ pub async fn handle_otlp_request(
                             }
                         };
 
-                        // add timestamp
-                        let timestamp = timestamps[idx];
-                        record_val.insert(
-                            cfg.common.column_timestamp.clone(),
-                            json::Value::Number(timestamp.into()),
-                        );
+                        let Some(timestamp) = record_val
+                            .get(&cfg.common.column_timestamp)
+                            .and_then(|ts| ts.as_i64())
+                        else {
+                            log::error!(
+                                "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                            );
+                            partial_success.rejected_spans += 1;
+                            continue;
+                        };
                         let (ts_data, _) = json_data_by_stream
                             .entry(traces_stream_name.to_string())
                             .or_insert((Vec::new(), None));
@@ -543,7 +545,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -552,7 +554,153 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
+        ])
+        .inc();
+
+    format_response(partial_success, req_type)
+}
+
+/// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
+/// Only accepts data that has already been validated against the otlp protocol.
+/// Please use other ingestion handlers when ingesting raw trace data.
+pub async fn ingest_json(
+    org_id: &str,
+    body: web::Bytes,
+    req_type: OtlpRequestType,
+    traces_stream_name: &str,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+
+    if !LOCAL_NODE.is_ingester() {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                "not an ingester".to_string(),
+            )),
+        );
+    }
+
+    if !db::file_list::BLOCKED_ORGS.is_empty()
+        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
+    {
+        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+            http::StatusCode::FORBIDDEN.into(),
+            format!("Quota exceeded for this organization [{}]", org_id),
+        )));
+    }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        log::error!(
+            "[TRACES:JSON] ingestion error while checking memtable size: {}",
+            e
+        );
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
+    let cfg = get_config();
+    let min_ts = (Utc::now()
+        - Duration::try_hours(cfg.limit.ingest_allowed_upto)
+            .expect("configuration error: too large ingest_allowed_upto"))
+    .timestamp_micros();
+
+    let json_values: Vec<json::Value> = json::from_slice(&body)?;
+    let mut json_data_by_stream = HashMap::new();
+    let mut partial_success = ExportTracePartialSuccess::default();
+    for mut value in json_values {
+        let timestamp = value[&cfg.common.column_timestamp].as_i64().unwrap_or(
+            value["start_time"]
+                .as_i64()
+                .map(|ts| ts / 1000)
+                .unwrap_or(min_ts),
+        );
+        let trace_id = value["trace_id"].to_string();
+        if timestamp < min_ts {
+            log::error!(
+                    "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
+                    &trace_id
+                );
+            partial_success.rejected_spans += 1;
+            continue;
+        }
+
+        // JSON Flattening
+        value = flatten::flatten(value)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+
+        // get json object
+        let mut record_val = match value.take() {
+            json::Value::Object(v) => v,
+            _ => {
+                log::error!(
+                    "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
+                    &trace_id
+                );
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        "stream did not receive a valid json object".into(),
+                    )),
+                );
+            }
+        };
+
+        // add timestamp
+        record_val.insert(
+            cfg.common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
+        let (ts_data, _) = json_data_by_stream
+            .entry(traces_stream_name.to_string())
+            .or_insert((Vec::new(), None));
+        ts_data.push((timestamp, record_val));
+    }
+
+    // if no data, fast return
+    if json_data_by_stream.is_empty() {
+        return format_response(partial_success, req_type);
+    }
+
+    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    {
+        log::error!("Error while writing traces: {}", e);
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("error while writing trace data: {e}",),
+            )),
+        );
+    }
+
+    let time = start.elapsed().as_secs_f64();
+    let ep = match req_type {
+        OtlpRequestType::Grpc => "/grpc/traces/json",
+        _ => "/api/traces/json",
+    };
+
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            ep,
+            "200",
+            org_id,
+            traces_stream_name,
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -806,8 +954,7 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer =
-        ingester::get_writer(0, org_id, &StreamType::Traces.to_string(), stream_name).await;
+    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,

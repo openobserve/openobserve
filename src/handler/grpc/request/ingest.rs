@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{meta::stream::StreamType, metrics, utils::json};
+use config::{
+    meta::{otlp::OtlpRequestType, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use proto::cluster_rpc::{
     ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType,
 };
@@ -73,6 +77,25 @@ impl Ingest for Ingester {
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
+                }
+            }
+            StreamType::Traces => {
+                let log_ingestion_type: IngestionType = req
+                    .ingestion_type
+                    .unwrap_or_default()
+                    .try_into()
+                    .unwrap_or(IngestionType::Multi); // multi is just place holder
+                if log_ingestion_type != IngestionType::Json {
+                    Err(anyhow::anyhow!(
+                        "Internal gRPC trace ingestion only supports json type data, got {:?}",
+                        log_ingestion_type
+                    ))
+                } else {
+                    let data = bytes::Bytes::from(in_data.data);
+                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name)
+                        .await
+                        .map(|_| ()) // we don't care about success response
+                        .map_err(|e| anyhow::anyhow!("error in ingesting traces {}", e))
                 }
             }
             StreamType::EnrichmentTables => {

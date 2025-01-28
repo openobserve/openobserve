@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
+          :height="chartPanelHeight"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -182,7 +183,11 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
+import {
+  getAllDashboardsByFolderId,
+  getDashboard,
+  getFoldersList,
+} from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -417,7 +422,7 @@ export default defineComponent({
             errorDetail.value = "";
           } catch (error: any) {
             console.error("error", error);
-            
+
             errorDetail.value = error.message;
           }
         } else {
@@ -560,7 +565,7 @@ export default defineComponent({
     });
 
     // when the error changes, emit the error
-    watch(errorDetail, () => {      
+    watch(errorDetail, () => {
       //check if there is an error message or not
       if (!errorDetail.value) return;
       emit("error", errorDetail);
@@ -677,7 +682,7 @@ export default defineComponent({
         hideDrilldownPopUp();
       }
     };
-    
+
     const { showErrorNotification } = useNotifications();
 
     let parser: any;
@@ -837,10 +842,10 @@ export default defineComponent({
           if (!parser) {
             await importSqlParser();
           }
-          
+
           const ast = await parseQuery(originalQuery, parser);
           if (!ast) return;
-          
+
           const tableAliases = ast.from
             ?.filter((fromEntry: any) => fromEntry.as)
             .map((fromEntry: any) => fromEntry.as);
@@ -848,7 +853,7 @@ export default defineComponent({
           const aliasClause = tableAliases?.length
             ? ` AS ${tableAliases.join(", ")}`
             : "";
-            
+
           const breakdownColumn = breakdown[0]?.column;
           const breakdownValue = drilldownParams[0]?.seriesName;
           const whereClause = buildWhereClause(
@@ -1000,7 +1005,7 @@ export default defineComponent({
           try {
             navigateToLogs();
           } catch (error) {
-            showErrorNotification("Failed to navigate to logs",)
+            showErrorNotification("Failed to navigate to logs");
           }
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
@@ -1031,10 +1036,14 @@ export default defineComponent({
 
           const dashboardId = allDashboardData?.find(
             (dashboard: any) =>
-              dashboard.title === drilldownData.data.dashboard
+              dashboard.title === drilldownData.data.dashboard,
           )?.dashboardId;
 
-          const dashboardData = await getDashboard(store, dashboardId, folderId);
+          const dashboardData = await getDashboard(
+            store,
+            dashboardId,
+            folderId,
+          );
 
           if (!dashboardData) {
             console.error(

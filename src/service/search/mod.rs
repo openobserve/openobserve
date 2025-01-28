@@ -92,6 +92,7 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("datafusion_runtime")
         .worker_threads(config::get_config().limit.cpu_num)
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .unwrap()
@@ -172,7 +173,7 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-
+    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters).await }
@@ -1006,7 +1007,10 @@ pub async fn match_file(
     equal_items: &[(String, String)],
 ) -> bool {
     // fast path
-    if partition_keys.is_empty() || !source.key.contains('=') {
+    if partition_keys.is_empty()
+        || !source.key.contains('=')
+        || stream_type == StreamType::EnrichmentTables
+    {
         return true;
     }
 
@@ -1158,13 +1162,13 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 // generate parquet file search schema
 pub fn generate_search_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }

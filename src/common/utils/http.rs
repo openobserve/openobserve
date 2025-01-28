@@ -19,8 +19,10 @@ use std::{
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
-use actix_web::{http::header::HeaderName, web::Query};
-use awc::http::header::HeaderMap;
+use actix_web::{
+    http::header::{HeaderMap, HeaderName},
+    web::Query,
+};
 use config::meta::{
     search::{SearchEventContext, SearchEventType},
     stream::StreamType,

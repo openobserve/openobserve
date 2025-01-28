@@ -113,11 +113,13 @@ struct ConfigResponse<'a> {
     meta_org: String,
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
+    user_defined_schema_max_fields: usize,
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
+    query_default_limit: i64,
 }
 
 #[derive(Serialize)]
@@ -290,11 +292,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         meta_org: cfg.common.usage_org.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
+        user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
+        query_default_limit: cfg.limit.query_default_limit,
     }))
 }
 

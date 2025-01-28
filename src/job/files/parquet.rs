@@ -561,10 +561,10 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .sub(file.meta.compressed_size);
         }
 
@@ -658,7 +658,7 @@ async fn merge_files(
         ),
         None => (Vec::new(), false),
     };
-    let _latest_schema = if !defined_schema_fields.is_empty() {
+    let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
             &latest_schema,
@@ -754,7 +754,28 @@ async fn merge_files(
     let buf = Bytes::from(buf);
     storage::put(&new_file_key, buf.clone()).await?;
 
+    // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+        return Ok((new_file_key, new_file_meta, retain_file_list));
+    }
+
+    // skip index generation if no fields to index
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
         return Ok((new_file_key, new_file_meta, retain_file_list));
     }
 
@@ -882,7 +903,7 @@ pub(crate) async fn generate_index_on_ingester(
 
         crate::common::utils::auth::set_ownership(
             org_id,
-            &StreamType::Index.to_string(),
+            StreamType::Index.as_str(),
             Authz::new(&index_stream_name),
         )
         .await;
@@ -964,13 +985,8 @@ pub(crate) async fn generate_index_on_ingester(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer = ingester::get_writer(
-        0,
-        org_id,
-        &StreamType::Index.to_string(),
-        &index_stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(0, org_id, StreamType::Index.as_str(), &index_stream_name).await;
     let _ = crate::service::ingestion::write_file(
         &writer,
         &index_stream_name,
@@ -1421,12 +1437,6 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .collect::<HashSet<_>>();
     let index_fields = index_fields
         .iter()
-        .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8)
-                .is_some()
-        })
         .map(|f| f.to_string())
         .collect::<HashSet<_>>();
     let tantivy_fields = fts_fields.union(&index_fields).collect::<HashSet<_>>();
@@ -1436,7 +1446,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     }
 
     // add fields to tantivy schema
-    if !fts_fields.is_empty() {
+    if !full_text_search_fields.is_empty() {
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
                 .set_index_option(tantivy::schema::IndexRecordOption::Basic)
@@ -1477,13 +1487,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
         // process full text search fields
         for column_name in tantivy_fields.iter() {
-            let column_data = match inverted_idx_batch
-                .column_by_name(column_name)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-            {
-                Some(column_data) => column_data,
+            let column_data = match inverted_idx_batch.column_by_name(column_name) {
+                Some(column_data) => match column_data.as_any().downcast_ref::<StringArray>() {
+                    Some(column_data) => column_data,
+                    None => {
+                        // generate empty array to ensure the tantivy and parquet have same rows
+                        &StringArray::from(vec![""; num_rows])
+                    }
+                },
                 None => {
                     // generate empty array to ensure the tantivy and parquet have same rows
                     &StringArray::from(vec![""; num_rows])
