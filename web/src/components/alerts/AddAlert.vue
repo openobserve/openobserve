@@ -53,14 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+          <q-form
+            class="add-alert-form"
+            data-test="add-alert-form"
+            ref="addAlertForm"
+            @submit="onSubmit"
+          >
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
               <div
                 data-test="add-alert-name-input"
                 class="alert-name-input o2-input"
-                style="padding-top: 12px;"
+                style="padding-top: 12px"
               >
                 <q-input
                   v-model="formData.name"
@@ -91,9 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @folder-selected="updateActiveFolderId"
                     :activeFolderId="activeFolderId"
                     :style="'height: 30px'"
-                />
+                  />
                 </div>
-               
               </div>
 
               <div
@@ -560,7 +564,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
-    folder_id : "",
+    folder_id: "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -653,8 +657,10 @@ export default defineComponent({
     const vrlFunctionError = ref("");
 
     const showTimezoneWarning = ref(false);
-    
-    const activeFolderId = ref(router.currentRoute.value.query.folder || "default");
+
+    const activeFolderId = ref(
+      router.currentRoute.value.query.folder || "default",
+    );
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId.value;
@@ -1373,10 +1379,10 @@ export default defineComponent({
     // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
-    if(!this.isUpdated){
-      this.formData.is_real_time = this.alertType === 'realTime'? true : false;
+    if (!this.isUpdated) {
+      this.formData.is_real_time = this.alertType === "realTime" ? true : false;
     }
-      this.formData.is_real_time = this.formData.is_real_time.toString();
+    this.formData.is_real_time = this.formData.is_real_time.toString();
 
     // Set default frequency to min_auto_refresh_interval
     if (this.store.state?.zoConfig?.min_auto_refresh_interval)
@@ -1454,6 +1460,7 @@ export default defineComponent({
     },
 
     async onSubmit() {
+      console.log("here it is");
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -1542,15 +1549,16 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
-          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
+          payload.folder_id =
+            this.router.currentRoute.value.query.folder || "default";
           callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
-            this.activeFolderId
+            this.activeFolderId,
           );
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = { ...defaultValue() };
               this.$emit("update:list", this.activeFolderId);
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1577,7 +1585,7 @@ export default defineComponent({
           callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload,
-            this.activeFolderId
+            this.activeFolderId,
           );
 
           callAlert
