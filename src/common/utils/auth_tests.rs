@@ -2708,6 +2708,7 @@ mod tests {
                 cookie_same_site_lax: bool::default(),
                 cookie_secure_only: bool::default(),
                 ext_auth_salt: String::default(),
+                script_server_token: String::default(),
             },
             report_server: config::ReportServer {
                 enable_report_server: bool::default(),
@@ -3136,8 +3137,13 @@ mod tests {
                 remote_stream_wal_concurrent_count: usize::default(),
                 offset_flush_interval: u64::default(),
                 remote_request_timeout: u64::default(),
-                remote_request_retry_time: u64::default(),
+                remote_request_max_retry_time: u64::default(),
                 max_connections: usize::default(),
+                wal_size_limit: u64::default(),
+            },
+            encryption: config::Encryption {
+                algorithm: String::default(),
+                master_key: String::default(),
             },
         }
     }
