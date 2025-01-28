@@ -85,11 +85,7 @@ pub async fn create_annotations(
         ("Authorization" = [])
     ),
     params(
-        ("org_id" = String, Path, description = "Organization ID"),
-        ("dashboard_id" = String, Query, description = "Dashboard ID"),
-        ("panels" = String, Query, description = "Comma-separated list of panel IDs"),
-        ("start_time" = i64, Query, description = "Start time (timestamp)"),
-        ("end_time" = i64, Query, description = "End time (timestamp)")
+        ListTimedAnnotationsQuery
     ),
     responses(
         (

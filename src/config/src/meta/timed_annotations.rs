@@ -131,8 +131,11 @@ impl TimedAnnotationUpdate {
 #[serde(rename_all = "snake_case")]
 #[into_params(rename_all = "snake_case")]
 pub struct ListTimedAnnotationsQuery {
+    /// Commas separated list of panels
     pub panels: Option<String>,
+    /// Time in microseconds
     pub start_time: i64,
+    /// Time in microseconds
     pub end_time: i64,
 }
 

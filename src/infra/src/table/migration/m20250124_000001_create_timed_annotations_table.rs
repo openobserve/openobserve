@@ -64,7 +64,6 @@ fn create_table_stmt() -> TableCreateStatement {
             ColumnDef::new(TimedAnnotations::Tags)
                 .json()
                 .not_null()
-                .default(serde_json::json!([])),
         )
         .col(
             ColumnDef::new(TimedAnnotations::CreatedAt)
