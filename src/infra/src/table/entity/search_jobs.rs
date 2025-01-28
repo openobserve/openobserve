@@ -13,7 +13,6 @@ pub struct Model {
     pub user_id: String,
     pub stream_type: String,
     pub stream_names: String,
-    #[sea_orm(column_type = "Text")]
     pub payload: String,
     pub start_time: i64,
     pub end_time: i64,
