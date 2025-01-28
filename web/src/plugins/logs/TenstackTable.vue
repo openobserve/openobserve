@@ -604,7 +604,9 @@ watch(
 const parentRef = ref<HTMLElement | null>(null);
 
 const isFirefox = computed(() => {
-  return typeof navigator !== "undefined" && navigator.userAgent.includes("Firefox");
+  return (
+    typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
+  );
 });
 
 const baseOffset = isFirefox.value ? 20 : 0;
