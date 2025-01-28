@@ -807,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!saveViewLoader"
             unelevated
             no-caps
-            :label="t('confirmDialog.ok')"
+            :label="t('common.save')"
             color="primary"
             class="text-bold"
             @click="handleSavedView"
