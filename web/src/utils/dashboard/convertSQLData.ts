@@ -721,7 +721,7 @@ export const convertSQLData = async (
           .flat()
           .filter((value: any) => typeof value === "number"),
       ),
-      panelSchema.config?.unit,
+      "null", // We don't need to add unit, as we are only calculating the max value. Unit will format the value
       panelSchema.config?.unit_custom,
       panelSchema.config?.decimals,
     );
@@ -741,7 +741,8 @@ export const convertSQLData = async (
 
     options.yAxis.forEach((it: any, index: number) => {
       if (addMaxValue) {
-        it.max = maxYValue.value;
+        const rounedMaxValue = Math.ceil(parseFloat(maxYValue.value));
+        it.max = rounedMaxValue + rounedMaxValue * 0.1; // Add 10% to the max value, to ensure that the max value is not at the top of the chart
       }
 
       it.axisLabel = {
