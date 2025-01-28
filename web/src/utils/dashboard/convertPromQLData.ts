@@ -433,6 +433,7 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                zlevel: 2,
                 itemStyle: {
                   color: (() => {
                     try {
@@ -722,6 +723,7 @@ export const convertPromQLData = async (
       data: markLines,
     },
   markArea: getSeriesMarkArea(),
+  zlevel: 1,
   });
   options.series = options.series.flat();
 
