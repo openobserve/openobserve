@@ -712,33 +712,7 @@ export default defineComponent({
           dashboardIndex: index,
         });
       }
-      checkStreamType(input.tabs, index);
     };
-    function checkStreamType(tabs, dashboardIndex) {
-      const streamTypeOptions = ["logs", "metrics", "traces"];
-      tabs.forEach((tab, tabIndex) => {
-        tab.panels.forEach((panel, panelIndex) => {
-          panel.queries.forEach((query, queryIndex) => {
-            // Check if stream is defined and is a valid string
-            if (
-              !query.fields.stream_type ||
-              typeof query.fields.stream_type !== "string" ||
-              query.fields.stream_type.trim() === "" ||
-              !streamTypeOptions.includes(query.fields.stream_type)
-            ) {
-              dashboardErrorsToDisplay.value.push({
-                message: `Missing or invalid 'stream_type' of dashboard - ${dashboardIndex + 1} at tab index ${tabIndex}, panel index ${panelIndex}, query index ${queryIndex}`,
-                field: "stream_type",
-                tabIndex: tabIndex,
-                panelIndex: panelIndex,
-                queryIndex: queryIndex,
-                dashboardIndex,
-              });
-            }
-          });
-        });
-      });
-    }
 
     const goToCommunityDashboards = () => {
       window.open("https://github.com/openobserve/dashboards", "_blank");
