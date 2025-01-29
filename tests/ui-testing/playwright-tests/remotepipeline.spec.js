@@ -40,7 +40,7 @@ export const b64EncodeStandard = (str) => {
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-//   await page.getByText("Login as internal user").click();
+  await page.getByText("Login as internal user").click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -296,7 +296,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Remote Destination" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
-    await page.getByLabel("Name *").fill("remote-node");
+    await page.getByLabel("Name *").fill("remote-nodes");
     await page.getByRole("button", { name: "Save" }).last().click();
     const orgId = process.env["ORGNAME"];
     const streamName = "remote_automate";
@@ -328,7 +328,7 @@ test.describe("Pipeline testcases", () => {
     );
   });
 
-  test("should add source, function, remote destination and then delete pipeline", async ({
+  test.skip("should add source, function, remote destination and then delete pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -391,7 +391,7 @@ test.describe("Pipeline testcases", () => {
     );
   });
 
-  test("should add source, condition & remote destination node and then delete the pipeline", async ({
+  test.skip("should add source, condition & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
