@@ -211,7 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           left: 0px;
           display: none;
           max-width: 200px;
-          text-wrap: wrap;
+          white-space: normal;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
           z-index: 9999999;
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -225,9 +227,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flex-direction: row;
             align-items: center;
             position: relative;
+            word-break: break-word;
           "
         >
-          <span>{{ selectedAnnotationData.text }}</span>
+          <span style="word-break: break-word">{{
+            selectedAnnotationData.text
+          }}</span>
         </div>
       </div>
       <!-- Annotation Dialog -->
