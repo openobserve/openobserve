@@ -24,7 +24,6 @@ pub struct Model {
     pub node: Option<String>,
     pub status: i64,
     pub result_path: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub error_message: Option<String>,
     pub partition_num: Option<i64>,
 }
