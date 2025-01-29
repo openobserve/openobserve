@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use config::{
     meta::{
@@ -117,12 +117,6 @@ pub async fn search(
     let stream = TableReference::from(empty_exec.name());
     let stream_name = stream.stream_name();
     let stream_type = stream.get_stream_type(req.stream_type);
-
-    let schema_latest = empty_exec.schema();
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
-    }
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
