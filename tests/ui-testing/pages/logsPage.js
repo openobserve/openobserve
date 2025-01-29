@@ -382,8 +382,8 @@ export class LogsPage {
   
     // Select the current date
     const date = new Date().getDate();
-    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).first().click();
-    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).last().click();
+    await this.page.getByRole('button', { name: date.toString(), exact: true }).click()
+    await this.page.getByRole('button', { name: date.toString(), exact: true }).click()
   
     // Fill the start time
     const startTimeInput = this.page.locator(".startEndTime td:nth-child(1) input");
