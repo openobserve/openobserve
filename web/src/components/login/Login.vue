@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
       <a
+        data-test="login-internal-link"
         class="cursor-pointer login-internal-link q-py-md"
         style="text-decoration: underline"
         @click="loginAsInternalUser = !loginAsInternalUser"
