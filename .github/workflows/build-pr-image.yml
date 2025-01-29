@@ -47,7 +47,7 @@ jobs:
             version: "21.12"
         - uses: actions/setup-node@v4
           with:
-            node-version: 18
+            node-version: 22.13.0
         
         - name: Build frontend code
           run: cd web && npm install && npm run build
@@ -134,7 +134,7 @@ jobs:
             version: "21.12"
         - uses: actions/setup-node@v4
           with:
-            node-version: 18
+            node-version: 22.13.0
         
         - name: Build frontend code
           run: cd web && npm install && npm run build
