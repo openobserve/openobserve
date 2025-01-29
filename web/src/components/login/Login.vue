@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
     </div>
 
-    <div class="q-py-md text-center">
+    <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
       <a
         class="cursor-pointer login-internal-link q-py-md"
         style="text-decoration: underline"
@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
+      v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
       <q-form ref="loginform"
