@@ -1154,11 +1154,11 @@ export default defineComponent({
     }
 
     onBeforeMount(async () => {
+      restoreUrlQueryParams();
       await importSqlParser();
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
         await loadPageData();
-        restoreUrlQueryParams();
       }
     });
 
@@ -1167,15 +1167,16 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      restoreUrlQueryParams();
       const params = router.currentRoute.value.query;
       if (params.reload === "true") {
+        restoreUrlQueryParams();
         loadPageData();
       }
       if (
         searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
+        restoreUrlQueryParams();
         loadPageData();
       }
 

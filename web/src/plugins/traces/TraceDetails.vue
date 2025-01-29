@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.shareLink')"
             @click="shareLink"
           />
-          <q-btn round flat icon="cancel" size="md" @click="router.back()" />
+          <q-btn round flat icon="cancel" size="md" @click="routeToTracesList" />
         </div>
       </div>
 
