@@ -1484,7 +1484,7 @@ const useLogs = () => {
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
-      const shouldUseWebSocket = isWebSocketEnabled();
+      const shouldUseWebSocket = isWebSocketEnabled(store.state);
 
       const isMultiStreamSearch =
         searchObj.data.stream.selectedStream.length > 1 &&

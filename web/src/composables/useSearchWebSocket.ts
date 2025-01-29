@@ -1,9 +1,11 @@
 import { getUUID, getWebSocketUrl } from "@/utils/zincutils";
 import useWebSocket from "@/composables/useWebSocket";
 import type { SearchRequestPayload } from "@/ts/interfaces";
+import { useStore } from "vuex";
 
 const useSearchWebSocket = () => {
   const webSocket = useWebSocket();
+  const store = useStore();
 
   const fetchQueryDataWithWebSocket = (
     data: {
@@ -22,7 +24,11 @@ const useSearchWebSocket = () => {
   ) => {
     try {
       const requestId = getUUID();
-      const url = getWebSocketUrl(requestId, data.org_id);
+      const url = getWebSocketUrl(
+        requestId,
+        data.org_id,
+        store.state.API_ENDPOINT,
+      );
 
       webSocket.connect(requestId, url);
 
