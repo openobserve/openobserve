@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMetaOrg"
           />
           <q-route-tab
+            v-if="config.isEnterprise == 'true'"
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
