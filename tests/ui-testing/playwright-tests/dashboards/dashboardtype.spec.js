@@ -18,7 +18,7 @@ async function login(page) {
   console.log("#######################");
   console.log(generatedHTML);
   console.log("#######################");
-  await page.locator('[data-test="login-internal-link"]').click();
+  // await page.locator('[data-test="login-internal-link"]').click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
