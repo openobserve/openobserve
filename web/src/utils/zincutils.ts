@@ -965,19 +965,22 @@ export const deepCopy = (value: any) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
+export const getWebSocketUrl = (
+  request_id: string,
+  org_identifier: string,
+  apiEndPoint: string,
+) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
+  return `${protocol}//${apiEndPoint.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
-export const isWebSocketEnabled = () => {
-  if (!store.state.zoConfig?.websocket_enabled) {
+export const isWebSocketEnabled = (data: any) => {
+  if (!data.zoConfig?.websocket_enabled) {
     return false;
   }
 
   if ((window as any).use_web_socket === undefined) {
-    return store?.state?.organizationData?.organizationSettings
-      ?.enable_websocket_search;
+    return data.organizationData?.organizationSettings?.enable_websocket_search;
   } else {
     return (window as any).use_web_socket;
   }

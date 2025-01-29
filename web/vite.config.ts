@@ -189,7 +189,7 @@ export default defineConfig({
   test: {
     enable: true,
     global: true,
-    setupFiles: "test/unit/helpers/setupTests.ts",
+    setupFiles: "src/test/unit/helpers/setupTests.ts",
     deps: {
       inline: ["monaco-editor", "vitest-canvas-mock"],
     },
