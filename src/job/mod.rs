@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use std::str::FromStr;
+
+use config::{cluster::LOCAL_NODE, meta::cluster::Role};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -75,7 +77,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
-    if !cfg.common.mmdb_disable_download {
+    if !cfg.common.mmdb_disable_download
+        && matches!(Role::from_str(&cfg.common.node_role), Ok(role) if role != Role::AlertManager)
+    {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
