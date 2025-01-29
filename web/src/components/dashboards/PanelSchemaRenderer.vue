@@ -31,12 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
-          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
+          :data="
+            panelData.chartType == 'maps' && validatePanelData.length === 0
+              ? panelData
+              : { options: {} }
+          "
         ></MapsRenderer>
         <GeoMapRenderer
           v-else-if="panelSchema.type == 'geomap'"
           :data="
-            panelData.chartType == 'geomap'
+            panelData.chartType == 'geomap' && validatePanelData.length === 0
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -44,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="
-            panelData.chartType == 'table'
+            panelData.chartType == 'table' && validatePanelData.length === 0
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -83,7 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data[0]?.length &&
               panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
-              panelData.chartType != 'maps')
+              panelData.chartType != 'maps' &&
+              validatePanelData.length === 0)
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -273,6 +278,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 
@@ -589,6 +595,12 @@ export default defineComponent({
         "is-cached-data-differ-with-current-time-range-update",
         isCachedDataDifferWithCurrentTimeRange.value,
       );
+    });
+
+    const validatePanelData = computed(() => {
+      const errors: any = [];
+      validateSQLPanelFields(panelSchema.value, 0, "", "", errors, true);
+      return errors;
     });
 
     const onDataZoom = (event: any) => {
@@ -1378,6 +1390,7 @@ export default defineComponent({
       hidePopupsAndOverlays,
       chartPanelClass,
       chartPanelHeight,
+      validatePanelData,
       isAddAnnotationDialogVisible,
       closeAddAnnotation,
       isAddAnnotationMode,

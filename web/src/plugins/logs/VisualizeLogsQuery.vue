@@ -397,7 +397,7 @@ export default defineComponent({
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors,true);
 
       if (errors.length) {
         // set errors into errorData

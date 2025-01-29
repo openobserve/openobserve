@@ -1209,7 +1209,7 @@ export default defineComponent({
     };
 
     //validate the data
-    const isValid = (onlyChart = false) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
       const errors = visualizeErrorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -1225,7 +1225,7 @@ export default defineComponent({
       }
 
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors, isFieldsValidationRequired);
 
       if (errors.length) {
         showErrorNotification(
@@ -1386,7 +1386,7 @@ export default defineComponent({
 
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        if (!isValid(true)) {
+        if (!isValid(true, false)) {
           return;
         }
 

@@ -769,7 +769,7 @@ export default defineComponent({
 
     const runQuery = () => {
       // console.time("runQuery");
-      if (!isValid(true)) {
+      if (!isValid(true, false)) {
         return;
       }
 
@@ -892,7 +892,7 @@ export default defineComponent({
     });
 
     //validate the data
-    const isValid = (onlyChart = false) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
       const errors = errorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -908,7 +908,7 @@ export default defineComponent({
       }
 
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors, isFieldsValidationRequired);
 
       // show all the errors
       // for (let index = 0; index < errors.length; index++) {
@@ -933,7 +933,7 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
-      if (!isValid()) {
+      if (!isValid(false, true)) {
         return;
       }
 
