@@ -14,11 +14,10 @@ const dashboardName = `AutomatedDashboard${Date.now()}`
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(3000);
-  const pageHTML = await page.content();
+  const generatedHTML = await page.evaluate(() => document.documentElement.outerHTML);
   console.log("#######################");
-  console.log(pageHTML);
+  console.log(generatedHTML);
   console.log("#######################");
-  console.log(page.locator('[data-test="login-internal-link"]'));
   await page.locator('[data-test="login-internal-link"]').click();
   await page.waitForTimeout(1000);
   await page
