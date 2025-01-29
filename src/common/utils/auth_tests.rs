@@ -20,7 +20,11 @@ mod tests {
     const REPORT_NAME: &str = "TEST_REPORT_NAME";
     const FOLDER_ID: &str = "TEST_FOLDER_ID";
     const FOLDER_NAME: &str = "TEST_FOLDER_NAME";
+    const DASHBOARDS_FOLDER_TYPE: &str = "dashboards";
+    const ALERTS_FOLDER_TYPE: &str = "alerts";
+    const REPORTS_FOLDER_TYPE: &str = "reports";
     const ALERT_NAME: &str = "TEST_ALERT_NAME";
+    const ALERT_ID: &str = "TEST_ALERT_ID";
     const TEMPLATE_NAME: &str = "TEST_TEMPLATE_NAME";
     const DESTINATION_NAME: &str = "TEST_DESTINATION_NAME";
     const KV_KEY: &str = "TEST_KV_KEY";
@@ -1641,10 +1645,288 @@ mod tests {
         .await
     }
 
-    // Tests for routes defined in handler::http::request::folders::deprecated.
+    // Tests for routes defined in handler::http::request::folders.
 
     #[tokio::test]
     async fn create_folder() {
+        test_auth(
+            Method::POST,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("dfolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::POST,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("afolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::POST,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("rfolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn update_folder() {
+        test_auth(
+            Method::PUT,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("dfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::PUT,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("afolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::PUT,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("rfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn list_folders() {
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("dfolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("afolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("rfolder:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn get_folder() {
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                // Is this correct? This seems right but it differs from
+                // get_folder_deprecated which expects dfolder:TEST_ORG_ID.
+                o2_type: format!("dfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                // Is this correct? This seems right but it differs from
+                // get_folder_deprecated which expects afolder:TEST_ORG_ID.
+                o2_type: format!("afolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                // Is this correct? This seems right but it differs from
+                // get_folder_deprecated which expects rfolder:TEST_ORG_ID.
+                o2_type: format!("rfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn get_folder_by_name() {
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}/name/{FOLDER_NAME}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("dfolder:_all_{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}/name/{FOLDER_NAME}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("afolder:_all_{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}/name/{FOLDER_NAME}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("rfolder:_all_{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn delete_folder() {
+        test_auth(
+            Method::DELETE,
+            format!("api/v2/{ORG_ID}/folders/{DASHBOARDS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("dfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::DELETE,
+            format!("api/v2/{ORG_ID}/folders/{ALERTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("afolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+
+        test_auth(
+            Method::DELETE,
+            format!("api/v2/{ORG_ID}/folders/{REPORTS_FOLDER_TYPE}/{FOLDER_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("rfolder:{FOLDER_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await;
+    }
+
+    // Tests for routes defined in handler::http::request::folders::deprecated.
+
+    #[tokio::test]
+    async fn create_folder_deprecated() {
         test_auth(
             Method::POST,
             format!("api/{ORG_ID}/folders"),
@@ -1661,7 +1943,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_folder() {
+    async fn update_folder_deprecated() {
         test_auth(
             Method::PUT,
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
@@ -1678,7 +1960,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_folders() {
+    async fn list_folders_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/folders"),
@@ -1695,7 +1977,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_folder() {
+    async fn get_folder_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
@@ -1713,7 +1995,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_folder_by_name() {
+    async fn get_folder_by_name_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/folders/name/{FOLDER_NAME}"),
@@ -1730,7 +2012,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_folder() {
+    async fn delete_folder_deprecated() {
         test_auth(
             Method::DELETE,
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
@@ -1746,13 +2028,13 @@ mod tests {
         .await
     }
 
-    // Tests for routes defined in handler::http::request::alerts::deprecated.
+    // Tests for routes defined in handler::http::request::alerts.
 
     #[tokio::test]
-    async fn save_alert() {
+    async fn create_alert() {
         test_auth(
             Method::POST,
-            format!("api/{ORG_ID}/{STREAM_NAME}/alerts"),
+            format!("api/v2/{ORG_ID}/alerts"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{POST_METHOD}"),
@@ -1769,6 +2051,127 @@ mod tests {
     async fn update_alert() {
         test_auth(
             Method::PUT,
+            format!("api/v2/{ORG_ID}/alerts/{ALERT_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("alert:{ALERT_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn list_alerts() {
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/alerts"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!("alert:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_alert() {
+        test_auth(
+            Method::GET,
+            format!("api/v2/{ORG_ID}/alerts/{ALERT_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!("alert:{ALERT_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_alert() {
+        test_auth(
+            Method::DELETE,
+            format!("api/v2/{ORG_ID}/alerts/{ALERT_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!("alert:{ALERT_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn enable_alert() {
+        test_auth(
+            Method::PUT,
+            format!("api/v2/{ORG_ID}/alerts/{ALERT_ID}/enable"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("alert:{ALERT_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn trigger_alert() {
+        test_auth(
+            Method::PUT,
+            format!("api/v2/{ORG_ID}/alerts/{ALERT_ID}/trigger"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!("alert:{ALERT_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    // Tests for routes defined in handler::http::request::alerts::deprecated.
+
+    #[tokio::test]
+    async fn save_alert_deprecated() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/{STREAM_NAME}/alerts"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!("alert:{ORG_ID}"),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_alert_deprecated() {
+        test_auth(
+            Method::PUT,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
@@ -1783,7 +2186,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_stream_alerts() {
+    async fn list_stream_alerts_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts"),
@@ -1800,7 +2203,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_alerts() {
+    async fn list_alerts_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/alerts"),
@@ -1817,7 +2220,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_alert() {
+    async fn get_alert_deprecated() {
         test_auth(
             Method::GET,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
@@ -1836,7 +2239,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_alert() {
+    async fn delete_alert_deprecated() {
         test_auth(
             Method::DELETE,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
@@ -1853,7 +2256,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn enable_alert() {
+    async fn enable_alert_deprecated() {
         test_auth(
             Method::PUT,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}/enable"),
@@ -1870,7 +2273,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn trigger_alert() {
+    async fn trigger_alert_deprecated() {
         test_auth(
             Method::PUT,
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}/trigger"),
