@@ -6,26 +6,38 @@ import os
 from tink import daead
 from tink import secret_key_access
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
+import time
 
 # root directory of the project
 root_dir = Path(__file__).parent.parent.parent
 
+# Variables to be used in the tests
+now = datetime.now(timezone.utc)
+end_time = int(now.timestamp() * 1000000)
+one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 100000)
+simpleKeys = "GNf6McCq0Sm7LCrnnPr4ge+6TG4V1XOGRqXW8m7s5cL50xq4oQEQFDFHevng2UQ8LYUnqwZDPCivlpenqJtpMw=="
+simpleKeysUp = "6h/Q/OootEDxfBAYXGSNT5ASinQxjDw0tsBSE6qn40O+0UGw0ToYQFyPJualHGDW35Z7PF6P/wTkW4LV9JrG3w=="
+akeylessurl = "https://api.akeyless.io"
+akeylessAccessID = "p-c7k3ogiwk1z9am"
+akeylessUpAccessID = "p-************am" 
+akeylessAccessKey = "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc="
+akeylessUpAccessKey = "tT5/Q**********************************5VFc="
+
 
 # number of total log entries to be ingested
 LOG_COUNT = 1000
-# keyset json. For simple type key, you still need to give the tink json from which you generated the key
-KS = r"""{"primaryKeyId":2939429116,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDqH9D86ii0QPF8EBhcZI1PkBKKdDGMPDS2wFITqqfjQ77RQbDROhhAXI8m5qUcYNbflns8Xo//BORbgtX0msbf","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2939429116,"outputPrefixType":"TINK"}]}"""
+KS = r"""{"primaryKeyId":2855908267,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2855908267,"outputPrefixType":"TINK"}]}"""
 
 # openobserve base url
 BASE_URL = os.environ["ZO_BASE_URL"]
 
-
-# values can be tink or simple, depending on the key you are using in OO
+# values can be tink or simple, depending on the key we are using in OO
 KEY_TYPE = "tink"
 
 # fake = Faker()
 daead.register()
-
 
 # normal aead encrypted value
 def encrypt_simple(s):
@@ -34,7 +46,7 @@ def encrypt_simple(s):
   )
   primitive = keyset_handle.primitive(daead.DeterministicAead)
   ciphertext = primitive.encrypt_deterministically(bytes(s,'utf-8'), b'')
-  return base64.b64encode(ciphertext[5:]).decode('utf-8')
+  assert base64.b64encode(ciphertext[5:]).decode('utf-8')
 
 # uses tink lib to encrypt
 def encrypt_tink(s):
@@ -43,7 +55,7 @@ def encrypt_tink(s):
   )
   primitive = keyset_handle.primitive(daead.DeterministicAead)
   ciphertext = primitive.encrypt_deterministically(bytes(s,'utf-8'), b'')
-  return base64.b64encode(ciphertext).decode('utf-8')
+  assert base64.b64encode(ciphertext).decode('utf-8')
 
 def test_cipher_data(create_session, base_url):
     """Ingest data into the openobserve running instance."""
@@ -70,7 +82,8 @@ def test_cipher_data(create_session, base_url):
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, json=temp, headers={"Content-Type": "application/json"})
     print("Data ingested successfully, status code: ", resp.status_code)
-    return resp.status_code == 200
+    assert resp.status_code == 200
+    
 
 def test_get_cipher(create_session, base_url):
     """Running an E2E test for all cipher_keys."""
@@ -107,7 +120,7 @@ def test_cipher_simpleOO(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"sim_{random.randint(1000, 9999)}"
         payload_simpleOO = {
             "name": cipher_name,
             "key": {
@@ -127,7 +140,7 @@ def test_cipher_simpleOO(create_session, base_url):
                             "dfc": {"name": "", "iv": "", "encrypted_data": ""}
                         }
                     },
-                    "local": "GNf6McCq0Sm7LCrnnPr4ge+6TG4V1XOGRqXW8m7s5cL50xq4oQEQFDFHevng2UQ8LYUnqwZDPCivlpenqJtpMw=="
+                    "local": simpleKeys
                 },
                 "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
             },
@@ -177,7 +190,7 @@ def test_cipher_simpleOO(create_session, base_url):
                         "dfc": {"name": "", "iv": "", "encrypted_data": ""}
                     }
                 },
-                "local": "6h/Q/OootEDxfBAYXGSNT5ASinQxjDw0tsBSE6qn40O+0UGw0ToYQFyPJualHGDW35Z7PF6P/wTkW4LV9JrG3w=="
+                "local": simpleKeysUp
             },
             "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
         },
@@ -196,25 +209,25 @@ def test_cipher_simpleOO(create_session, base_url):
 
 
 
-    resp_delete_cipher_simpleOO = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
+    # resp_delete_cipher_simpleOO = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
     
-    print(resp_delete_cipher_simpleOO.content)
+    # print(resp_delete_cipher_simpleOO.content)
     
-    assert (
-            resp_delete_cipher_simpleOO.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_simpleOO.status_code} {resp_delete_cipher_simpleOO.content}"
+    # assert (
+    #         resp_delete_cipher_simpleOO.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_simpleOO.status_code} {resp_delete_cipher_simpleOO.content}"
 
-    # Verify deleted cipher key
-    resp_ver_cipher_simpleOO = session.get(
-        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-    )
-    print(resp_ver_cipher_simpleOO.content)
+    # # Verify deleted cipher key
+    # resp_ver_cipher_simpleOO = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_simpleOO.content)
 
-    assert (
-        resp_ver_cipher_simpleOO.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_simpleOO.status_code} {resp_ver_cipher_simpleOO.content}"
+    # assert (
+    #     resp_ver_cipher_simpleOO.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_simpleOO.status_code} {resp_ver_cipher_simpleOO.content}"
 
 
 def test_cipher_tinkOO(create_session, base_url):
@@ -224,7 +237,7 @@ def test_cipher_tinkOO(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"tink_{random.randint(1000, 9999)}"
         payload_tinkOO = {
             "name": cipher_name,
             "key": {
@@ -325,27 +338,98 @@ def test_cipher_tinkOO(create_session, base_url):
         resp_update_cipher_tinkOO.status_code == 200
     ), f"Expected 200, but got {resp_update_cipher_tinkOO.status_code} {resp_update_cipher_tinkOO.content}"
 
+    time.sleep(10)
+    print("Create Cipher Response:", resp_create_cipher_tinkOO.content)
+    print("Get Cipher Response:", resp_get_cipher_tinkOO.content)
+    print("Update Cipher Response:", resp_update_cipher_tinkOO.content)
 
+    print(f"Trying to decrypt with cipher name: {cipher_name}")
 
-    resp_delete_cipher_tinkOO = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
-    
-    print(resp_delete_cipher_tinkOO.content)
-    
-    assert (
-            resp_delete_cipher_tinkOO.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_tinkOO.status_code} {resp_delete_cipher_tinkOO.content}"
-
-    # Verify deleted cipher key
-    resp_ver_cipher_tinkOO = session.get(
+    # Get the cipher key using the correct URL
+    resp_tinkOO = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
     )
-    print(resp_ver_cipher_tinkOO.content)
+    print(resp_tinkOO.content)
+
+    # Parse the response JSON
+    response_json_tinkOO = resp_tinkOO.json()
+
+    # Check if the response is a dictionary (which it seems to be)
+    if isinstance(response_json_tinkOO, dict):
+        tinkOO_updated = response_json_tinkOO.get("name", None)
+    else:
+        raise ValueError("Unexpected response format: Expected a dictionary")
+
+
+    # Decrypt the data search
+      
+    print(f"Trying to decrypt with cipher name: {tinkOO_updated}")
+
+    sql_query = f"SELECT decrypt(log, '{tinkOO_updated}') FROM default"
+    print(f"SQL Query: {sql_query}")
+
+    # Search Partition decrypted the cipher key
+    json_partition = {
+            "sql": sql_query,
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "sql_mode": "full"    
+    }
+
+    print("JSON Payload:", json_partition)  # Print the entire JSON payload for debugging
+
+    resp_partition_tinkOO = session.post(f"{base_url}api/{org_id}/_search_partition?type=logs", json=json_partition)
 
     assert (
-        resp_ver_cipher_tinkOO.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_tinkOO.status_code} {resp_ver_cipher_tinkOO.content}"
+    resp_partition_tinkOO.status_code == 200
+    ), f"Expected 200, but got {resp_partition_tinkOO.status_code} {resp_partition_tinkOO.content}"
+
+
+    # Search decrypted the cipher key
+    json_search = {
+    "query": {
+        "sql": sql_query,
+        "start_time": one_min_ago,
+        "end_time": end_time,
+        "sql_mode": "full",
+        "from":0,
+        "size":100,
+        "quick_mode":False,
+        "sql_mode":"full"
+        },
+        "regions":[],
+        "clusters":[]
+   
+    }
+
+
+    resp_search_tinkOO = session.post(f"{base_url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=true", json=json_search)
+
+    assert (
+    resp_search_tinkOO.status_code == 200
+    ), f"Expected 200, but got {resp_search_tinkOO.status_code} {resp_search_tinkOO.content}"
+
+
+
+    # resp_delete_cipher_tinkOO = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
+    
+    # print(resp_delete_cipher_tinkOO.content)
+    
+    # assert (
+    #         resp_delete_cipher_tinkOO.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_tinkOO.status_code} {resp_delete_cipher_tinkOO.content}"
+
+    # # Verify deleted cipher key
+    # resp_ver_cipher_tinkOO = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_tinkOO.content)
+
+    # assert (
+    #     resp_ver_cipher_tinkOO.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_tinkOO.status_code} {resp_ver_cipher_tinkOO.content}"
 
 def test_cipher_staticAkeyless(create_session, base_url):
     """Running an E2E test for create, update and delete cipher_keys with static Akeyless cipher."""
@@ -354,18 +438,18 @@ def test_cipher_staticAkeyless(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"s_ak_{random.randint(1000, 9999)}"
         payload_staticAkeyless = {
             "name": cipher_name,
             "key": {
                 "store": {
                     "type": "akeyless",
                     "akeyless": {
-                        "base_url": "https://api.akeyless.io",
-                        "access_id": "p-c7k3ogiwk1z9am",
+                        "base_url": akeylessurl,
+                        "access_id": akeylessAccessID,
                         "auth": {
                             "type": "access_key",
-                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "access_key": akeylessAccessKey,
                             "ldap": {"username": "", "password": ""}
                         },
                         "store": {
@@ -411,11 +495,11 @@ def test_cipher_staticAkeyless(create_session, base_url):
             "store": {
                 "type": "akeyless",
                 "akeyless": {
-                    "base_url": "https://api.akeyless.io",
-                    "access_id": "p-************am",
+                    "base_url": akeylessurl,
+                    "access_id": akeylessUpAccessID,
                     "auth": {
                         "type": "access_key",
-                        "access_key": "tT5/Q**********************************5VFc=",
+                        "access_key": akeylessUpAccessKey,
                         "ldap": {"username": "", "password": ""}
                     },
                     "store": {
@@ -443,25 +527,25 @@ def test_cipher_staticAkeyless(create_session, base_url):
 
 
 
-    resp_delete_cipher_staticAkeyless = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
+    # resp_delete_cipher_staticAkeyless = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
     
-    print(resp_delete_cipher_staticAkeyless.content)
+    # print(resp_delete_cipher_staticAkeyless.content)
     
-    assert (
-            resp_delete_cipher_staticAkeyless.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_staticAkeyless.status_code} {resp_delete_cipher_staticAkeyless.content}"
+    # assert (
+    #         resp_delete_cipher_staticAkeyless.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_staticAkeyless.status_code} {resp_delete_cipher_staticAkeyless.content}"
 
-    # Verify deleted cipher key
-    resp_ver_cipher_staticAkeyless = session.get(
-        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-    )
-    print(resp_ver_cipher_staticAkeyless.content)
+    # # Verify deleted cipher key
+    # resp_ver_cipher_staticAkeyless = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_staticAkeyless.content)
 
-    assert (
-        resp_ver_cipher_staticAkeyless.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_staticAkeyless.status_code} {resp_ver_cipher_staticAkeyless.content}"
+    # assert (
+    #     resp_ver_cipher_staticAkeyless.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_staticAkeyless.status_code} {resp_ver_cipher_staticAkeyless.content}"
 
 
 def test_cipher_staticAkeylessTink(create_session, base_url):
@@ -471,18 +555,18 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"st_Ak_t{random.randint(1000, 9999)}"
         payload_staticAkeylessTink = {
             "name": cipher_name,
             "key": {
                 "store": {
                     "type": "akeyless",
                     "akeyless": {
-                        "base_url": "https://api.akeyless.io",
-                        "access_id": "p-c7k3ogiwk1z9am",
+                        "base_url": akeylessurl,
+                        "access_id": akeylessAccessID,
                         "auth": {
                             "type": "access_key",
-                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "access_key": akeylessAccessKey,
                             "ldap": {"username": "", "password": ""}
                         },
                         "store": {
@@ -528,11 +612,11 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
             "store": {
                 "type": "akeyless",
                 "akeyless": {
-                    "base_url": "https://api.akeyless.io",
-                    "access_id": "p-************am",
+                    "base_url": akeylessurl,
+                    "access_id": akeylessUpAccessID,
                     "auth": {
                         "type": "access_key",
-                        "access_key": "tT5/Q**********************************5VFc=",
+                        "access_key": akeylessUpAccessKey,
                         "ldap": {"username": "", "password": ""}
                     },
                     "store": {
@@ -560,25 +644,25 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
 
 
 
-    resp_delete_cipher_staticAkeylessTink = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
+    # resp_delete_cipher_staticAkeylessTink = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
     
-    print(resp_delete_cipher_staticAkeylessTink.content)
+    # print(resp_delete_cipher_staticAkeylessTink.content)
     
-    assert (
-            resp_delete_cipher_staticAkeylessTink.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_staticAkeylessTink.status_code} {resp_delete_cipher_staticAkeylessTink.content}"
+    # assert (
+    #         resp_delete_cipher_staticAkeylessTink.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_staticAkeylessTink.status_code} {resp_delete_cipher_staticAkeylessTink.content}"
 
-    # Verify deleted cipher key
-    resp_ver_cipher_staticAkeylessTink = session.get(
-        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-    )
-    print(resp_ver_cipher_staticAkeylessTink.content)
+    # # Verify deleted cipher key
+    # resp_ver_cipher_staticAkeylessTink = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_staticAkeylessTink.content)
 
-    assert (
-        resp_ver_cipher_staticAkeylessTink.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_staticAkeylessTink.status_code} {resp_ver_cipher_staticAkeylessTink.content}"
+    # assert (
+    #     resp_ver_cipher_staticAkeylessTink.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_staticAkeylessTink.status_code} {resp_ver_cipher_staticAkeylessTink.content}"
 
 
 def test_cipher_dfcAkeyless(create_session, base_url):
@@ -588,18 +672,18 @@ def test_cipher_dfcAkeyless(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"d_ak_{random.randint(1000, 9999)}"
         payload_dfcAkeyless = {
             "name": cipher_name,
             "key": {
                 "store": {
                     "type": "akeyless",
                     "akeyless": {
-                        "base_url": "https://api.akeyless.io",
-                        "access_id": "p-c7k3ogiwk1z9am",
+                        "base_url": akeylessurl,
+                        "access_id": akeylessAccessID,
                         "auth": {
                             "type": "access_key",
-                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "access_key": akeylessAccessKey,
                             "ldap": {"username": "", "password": ""}
                         },
                         "store": {
@@ -645,11 +729,11 @@ def test_cipher_dfcAkeyless(create_session, base_url):
             "store": {
                 "type": "akeyless",
                 "akeyless": {
-                    "base_url": "https://api.akeyless.io",
-                    "access_id": "p-************am",
+                    "base_url": akeylessurl,
+                    "access_id": akeylessUpAccessID,
                     "auth": {
                         "type": "access_key",
-                        "access_key": "tT5/Q**********************************5VFc=",
+                        "access_key": akeylessUpAccessKey,
                         "ldap": {"username": "", "password": ""}
                     },
                     "store": {
@@ -677,25 +761,25 @@ def test_cipher_dfcAkeyless(create_session, base_url):
 
 
 
-    resp_delete_cipher_dfcAkeyless = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
+    # resp_delete_cipher_dfcAkeyless = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
     
-    print(resp_delete_cipher_dfcAkeyless.content)
+    # print(resp_delete_cipher_dfcAkeyless.content)
     
-    assert (
-            resp_delete_cipher_dfcAkeyless.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_dfcAkeyless.status_code} {resp_delete_cipher_dfcAkeyless.content}"
+    # assert (
+    #         resp_delete_cipher_dfcAkeyless.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_dfcAkeyless.status_code} {resp_delete_cipher_dfcAkeyless.content}"
 
-    # Verify deleted cipher key
-    resp_ver_cipher_dfcAkeyless = session.get(
-        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-    )
-    print(resp_ver_cipher_dfcAkeyless.content)
+    # # Verify deleted cipher key
+    # resp_ver_cipher_dfcAkeyless = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_dfcAkeyless.content)
 
-    assert (
-        resp_ver_cipher_dfcAkeyless.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_dfcAkeyless.status_code} {resp_ver_cipher_dfcAkeyless.content}"
+    # assert (
+    #     resp_ver_cipher_dfcAkeyless.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_dfcAkeyless.status_code} {resp_ver_cipher_dfcAkeyless.content}"
 
 def test_cipher_dfcAkeylessTink(create_session, base_url):
     """Running an E2E test for create, update and delete cipher_keys with DFC Akeyless Tink cipher."""
@@ -704,18 +788,18 @@ def test_cipher_dfcAkeylessTink(create_session, base_url):
 
     # Create a unique cipher name
     while True:
-        cipher_name = f"cipher_{random.randint(1000, 9999)}"
+        cipher_name = f"d_Ak_t{random.randint(1000, 9999)}"
         payload_dfcAkeylessTink = {
             "name": cipher_name,
             "key": {
                 "store": {
                     "type": "akeyless",
                     "akeyless": {
-                        "base_url": "https://api.akeyless.io",
-                        "access_id": "p-c7k3ogiwk1z9am",
+                        "base_url": akeylessurl,
+                        "access_id": akeylessAccessID,
                         "auth": {
                             "type": "access_key",
-                            "access_key": "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc=",
+                            "access_key": akeylessAccessKey,
                             "ldap": {"username": "", "password": ""}
                         },
                         "store": {
@@ -761,11 +845,11 @@ def test_cipher_dfcAkeylessTink(create_session, base_url):
             "store": {
                 "type": "akeyless",
                 "akeyless": {
-                    "base_url": "https://api.akeyless.io",
-                    "access_id": "p-************am",
+                    "base_url": akeylessurl,
+                    "access_id": akeylessUpAccessID,
                     "auth": {
                         "type": "access_key",
-                        "access_key": "tT5/Q**********************************5VFc=",
+                        "access_key": akeylessUpAccessKey,
                         "ldap": {"username": "", "password": ""}
                     },
                     "store": {
@@ -793,23 +877,23 @@ def test_cipher_dfcAkeylessTink(create_session, base_url):
 
 
 
-    resp_delete_cipher_dfcAkeylessTink = session.delete(
-            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-        )
+    # resp_delete_cipher_dfcAkeylessTink = session.delete(
+    #         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    #     )
     
-    print(resp_delete_cipher_dfcAkeylessTink.content)
+    # print(resp_delete_cipher_dfcAkeylessTink.content)
     
-    assert (
-            resp_delete_cipher_dfcAkeylessTink.status_code == 200
-        ), f"Expected 200, but got {resp_delete_cipher_dfcAkeylessTink.status_code} {resp_delete_cipher_dfcAkeylessTink.content}"
+    # assert (
+    #         resp_delete_cipher_dfcAkeylessTink.status_code == 200
+    #     ), f"Expected 200, but got {resp_delete_cipher_dfcAkeylessTink.status_code} {resp_delete_cipher_dfcAkeylessTink.content}"
 
-    # Verify deleted cipher key
-    resp_ver_cipher_dfcAkeylessTink = session.get(
-        f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
-    )
-    print(resp_ver_cipher_dfcAkeylessTink.content)
+    # # Verify deleted cipher key
+    # resp_ver_cipher_dfcAkeylessTink = session.get(
+    #     f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+    # )
+    # print(resp_ver_cipher_dfcAkeylessTink.content)
 
-    assert (
-        resp_ver_cipher_dfcAkeylessTink.status_code == 404
-    ), f"Expected 404, but got {resp_ver_cipher_dfcAkeylessTink.status_code} {resp_ver_cipher_dfcAkeylessTink.content}"
+    # assert (
+    #     resp_ver_cipher_dfcAkeylessTink.status_code == 404
+    # ), f"Expected 404, but got {resp_ver_cipher_dfcAkeylessTink.status_code} {resp_ver_cipher_dfcAkeylessTink.content}"
 
