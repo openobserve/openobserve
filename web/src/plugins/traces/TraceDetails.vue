@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center">
           <div class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300">
-              <q-input
+            <q-input
               v-model="searchQuery"
               placeholder="Search..."
               @update:model-value="handleSearchQueryChange" 
@@ -499,11 +499,19 @@ export default defineComponent({
     };
     const traceTreeRef = ref<InstanceType<typeof TraceTree> | null>(null);
     const nextMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn('TraceTree component reference not found');
+        return;
+      }
       if (traceTreeRef.value) {
         traceTreeRef.value.nextMatch();
       }
     };
     const prevMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn('TraceTree component reference not found');
+        return;
+      }
       if (traceTreeRef.value) {
         traceTreeRef.value.prevMatch();
       }
@@ -700,7 +708,7 @@ export default defineComponent({
             return;
           }
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
-          console.log(res.data?.hits)
+          console.log(res.data?.hits);
           buildTracesTree();
         })
         .finally(() => {

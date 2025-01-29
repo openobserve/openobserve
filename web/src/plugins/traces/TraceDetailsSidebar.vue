@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 {{ key }}
-            </td>
+              </td>
               <td class="q-py-xs q-px-sm">
                 <span v-html="highlightSearch(val)"></span> 
               </td>
