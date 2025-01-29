@@ -43,6 +43,7 @@ pub async fn get(short_id: &str) -> Result<String, anyhow::Error> {
 
 pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<(), anyhow::Error> {
     if let Err(e) = short_urls::add(short_id, &entry.original_url).await {
+        log::error!("Failed to add short URL to DB: {}", e);
         return Err(e).context("Failed to add short URL to DB");
     }
 
