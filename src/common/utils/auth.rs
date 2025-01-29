@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
+#[cfg(feature = "enterprise")]
+use std::fmt::Display;
 
+#[cfg(feature = "enterprise")]
 use actix_http::Method;
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
@@ -27,6 +30,7 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
+#[cfg(feature = "enterprise")]
 use route_recognizer::{Params as RouteParams, Router};
 
 #[cfg(feature = "enterprise")]
@@ -186,6 +190,7 @@ impl FromRequest for UserEmail {
 }
 
 /// OpenFGA relation that defines the ability of a user to access a resource.
+#[cfg(feature = "enterprise")]
 pub enum AccessMethod {
     /// Indicates that a user can create a resource.
     Post,
@@ -203,6 +208,7 @@ pub enum AccessMethod {
     List,
 }
 
+#[cfg(feature = "enterprise")]
 impl Display for AccessMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -216,6 +222,7 @@ impl Display for AccessMethod {
 }
 
 /// OpenFGA type for a specific type of resource that can be accessed by users.
+#[cfg(feature = "enterprise")]
 pub enum O2Type {
     Alert,
     AlertsFolder,
@@ -223,6 +230,7 @@ pub enum O2Type {
     ReportsFolder,
 }
 
+#[cfg(feature = "enterprise")]
 impl O2Type {
     fn from_folder_type_param(param: &str) -> Option<Self> {
         match param {
@@ -234,6 +242,7 @@ impl O2Type {
     }
 }
 
+#[cfg(feature = "enterprise")]
 impl Display for O2Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -255,6 +264,7 @@ pub struct AuthExtractor {
     pub parent_id: String,
 }
 
+#[cfg(feature = "enterprise")]
 impl AuthExtractor {
     /// Returns a new [AuthExtractor].
     fn new(auth: &str, method: AccessMethod, o2_type: O2Type, o2_id: &str, org_id: &str) -> Self {
