@@ -12,6 +12,8 @@ async function login(page) {
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  await page.getByText('Login as internal user').click();
+  await page.waitForTimeout(1000);
   //Enter Password
   await page
     .locator('[data-cy="login-password"]')

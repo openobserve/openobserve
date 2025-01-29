@@ -14,6 +14,8 @@ const dashboardName = `AutomatedDashboard${Date.now()}`
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(3000);
+  await page.getByText('Login as internal user').click({force: true});
+  await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);

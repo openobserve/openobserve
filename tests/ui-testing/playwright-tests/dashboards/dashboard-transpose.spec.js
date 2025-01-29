@@ -9,7 +9,7 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-  // await page.getByText('Login as internal user').click();
+  await page.getByText('Login as internal user').click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
