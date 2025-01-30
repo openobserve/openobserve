@@ -38,6 +38,7 @@ use config::{
     DISTINCT_FIELDS,
 };
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use o2_enterprise::enterprise::vector_scan::pattern_manager::PATTERN_MANAGER;
 
 use super::{
     db::organization::get_org_setting,
@@ -195,6 +196,43 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+use rayon::prelude::*;
+
+fn parallel_batch_redact(
+    org_id: &str,
+    records: &mut [(i64, serde_json::Map<String, serde_json::Value>)],
+    keys: &[&str],
+) {
+    records.par_iter_mut().for_each(|(_, map)| {
+        for key in keys {
+            if let Some(value) = map.get_mut(*key) {
+                if let Some(text) = value.as_str() {
+                    *value = serde_json::Value::String(
+                        PATTERN_MANAGER
+                            .scan_and_replace(org_id, text)
+                            .unwrap_or(text.to_string()),
+                    );
+                }
+            }
+        }
+    });
+}
+
+fn parallel_batch_scan(
+    org_id: &str,
+    records: &mut [(i64, serde_json::Map<String, serde_json::Value>)],
+    keys: &[&str],
+) {
+    records.par_iter_mut().for_each(|(_, map)| {
+        for key in keys {
+            if let Some(value) = map.get_mut(*key) {
+                if let Some(text) = value.as_str() {
+                    let _ = PATTERN_MANAGER.scan(org_id, text).unwrap();
+                }
+            }
+        }
+    });
+}
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
@@ -204,14 +242,22 @@ async fn write_logs_by_stream(
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
 ) -> Result<()> {
-    for (stream_name, (json_data, fn_num)) in json_data_by_stream {
+    for (stream_name, (mut json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
             continue; // skip
         }
-
+        if get_config().common.enable_redaction {
+            let start = Instant::now();
+            parallel_batch_redact(org_id, &mut json_data, &["message"]);
+            println!("redact time: {:?}", start.elapsed());
+        } else {
+            let start = Instant::now();
+            parallel_batch_scan(org_id, &mut json_data, &["message"]);
+            println!("scan time: {:?}", start.elapsed());
+        }
         // write json data by stream
         let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
 

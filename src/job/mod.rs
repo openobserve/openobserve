@@ -17,6 +17,8 @@ use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::vector_scan::pattern_manager::PATTERN_MANAGER;
 use regex::Regex;
 
 use crate::{
@@ -238,6 +240,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .await
             .expect("syslog server run failed");
     }
+
+    PATTERN_MANAGER.initialize_patterns("default");
 
     Ok(())
 }

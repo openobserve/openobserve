@@ -32,6 +32,7 @@ use config::{
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 use flate2::read::GzDecoder;
+use o2_enterprise::enterprise::vector_scan::pattern_manager::PATTERN_MANAGER;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{any_value::Value, AnyValue, KeyValue},
@@ -264,6 +265,7 @@ pub async fn ingest(
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
                 .or_insert_with(|| (Vec::new(), None));
+            // redact_keys_in_map(org_id, &mut [&mut local_val], &["message"]);
             ts_data.push((timestamp, local_val));
             *fn_num = need_usage_report.then_some(0); // no pl -> no func
         }
@@ -352,6 +354,7 @@ pub async fn ingest(
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(stream_params.stream_name.to_string())
                             .or_insert_with(|| (Vec::new(), None));
+                        // redact_keys_in_map(org_id, &mut [&mut local_val], &["message"]);
                         ts_data.push((timestamp, local_val));
                         *fn_num = need_usage_report.then_some(function_no);
                     }
@@ -836,6 +839,55 @@ fn construct_values_from_open_telemetry_v1_metric(
     }
 
     Ok(events)
+}
+
+fn redact_keys_in_map(
+    org_id: &str,
+    vec_of_maps: &mut [&mut json::Map<String, json::Value>],
+    keys_to_redact: &[&str],
+) {
+    if !get_config().common.enable_redaction {
+        return;
+    }
+    vec_of_maps.iter_mut().for_each(|map| {
+        keys_to_redact.iter().for_each(|&key| {
+            if let Some(value) = map.get_mut(key) {
+                match value {
+                    serde_json::Value::String(str_value) => {
+                        // Handle string fields
+                        if let Ok(redacted_value) =
+                            PATTERN_MANAGER.scan_and_replace(org_id, str_value)
+                        {
+                            *value = serde_json::Value::String(redacted_value);
+                        }
+                    }
+                    serde_json::Value::Number(num_value) => {
+                        // Convert the number to a string, redact, and replace
+                        let num_str = num_value.to_string();
+                        if let Ok(redacted_value) =
+                            PATTERN_MANAGER.scan_and_replace(org_id, &num_str)
+                        {
+                            *value = serde_json::Value::String(redacted_value);
+                        }
+                    }
+                    _ => {
+                        // For other types (bool, null), skip redaction
+                    }
+                }
+            }
+        });
+    });
+}
+
+fn redact_keys_in_record(org_id: &str, record: &str) -> Option<String> {
+    if !get_config().common.enable_redaction {
+        return None;
+    }
+    if let Ok(redacted_value) = PATTERN_MANAGER.scan_and_replace(org_id, record) {
+        return Some(redacted_value);
+    } else {
+        return None;
+    }
 }
 
 #[cfg(test)]
