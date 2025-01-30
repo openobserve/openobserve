@@ -255,12 +255,23 @@ mod legacy_dashboards {
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
         let mut pages = legacy_entities::legacy_dashboards::Entity::find()
+            .find_also_related(legacy_entities::legacy_folders::Entity)
             .order_by_asc(legacy_entities::legacy_dashboards::Column::Id)
             .paginate(conn, page_size);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
-            for dashboard in dashboards {
-                let ksuid = ksuid_from_hash(&dashboard).to_string();
+            for (dashboard, folder) in dashboards {
+                let folder_id = match folder {
+                    Some(folder) => folder.folder_id,
+                    _ => {
+                        log::error!(
+                            "Dashboard with ID {} has no associated folder",
+                            dashboard.id
+                        );
+                        "".to_string()
+                    }
+                };
+                let ksuid = ksuid_from_hash(&dashboard, &folder_id).to_string();
                 let mut am = dashboard.into_active_model();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
@@ -288,10 +299,14 @@ mod legacy_dashboards {
     /// It is important to note that KSUIDs generated in this manner will have
     /// timestamp bits which are effectively random, meaning that the timestamp
     /// in any KSUID generated with this function will be random.
-    fn ksuid_from_hash(dashboard: &legacy_entities::legacy_dashboards::Model) -> svix_ksuid::Ksuid {
+    fn ksuid_from_hash(
+        dashboard: &legacy_entities::legacy_dashboards::Model,
+        folder_id: &str,
+    ) -> svix_ksuid::Ksuid {
         use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(dashboard.dashboard_id.clone());
+        hasher.update(folder_id.to_owned());
         let hash = hasher.finalize();
         svix_ksuid::Ksuid::from_bytes(hash.into())
     }
