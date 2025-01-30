@@ -195,7 +195,7 @@ def test_cipher_simpleOO(create_session, base_url):
         elif resp_create_cipher_simpleOO.status_code == 400:
             continue  # Key already exists, try again
         else:
-            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}")
 
     # Get created cipher key
     resp_get_cipher_simpleOO = session.get(
@@ -326,7 +326,7 @@ def test_cipher_tinkOO(create_session, base_url):
         elif resp_create_cipher_tinkOO.status_code == 400:
             continue  # Key already exists, try again
         else:
-            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}")
     # Get created cipher key
     resp_get_cipher_tinkOO = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -441,16 +441,12 @@ def test_cipher_tinkOO(create_session, base_url):
         "sql": sql_query,
         "start_time": one_min_ago,
         "end_time": end_time,
-        "sql_mode": "full",
         "from":0,
         "size":100,
         "quick_mode":False,
         "sql_mode":"full"
-        },
-        "regions":[],
-        "clusters":[]
-   
-    }
+        }
+        }
 
 
     resp_search_tinkOO = session.post(f"{base_url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=true", json=json_search)
@@ -459,6 +455,45 @@ def test_cipher_tinkOO(create_session, base_url):
     resp_search_tinkOO.status_code == 200
     ), f"Expected 200, but got {resp_search_tinkOO.status_code} {resp_search_tinkOO.content}"
 
+    sql_query_like = f"SELECT * FROM default where decrypt(log, '{tinkOO_updated}') like '%INFO%'"
+    print(f"SQL Like Query: {sql_query_like}")
+
+    # Search Partition decrypted the cipher key
+    json_partition_like = {
+            "sql": sql_query_like,
+            "start_time": one_min_ago,
+            "end_time": end_time,
+            "sql_mode": "full"    
+    }
+
+    print("JSON Payload:", json_partition_like)  # Print the entire JSON payload for debugging
+
+    resp_partition_tinkOO_like = session.post(f"{base_url}api/{org_id}/_search_partition?type=logs", json=json_partition_like)
+
+    assert (
+    resp_partition_tinkOO_like.status_code == 200
+    ), f"Expected 200, but got {resp_partition_tinkOO_like.status_code} {resp_partition_tinkOO_like.content}"
+
+
+    # Search decrypted the cipher key
+    json_search_like = {
+    "query": {
+        "sql": sql_query_like,
+        "start_time": one_min_ago,
+        "end_time": end_time,
+        "from":0,
+        "size":100,
+        "quick_mode":False,
+        "sql_mode":"full"
+        }
+        }
+
+
+    resp_search_tinkOO_like = session.post(f"{base_url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=true", json=json_search)
+
+    assert (
+    resp_search_tinkOO.status_code == 200
+    ), f"Expected 200, but got {resp_search_tinkOO.status_code} {resp_search_tinkOO.content}"
 
 
     resp_delete_cipher_tinkOO = session.delete(
@@ -642,8 +677,7 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
         elif resp_create_cipher_staticAkeylessTink.status_code == 400:
             continue  # Key already exists, try again
         else:
-            # assert False, f"Unexpected error: {resp_create_cipher_staticAkeylessTink.status_code} {resp_create_cipher_staticAkeylessTink.content}"
-            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeylessTink.status_code} {resp_create_cipher_staticAkeylessTink.content}")
     # Get created cipher key
     resp_get_cipher_staticAkeylessTink = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -759,8 +793,7 @@ def test_cipher_dfcAkeyless(create_session, base_url):
         elif resp_create_cipher_dfcAkeyless.status_code == 400:
             continue  # Key already exists, try again
         else:
-            # assert False, f"Unexpected error: {resp_create_cipher_dfcAkeyless.status_code} {resp_create_cipher_dfcAkeyless.content}"
-            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_dfcAkeyless.status_code} {resp_create_cipher_dfcAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_dfcAkeyless = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -875,8 +908,7 @@ def test_cipher_dfcAkeylessTink(create_session, base_url):
         elif resp_create_cipher_dfcAkeylessTink.status_code == 400:
             continue  # Key already exists, try again
         else:
-            # assert False, f"Unexpected error: {resp_create_cipher_dfcAkeylessTink.status_code} {resp_create_cipher_dfcAkeylessTink.content}"
-            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_dfcAkeylessTink.status_code} {resp_create_cipher_dfcAkeylessTink.content}")
     # Get created cipher key
     resp_get_cipher_dfcAkeylessTink = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
