@@ -748,7 +748,6 @@ mod legacy_entities {
             pub org: String,
             pub folder_id: String,
             pub name: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub r#type: i16,
             pub ksuid: Option<String>, // This column is newly added by this migration.
@@ -794,7 +793,6 @@ mod legacy_entities {
             pub destinations: Json,
             pub context_attributes: Option<Json>,
             pub row_template: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub enabled: bool,
             pub tz_offset: i32,
@@ -814,7 +812,6 @@ mod legacy_entities {
             pub trigger_threshold_count: i64,
             pub trigger_frequency_type: i16,
             pub trigger_frequency_seconds: i64,
-            #[sea_orm(column_type = "Text", nullable)]
             pub trigger_frequency_cron: Option<String>,
             pub trigger_frequency_cron_timezone: Option<String>,
             pub trigger_silence_seconds: i64,
@@ -858,7 +855,6 @@ mod legacy_entities {
             pub owner: String,
             pub role: Option<String>,
             pub title: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub data: Json,
             pub version: i32,
@@ -902,7 +898,6 @@ mod new_entities {
             pub org: String,
             pub folder_id: String,
             pub name: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub r#type: i16,
         }
@@ -934,7 +929,6 @@ mod new_entities {
             pub destinations: Json,
             pub context_attributes: Option<Json>,
             pub row_template: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub enabled: bool,
             pub tz_offset: i32,
@@ -954,7 +948,6 @@ mod new_entities {
             pub trigger_threshold_count: i64,
             pub trigger_frequency_type: i16,
             pub trigger_frequency_seconds: i64,
-            #[sea_orm(column_type = "Text", nullable)]
             pub trigger_frequency_cron: Option<String>,
             pub trigger_frequency_cron_timezone: Option<String>,
             pub trigger_silence_seconds: i64,
@@ -986,7 +979,6 @@ mod new_entities {
             pub owner: String,
             pub role: Option<String>,
             pub title: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub data: Json,
             pub version: i32,
