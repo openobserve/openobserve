@@ -232,7 +232,7 @@ export default defineComponent({
           });
           emit("update:list");
           uploadProgress.value = 0;
-          worker.terminate();
+          worker?.terminate();
         } else if (status === "error") {
           // dismiss();
           compilationErr.value = error;
@@ -256,7 +256,7 @@ export default defineComponent({
         worker.terminate();
       }
     });
-    const warnOnRefresh = (event) => {
+    const warnOnRefresh = (event:any) => {
       if (uploadProgress.value) {
         event.preventDefault();
       
