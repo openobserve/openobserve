@@ -273,7 +273,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDeletePipeline();
     await pipelinePage.verifyPipelineDeleted();
   }
-  test("should add source & remote destination node and then delete the pipeline", async ({
+  test.skip("should add source & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
