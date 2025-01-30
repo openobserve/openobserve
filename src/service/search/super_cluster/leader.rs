@@ -175,7 +175,7 @@ async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     // construct physical plan
-    let mut ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
+    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
         Ok(v) => v,
         Err(e) => {
             return Err(e);
