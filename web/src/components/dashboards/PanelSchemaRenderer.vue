@@ -31,16 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
-          :data="
-            panelData.chartType == 'maps' && validatePanelData.length === 0
-              ? panelData
-              : { options: {} }
-          "
+          :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
         ></MapsRenderer>
         <GeoMapRenderer
           v-else-if="panelSchema.type == 'geomap'"
           :data="
-            panelData.chartType == 'geomap' && validatePanelData.length === 0
+            panelData.chartType == 'geomap'
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -48,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="
-            panelData.chartType == 'table' && validatePanelData.length === 0
+            panelData.chartType == 'table'
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -456,6 +452,35 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
+    const validatePanelData = computed(() => {
+      const errors: any = [];
+
+      const currentXLabel =
+        panelSchema?.value?.type == "table"
+          ? "First Column"
+          : panelSchema?.value?.type == "h-bar"
+            ? "Y-Axis"
+            : "X-Axis";
+
+      const currentYLabel =
+        panelSchema?.value?.type == "table"
+          ? "Other Columns"
+          : panelSchema?.value?.type == "h-bar"
+            ? "X-Axis"
+            : "Y-Axis";
+
+      validateSQLPanelFields(
+        panelSchema.value,
+        0,
+        currentXLabel,
+        currentYLabel,
+        errors,
+        true,
+      );
+
+      return errors;
+    });
+
     // ======= [START] dashboard PrintMode =======
 
     //inject variablesAndPanelsDataLoadingState from parent
@@ -534,7 +559,7 @@ export default defineComponent({
         }
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value) {
+        if (!errorDetail.value && validatePanelData?.value?.length === 0) {
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -595,12 +620,6 @@ export default defineComponent({
         "is-cached-data-differ-with-current-time-range-update",
         isCachedDataDifferWithCurrentTimeRange.value,
       );
-    });
-
-    const validatePanelData = computed(() => {
-      const errors: any = [];
-      validateSQLPanelFields(panelSchema.value, 0, "", "", errors, true);
-      return errors;
     });
 
     const onDataZoom = (event: any) => {

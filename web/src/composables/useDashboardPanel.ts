@@ -2685,8 +2685,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       validateSQLPanelFields(
         dashboardPanelData.data,
         dashboardPanelData.layout.currentQueryIndex,
-        currentXLabel,
-        currentYLabel,
+        currentXLabel.value,
+        currentYLabel.value,
         errors,
         isFieldsValidationRequired,
       );

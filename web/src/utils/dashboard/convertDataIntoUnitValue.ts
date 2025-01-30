@@ -494,19 +494,19 @@ export const validateSQLPanelFields = (
     return;
   }
 
-  switch (panelData.type) {
+  switch (panelData?.type) {
     case "donut":
     case "pie": {
       if (
-        panelData.queries[queryIndex].fields.y.length > 1 ||
-        panelData.queries[queryIndex].fields.y.length == 0
+        panelData?.queries[queryIndex].fields.y.length > 1 ||
+        panelData?.queries[queryIndex].fields.y.length == 0
       ) {
         errors.push("Add one value field for donut and pie charts");
       }
 
       if (
-        panelData.queries[queryIndex].fields.x.length > 1 ||
-        panelData.queries[queryIndex].fields.x.length == 0
+        panelData?.queries[queryIndex].fields.x.length > 1 ||
+        panelData?.queries[queryIndex].fields.x.length == 0
       ) {
         errors.push("Add one label field for donut and pie charts");
       }
@@ -522,9 +522,7 @@ export const validateSQLPanelFields = (
       }
 
       if (panelData.queries[queryIndex].fields.x.length) {
-        errors.push(
-          `${currentXLabel.value} field is not allowed for Metric chart`,
-        );
+        errors.push(`${currentXLabel} field is not allowed for Metric chart`);
       }
 
       break;
@@ -644,7 +642,7 @@ export const validateSQLPanelFields = (
   }
 
   // check if aggregation function is selected or not
-  if (!(panelData.type == "heatmap")) {
+  if (panelData?.type && !(panelData?.type == "heatmap")) {
     const aggregationFunctionError = panelData.queries[
       queryIndex
     ].fields.y.filter(
@@ -659,28 +657,31 @@ export const validateSQLPanelFields = (
       errors.push(
         ...aggregationFunctionError.map(
           (it: any) =>
-            `${currentYLabel.value}: ${it.column}: Aggregation function required`,
+            `${currentYLabel}: ${it.column}: Aggregation function required`,
         ),
       );
     }
   }
 
   // check if labels are there for y axis items
-  const labelError = panelData.queries[queryIndex].fields.y.filter(
-    (it: any) => it.label == null || it.label == "",
+  const labelError = panelData?.queries?.[queryIndex]?.fields?.y?.filter(
+    (it: any) => it?.label == null || it?.label == "",
   );
-  if (panelData.queries[queryIndex].fields.y.length && labelError.length) {
+  if (
+    panelData?.queries?.[queryIndex]?.fields?.y?.length &&
+    labelError?.length
+  ) {
     errors.push(
       ...labelError.map(
-        (it: any) => `${currentYLabel.value}: ${it.column}: Label required`,
+        (it: any) => `${currentYLabel}: ${it.column}: Label required`,
       ),
     );
   }
 
-  if (panelData.queries[queryIndex].fields.filter.conditions.length) {
+  if (panelData?.queries?.[queryIndex]?.fields?.filter?.conditions?.length) {
     // Validate the top-level conditions
     validateConditions(
-      panelData.queries[queryIndex].fields.filter.conditions,
+      panelData?.queries?.[queryIndex]?.fields?.filter?.conditions,
       errors,
     );
   }
