@@ -11,6 +11,8 @@ test.describe.configure({ mode: "parallel" });
 
 const randomPipelineName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
+const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
+
 const getPasscode = async (page, url, headers) => {
   return await page.evaluate(
     async ({ url, headers }) => {
@@ -40,7 +42,7 @@ export const b64EncodeStandard = (str) => {
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-//   await page.getByText("Login as internal user").click();
+// await page.getByText("Login as internal user").click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -292,29 +294,10 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator("button").filter({ hasText: "edit" }).hover();
-    await page.getByRole("img", { name: "Remote Destination" }).click();
-    await pipelinePage.toggleCreateStream();
-    await page.getByLabel("Name *").click();
-    await page.getByLabel("Name *").fill("remote-nodes");
-    await page.getByRole("button", { name: "Save" }).last().click();
-    const orgId = process.env["ORGNAME"];
-    const streamName = "remote_automate";
-    const url = process.env.INGESTION_URL;
-
     await page
-      .locator('[data-test="add-destination-url-input"]')
-      .fill(`${url}/api/${orgId}/${streamName}/_json`);
-    await page
-      .locator('[data-test="add-destination-header--key-input"]')
-      .fill("Authorization");
-    await page.waitForTimeout(1000);
-    await page
-      .locator('[data-test="add-destination-header-Authorization-value-input"]')
-      .fill(`Basic ${AuthorizationToken}`);
-    await page.locator('[data-test="add-destination-submit-btn"]').click();
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="add-destination-submit-btn"]').click();
+      .getByRole("button", { name: "e2e_automate" })
+      .hover();  
+    await pipelinePage.createRemoteDestination(randomNodeName, AuthorizationToken)
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
@@ -326,9 +309,11 @@ test.describe("Pipeline testcases", () => {
       "remote_automate",
       pipelineName
     );
+
+    await pipelinePage.deleteDestination(randomNodeName);
   });
 
-  test.skip("should add source, function, remote destination and then delete pipeline", async ({
+  test("should add source, function, remote destination and then delete pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -374,10 +359,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
     await page.getByRole("button", { name: randomFunctionName }).hover();
-    await page.getByRole("img", { name: "Remote Destination" }).click();
-    await page.locator('[data-test="external-destination-select"]').click();
-    await page.getByText("remote-node").click();
-    await page.locator('[data-test="add-destination-submit-btn"]').click();
+    
+    await pipelinePage.createRemoteDestination(randomNodeName, AuthorizationToken)
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
@@ -389,9 +372,11 @@ test.describe("Pipeline testcases", () => {
       "remote_automate",
       pipelineName
     );
+    await pipelinePage.deleteDestination(randomNodeName);
+
   });
 
-  test.skip("should add source, condition & remote destination node and then delete the pipeline", async ({
+  test("should add source, condition & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -431,12 +416,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await page
       .getByRole("button", { name: "kubernetes_container_name" })
-      .hover();
-    await page.getByRole("img", { name: "Remote Destination" }).click();
-    await page.locator('[data-test="external-destination-select"]').click();
-    await page.waitForTimeout(1000);
-    await page.getByText("remote-node").click();
-    await page.locator('[data-test="add-destination-submit-btn"]').click();
+      .hover(); 
+    await pipelinePage.createRemoteDestination(randomNodeName, AuthorizationToken)  
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
@@ -447,6 +428,7 @@ test.describe("Pipeline testcases", () => {
       "remote_automate",
       pipelineName
     );
+    await pipelinePage.deleteDestination(randomNodeName);
   });
   test("should add source, function,destination and then delete pipeline", async ({
     page,
