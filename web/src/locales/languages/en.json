@@ -134,6 +134,7 @@
     "functionErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search saved views",
+    "searchSavedFunction": "Search saved function",
     "streamNotExist": "The following [STREAM_NAME] stream(s) were not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for the selected stream",
     "regionTitle": "Select a Region",
