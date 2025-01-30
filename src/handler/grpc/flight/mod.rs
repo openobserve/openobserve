@@ -103,7 +103,7 @@ impl FlightService for FlightServiceImpl {
         let result = get_ctx_and_physical_plan(&trace_id, &req).await;
 
         #[cfg(feature = "enterprise")]
-        if !is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
+        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
             SEARCH_SERVER.remove(&trace_id, false).await;
         }
 
