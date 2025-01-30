@@ -17,7 +17,7 @@ async function login(page) {
   try {
     // Navigate to the page with a longer timeout
     console.log('Navigating to:', process.env["ZO_BASE_URL"]);
-    await page.goto(process.env["ZO_BASE_URL"], { 
+    await page.goto(process.env["ZO_BASE_URL"] + "/web/login", { 
       waitUntil: 'networkidle',
       timeout: 60000 
     });
