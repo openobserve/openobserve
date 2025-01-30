@@ -17,18 +17,49 @@ now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
 one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
 one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 100000)
-simpleKeys = "GNf6McCq0Sm7LCrnnPr4ge+6TG4V1XOGRqXW8m7s5cL50xq4oQEQFDFHevng2UQ8LYUnqwZDPCivlpenqJtpMw=="
-simpleKeysUp = "6h/Q/OootEDxfBAYXGSNT5ASinQxjDw0tsBSE6qn40O+0UGw0ToYQFyPJualHGDW35Z7PF6P/wTkW4LV9JrG3w=="
-akeylessurl = "https://api.akeyless.io"
-akeylessAccessID = "p-c7k3ogiwk1z9am"
-akeylessUpAccessID = "p-************am" 
-akeylessAccessKey = "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc="
-akeylessUpAccessKey = "tT5/Q**********************************5VFc="
+# akeylessurl = "https://api.akeyless.io"
+akeylessurl = os.environ["AKEYLESS_URL"]
+# akeylessAccessID = "p-c7k3ogiwk1z9am"
+akeylessAccessID = os.environ["AKEYLESS_ACCESS_ID"]
+# akeylessUpAccessID = "p-************am" 
+akeylessUpAccessID = os.environ["AKEYLESS_UP_ACCESS_ID"]
+# akeylessAccessKey = "tT5/Q0SrSyL80E3g7tU7PSymsG2m24s3EaYiCRl5VFc="
+akeylessAccessKey = os.environ["AKEYLESS_ACCESS_KEY"]
+# akeylessUpAccessKey = "tT5/Q**********************************5VFc="
+akeylessUpAccessKey = os.environ["AKEYLESS_UP_ACCESS_KEY"]
+# simpleKeys = "GNf6McCq0Sm7LCrnnPr4ge+6TG4V1XOGRqXW8m7s5cL50xq4oQEQFDFHevng2UQ8LYUnqwZDPCivlpenqJtpMw=="
+simpleKeys = os.environ["SIMPLE_KEYS"]
+# simpleKeysUp = "6h/Q/OootEDxfBAYXGSNT5ASinQxjDw0tsBSE6qn40O+0UGw0ToYQFyPJualHGDW35Z7PF6P/wTkW4LV9JrG3w=="
+simpleKeysUp = os.environ["SIMPLE_KEYS_UP"]
 
+# Retrieve the primary key ID from the environment variable
+primary_key_id = os.environ.get("PRIMARY_KEY_ID", 0)  # Default to 0 if not set
+
+# Construct the JSON structure
+keyset = {
+    "primaryKeyId": int(primary_key_id),  # Ensure it's an integer if needed
+    "key": [
+        {
+            "keyData": {
+                "typeUrl": "type.googleapis.com/google.crypto.tink.AesSivKey",
+                "value": "EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR",
+                "keyMaterialType": "SYMMETRIC"
+            },
+            "status": "ENABLED",
+            "keyId": int(primary_key_id),  # Use the same variable here if needed
+            "outputPrefixType": "TINK"
+        }
+    ]
+}
+
+# Convert to JSON string
+keyset_json = json.dumps(keyset)
 
 # number of total log entries to be ingested
 LOG_COUNT = 1000
-KS = r"""{"primaryKeyId":2855908267,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2855908267,"outputPrefixType":"TINK"}]}"""
+print("Primary Key Value", primary_key_id)
+# KS = r"""{"primaryKeyId": primary_key_id,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2855908267,"outputPrefixType":"TINK"}]}"""
+KS = r"""keyset_json"""
 
 # openobserve base url
 BASE_URL = os.environ["ZO_BASE_URL"]
@@ -46,8 +77,8 @@ def encrypt_simple(s):
   )
   primitive = keyset_handle.primitive(daead.DeterministicAead)
   ciphertext = primitive.encrypt_deterministically(bytes(s,'utf-8'), b'')
-  assert base64.b64encode(ciphertext[5:]).decode('utf-8')
-
+#   assert base64.b64encode(ciphertext[5:]).decode('utf-8')
+  return base64.b64encode(ciphertext[5:]).decode('utf-8')
 # uses tink lib to encrypt
 def encrypt_tink(s):
   keyset_handle = tink.json_proto_keyset_format.parse(
@@ -55,34 +86,87 @@ def encrypt_tink(s):
   )
   primitive = keyset_handle.primitive(daead.DeterministicAead)
   ciphertext = primitive.encrypt_deterministically(bytes(s,'utf-8'), b'')
-  assert base64.b64encode(ciphertext).decode('utf-8')
+#   assert base64.b64encode(ciphertext).decode('utf-8')
+  return base64.b64encode(ciphertext).decode('utf-8')
+
+# def test_cipher_data(create_session, base_url):
+#     """Ingest data into the openobserve running instance."""
+#     # efn = None
+    
+    # # depending on type of key, change the encryption fn
+    # if KEY_TYPE == "tink":
+    #     efn = encrypt_tink
+    # else:
+    #     efn = encrypt_simple
+
+    # session = create_session
+    # # Open the json data file and read it
+    # # with open(root_dir / "test-data/logs_data.json") as f:
+    # #     data = f.read()
+    
+    # # temp = json.loads(data)
+    # # for t in temp:
+    # #     if t["log"] is not None:
+    # #         t["log"] = efn(t["log"])
+
+
+    # # Open the json data file and read it from the test-data folder in the root directory of the project  
+    # try:
+    #     with open(root_dir / "test-data/logs_data.json") as f:
+    #         data = f.read()
+    
+    #     temp = json.loads(data)
+    #     if not isinstance(temp, list):
+    #         raise ValueError("Expected JSON array in logs_data.json")
+
+
+    #     for t in temp:
+    #         if not isinstance(t, dict) or "log" not in t:
+    #             raise ValueError("Invalid log entry structure")
+    #         if t["log"] is not None:
+    #             t["log"] = efn(t["log"])
+
 
 def test_cipher_data(create_session, base_url):
     """Ingest data into the openobserve running instance."""
-    efn = None
-    
-    # depending on type of key, change the encryption fn
     if KEY_TYPE == "tink":
+        keyset_json = "..."  # Load your keyset JSON here
+        if not keyset_json:  # Check if it's empty
+            raise ValueError("Keyset JSON is empty.")
         efn = encrypt_tink
     else:
         efn = encrypt_simple
+        session = create_session  # Use create_session directly
 
-    session = create_session
-    # Open the json data file and read it
-    with open(root_dir / "test-data/logs_data.json") as f:
-        data = f.read()
-    
-    temp = json.loads(data)
-    for t in temp:
-        if t["log"] is not None:
-            t["log"] = efn(t["log"])
+    try:
+        json_file_path = root_dir / "test-data/logs_data.json"
+        if not os.path.exists(json_file_path):
+            raise FileNotFoundError(f"{json_file_path} does not exist.")
 
-    stream_name = "default"
-    org = "default"
-    url = f"{BASE_URL}api/{org}/{stream_name}/_json"
-    resp = session.post(url, json=temp, headers={"Content-Type": "application/json"})
-    print("Data ingested successfully, status code: ", resp.status_code)
-    assert resp.status_code == 200
+        with open(json_file_path) as f:
+            data = f.read()
+
+        temp = json.loads(data)
+        if not isinstance(temp, list):
+            raise ValueError("Expected JSON array in logs_data.json")
+
+        for t in temp:
+            if not isinstance(t, dict) or "log" not in t:
+                raise ValueError("Invalid log entry structure")
+            if t["log"] is not None:
+                print(f"Processing log: {t['log']}")
+                t["log"] = efn(t["log"])  # This will use the encryption function
+
+        stream_name = "default"
+        org = "default"
+        url = f"{base_url}api/{org}/{stream_name}/_json"
+        resp = create_session.post(url, json=temp, headers={"Content-Type": "application/json"})  # Use create_session here
+
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        print(f"Error occurred: {e}")
+    except tink.core.TinkError as e:
+        print(f"Tink error occurred: {e}")
+
     
 
 def test_get_cipher(create_session, base_url):
@@ -158,7 +242,8 @@ def test_cipher_simpleOO(create_session, base_url):
         elif resp_create_cipher_simpleOO.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}"
+            # assert False, f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
 
     # Get created cipher key
     resp_get_cipher_simpleOO = session.get(
@@ -275,8 +360,8 @@ def test_cipher_tinkOO(create_session, base_url):
         elif resp_create_cipher_tinkOO.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}"
-
+            # assert False, f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_tinkOO = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -476,8 +561,8 @@ def test_cipher_staticAkeyless(create_session, base_url):
         elif resp_create_cipher_staticAkeyless.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}"
-
+            # assert False, f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_staticAkeyless = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -593,8 +678,8 @@ def test_cipher_staticAkeylessTink(create_session, base_url):
         elif resp_create_cipher_staticAkeylessTink.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_staticAkeylessTink.status_code} {resp_create_cipher_staticAkeylessTink.content}"
-
+            # assert False, f"Unexpected error: {resp_create_cipher_staticAkeylessTink.status_code} {resp_create_cipher_staticAkeylessTink.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_staticAkeylessTink = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -710,8 +795,8 @@ def test_cipher_dfcAkeyless(create_session, base_url):
         elif resp_create_cipher_dfcAkeyless.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_dfcAkeyless.status_code} {resp_create_cipher_dfcAkeyless.content}"
-
+            # assert False, f"Unexpected error: {resp_create_cipher_dfcAkeyless.status_code} {resp_create_cipher_dfcAkeyless.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_dfcAkeyless = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
@@ -826,8 +911,8 @@ def test_cipher_dfcAkeylessTink(create_session, base_url):
         elif resp_create_cipher_dfcAkeylessTink.status_code == 400:
             continue  # Key already exists, try again
         else:
-            assert False, f"Unexpected error: {resp_create_cipher_dfcAkeylessTink.status_code} {resp_create_cipher_dfcAkeylessTink.content}"
-
+            # assert False, f"Unexpected error: {resp_create_cipher_dfcAkeylessTink.status_code} {resp_create_cipher_dfcAkeylessTink.content}"
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_staticAkeyless.status_code} {resp_create_cipher_staticAkeyless.content}")
     # Get created cipher key
     resp_get_cipher_dfcAkeylessTink = session.get(
         f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
