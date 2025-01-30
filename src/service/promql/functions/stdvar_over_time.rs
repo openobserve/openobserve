@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,11 @@ use crate::service::promql::{
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stdvar_over_time
-pub(crate) fn stdvar_over_time(data: &Value) -> Result<Value> {
+pub(crate) fn stdvar_over_time(data: Value) -> Result<Value> {
     super::eval_idelta(data, "stdvar_over_time", exec, false)
 }
 
-fn exec(data: &RangeValue) -> Option<f64> {
+fn exec(data: RangeValue) -> Option<f64> {
     if data.samples.is_empty() {
         return None;
     }

@@ -173,7 +173,7 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-
+    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters).await }
@@ -1162,13 +1162,13 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 // generate parquet file search schema
 pub fn generate_search_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, Error> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }

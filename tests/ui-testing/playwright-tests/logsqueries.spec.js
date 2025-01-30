@@ -1,5 +1,6 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
+import { LogsPage } from '../pages/logsPage.js';
 import logsdata from "../../test-data/logs_data.json";
 
 test.describe.configure({ mode: 'parallel' });
@@ -55,6 +56,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
         "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 test.describe("Logs Queries testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -79,6 +81,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
+    logsPage = new LogsPage(page);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -290,5 +293,14 @@ test.describe("Logs Queries testcases", () => {
     await expect(targetElement).toBeVisible(); // Assertion to ensure visibility
     await targetElement.click()
   })
+
+  test("should display results in selected time", async ({
+    page,
+  }) => {
+    
+    await logsPage.setDateTimeToToday();
+    
+    
+  });
 
 })

@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod action_scripts;
 mod alerts;
+mod cipher_keys;
 mod dashboards;
 mod distinct_values;
 mod folders;
@@ -26,8 +28,8 @@ mod short_urls;
 
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue,
+    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -43,6 +45,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_search_job_msg: search_job::process,
         on_dashboard_msg: dashboards::process,
         on_pipeline_msg: pipelines::process,
+        on_cipher_key_msg: cipher_keys::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
@@ -63,6 +66,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let folders_queue = FoldersQueue {
         on_folder_msg: folders::process,
     };
+    let action_scripts_queue = ActionScriptsQueue {
+        on_action_script_msg: action_scripts::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -72,6 +78,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
         Box::new(folders_queue),
+        Box::new(action_scripts_queue),
     ];
 
     for queue in queues {

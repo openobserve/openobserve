@@ -40,8 +40,6 @@ use once_cell::sync::Lazy;
 mod etcd;
 mod nats;
 
-const HEALTH_CHECK_FAILED_TIMES: usize = 3;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
@@ -393,13 +391,20 @@ async fn watch_node_list() -> Result<()> {
 
 async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
+    if !cfg.health_check.enabled {
+        return Ok(());
+    }
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
             continue;
         }
         let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
-        let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
+        let resp = client
+            .get(url)
+            .timeout(Duration::from_secs(cfg.health_check.timeout))
+            .send()
+            .await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!(
                 "[CLUSTER] node {}[{}] health check failed",
@@ -409,11 +414,12 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             let mut w = NODES_HEALTH_CHECK.write().await;
             let entry = w.entry(node.uuid.clone()).or_insert(0);
             *entry += 1;
-            if *entry >= HEALTH_CHECK_FAILED_TIMES {
+            if *entry >= cfg.health_check.failed_times {
                 log::error!(
-                    "[CLUSTER] node {}[{}] health check failed 3 times, remove it",
+                    "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
-                    node.http_addr
+                    node.http_addr,
+                    cfg.health_check.failed_times
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(

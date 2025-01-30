@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,11 +17,11 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::{
     common::calculate_trend,
-    value::{InstantValue, LabelsExt, RangeValue, Sample, Value},
+    value::{InstantValue, Sample, Value},
 };
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
-pub(crate) fn holt_winters(data: &Value, scaling_factor: f64, trend_factor: f64) -> Result<Value> {
+pub(crate) fn holt_winters(data: Value, scaling_factor: f64, trend_factor: f64) -> Result<Value> {
     let data = match data {
         Value::Matrix(v) => v,
         Value::None => return Ok(Value::None),
@@ -34,10 +34,11 @@ pub(crate) fn holt_winters(data: &Value, scaling_factor: f64, trend_factor: f64)
     };
 
     let mut rate_values = Vec::with_capacity(data.len());
-    for metric in data {
-        let labels = metric.labels.without_metric_name();
-        if let Some(value) = holt_winters_calculation(metric, scaling_factor, trend_factor) {
-            let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
+    for mut metric in data {
+        let labels = std::mem::take(&mut metric.labels);
+        let eval_ts = metric.time_window.as_ref().unwrap().eval_ts;
+        if let Some(value) = holt_winters_calculation(&metric.samples, scaling_factor, trend_factor)
+        {
             rate_values.push(InstantValue {
                 labels,
                 sample: Sample::new(eval_ts, value),
@@ -48,19 +49,19 @@ pub(crate) fn holt_winters(data: &Value, scaling_factor: f64, trend_factor: f64)
 }
 
 pub fn holt_winters_calculation(
-    data: &RangeValue,
+    samples: &[Sample],
     smoothing_factor: f64,
     trend_factor: f64,
 ) -> Option<f64> {
-    if data.samples.len() < 2 {
+    if samples.len() < 2 {
         return None;
     }
 
     let mut previous_smoothed = 0.0;
-    let mut current_smoothed = data.samples[0].value;
-    let mut trend = data.samples[1].value - data.samples[0].value;
+    let mut current_smoothed = samples[0].value;
+    let mut trend = samples[1].value - samples[0].value;
 
-    for (i, &sample) in data.samples[1..].iter().enumerate() {
+    for (i, sample) in samples[1..].iter().enumerate() {
         let scaled_value = smoothing_factor * sample.value;
         trend = calculate_trend(
             i as i64,

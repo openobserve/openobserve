@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use std::str::FromStr;
+
+use config::{cluster::LOCAL_NODE, meta::cluster::Role};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -28,12 +30,15 @@ use crate::{
 };
 
 mod alert_manager;
+#[cfg(feature = "enterprise")]
+mod cipher;
 mod compactor;
 pub(crate) mod files;
 mod flatten_compactor;
 mod ingester;
 pub mod metrics;
 mod mmdb_downloader;
+mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
@@ -73,7 +78,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await;
     }
 
-    if !cfg.common.mmdb_disable_download {
+    if !cfg.common.mmdb_disable_download
+        && matches!(Role::from_str(&cfg.common.node_role), Ok(role) if role != Role::AlertManager)
+    {
         // Try to download the mmdb files, if its not disabled.
         tokio::task::spawn(async move { mmdb_downloader::run().await });
     }
@@ -94,7 +101,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { promql_self_consume::run().await });
     // Router doesn't need to initialize job
-    if LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
 
@@ -127,10 +134,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::ofga::watch().await });
 
     #[cfg(feature = "enterprise")]
-    if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
         tokio::task::spawn(async move { db::session::watch().await });
     }
-    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
@@ -205,9 +212,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
+    // start pipeline data retention
+    tokio::task::spawn(async move { pipeline::run().await });
 
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
+
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { cipher::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::keys::watch().await });
 
     // RBAC model
     #[cfg(feature = "enterprise")]

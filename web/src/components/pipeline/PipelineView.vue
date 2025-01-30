@@ -61,6 +61,8 @@ const streamImage = getImageURL("images/pipeline/stream.svg");
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
+
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
@@ -148,6 +150,14 @@ const queryImage = getImageURL("images/pipeline/query.svg");
     io_type: "output",
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "Remote",
+    subtype: "remote_stream",
+    io_type: "output",
+    icon: "img:" + externalOutputImage,
+    tooltip: "Destination: External Destination Node",
     isSectionHeader: false,
   },
 ];

@@ -256,6 +256,16 @@ impl Pipeline {
             }
         }
     }
+
+    pub fn contains_remote_destination(&self, destination: &str) -> bool {
+        self.nodes.iter().any(|node| {
+            if let NodeData::RemoteStream(dest) = &node.data {
+                dest.destination_name == destination
+            } else {
+                false
+            }
+        })
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline
@@ -355,7 +365,7 @@ fn dfs_traversal_check(
     if !graph.contains_key(current_id) {
         // Ensure leaf nodes are Stream nodes
         if let Some(node_data) = node_map.get(current_id) {
-            if !matches!(node_data, NodeData::Stream(_)) {
+            if !matches!(node_data, NodeData::Stream(_) | NodeData::RemoteStream(_)) {
                 return Err(anyhow!("All leaf nodes must be StreamNode"));
             }
         } else {

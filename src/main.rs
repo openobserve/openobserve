@@ -30,6 +30,10 @@ use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
 use log::LevelFilter;
+#[cfg(feature = "enterprise")]
+use openobserve::handler::http::{
+    auth::script_server::validator as script_server_validator, request::script_server,
+};
 use openobserve::{
     cli::basic::cli,
     common::{
@@ -164,12 +168,26 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {} MB, Disk total {} GB, free {} GB",
+        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total / 1024 / 1024,
-        cfg.limit.disk_total / 1024 / 1024 / 1024,
-        cfg.limit.disk_free / 1024 / 1024 / 1024,
+        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
     );
+    log::info!(
+        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
+        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+    );
+
+    // init script server
+    #[cfg(feature = "enterprise")]
+    if config::cluster::LOCAL_NODE.is_script_server() && config::cluster::LOCAL_NODE.is_standalone()
+    {
+        log::info!("Starting script server");
+        return init_script_server().await;
+    }
 
     // init backend jobs
     let (job_init_tx, job_init_rx) = oneshot::channel();
@@ -211,7 +229,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = init_enterprise().await {
+            if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -572,14 +590,18 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 )
                 .app_data(web::Data::new(http_client))
         } else {
-            app = app.service(
-                web::scope(&cfg.common.base_uri)
+            app = app.service({
+                let scope = web::scope(&cfg.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
+                    .configure(get_proxy_routes);
+                #[cfg(feature = "enterprise")]
+                let scope = scope.configure(get_script_server_routes);
+
+                scope
+            })
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
@@ -672,14 +694,18 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 )
                 .app_data(web::Data::new(http_client))
         } else {
-            app = app.service(
-                web::scope(&cfg.common.base_uri)
+            app = app.service({
+                let scope = web::scope(&cfg.common.base_uri)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
                     .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
+                    .configure(get_proxy_routes);
+                #[cfg(feature = "enterprise")]
+                let scope = scope.configure(get_script_server_routes);
+
+                scope
+            })
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
@@ -880,10 +906,130 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
+async fn init_script_server() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    // metrics
+    let prometheus = config::metrics::create_prometheus_handler();
+
+    let thread_id = Arc::new(AtomicU16::new(0));
+    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
+        format!("[::]:{}", cfg.http.port).parse()?
+    } else {
+        let ip = if !cfg.http.addr.is_empty() {
+            cfg.http.addr.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        format!("{}:{}", ip, cfg.http.port).parse()?
+    };
+
+    // following command will setup the namespace
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::actions::app_deployer::init().await?;
+
+    let server = HttpServer::new(move || {
+        let cfg = get_config();
+        let local_id = thread_id.load(Ordering::SeqCst) as usize;
+        if cfg.common.feature_per_thread_lock {
+            thread_id.fetch_add(1, Ordering::SeqCst);
+        }
+        let scheme = if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        };
+        log::info!(
+            "Starting Script Server {} server at: {}, thread_id: {}",
+            scheme,
+            haddr,
+            local_id
+        );
+        let mut app = App::new().wrap(prometheus.clone());
+
+        app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
+
+        app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
+            .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
+            .app_data(web::Data::new(local_id))
+            .wrap(middleware::Compress::default())
+            .wrap(middleware::Logger::new(
+                r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
+            ))
+            .wrap(RequestTracing::new())
+    })
+    .keep_alive(if cfg.limit.keep_alive_disabled {
+        KeepAlive::Disabled
+    } else {
+        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
+    })
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
+    let server = if cfg.http.tls_enabled {
+        let sc = http_tls_config()?;
+        server.bind_rustls_0_23(haddr, sc)?
+    } else {
+        server.bind(haddr)?
+    };
+
+    let server = server
+        .workers(cfg.limit.http_worker_num)
+        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .disable_signals()
+        .run();
+    let handle = server.handle();
+    tokio::task::spawn(async move {
+        graceful_shutdown(handle).await;
+    });
+    server.await?;
+
+    log::info!("HTTP server stopped");
+
+    // flush usage report
+    self_reporting::flush().await;
+
+    // stop telemetry
+    if cfg.common.telemetry_enabled {
+        meta::telemetry::Telemetry::new()
+            .event("OpenObserve - Server stopped", None, false)
+            .await;
+    }
+
+    #[cfg(feature = "profiling")]
+    if let Some(agent) = agent {
+        let agent_ready = agent.stop().unwrap();
+        agent_ready.shutdown();
+    }
+
+    log::info!("server stopped");
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
+    cfg.service(
+        web::scope("/api")
+            .wrap(actix_web_httpauth::middleware::HttpAuthentication::with_fn(
+                script_server_validator,
+            ))
+            .wrap(cors)
+            .service(script_server::create_job)
+            .service(script_server::delete_job)
+            .service(script_server::get_app_details)
+            .service(script_server::list_deployed_apps),
+    );
+}
+
 /// Initializes enterprise features.
 #[cfg(feature = "enterprise")]
 async fn init_enterprise() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::search::init().await?;
+
+    if let Err(e) = o2_enterprise::enterprise::actions::action_manager::init_client() {
+        log::warn!("Failed to init action manager client: {e}");
+    }
 
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
@@ -893,5 +1039,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         openobserve::super_cluster_queue::init().await?;
     }
+
+    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
+
     Ok(())
 }

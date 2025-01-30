@@ -380,11 +380,14 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.locator('[data-test="index-field-search-input"]').fill("kubernetes_container_hash");
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+    await page.locator('[data-test="index-field-search-input"]').fill("");
+    await page.locator('[data-test="index-field-search-input"]').fill("kubernetes_container_name");
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'

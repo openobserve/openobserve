@@ -944,8 +944,9 @@ export default defineComponent({
           Object.keys(importantFields).forEach((rowName) => {
             if (fields[rowName] == undefined) {
               fields[rowName] = {};
+              const formattedName = rowName === "duration" ? `${rowName} (µs)` : rowName;
               searchObj.data.stream.selectedStreamFields.push({
-                name: rowName,
+                name: formattedName,
                 ftsKey: ftsKeys.has(rowName),
                 showValues: !idFields[rowName],
               });
@@ -1153,11 +1154,11 @@ export default defineComponent({
     }
 
     onBeforeMount(async () => {
+      restoreUrlQueryParams();
       await importSqlParser();
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
         await loadPageData();
-        restoreUrlQueryParams();
       }
     });
 
@@ -1166,15 +1167,16 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      restoreUrlQueryParams();
       const params = router.currentRoute.value.query;
       if (params.reload === "true") {
+        restoreUrlQueryParams();
         loadPageData();
       }
       if (
         searchObj.organizationIdentifier !=
         store.state.selectedOrganization.identifier
       ) {
+        restoreUrlQueryParams();
         loadPageData();
       }
 

@@ -23,7 +23,10 @@ use ::config::{
     },
     utils::rand::get_rand_element,
 };
-use actix_web::{http::Error, route, web, FromRequest, HttpRequest, HttpResponse};
+use actix_web::{
+    http::{Error, Method},
+    route, web, FromRequest, HttpRequest, HttpResponse,
+};
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -189,15 +192,15 @@ async fn dispatch(
             .body(new_url.error.unwrap_or("internal server error".to_string())));
     }
 
+    // check if the request need to be proxied by body
+    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
+        return proxy_querier_by_body(req, payload, client, new_url, start).await;
+    }
+
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
     if *path_columns.get(3).unwrap_or(&"") == "ws" {
         return proxy_ws(req, payload, new_url, start).await;
-    }
-
-    // check if the request need to be proxied by body
-    if cfg.common.metrics_cache_enabled && is_querier_route_by_body(&path) {
-        return proxy_querier_by_body(req, payload, client, new_url, start).await;
     }
 
     // send query
@@ -262,14 +265,7 @@ async fn default_proxy(
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     // send query
-    let req = if new_url.full_url.starts_with("https://") {
-        create_http_client()
-            .unwrap()
-            .request_from(req.full_url().to_string(), req.head())
-            .address(new_url.node_addr.parse().unwrap())
-    } else {
-        client.request_from(&new_url.full_url, req.head())
-    };
+    let req = create_proxy_request(client, req, &new_url).await?;
     let mut resp = match req.send_stream(payload).await {
         Ok(resp) => resp,
         Err(e) => {
@@ -325,7 +321,7 @@ async fn proxy_querier_by_body(
     let (key, payload) = if new_url.path.contains("/prometheus/api/v1/query_range")
         || new_url.path.contains("/prometheus/api/v1/query_exemplars")
     {
-        if req.method() == "GET" {
+        if req.method() == Method::GET {
             let Ok(query) = web::Query::<RequestRangeQuery>::from_query(req.query_string()) else {
                 return Ok(HttpResponse::BadRequest().body("Failed to parse query string"));
             };
@@ -359,14 +355,7 @@ async fn proxy_querier_by_body(
         .replace("https://", "");
 
     // send query
-    let req = if new_url.full_url.starts_with("https://") {
-        create_http_client()
-            .unwrap()
-            .request_from(req.full_url().to_string(), req.head())
-            .address(new_url.node_addr.parse().unwrap())
-    } else {
-        client.request_from(&new_url.full_url, req.head())
-    };
+    let req = create_proxy_request(client, req, &new_url).await?;
     let resp = if let Some(payload) = payload {
         req.send_form(&payload).await
     } else {
@@ -457,6 +446,43 @@ async fn proxy_ws(
     }
 }
 
+async fn create_proxy_request(
+    client: web::Data<awc::Client>,
+    req: HttpRequest,
+    new_url: &URLDetails,
+) -> actix_web::Result<awc::ClientRequest, Error> {
+    // get cookies
+    let cookies = req
+        .head()
+        .headers
+        .iter()
+        .filter_map(|(key, value)| {
+            if key.as_str() == "cookie" {
+                Some(value.to_str().unwrap_or("").to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    // create request
+    let mut req = if new_url.full_url.starts_with("https://") {
+        create_http_client()
+            .unwrap()
+            .request_from(req.full_url().to_string(), req.head())
+            .address(new_url.node_addr.parse().unwrap())
+    } else {
+        client.request_from(&new_url.full_url, req.head())
+    };
+    // set cookies
+    if !cookies.is_empty() {
+        req.headers_mut().insert(
+            actix_web::http::header::COOKIE,
+            actix_http::header::HeaderValue::from_str(&cookies.join("; ")).unwrap(),
+        );
+    }
+    Ok(req)
+}
+
 pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
     let cfg = get_config();
     let mut client_builder = awc::Client::builder()
@@ -479,6 +505,9 @@ mod tests {
         assert!(is_querier_route("/api/_search"));
         assert!(is_querier_route("/api/_around"));
         assert!(!is_querier_route("/api/_bulk"));
+        assert!(is_querier_route(
+            "https://test.com/api/default/prometheus/api/v1/query_range"
+        ));
     }
 
     #[test]
