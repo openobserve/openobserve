@@ -85,10 +85,8 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
-        let trace_id = format!(
-            "{}-{}",
-            req.query_identifier.trace_id, req.query_identifier.job_id
-        );
+        let orig_trace_id = req.query_identifier.trace_id.to_string();
+        let trace_id = format!("{}-{}", orig_trace_id, req.query_identifier.job_id);
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
 
         log::info!("[trace_id {}] flight->search: do_get", trace_id);
@@ -96,7 +94,10 @@ impl FlightService for FlightServiceImpl {
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
             SEARCH_SERVER
-                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
+                .insert(
+                    orig_trace_id.clone(),
+                    TaskStatus::new_follower(vec![], false),
+                )
                 .await;
         }
 
@@ -104,7 +105,7 @@ impl FlightService for FlightServiceImpl {
 
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id, false).await;
+            SEARCH_SERVER.remove(&orig_trace_id, false).await;
         }
 
         // 2. prepare dataufion context
