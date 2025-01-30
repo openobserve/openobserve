@@ -14,10 +14,18 @@ const dashboardName = `AutomatedDashboard${Date.now()}`
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   // await page.getByText('Login as internal user').click();
-  await page.waitForTimeout(1000);
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  
+  await page.waitForTimeout(3000);
+  // Take a screenshot and get it in binary format
+  const screenshotBuffer = await page.screenshot();
+
+  // Convert binary format to base64 (optional for logging)
+  const base64Screenshot = screenshotBuffer.toString('base64');
+  console.log("Screenshot in Base64 format:", base64Screenshot);
+
+
+  await page.waitForSelector('[data-cy="login-user-id"]');
+  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
   //Enter Password
   await page.locator('label').filter({ hasText: 'Password *' }).click();
   await page
