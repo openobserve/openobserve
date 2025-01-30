@@ -12,7 +12,6 @@ pub struct Model {
     pub owner: String,
     pub role: Option<String>,
     pub title: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub data: Json,
     pub version: i32,
