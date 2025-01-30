@@ -51,7 +51,7 @@ use crate::service::search::{
             remote_scan::RemoteScanExec,
             NewEmptyExecVisitor,
         },
-        exec::prepare_datafusion_context,
+        exec::{prepare_datafusion_context, register_udf},
     },
     generate_filter_from_equal_items,
     request::{FlightSearchRequest, Request},
@@ -85,6 +85,8 @@ pub async fn search(
         prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
             .await?;
 
+    // register UDF
+    register_udf(&ctx, &req.org_id)?;
     // register function
     datafusion_functions_json::register_all(&mut ctx)?;
 
