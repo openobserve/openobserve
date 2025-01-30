@@ -12,28 +12,47 @@ test.describe.configure({ mode: 'parallel' });
 const dashboardName = `AutomatedDashboard${Date.now()}`
 
 async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  console.log('Starting login process...');
   
-  await page.waitForTimeout(3000);
-  // Take a screenshot and get it in binary format
-  const screenshotBuffer = await page.screenshot();
-
-  // Convert binary format to base64 (optional for logging)
-  const base64Screenshot = screenshotBuffer.toString('base64');
-  console.log("Screenshot in Base64 format:", base64Screenshot);
-
-
-  await page.waitForSelector('[data-cy="login-user-id"]');
-  await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  //Enter Password
-  await page.locator('label').filter({ hasText: 'Password *' }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-  // await page.waitForTimeout(4000);
-  // await page.goto(process.env["ZO_BASE_URL"]);
+  try {
+    // Navigate to the page with a longer timeout
+    console.log('Navigating to:', process.env["ZO_BASE_URL"]);
+    await page.goto(process.env["ZO_BASE_URL"], { 
+      waitUntil: 'networkidle',
+      timeout: 60000 
+    });
+    
+    console.log('Waiting for login form...');
+    // Wait for the login form with explicit timeout and visibility check
+    await page.waitForSelector('[data-cy="login-user-id"]', { 
+      state: 'visible',
+      timeout: 60000 
+    });
+    
+    // Log the page content if the selector is not found (for debugging)
+    const content = await page.content();
+    console.log('Page content length:', content.length);
+    console.log('First 500 chars of content:', content.substring(0, 500));
+    
+    // Fill in login details
+    console.log('Filling login credentials...');
+    await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    
+    await page.locator('label').filter({ hasText: 'Password *' }).click();
+    await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+    
+    // Click login button and wait for navigation
+    console.log('Submitting login form...');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle' }),
+      page.locator('[data-cy="login-sign-in"]').click()
+    ]);
+    
+    console.log('Login successful');
+  } catch (error) {
+    console.error('Login failed:', error);
+    throw error;
+  }
 }
 
 async function ingestion(page) {
@@ -200,4 +219,4 @@ test.describe("dashboard testcases", () => {
     await page.getByRole('row', { name: dashboardName }).locator('[data-test="dashboard-delete"]').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
-})
+}
