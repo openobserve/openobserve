@@ -306,7 +306,7 @@ mod legacy_dashboards {
         use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(dashboard.dashboard_id.clone());
-        hasher.update(folder_id.to_owned());
+        hasher.update(folder_id);
         let hash = hasher.finalize();
         svix_ksuid::Ksuid::from_bytes(hash.into())
     }
