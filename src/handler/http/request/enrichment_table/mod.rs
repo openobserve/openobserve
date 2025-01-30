@@ -17,8 +17,7 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
-use config::SIZE_IN_MB;
-use hashbrown::HashMap;
+use config::{meta::enrichment_table::UploadEnrichmentTableQuery, SIZE_IN_MB};
 use url::Url;
 
 use crate::{
@@ -28,6 +27,36 @@ use crate::{
         list_jobs, save_enrichment_data,
     },
 };
+
+#[post("/{org_id}/enrichment_tables/v2/{table_name}")]
+pub async fn save_enrichment_table_v2(
+    path: web::Path<(String, String)>,
+    payload: Multipart,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, table_name) = path.into_inner();
+    let content_type = req.headers().get("content-type");
+    let content_length = match req.headers().get("content-length") {
+        None => 0.0,
+        Some(content_length) => {
+            content_length
+                .to_str()
+                .unwrap_or("0")
+                .parse::<f64>()
+                .unwrap_or(0.0)
+                / SIZE_IN_MB
+        }
+    };
+    let cfg = config::get_config();
+    let Ok(query) = web::Query::<UploadEnrichmentTableQuery>::from_query(req.query_string()) else {
+        return Ok(MetaHttpResponse::bad_request(
+            "Error parsing query params".to_string(),
+        ));
+    };
+    let append_data = query.append;
+    // TODO: complete the implementation
+    Ok(HttpResponse::Ok().finish())
+}
 
 /// CreateEnrichmentTable
 #[utoipa::path(
@@ -67,11 +96,12 @@ pub async fn save_enrichment_table(
         }
     };
     let cfg = config::get_config();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let append_data = match query.get("append") {
-        Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
-        None => false,
+    let Ok(query) = web::Query::<UploadEnrichmentTableQuery>::from_query(req.query_string()) else {
+        return Ok(MetaHttpResponse::bad_request(
+            "Error parsing query params".to_string(),
+        ));
     };
+    let append_data = query.append;
     match content_type {
         Some(content_type) => {
             if content_type
