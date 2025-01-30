@@ -219,4 +219,4 @@ test.describe("dashboard testcases", () => {
     await page.getByRole('row', { name: dashboardName }).locator('[data-test="dashboard-delete"]').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
-}
+});
