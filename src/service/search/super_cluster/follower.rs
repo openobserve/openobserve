@@ -85,7 +85,8 @@ pub async fn search(
         prepare_datafusion_context(req.work_group.clone(), vec![], false, cfg.limit.cpu_num)
             .await?;
 
-    // register function
+    // register udf
+    register_udf(&ctx, &req.org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes

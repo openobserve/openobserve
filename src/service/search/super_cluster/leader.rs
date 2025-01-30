@@ -184,7 +184,6 @@ async fn run_datafusion(
 
     // register table
     register_table(&ctx, &sql).await?;
-    datafusion_functions_json::register_all(&mut ctx)?;
 
     // create physical plan
     let plan = match ctx.state().create_logical_plan(&sql.sql).await {
