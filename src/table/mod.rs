@@ -34,7 +34,10 @@ pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
 
-pub async fn init() -> Result<(), anyhow::Error> {
+/// Runs old migrations that are not managed by SeaORM.
+///
+/// Includes migrations for the `distinct_values` and `short_urls` tables.
+pub async fn run_unmanaged_migrations() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
     Ok(())

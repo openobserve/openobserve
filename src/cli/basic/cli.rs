@@ -153,6 +153,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     // init infra, create data dir & tables
     infra::init().await.expect("infra init failed");
+    crate::table::run_unmanaged_migrations()
+        .await
+        .expect("migrations for distinct_values and short_urls could not complete");
     match name {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
