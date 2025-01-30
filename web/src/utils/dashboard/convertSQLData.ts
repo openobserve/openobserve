@@ -1226,12 +1226,14 @@ export const convertSQLData = async (
     yAxisName: string,
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
+    seriesName: string,
   ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
       name: yAxisName,
       ...defaultSeriesProps,
       label: getSeriesLabel(),
+      originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
@@ -1309,11 +1311,11 @@ export const convertSQLData = async (
 
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, seriesConfig);
+              return getSeriesObj(yAxisName, seriesData, seriesConfig, key);
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, seriesData, seriesConfig);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig, "");
           }
         })
         .flat() || []
@@ -1369,7 +1371,11 @@ export const convertSQLData = async (
           new Set(getAxisDataFromKey(xAxisKeys[0])),
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
-      } else if (panelSchema.type !== "line" && panelSchema.type !== "area" && panelSchema.type !== "bar") {
+      } else if (
+        panelSchema.type !== "line" &&
+        panelSchema.type !== "area" &&
+        panelSchema.type !== "bar"
+      ) {
         options.tooltip.formatter = function (name: any) {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
@@ -1449,7 +1455,8 @@ export const convertSQLData = async (
       if (
         (panelSchema.type === "line" ||
           panelSchema.type == "area" ||
-          panelSchema.type == "scatter" || panelSchema.type == "bar") &&
+          panelSchema.type == "scatter" ||
+          panelSchema.type == "bar") &&
         panelSchema.config.trellis?.layout &&
         breakDownKeys.length
       )

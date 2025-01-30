@@ -1078,7 +1078,17 @@ export default defineComponent({
             : "";
 
           const breakdownColumn = breakdown[0]?.column;
-          const breakdownValue = drilldownParams[0]?.seriesName;
+
+          const seriesIndex = drilldownParams[0].seriesIndex;
+
+          const breakdownSeriesName =
+            panelData.value.options.series[seriesIndex];
+
+          const uniqueSeriesName = breakdownSeriesName
+            ? breakdownSeriesName.originalSeriesName
+            : drilldownParams[0]?.seriesName;
+
+          const breakdownValue = uniqueSeriesName;
           const whereClause = buildWhereClause(
             ast,
             breakdownColumn,
