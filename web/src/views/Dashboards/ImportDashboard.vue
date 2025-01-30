@@ -422,42 +422,39 @@ export default defineComponent({
     });
 
     watch(jsonStr, (newVal) => {
-        if (newVal) {
-          try {
-            // If newVal is an object, stringify it directly
-            if (typeof newVal === "object") {
-              jsonStr.value = JSON.stringify(newVal, null, 2);
-            } else if (typeof newVal === "string") {
-              // Only parse it if it's a string
-              const jsonObject = JSON.parse(newVal);
-              jsonStr.value = JSON.stringify(jsonObject, null, 2);
-            }
-          } catch (error) {
-            showErrorNotification("Invalid JSON format");
+      if (newVal) {
+        try {
+          // If newVal is an object, stringify it directly
+          if (typeof newVal === "object") {
+            jsonStr.value = JSON.stringify(newVal, null, 2);
+          } else if (typeof newVal === "string") {
+            // Only parse it if it's a string
+            const jsonObject = JSON.parse(newVal);
+            jsonStr.value = JSON.stringify(jsonObject, null, 2);
           }
+        } catch (error) {
+          showErrorNotification("Invalid JSON format");
         }
-        if(newVal == ""){
-          jsonFiles.value = null;
-          url.value = "";
-        }
-      });
-
-
-
+      }
+      if (newVal == "") {
+        jsonFiles.value = null;
+        url.value = "";
+      }
+    });
 
     watch(url, async (newVal) => {
       try {
         if (newVal) {
           const urlObj = new URL(newVal);
-        if (!['http:', 'https:'].includes(urlObj.protocol)) {
-          throw new Error('Only HTTP(S) URLs are allowed');
-        }
-        const response = await axios.get(newVal, {
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json,text/plain'
+          if (!["http:", "https:"].includes(urlObj.protocol)) {
+            throw new Error("Only HTTP(S) URLs are allowed");
           }
-        });
+          const response = await axios.get(newVal, {
+            timeout: 5000,
+            headers: {
+              Accept: "application/json,text/plain",
+            },
+          });
 
           // Check if the response body is valid JSON
           try {
@@ -604,7 +601,7 @@ export default defineComponent({
         // get the dashboard
         const urlData = url.value.trim() ? url.value.trim() : "";
 
-        if (!urlData) {
+        if (!urlData && !jsonStr.value) {
           showErrorNotification("Please Enter a URL for import");
           return;
         }
@@ -677,33 +674,35 @@ export default defineComponent({
       url.value = "";
     };
     const importDashboard = () => {
-      try{
+      try {
         dashboardErrorsToDisplay.value = [];
-      const jsonObj = JSON.parse(jsonStr.value);
-      if (Array.isArray(jsonObj)) {
-        jsonObj.forEach((input, index) => {
-          validateBasicInputs(input, index);
-        });
-      } else {
-        validateBasicInputs(jsonObj);
-      }
-      if (dashboardErrorsToDisplay.value.length > 0) {
-        return;
-      }
-      if (activeTab.value === "import_json_file") {
-        if (jsonFiles.value == undefined) {
-          importFromJsonStr();
+        const jsonObj = JSON.parse(jsonStr.value);
+        if (Array.isArray(jsonObj)) {
+          jsonObj.forEach((input, index) => {
+            // migrate to new schema
+            const convertedSchema = convertDashboardSchemaVersion(input);
+            validateBasicInputs(convertedSchema, index);
+          });
         } else {
-          importFiles();
+          // migrate to new schema
+          const convertedSchema = convertDashboardSchemaVersion(jsonObj);
+          validateBasicInputs(convertedSchema);
         }
-      } else {
-        importFromUrl();
-      }
-      }
-      catch(e){
+        if (dashboardErrorsToDisplay.value.length > 0) {
+          return;
+        }
+        if (activeTab.value === "import_json_file") {
+          if (jsonFiles.value == undefined) {
+            importFromJsonStr();
+          } else {
+            importFiles();
+          }
+        } else {
+          importFromUrl();
+        }
+      } catch (e) {
         showErrorNotification("Failed to Import Dashboard");
       }
- 
     };
     const validateBasicInputs = (input, index = 0) => {
       if (input.title === "" || typeof input.title !== "string") {
@@ -713,33 +712,7 @@ export default defineComponent({
           dashboardIndex: index,
         });
       }
-      checkStreamType(input.tabs, index);
     };
-    function checkStreamType(tabs, dashboardIndex) {
-      const streamTypeOptions = ["logs", "metrics", "traces"];
-      tabs.forEach((tab, tabIndex) => {
-        tab.panels.forEach((panel, panelIndex) => {
-          panel.queries.forEach((query, queryIndex) => {
-            // Check if stream is defined and is a valid string
-            if (
-              !query.fields.stream_type ||
-              typeof query.fields.stream_type !== "string" ||
-              query.fields.stream_type.trim() === "" ||
-              !streamTypeOptions.includes(query.fields.stream_type)
-            ) {
-              dashboardErrorsToDisplay.value.push({
-                message: `Missing or invalid 'stream_type' of dashboard - ${dashboardIndex + 1} at tab index ${tabIndex}, panel index ${panelIndex}, query index ${queryIndex}`,
-                field: "stream_type",
-                tabIndex: tabIndex,
-                panelIndex: panelIndex,
-                queryIndex: queryIndex,
-                dashboardIndex,
-              });
-            }
-          });
-        });
-      });
-    }
 
     const goToCommunityDashboards = () => {
       window.open("https://github.com/openobserve/dashboards", "_blank");

@@ -106,7 +106,6 @@ pub struct ExecutablePipelineBulkInputs {
 #[derive(Debug)]
 pub struct ExecutablePipelineTraceInputs {
     records: Vec<Value>,
-    timestamps: Vec<i64>,
     services: Vec<String>,
     span_names: Vec<String>,
     span_status_for_spanmetrics: Vec<String>,
@@ -419,7 +418,6 @@ impl ExecutablePipelineTraceInputs {
     pub fn new() -> Self {
         Self {
             records: Vec::new(),
-            timestamps: Vec::new(),
             services: Vec::new(),
             span_names: Vec::new(),
             span_status_for_spanmetrics: Vec::new(),
@@ -432,7 +430,6 @@ impl ExecutablePipelineTraceInputs {
     pub fn add_input(
         &mut self,
         record: Value,
-        ts: i64,
         service: String,
         span_name: String,
         span_status_for_spanmetric: String,
@@ -440,7 +437,6 @@ impl ExecutablePipelineTraceInputs {
         duration: f64,
     ) {
         self.records.push(record);
-        self.timestamps.push(ts);
         self.services.push(service);
         self.span_names.push(span_name);
         self.span_status_for_spanmetrics
@@ -454,7 +450,6 @@ impl ExecutablePipelineTraceInputs {
         self,
     ) -> (
         Vec<Value>,
-        Vec<i64>,
         Vec<String>,
         Vec<String>,
         Vec<String>,
@@ -463,7 +458,6 @@ impl ExecutablePipelineTraceInputs {
     ) {
         (
             self.records,
-            self.timestamps,
             self.services,
             self.span_names,
             self.span_status_for_spanmetrics,

@@ -428,8 +428,7 @@ pub async fn handle_otlp_request(
 
             let timestamp = val_map
                 .get(&cfg.common.column_timestamp)
-                .unwrap()
-                .as_i64()
+                .and_then(|ts| ts.as_i64())
                 .unwrap_or(Utc::now().timestamp_micros());
 
             let value_str = json::to_string(&val_map).unwrap();

@@ -200,6 +200,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </q-item-section>
                           <q-item-section
+                            :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
+                            side
+                            @click.stop="handleUpdateSavedView(props.row)"
+                          >
+                            <q-icon name="edit" color="grey" size="xs" />
+                          </q-item-section>
+                          <q-item-section
                             :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
@@ -440,6 +447,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
               :trigger="true"
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval ?? 0
+              "
               @update:model-value="onRefreshIntervalUpdate"
               @trigger="$emit('onAutoIntervalTrigger')"
             />
@@ -740,18 +750,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section class="q-pt-none">
-          <span>Update</span>
-          <q-toggle
-            data-test="saved-view-action-toggle"
-            v-bind:disable="searchObj.data.savedViews.length == 0"
-            name="saved_view_action"
-            v-model="isSavedViewAction"
-            true-value="create"
-            false-value="update"
-            label=""
-            @change="savedViewName = ''"
-          />
-          <span>Create</span>
           <div v-if="isSavedViewAction == 'create'">
             <q-input
               data-test="add-alert-name-input"
@@ -809,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!saveViewLoader"
             unelevated
             no-caps
-            :label="t('confirmDialog.ok')"
+            :label="t('common.save')"
             color="primary"
             class="text-bold"
             @click="handleSavedView"
@@ -925,6 +923,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
+    />
+    <ConfirmDialog
+      title="Update Saved View"
+      message="Are you sure you want to update the saved view? This action will overwrite the existing one."
+      @update:ok="confirmUpdateSavedViews"
+      @update:cancel="confirmUpdate = false"
+      v-model="confirmUpdate"
     />
     <ConfirmDialog
       title="Reset Changes"
@@ -1043,11 +1048,30 @@ export default defineComponent({
       this.deleteViewID = item.view_id;
       this.confirmDelete = true;
     },
+    handleUpdateSavedView(item: any) {
+      if (this.searchObj.data.stream.selectedStream.length == 0) {
+        this.$q.notify({
+          type: "negative",
+          message: "No stream available to update save view.",
+        });
+        return;
+      }
+      this.savedViewDropdownModel = false;
+      this.updateViewObj = item;
+      this.confirmUpdate = true;
+    },
     confirmDeleteSavedViews() {
       this.deleteSavedViews();
     },
     toggleCustomDownloadDialog() {
       this.customDownloadDialog = true;
+    },
+    confirmUpdateSavedViews() {
+      this.updateSavedViews(
+        this.updateViewObj.view_id,
+        this.updateViewObj.view_name,
+      );
+      return;
     },
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
@@ -1194,6 +1218,8 @@ export default defineComponent({
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
+    const confirmUpdate = ref(false);
+    const updateViewObj = ref({});
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -2123,25 +2149,26 @@ export default defineComponent({
           saveViewLoader.value = true;
           createSavedViews(savedViewName.value);
         }
-      } else {
-        if (savedViewSelectedName.value.view_id) {
-          saveViewLoader.value = false;
-          showSavedViewConfirmDialog(() => {
-            saveViewLoader.value = true;
-            updateSavedViews(
-              savedViewSelectedName.value.view_id,
-              savedViewSelectedName.value.view_name,
-            );
-          });
-        } else {
-          $q.notify({
-            message: `Please select saved view to update.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-        }
       }
+      //  else {
+      //   if (savedViewSelectedName.value.view_id) {
+      //     saveViewLoader.value = false;
+      //     showSavedViewConfirmDialog(() => {
+      //       saveViewLoader.value = true;
+      //       updateSavedViews(
+      //         savedViewSelectedName.value.view_id,
+      //         savedViewSelectedName.value.view_name,
+      //       );
+      //     });
+      //   } else {
+      //     $q.notify({
+      //       message: `Please select saved view to update.`,
+      //       color: "negative",
+      //       position: "bottom",
+      //       timeout: 1000,
+      //     });
+      //   }
+      // }
     };
 
     const deleteSavedViews = async () => {
@@ -2292,9 +2319,16 @@ export default defineComponent({
           view_name: viewName,
         };
 
+        const dismiss = $q.notify({
+          message: "Updating saved view...",
+          position: "bottom",
+          timeout: 0,
+        });
+
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
+            dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               //update the payload and view_name in savedViews object based on id
@@ -2328,6 +2362,7 @@ export default defineComponent({
             }
           })
           .catch((err) => {
+            dismiss();
             saveViewLoader.value = false;
             $q.notify({
               message: `Error while updating saved view.`,
@@ -2738,6 +2773,7 @@ export default defineComponent({
     // [END] cancel running queries
 
     return {
+      $q,
       t,
       store,
       router,
@@ -2825,6 +2861,9 @@ export default defineComponent({
       fnParsedSQL,
       iconRight,
       functionToggleIcon,
+      confirmUpdate,
+      updateViewObj,
+      updateSavedViews,
     };
   },
   computed: {

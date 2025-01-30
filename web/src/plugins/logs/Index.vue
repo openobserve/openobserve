@@ -536,6 +536,7 @@ export default defineComponent({
       extractFields,
       resetHistogramWithError,
       isLimitQuery,
+      enableRefreshInterval,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1024,6 +1025,13 @@ export default defineComponent({
     };
 
     const onChangeInterval = () => {
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+      }
+
       updateUrlQueryParams();
       refreshData();
     };
