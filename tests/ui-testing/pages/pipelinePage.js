@@ -393,6 +393,7 @@ async createRemoteDestination(randomNodeName, AuthorizationToken) {
   
   await this.headerValueInput.waitFor();
   await this.headerValueInput.fill(`Basic ${AuthorizationToken}`);
+  console.log("this is to test", AuthorizationToken)
 
   await this.submitButton.waitFor();
   await this.submitButton.click();
