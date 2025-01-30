@@ -13,7 +13,6 @@ pub struct Model {
     pub name: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub kind: String,
-    #[sea_orm(column_type = "Text")]
     pub data: String,
 }
 
