@@ -7,13 +7,13 @@
       <q-card-section class="q-pa-md">
         <q-input
           v-model="annotationData.title"
-          label="Title"
+          label="Title *"
           stack-label
           class="q-py-md showLabelOnTop"
           dense
           outlined
           style="margin-bottom: 10px"
-          :rules="[(val) => !!val || 'Field is required!']"
+          :rules="[(val) => !!val || 'Title is required.']"
         />
         <q-input
           v-model="annotationData.text"
@@ -113,7 +113,6 @@
             flat
             label="Cancel"
             v-close-popup
-            :loading="deleteAnnotation.isLoading.value"
           />
           <q-btn
             color="negative"
