@@ -150,31 +150,6 @@ pub struct UpdateActionDetailsRequest {
 
 /// Request send to Action Deployer, to deploy an action
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DeployActionRequest {
-    #[serde(default)]
-    pub job_name: String,
-    #[serde(default)]
-    pub label_name: String,
-    #[serde(default)]
-    pub execution_details: ExecutionDetailsType,
-    #[serde(default)]
-    pub cron_expr: Option<String>,
-    #[serde(default)]
-    pub environment_variables: HashMap<String, String>,
-    #[serde(default)]
-    pub ksuid: String,
-    #[serde(default)]
-    pub runtime: String,
-    #[serde(default)]
-    pub origin_cluster_url: String,
-    #[serde(default)]
-    pub sa_token: String,
-    #[serde(default)]
-    pub service_account: String,
-}
-
-/// Request send to Action Deployer, to deploy an action
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UpdateActionRequest {
     #[serde(default)]
     pub job_name: Option<String>,

@@ -21,11 +21,8 @@ use o2_enterprise::enterprise::actions::app_deployer::APP_DEPLOYER;
 pub async fn create_job(path: web::Path<String>, body: web::Bytes) -> impl Responder {
     let org_id = path.into_inner();
 
-    // Convert body to string
-    let req: DeployActionRequest = serde_json::from_slice(&body).unwrap();
-
     if let Some(deployer) = APP_DEPLOYER.get() {
-        return match deployer.create_app(&org_id, req).await {
+        return match deployer.create_app(&org_id, body).await {
             Ok(created_at) => HttpResponse::Ok().body(created_at.to_rfc3339()),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
         };
