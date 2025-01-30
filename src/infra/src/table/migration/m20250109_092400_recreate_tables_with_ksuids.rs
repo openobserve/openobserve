@@ -255,12 +255,23 @@ mod legacy_dashboards {
         page_size: u64,
     ) -> Result<(), sea_orm_migration::DbErr> {
         let mut pages = legacy_entities::legacy_dashboards::Entity::find()
+            .find_also_related(legacy_entities::legacy_folders::Entity)
             .order_by_asc(legacy_entities::legacy_dashboards::Column::Id)
             .paginate(conn, page_size);
 
         while let Some(dashboards) = pages.fetch_and_next().await? {
-            for dashboard in dashboards {
-                let ksuid = ksuid_from_hash(&dashboard).to_string();
+            for (dashboard, folder) in dashboards {
+                let folder_id = match folder {
+                    Some(folder) => folder.folder_id,
+                    _ => {
+                        log::error!(
+                            "Dashboard with ID {} has no associated folder",
+                            dashboard.id
+                        );
+                        "".to_string()
+                    }
+                };
+                let ksuid = ksuid_from_hash(&dashboard, &folder_id).to_string();
                 let mut am = dashboard.into_active_model();
                 am.ksuid = Set(Some(ksuid));
                 am.update(conn).await?;
@@ -288,10 +299,14 @@ mod legacy_dashboards {
     /// It is important to note that KSUIDs generated in this manner will have
     /// timestamp bits which are effectively random, meaning that the timestamp
     /// in any KSUID generated with this function will be random.
-    fn ksuid_from_hash(dashboard: &legacy_entities::legacy_dashboards::Model) -> svix_ksuid::Ksuid {
+    fn ksuid_from_hash(
+        dashboard: &legacy_entities::legacy_dashboards::Model,
+        folder_id: &str,
+    ) -> svix_ksuid::Ksuid {
         use sha1::{Digest, Sha1};
         let mut hasher = Sha1::new();
         hasher.update(dashboard.dashboard_id.clone());
+        hasher.update(folder_id);
         let hash = hasher.finalize();
         svix_ksuid::Ksuid::from_bytes(hash.into())
     }
@@ -509,6 +524,7 @@ mod new_alerts {
     use sea_orm::QueryOrder;
 
     use super::*;
+    use crate::table::migration::get_text_type;
     const ALERTS_FOLDERS_FK: &str = "alerts_folders_fk_2";
     const ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX: &str =
         "alerts_org_stream_type_stream_name_name_idx_2";
@@ -560,6 +576,7 @@ mod new_alerts {
 
     /// Statement to create the alerts table.
     pub fn create_alerts_table_statement() -> TableCreateStatement {
+        let text_type = get_text_type();
         Table::create()
         .table(Alerts::Table)
         .if_not_exists()
@@ -584,7 +601,7 @@ mod new_alerts {
         .col(ColumnDef::new(Alerts::IsRealTime).boolean().not_null())
         .col(ColumnDef::new(Alerts::Destinations).json().not_null())
         .col(ColumnDef::new(Alerts::ContextAttributes).json().null())
-        .col(ColumnDef::new(Alerts::RowTemplate).text().null())
+        .col(ColumnDef::new(Alerts::RowTemplate).custom(Alias::new(&text_type)).null())
         .col(ColumnDef::new(Alerts::Description).text().null())
         .col(ColumnDef::new(Alerts::Enabled).boolean().not_null())
         .col(ColumnDef::new(Alerts::TzOffset).integer().not_null())
@@ -595,15 +612,15 @@ mod new_alerts {
             ColumnDef::new(Alerts::QueryType).small_integer().not_null(),
         )
         .col(ColumnDef::new(Alerts::QueryConditions).json().null())
-        .col(ColumnDef::new(Alerts::QuerySql).text().null())
-        .col(ColumnDef::new(Alerts::QueryPromql).text().null())
+        .col(ColumnDef::new(Alerts::QuerySql).custom(Alias::new(&text_type)).null())
+        .col(ColumnDef::new(Alerts::QueryPromql).custom(Alias::new(&text_type)) .null())
         .col(
             ColumnDef::new(Alerts::QueryPromqlCondition)
                 .json()
                 .null(),
         )
         .col(ColumnDef::new(Alerts::QueryAggregation).json().null())
-        .col(ColumnDef::new(Alerts::QueryVrlFunction).text().null())
+        .col(ColumnDef::new(Alerts::QueryVrlFunction).custom(Alias::new(&text_type)).null())
         .col(
             ColumnDef::new(Alerts::QuerySearchEventType).small_integer().null(),
         )
@@ -731,7 +748,6 @@ mod legacy_entities {
             pub org: String,
             pub folder_id: String,
             pub name: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub r#type: i16,
             pub ksuid: Option<String>, // This column is newly added by this migration.
@@ -776,9 +792,7 @@ mod legacy_entities {
             pub is_real_time: bool,
             pub destinations: Json,
             pub context_attributes: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub row_template: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub enabled: bool,
             pub tz_offset: i32,
@@ -786,13 +800,10 @@ mod legacy_entities {
             pub last_satisfied_at: Option<i64>,
             pub query_type: i16,
             pub query_conditions: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_sql: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_promql: Option<String>,
             pub query_promql_condition: Option<Json>,
             pub query_aggregation: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_vrl_function: Option<String>,
             pub query_search_event_type: Option<i16>,
             pub query_multi_time_range: Option<Json>,
@@ -801,7 +812,6 @@ mod legacy_entities {
             pub trigger_threshold_count: i64,
             pub trigger_frequency_type: i16,
             pub trigger_frequency_seconds: i64,
-            #[sea_orm(column_type = "Text", nullable)]
             pub trigger_frequency_cron: Option<String>,
             pub trigger_frequency_cron_timezone: Option<String>,
             pub trigger_silence_seconds: i64,
@@ -845,7 +855,6 @@ mod legacy_entities {
             pub owner: String,
             pub role: Option<String>,
             pub title: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub data: Json,
             pub version: i32,
@@ -889,7 +898,6 @@ mod new_entities {
             pub org: String,
             pub folder_id: String,
             pub name: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub r#type: i16,
         }
@@ -920,9 +928,7 @@ mod new_entities {
             pub is_real_time: bool,
             pub destinations: Json,
             pub context_attributes: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub row_template: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub enabled: bool,
             pub tz_offset: i32,
@@ -930,13 +936,10 @@ mod new_entities {
             pub last_satisfied_at: Option<i64>,
             pub query_type: i16,
             pub query_conditions: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_sql: Option<String>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_promql: Option<String>,
             pub query_promql_condition: Option<Json>,
             pub query_aggregation: Option<Json>,
-            #[sea_orm(column_type = "Text", nullable)]
             pub query_vrl_function: Option<String>,
             pub query_search_event_type: Option<i16>,
             pub query_multi_time_range: Option<Json>,
@@ -945,7 +948,6 @@ mod new_entities {
             pub trigger_threshold_count: i64,
             pub trigger_frequency_type: i16,
             pub trigger_frequency_seconds: i64,
-            #[sea_orm(column_type = "Text", nullable)]
             pub trigger_frequency_cron: Option<String>,
             pub trigger_frequency_cron_timezone: Option<String>,
             pub trigger_silence_seconds: i64,
@@ -977,7 +979,6 @@ mod new_entities {
             pub owner: String,
             pub role: Option<String>,
             pub title: String,
-            #[sea_orm(column_type = "Text", nullable)]
             pub description: Option<String>,
             pub data: Json,
             pub version: i32,
