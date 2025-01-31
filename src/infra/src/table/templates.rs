@@ -91,9 +91,6 @@ pub async fn put(template: Template) -> Result<Template, Error> {
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match get_model(client, org_id, name).await? {
         Some(model) => Ok(Some(Template::try_from(model)?)),
@@ -102,9 +99,6 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let templates = list_models(client, Some(org_id))
         .await?
@@ -115,9 +109,6 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
 }
 
 pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let templates = list_models(client, None)
         .await?
