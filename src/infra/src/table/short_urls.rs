@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
-    FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*,
+    sea_query::{Alias, DynIden},
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,9 +35,14 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_type = "String(StringLen::N(32))")]
     pub short_id: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(column_type = "Custom(get_text_type())")]
     pub original_url: String,
     pub created_ts: i64,
+}
+
+fn get_text_type() -> DynIden {
+    let txt_type = crate::table::migration::get_text_type();
+    SeaRc::new(Alias::new(&txt_type))
 }
 
 #[derive(Copy, Clone, Debug, EnumIter)]

@@ -149,6 +149,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
+          <div class="flex justify-center items-center tw-border tw-pl-2 tw-rounded-sm tw-border-gray-300">
+            <q-input
+              v-model="searchQuery"
+              placeholder="Search..."
+              @update:model-value="handleSearchQueryChange" 
+              dense
+              borderless
+              clearable
+              debounce="500"
+              class="q-mr-sm custom-height flex items-center"
+            />
+            <p class="tw-mr-1" v-if="searchResults"><small><span>{{currentIndex+1}}</span> of <span>{{searchResults}}</span></small></p>
+            <q-btn 
+              v-if="searchResults" 
+              :disable="currentIndex === 0" 
+              class="tw-mr-1 download-logs-btn flex" 
+              flat 
+              round
+              title="Previous"
+              icon="keyboard_arrow_up"
+              @click="prevMatch"
+              dense
+              :size="`sm`"
+              />
+            <q-btn 
+              v-if="searchResults"
+              :disable="currentIndex+1 === searchResults"
+              class="tw-mr-1 download-logs-btn flex"
+              flat round title= "Next" 
+              icon="keyboard_arrow_down" 
+              @click="nextMatch" 
+              dense
+              :size="`sm`"
+            />
+            </div>
           <q-btn
             data-test="logs-search-bar-share-link-btn"
             class="q-mr-sm download-logs-btn"
@@ -160,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.shareLink')"
             @click="shareLink"
           />
-          <q-btn round flat icon="cancel" size="md" @click="router.back()" />
+          <q-btn round flat icon="cancel" size="md" @click="routeToTracesList" />
         </div>
       </div>
 
@@ -228,17 +263,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
           isTimelineExpanded ? '' : 'full',
         ]"
+        ref="parentContainer" 
       >
         <trace-header
           :baseTracePosition="baseTracePosition"
           :splitterWidth="leftWidth"
+          @resize-start="startResize"
         />
         <div class="relative-position full-height">
           <div
             class="trace-tree-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
           >
-            <div class="q-pt-sm position-relative">
+            <div class="position-relative" >
               <div
                 :style="{
                   width: '1px',
@@ -247,10 +284,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? '#3c3c3c' : '#ececec',
                   zIndex: 999,
                   top: '-28px',
-                  height: 'calc(100% + 30px) !important',
+                  height: `${parentHeight}px`,
                   cursor: 'col-resize',
                 }"
-                class="absolute full-height"
+                class="absolute resize"
                 @mousedown="startResize"
               />
               <trace-tree
@@ -260,8 +297,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spanDimensions="spanDimensions"
                 :spanMap="spanMap"
                 :leftWidth="leftWidth"
+                ref="traceTreeRef" 
+                :search-query="searchQuery"
+                :spanList="spanList"
                 @toggle-collapse="toggleSpanCollapse"
                 @select-span="updateSelectedSpan"
+                @update-current-index="handleIndexUpdate"
+                @search-result="handleSearchResult"
               />
             </div>
           </div>
@@ -276,6 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <trace-details-sidebar
           :span="spanMap[selectedSpanId as string]"
           :baseTracePosition="baseTracePosition"
+          :search-query="searchQuery"          
           @view-logs="redirectToLogs"
           @close="closeSidebar"
           @open-trace="openTraceLink"
@@ -302,6 +345,7 @@ import {
   watch,
   defineAsyncComponent,
   onBeforeMount,
+  nextTick,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -351,7 +395,8 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
   },
-  emits: ["shareLink"],
+  
+  emits: ["shareLink","searchQueryUpdated"],
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
@@ -379,6 +424,21 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+    const parentContainer = ref<HTMLElement | null>(null);
+    let parentHeight = ref(0);
+    let currentHeight = 0; 
+    const updateHeight = async () => {
+      await nextTick();
+      if (parentContainer.value) {
+        const newHeight = parentContainer.value.scrollHeight;
+        if (currentHeight !== newHeight) {
+          currentHeight = newHeight;
+          parentHeight.value = currentHeight;
+          
+        }
+      }
+    };
+
 
     const { showErrorNotification } = useNotifications();
 
@@ -429,26 +489,43 @@ export default defineComponent({
     );
 
     const showTraceDetails = ref(false);
+    const currentIndex = ref(0);
+    const searchResults = ref(0);
+    const searchQuery = ref('');
 
-    // Disabled for now
-    // onActivated(() => {
-    //   const params = router.currentRoute.value.query;
+    const handleSearchQueryChange = (value:any) => {
+      searchQuery.value = value; 
+      
+    };
+    const traceTreeRef = ref<InstanceType<typeof TraceTree> | null>(null);
+    const nextMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn('TraceTree component reference not found');
+        return;
+      }
+      if (traceTreeRef.value) {
+        traceTreeRef.value.nextMatch();
+      }
+    };
+    const prevMatch = () => {
+      if (!traceTreeRef.value) {
+        console.warn('TraceTree component reference not found');
+        return;
+      }
+      if (traceTreeRef.value) {
+        traceTreeRef.value.prevMatch();
+      }
+    };
+    const handleIndexUpdate = (newIndex:any) => {
+      currentIndex.value = newIndex; // Update the parent's state with the child's emitted value
+    };
+    const handleSearchResult = (newIndex:any) => {
+      searchResults.value = newIndex; // Update the parent's state with the child's emitted value
+    };
+    // Watch for changes in searchQuery
+    
 
-    //   // If selected trace is different from the one in the URL, reset the trace details
-    //   // If there is no selected trace, then also reset the trace details
-
-    //   if (
-    //     (searchObj.data.traceDetails.selectedTrace &&
-    //       params.trace_id !==
-    //         searchObj.data.traceDetails.selectedTrace?.trace_id) ||
-    //     !searchObj.data.traceDetails.selectedTrace
-    //   ) {
-    //     resetTraceDetails();
-    //     console.log("resetTraceDetails >>>>>>>>>>>>>");
-    //     setupTraceDetails();
-    //   }
-    // });
-
+    
     onBeforeMount(async () => {
       resetTraceDetails();
       setupTraceDetails();
@@ -465,26 +542,6 @@ export default defineComponent({
       }
     );
 
-    // Disabled for now
-    // watch(
-    //   () => router.currentRoute.value.query.trace_id,
-    //   (_new, _old) => {
-    //     // If trace_id changes, reset the trace details
-    //     if (
-    //       _new &&
-    //       _old &&
-    //       _new !== _old &&
-    //       _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
-    //     ) {
-    //       resetTraceDetails();
-    //       // setupTraceDetails();
-    //       const params = router.currentRoute.value.query;
-    //       if (params.span_id) {
-    //         updateSelectedSpan(params.span_id as string);
-    //       }
-    //     }
-    //   },
-    // );
 
     const backgroundStyle = computed(() => {
       return {
@@ -531,7 +588,16 @@ export default defineComponent({
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
       }
+      nextTick(() => {
+        updateHeight();
+      });
+      // window.addEventListener("resize", updateHeight);
     });
+
+    // onBeforeUnmount(() => {
+    //   window.removeEventListener("resize", updateHeight);
+    // });
+
 
     // watch(
     //   () => spanList.value.length,
@@ -642,6 +708,7 @@ export default defineComponent({
             return;
           }
           searchObj.data.traceDetails.spanList = res.data?.hits || [];
+          console.log(res.data?.hits);
           buildTracesTree();
         })
         .finally(() => {
@@ -978,6 +1045,7 @@ export default defineComponent({
       timeRange.value.start = data.start || 0;
       timeRange.value.end = data.end || 0;
       calculateTracePosition();
+      updateHeight();
     };
 
     onMounted(() => {
@@ -985,6 +1053,8 @@ export default defineComponent({
     });
 
     const startResize = (event: any) => {
+      console.log("called");
+      
       initialX.value = event.clientX;
       initialWidth.value = leftWidth.value;
 
@@ -1145,6 +1215,18 @@ export default defineComponent({
       routeToTracesList,
       openTraceLink,
       convertTimeFromNsToMs,
+      searchQuery,
+      handleSearchQueryChange,
+      traceTreeRef,
+      nextMatch,
+      prevMatch,
+      currentIndex,
+      handleIndexUpdate,
+      handleSearchResult,
+      searchResults,
+      parentContainer,
+      parentHeight,
+      updateHeight
     };
   },
 });
@@ -1312,4 +1394,23 @@ $traceChartCollapseHeight: 42px;
     }
   }
 }
+.custom-height {
+  height: 34px;
+}
+
+.custom-height .q-field__control,.custom-height .q-field__append {
+  height: 100%; /* Ensures the input control fills the container height */
+  line-height: 36px; /* Vertically centers the text inside */
+}
+.resize::after{
+  content: ' ';
+  position: absolute;
+  height: 100%;
+  left: -10px;
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
 </style>
