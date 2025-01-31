@@ -3057,6 +3057,7 @@ export default defineComponent({
         query:{
           action: "search_scheduler",
           org_identifier: store.state.selectedOrganization.identifier,
+          type: "search_scheduler_list"
         }
       });
     }
