@@ -106,7 +106,7 @@ pub async fn put(
             None => {
                 let (active, new_template) = {
                     let mut active = ActiveModel {
-                        id: Set(ider::uuid()),
+                        id: Set(destination.id.map_or_else(ider::uuid, |id| id.to_string())),
                         org: Set(destination.org_id),
                         name: Set(destination.name),
                         template_id: Set(None),

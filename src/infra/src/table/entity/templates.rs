@@ -11,9 +11,7 @@ pub struct Model {
     pub name: String,
     pub is_default: bool,
     pub r#type: String,
-    #[sea_orm(column_type = "Text")]
     pub body: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub title: Option<String>,
 }
 

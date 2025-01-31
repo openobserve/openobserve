@@ -83,7 +83,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
             active.update(client).await?.try_into_model()?
         }
         None => {
-            active.id = Set(ider::uuid());
+            active.id = Set(template.id.map_or_else(ider::uuid, |id| id.to_string()));
             active.insert(client).await?.try_into_model()?
         }
     };
