@@ -149,8 +149,12 @@ impl ListTimedAnnotationsQuery {
     }
 
     pub fn get_panels(&self) -> Option<Vec<String>> {
-        self.panels
-            .as_ref()
-            .map(|panels| panels.split(',').map(|panel| panel.to_string()).collect())
+        self.panels.as_ref().map(|panels| {
+            panels
+                .split(',')
+                .filter(|panel| !panel.is_empty())
+                .map(|panel| panel.to_string())
+                .collect()
+        })
     }
 }
