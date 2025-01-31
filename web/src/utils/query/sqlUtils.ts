@@ -262,23 +262,6 @@ export function extractFields(parsedAst: any, timeField: string) {
   if (allFieldsSelected) {
     // empty fields array
     fields = [];
-
-    // Add histogram(_timestamp) and count(_timestamp) to the fields array
-    fields.push(
-      {
-        column: timeField,
-        alias: "x_axis_1",
-        aggregationFunction: "histogram",
-      },
-      {
-        column: timeField,
-        alias: "y_axis_1",
-        aggregationFunction: "count",
-      },
-    );
-
-    // Filter out the `*` entry from fields
-    fields = fields.filter((field: any) => field.column !== "*");
   }
 
   return fields;

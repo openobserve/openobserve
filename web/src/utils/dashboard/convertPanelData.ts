@@ -38,6 +38,7 @@ export const convertPanelData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  annotations: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -69,6 +70,7 @@ export const convertPanelData = async (
             store,
             chartPanelRef,
             hoveredSeriesState,
+            annotations,
           )),
         };
       } else {
@@ -85,6 +87,7 @@ export const convertPanelData = async (
               resultMetaData,
               metadata,
               chartPanelStyle,
+              annotations,
             )),
           };
         } catch (error) {

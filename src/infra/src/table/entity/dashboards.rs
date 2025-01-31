@@ -28,11 +28,19 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Folders,
+    #[sea_orm(has_many = "super::timed_annotations::Entity")]
+    TimedAnnotations,
 }
 
 impl Related<super::folders::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Folders.def()
+    }
+}
+
+impl Related<super::timed_annotations::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::TimedAnnotations.def()
     }
 }
 
