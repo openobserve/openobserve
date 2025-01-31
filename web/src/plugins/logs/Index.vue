@@ -1277,6 +1277,23 @@ export default defineComponent({
         store.state.zoConfig.timestamp_column ?? "_timestamp",
       );
 
+      // if fields length is 0, then add default fields
+      if (fields.length == 0) {
+        // Add histogram(_timestamp) and count(_timestamp) to the fields array
+        fields.push(
+          {
+            column: timeField,
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+          {
+            column: timeField,
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
+        );
+      }
+
       // set stream type and stream name
       if (streamName && streamName != "undefined") {
         dashboardPanelData.data.queries[0].fields.stream_type =
