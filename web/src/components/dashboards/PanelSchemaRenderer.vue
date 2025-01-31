@@ -273,6 +273,7 @@ import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
 
@@ -450,6 +451,35 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
+    const validatePanelData = computed(() => {
+      const errors: any = [];
+
+      const currentXLabel =
+        panelSchema?.value?.type == "table"
+          ? "First Column"
+          : panelSchema?.value?.type == "h-bar"
+            ? "Y-Axis"
+            : "X-Axis";
+
+      const currentYLabel =
+        panelSchema?.value?.type == "table"
+          ? "Other Columns"
+          : panelSchema?.value?.type == "h-bar"
+            ? "X-Axis"
+            : "Y-Axis";
+
+      validateSQLPanelFields(
+        panelSchema.value,
+        0,
+        currentXLabel,
+        currentYLabel,
+        errors,
+        true,
+      );
+
+      return errors;
+    });
+
     // ======= [START] dashboard PrintMode =======
 
     //inject variablesAndPanelsDataLoadingState from parent
@@ -528,7 +558,7 @@ export default defineComponent({
         }
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (!errorDetail.value) {
+        if (!errorDetail.value && validatePanelData?.value?.length === 0) {
           try {
             // passing chartpanelref to get width and height of DOM element
             panelData.value = await convertPanelData(
@@ -1378,6 +1408,7 @@ export default defineComponent({
       hidePopupsAndOverlays,
       chartPanelClass,
       chartPanelHeight,
+      validatePanelData,
       isAddAnnotationDialogVisible,
       closeAddAnnotation,
       isAddAnnotationMode,
