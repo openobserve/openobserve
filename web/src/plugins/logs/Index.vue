@@ -1279,6 +1279,7 @@ export default defineComponent({
 
       // if fields length is 0, then add default fields
       if (fields.length == 0) {
+        const timeField = store.state.zoConfig.timestamp_column ?? "_timestamp";
         // Add histogram(_timestamp) and count(_timestamp) to the fields array
         fields.push(
           {

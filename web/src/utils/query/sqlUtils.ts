@@ -262,9 +262,6 @@ export function extractFields(parsedAst: any, timeField: string) {
   if (allFieldsSelected) {
     // empty fields array
     fields = [];
-
-    // Filter out the `*` entry from fields
-    fields = fields.filter((field: any) => field.column !== "*");
   }
 
   return fields;
