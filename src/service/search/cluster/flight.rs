@@ -958,7 +958,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![]).await?;
+    let resp = super::http::search(req, query, vec![], vec![], false).await?;
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
