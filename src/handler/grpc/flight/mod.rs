@@ -92,7 +92,7 @@ impl FlightService for FlightServiceImpl {
         log::info!("[trace_id {}] flight->search: do_get", trace_id);
 
         #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
+        if is_super_cluster && !SEARCH_SERVER.contain_key(&orig_trace_id).await {
             SEARCH_SERVER
                 .insert(
                     orig_trace_id.clone(),
@@ -104,7 +104,7 @@ impl FlightService for FlightServiceImpl {
         let result = get_ctx_and_physical_plan(&trace_id, &req).await;
 
         #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
+        if is_super_cluster && !SEARCH_SERVER.is_leader(&orig_trace_id).await {
             SEARCH_SERVER.remove(&orig_trace_id, false).await;
         }
 
