@@ -1404,8 +1404,8 @@ export default defineComponent({
 
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        if (!isValid(true, false)) {
-          return;
+        if (!isValid(true, true)) {
+          // return;
         }
 
         // refresh the date time
