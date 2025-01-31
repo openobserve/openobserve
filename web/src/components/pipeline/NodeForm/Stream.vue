@@ -35,13 +35,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             data-test="input-node-stream-type-select"
             class="alert-stream-type o2-input q-mr-sm full-width"
-            style="padding-top: 0"
-          >
+            style="padding-top: 0">
+          <div
+          data-test="scheduled-alert-threshold-title"
+          class="text-bold flex items-center"
+          style="width: fit-content; opacity: 0.6;">
+         {{ t('alerts.streamType') + ' *' }}
+
+            </div>
 
             <q-select
               v-model="stream_type"
               :options="filteredStreamTypes"
-              :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'none' }"
               color="input-border"
               bg-color="input-bg"
@@ -52,24 +57,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
+              style="padding-top: 6px !important"
+
             />
           </div>
           <div
             data-test="input-node-stream-type-select"
-            class="alert-stream-type o2-input q-mr-sm full-width"
+            class="alert-stream-type q-mr-sm full-width"
             style="padding-top: 0"
           >
+          <div class='flex'>
+
+
+          <div
+          data-test="scheduled-alert-threshold-title"
+          class="text-bold flex items-center"
+          style="width: fit-content; opacity: 0.6; "
+        >
+         {{ t('alerts.stream_name') + ' *'}}
+
+
+        </div>
+        <q-icon
+        v-if="selectedNodeType == 'output'"
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            " 
+             style="opacity: 1 !important;"       
+             >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >select an existing stream from the list or enter the name to create a new one</span
+              >
+            </q-tooltip>
+          </q-icon>
+        </div>
+          
+          
           <q-select
             v-model="stream_name"
             :options="filteredStreams"
              option-label="label"
               option-value="value"
-            :label="t('alerts.stream_name') + ' *'"
             :loading="isFetchingStreams"
+            label=''
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case full-width"
+            class="q-py-sm no-case showLabelOnTop full-width "
             filled
             stack-label
             dense
@@ -82,11 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
+            style="padding-top: 6px !important"
            
             />
-
-
-
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
