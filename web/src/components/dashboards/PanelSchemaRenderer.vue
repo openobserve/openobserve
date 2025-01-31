@@ -218,7 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         ref="annotationPopupRef"
-        @mouseleave="hidePopupsAndOverlays"
       >
         <div
           class="q-px-sm q-py-xs"
