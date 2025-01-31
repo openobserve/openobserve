@@ -1296,14 +1296,6 @@ export const convertSQLData = async (
         .map((yAxis: any) => {
           let yAxisName = getYAxisLabel(yAxis);
 
-          // if (
-          //   breakDownKeys.length &&
-          //   (panelSchema.type === "bar" || panelSchema.type === "h-bar") &&
-          //   !panelSchema.config.trellis?.layout
-          // ) {
-          //   const seriesData = getAxisDataFromKey(yAxis);
-          //   return getSeriesObj(yAxisName, seriesData, seriesConfig);
-          // } else if (breakDownKeys.length) {
           if (breakDownKeys.length) {
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
@@ -1467,19 +1459,7 @@ export const convertSQLData = async (
     case "bar": {
       options.series = getSeries({ barMinHeight: 1 });
 
-      // if (panelSchema.config.trellis?.layout && breakDownKeys.length) {
-      //   updateTrellisConfig();
-      // } else if (breakDownKeys.length) {
-      //   options.xAxis.forEach((it: any, index: number) => {
-      //     it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 20;
-      //     it.axisLabel.margin =
-      //       18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 25;
-      //     it.axisTick.length =
-      //       20 * (xAxisKeys.length + breakDownKeys.length - index);
-      //   });
-      // }
-
-      // break;
+      break;
     }
     case "h-bar": {
       //generate trace based on the y axis keys
