@@ -1890,7 +1890,6 @@ const useLogs = () => {
           }
         }
         delete queryReq.aggs;
-
       }
               searchObj.data.queryResults.subpage = 1;
             if (searchObj.meta.jobId == "" ) {
@@ -1903,9 +1902,11 @@ const useLogs = () => {
               },
               "UI",
             ).then((res: any) => {
-
-            }).catch((e)=>{
-
+              $q.notify({
+                type: "positive",
+                message: "Job Added Succesfully",
+                timeout: 2000,
+              });
             })
             }
             else {
