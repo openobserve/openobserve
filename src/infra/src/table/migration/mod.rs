@@ -69,10 +69,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20250122_000001_create_table_action_scripts::Migration),
             Box::new(m20250125_115400_create_templates_table::Migration),
             Box::new(m20250125_132500_populate_templates_table::Migration),
-            Box::new(m20250125_172300_delete_metas_templates::Migration),
+            // Box::new(m20250125_172300_delete_metas_templates::Migration),
             Box::new(m20250125_102300_create_destinations_table::Migration),
             Box::new(m20250125_133700_populate_destinations_table::Migration),
-            Box::new(m20250125_153005_delete_metas_destinations::Migration),
+            // Box::new(m20250125_153005_delete_metas_destinations::Migration),
         ]
     }
 }

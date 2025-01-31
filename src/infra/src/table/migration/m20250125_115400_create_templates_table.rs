@@ -45,6 +45,7 @@ impl MigrationTrait for Migration {
 
 /// Statement to create the templates table.
 fn create_templates_table_statement() -> TableCreateStatement {
+    let text_type = super::get_text_type();
     Table::create()
         .table(Templates::Table)
         .if_not_exists()
@@ -59,7 +60,7 @@ fn create_templates_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(Templates::Name).string_len(256).not_null())
         .col(ColumnDef::new(Templates::IsDefault).boolean().not_null())
         .col(ColumnDef::new(Templates::Type).string_len(10).not_null())
-        .col(ColumnDef::new(Templates::Body).text().not_null())
+        .col(ColumnDef::new(Templates::Body).custom(Alias::new(&text_type)).not_null())
         .col(ColumnDef::new(Templates::Title).text().null())
         .to_owned()
 }
