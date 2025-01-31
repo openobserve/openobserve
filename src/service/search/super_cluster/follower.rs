@@ -312,8 +312,10 @@ async fn get_inverted_index_file_lists(
 
     // use inverted index to filter file list
     let index_terms = generate_filter_from_equal_items(&index_terms);
+    let mut index_req = req.clone();
+    index_req.trace_id = trace_id.to_string(); // reset trace_id for follower
     let (idx_file_list, idx_scan_size, idx_took) =
-        get_inverted_index_file_list(req.clone(), query, stream_name, match_terms, &index_terms)
+        get_inverted_index_file_list(index_req, query, stream_name, match_terms, &index_terms)
             .await?;
 
     log::info!(

@@ -85,27 +85,26 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
-        let orig_trace_id = req.query_identifier.trace_id.to_string();
-        let trace_id = format!("{}-{}", orig_trace_id, req.query_identifier.job_id);
+        let trace_id = format!(
+            "{}-{}",
+            req.query_identifier.trace_id, req.query_identifier.job_id
+        );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
 
         log::info!("[trace_id {}] flight->search: do_get", trace_id);
 
         #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.contain_key(&orig_trace_id).await {
+        if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
             SEARCH_SERVER
-                .insert(
-                    orig_trace_id.clone(),
-                    TaskStatus::new_follower(vec![], false),
-                )
+                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
                 .await;
         }
 
         let result = get_ctx_and_physical_plan(&trace_id, &req).await;
 
         #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.is_leader(&orig_trace_id).await {
-            SEARCH_SERVER.remove(&orig_trace_id, false).await;
+        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
+            SEARCH_SERVER.remove(&trace_id, false).await;
         }
 
         // 2. prepare dataufion context
