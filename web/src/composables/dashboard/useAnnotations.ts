@@ -1,4 +1,3 @@
-import { ref, watch } from "vue";
 import { annotationService } from "../../services/dashboard_annotations";
 
 export const useAnnotations = (

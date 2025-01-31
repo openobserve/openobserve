@@ -91,7 +91,7 @@
           <q-btn flat label="Cancel" @click="handleClose" />
           <q-btn
             color="primary"
-            :label="annotationData.id ? 'Update' : 'Save'"
+            :label="annotationData.annotation_id ? 'Update' : 'Save'"
             @click="saveAnnotation.execute()"
             :loading="saveAnnotation.isLoading?.value"
             :disable="!annotationData.title"
