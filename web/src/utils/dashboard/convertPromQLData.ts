@@ -722,7 +722,7 @@ export const convertPromQLData = async (
       animation: false,
       data: markLines,
     },
-  markArea: getSeriesMarkArea(),
+    markArea: getSeriesMarkArea(),
   zlevel: 1,
   });
   options.series = options.series.flat();

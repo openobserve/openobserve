@@ -1,8 +1,8 @@
 import { annotationService } from "../../services/dashboard_annotations";
 
 export const useAnnotations = (
-  organization: any,
-  dashboardId: any,
+  organization: string,
+  dashboardId: string,
   panelId: string,
 ) => {
   const refreshAnnotations = async (start_time: number, end_time: number) => {

@@ -28,8 +28,7 @@
 
         <div class="q-mt-md">
           <q-select
-            hint="If no panel is selected, annotations will be applied to dashboard
-            by default."
+            hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
@@ -109,11 +108,7 @@
           Are you sure you want to delete this annotation?
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn
-            flat
-            label="Cancel"
-            v-close-popup
-          />
+          <q-btn flat label="Cancel" v-close-popup />
           <q-btn
             color="negative"
             label="Delete"
@@ -131,6 +126,7 @@ import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
+import useNotifications from "@/composables/useNotifications";
 
 const props = defineProps({
   dashboardId: { type: String, required: true },
@@ -138,7 +134,7 @@ const props = defineProps({
   panelsList: { type: Array, default: () => [], required: true },
 });
 
-const emit = defineEmits(["save", "remove", "close", "update"]);
+const emit = defineEmits(["remove", "close"]);
 
 const store = useStore();
 const isOpen = ref(true);
@@ -243,31 +239,45 @@ const handleClose = () => {
 };
 
 const organization = store.state.selectedOrganization.identifier;
-
+const { showErrorNotification } = useNotifications();
 const handleSave = async () => {
   if (annotationData?.value?.title?.trim()) {
     if (isEditMode.value) {
-      const annotationToUpdate = {
-        start_time: annotationData.value.start_time,
-        end_time: annotationData.value.end_time,
-        title: annotationData.value.title,
-        text: annotationData.value.text,
-        panels: annotationData.value.panels,
-        tags: annotationData.value.tags,
-      };
-      const response = await annotationService.update_timed_annotations(
-        organization,
-        props.dashboardId,
-        annotationData.value.annotation_id,
-        annotationToUpdate,
-      );
+      try {
+        const annotationToUpdate = {
+          start_time: annotationData.value.start_time,
+          end_time: annotationData.value.end_time,
+          title: annotationData.value.title,
+          text: annotationData.value.text,
+          panels: annotationData.value.panels,
+          tags: annotationData.value.tags,
+        };
+        const response = await annotationService.update_timed_annotations(
+          organization,
+          props.dashboardId,
+          annotationData.value.annotation_id,
+          annotationToUpdate,
+        );
+      } catch (error) {
+        showErrorNotification(
+          error?.message ?? "Failed to update annotation: " + error.message,
+        );
+        return;
+      }
     } else {
-      // create annotation
-      const response = await annotationService.create_timed_annotations(
-        organization,
-        props.dashboardId,
-        [annotationData.value],
-      );
+      try {
+        // create annotation
+        const response = await annotationService.create_timed_annotations(
+          organization,
+          props.dashboardId,
+          [annotationData.value],
+        );
+      } catch (error) {
+        showErrorNotification(
+          error?.message ?? "Failed to create annotation: " + error.message,
+        );
+        return;
+      }
     }
 
     handleClose();

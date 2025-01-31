@@ -5,8 +5,8 @@ import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
 
 export const useAnnotationsData = (
-  organization: any,
-  dashboardId: any,
+  organization: string,
+  dashboardId: string,
   panelId: string,
   folderId: string,
 ) => {
@@ -18,8 +18,6 @@ export const useAnnotationsData = (
 
   const isEditMode = ref(false);
   const annotationToAddEdit = ref<any>(null);
-
-  const annotations = ref<any[]>([]);
 
   const { showInfoNotification } = useNotifications();
 
@@ -155,7 +153,6 @@ export const useAnnotationsData = (
     isAddAnnotationDialogVisible,
     isEditMode,
     annotationToAddEdit,
-    annotations,
     editAnnotation,
     enableAddAnnotationMode,
     disableAddAnnotationMode,
