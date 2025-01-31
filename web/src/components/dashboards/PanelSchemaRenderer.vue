@@ -83,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data[0]?.length &&
               panelData.chartType != 'geomap' &&
               panelData.chartType != 'table' &&
-              panelData.chartType != 'maps' &&
-              validatePanelData.length === 0)
+              panelData.chartType != 'maps')
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
