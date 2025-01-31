@@ -352,7 +352,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-d-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await page.locator('[data-test="chart-renderer"] canvas').click({
+    await page.locator('[data-test="chart-renderer"] canvas').last().click({
       position: {
         x: 753,
         y: 200,
