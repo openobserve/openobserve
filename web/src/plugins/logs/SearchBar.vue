@@ -1321,7 +1321,8 @@ export default defineComponent({
       extractFields,
       cancelQuery,
       setSelectedStreams,
-      getJobData
+      getJobData,
+      routeToSearchSchedule,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -3051,16 +3052,6 @@ export default defineComponent({
       }
 
     };
-
-    const routeToSearchSchedule = () => {
-      router.push({
-        query:{
-          action: "search_scheduler",
-          org_identifier: store.state.selectedOrganization.identifier,
-          type: "search_scheduler_list"
-        }
-      });
-    }
 
     const createScheduleJob = () => {
       searchSchedulerJob.value = true;
