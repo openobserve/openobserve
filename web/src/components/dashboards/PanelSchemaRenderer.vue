@@ -1079,10 +1079,10 @@ export default defineComponent({
 
           const breakdownColumn = breakdown[0]?.column;
 
-          const seriesIndex = drilldownParams[0].seriesIndex;
+          const seriesIndex = drilldownParams[0]?.seriesIndex;
 
           const breakdownSeriesName =
-            panelData.value.options.series[seriesIndex];
+            seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
 
           const uniqueSeriesName = breakdownSeriesName
             ? breakdownSeriesName.originalSeriesName
