@@ -294,8 +294,8 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await page.getByLabel("Stream Name *").fill("destination_node");
+    await page.waitForTimeout(1000);
     // await page
     //   .locator(
     //     ".q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
@@ -422,7 +422,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
-    // await page.getByLabel("Name *").fill("destination-node");
+    // await page.getByLabel("Name *").fill("destination_node");
     // await page
     //   .locator(
     //     ".q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
@@ -435,7 +435,7 @@ test.describe("Pipeline testcases", () => {
     //   .click();
     // await pipelinePage.clickSaveStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
+    await page.getByLabel("Stream Name *").fill("destination_node");
     await page.waitForTimeout(100);
     await pipelinePage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -567,7 +567,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Output Stream" }).click();
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
-    // await page.getByLabel("Name *").fill("destination-node");
+    // await page.getByLabel("Name *").fill("destination_node");
     // await page
     //   .locator(
     //     ".q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
@@ -580,7 +580,7 @@ test.describe("Pipeline testcases", () => {
     //   .click();
     // await pipelinePage.clickSaveStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
+    await page.getByLabel("Stream Name *").fill("destination_node");
     await page.waitForTimeout(100);
     await pipelinePage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
@@ -656,7 +656,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     // await pipelinePage.toggleCreateStream();
     // await page.getByLabel("Name *").click();
-    // await page.getByLabel("Name *").fill("destination-node");
+    // await page.getByLabel("Name *").fill("destination_node");
     // await page
     //   .locator(
     //     ".q-form > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
@@ -669,7 +669,7 @@ test.describe("Pipeline testcases", () => {
     //   .click();
     // await pipelinePage.clickSaveStream();
     await page.getByLabel("Stream Name *").click();
-    await page.getByLabel("Stream Name *").fill("destination-node");
+    await page.getByLabel("Stream Name *").fill("destination_node");
     await page.waitForTimeout(100);
     await pipelinePage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
