@@ -26,7 +26,10 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::time::{now_micros, second_micros},
+    utils::{
+        rand::generate_random_string,
+        time::{now_micros, second_micros},
+    },
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -190,12 +193,9 @@ async fn search_in_cluster(
         partition_step
     };
 
-    // partition request, here plus 1 second, because division is integer, maybe
-    // lose some precision XXX-REFACTORME: move this into a function
-    let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
         trace_id: trace_id.to_string(),
-        job: job_id,
+        job: generate_random_string(7),
         stage: 0,
         partition: 0,
     };
