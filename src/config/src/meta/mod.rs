@@ -32,4 +32,5 @@ pub mod self_reporting;
 pub mod short_url;
 pub mod sql;
 pub mod stream;
+pub mod timed_annotations;
 pub mod websocket;
