@@ -22,7 +22,6 @@ use config::{
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
-use hashbrown::HashSet;
 use infra::{
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
@@ -115,11 +114,6 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.name.ne(&node_name) {
             continue; // not this node
         }
-
-        // lock the stream to avoid compacting conflict with retention
-        let lock_key = generate_retention_lock_key(org_id, &stream_type, stream_name);
-        let lock = infra::local_lock::lock(&lock_key).await?;
-        let _lock_guard = lock.lock().await;
 
         let ret = if retention.eq("all") {
             retention::delete_all(org_id, stream_type, stream_name).await
@@ -259,7 +253,6 @@ pub async fn run_merge(
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
-    let mut need_lock_ids = HashSet::new();
     for job in jobs.iter() {
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
@@ -277,8 +270,10 @@ pub async fn run_merge(
         } else {
             data_lifecycle_end
         };
-        let need_lock = job.offsets < stream_data_retention_end.timestamp_micros();
-        if partition_time_level == PartitionTimeLevel::Daily || need_lock {
+        if job.offsets <= stream_data_retention_end.timestamp_micros() {
+            continue; // the data will be deleted by retention, just skip
+        }
+        if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -287,8 +282,6 @@ pub async fn run_merge(
             };
             if LOCAL_NODE.name.ne(&node_name) {
                 need_release_ids.push(job.id); // not this node
-            } else if need_lock {
-                need_lock_ids.insert(job.id); // need lock
             }
         }
     }
@@ -354,14 +347,6 @@ pub async fn run_merge(
                 &stream_name,
             );
             continue;
-        }
-
-        // lock the stream to avoid compacting conflict with retention
-        let lock_key = generate_retention_lock_key(&org_id, &stream_type, &stream_name);
-        let lock = infra::local_lock::lock(&lock_key).await?;
-        let lock_guard = lock.lock().await;
-        if !need_lock_ids.contains(&job.id) {
-            drop(lock_guard);
         }
 
         let org_id = org_id.clone();
@@ -456,15 +441,4 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-fn generate_retention_lock_key(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
-) -> String {
-    format!(
-        "lock_for_retention_{}/{}/{}",
-        org_id, stream_type, stream_name
-    )
 }

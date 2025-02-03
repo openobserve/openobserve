@@ -19,7 +19,6 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
-pub mod local_lock;
 pub mod pipeline;
 pub mod queue;
 pub mod scheduler;
