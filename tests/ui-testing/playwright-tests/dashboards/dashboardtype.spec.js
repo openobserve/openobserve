@@ -21,6 +21,12 @@ async function login(page) {
       waitUntil: 'networkidle',
       timeout: 60000 
     });
+
+    const generatedHTML = await page.evaluate(() => document.documentElement.outerHTML);
+    console.log("#######################");
+    console.log(generatedHTML);
+    console.log("#######################");
+    
     await page.waitForTimeout(1000);
     await expect(page.getByText('Login as internal user')).toBeVisible();
     await page.waitForTimeout(1000);
