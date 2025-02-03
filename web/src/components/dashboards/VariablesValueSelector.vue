@@ -872,7 +872,7 @@ export default defineComponent({
       switch (variableObject.type) {
         case "query_values": {
           try {
-            const queryContext = await buildQueryContext(variableObject);
+            const queryContext: any = await buildQueryContext(variableObject);
             const response = await fetchFieldValues(
               variableObject,
               queryContext,
@@ -1189,7 +1189,7 @@ export default defineComponent({
       );
 
       // Set loading state for immediate children
-      childrenToUpdate.forEach((variable) => {
+      childrenToUpdate.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
         // Reset the value of dependent variables when parent changes
         if (variable.multiSelect) {
@@ -1201,7 +1201,7 @@ export default defineComponent({
 
       // Load data for immediate children
       await Promise.all(
-        childrenToUpdate.map((variable) =>
+        childrenToUpdate.map((variable: any) =>
           loadSingleVariableDataByName(variable),
         ),
       ).catch((error) => {
