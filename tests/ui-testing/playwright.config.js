@@ -37,12 +37,12 @@ module.exports = defineConfig({
    
   /* Configure projects for major browsers */
   projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, channel: 'chromium', },
+    // {
+    //   name: 'chromium',
+    //   use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, channel: 'chromium', },
      
       
-    }
+    // }
 
     /* Test against mobile viewports. */
     // {
@@ -55,14 +55,14 @@ module.exports = defineConfig({
     // },
 
     /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    {
+      name: 'Microsoft Edge',
+      use: { ...devices['Desktop Edge'], channel: 'msedge' },
+    },
+    {
+      name: 'Google Chrome',
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    },
   ],
 
   /* Run your local dev server before starting the tests */
