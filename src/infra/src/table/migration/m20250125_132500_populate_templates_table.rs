@@ -46,15 +46,27 @@ impl MigrationTrait for Migration {
                         } else {
                             None
                         };
-                    Ok(template::ActiveModel {
-                        id: Set(ider::uuid()),
-                        org: Set(meta.key1),
-                        name: Set(old_temp.name),
-                        is_default: Set(old_temp.is_default.unwrap_or_default()),
-                        r#type: Set(old_temp.template_type.to_string()),
-                        body: Set(old_temp.body),
-                        title: Set(title),
-                    })
+                    if matches!(
+                        old_temp.template_type,
+                        meta_templates::DestinationType::RemotePipeline
+                    ) {
+                        Ok(None)
+                    } else {
+                        Ok(Some(template::ActiveModel {
+                            id: Set(ider::uuid()),
+                            org: Set(meta.key1),
+                            name: Set(old_temp.name),
+                            is_default: Set(old_temp.is_default.unwrap_or_default()),
+                            r#type: Set(old_temp.template_type.to_string()),
+                            body: Set(old_temp.body),
+                            title: Set(title),
+                        }))
+                    }
+                })
+                .filter_map(|result| match result {
+                    Ok(None) => None, // templates shouldn't have RemotePipeline type. dropped
+                    Ok(Some(temp)) => Some(Ok(temp)),
+                    Err(e) => Some(Err(e)),
                 })
                 .collect();
             let new_temps = new_temp_results?;
@@ -98,24 +110,25 @@ mod meta_templates {
         pub title: String,
     }
 
-    #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+    #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone)]
+    #[serde(rename_all = "snake_case")]
     pub enum DestinationType {
         #[default]
-        #[serde(rename = "http")]
         Http,
-        #[serde(rename = "email")]
         Email,
-        #[serde(rename = "sns")]
         Sns,
+        RemotePipeline,
     }
 
     impl std::fmt::Display for DestinationType {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self {
-                DestinationType::Http => write!(f, "http"),
-                DestinationType::Email => write!(f, "email"),
-                DestinationType::Sns => write!(f, "sns"),
-            }
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let s = match self {
+                DestinationType::Http => "http",
+                DestinationType::Email => "email",
+                DestinationType::Sns => "sns",
+                DestinationType::RemotePipeline => "remote_pipeline",
+            };
+            write!(f, "{}", s)
         }
     }
 }

@@ -51,21 +51,24 @@ impl MigrationTrait for Migration {
                     let old_dest: meta_destinations::Destination =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
 
-                    let new_type = match old_dest.destination_type {
-                        meta_destinations::DestinationType::Http => {
+                    let (module, new_type) = match old_dest.destination_type {
+                        meta_destinations::DestinationType::Http => (
+                            "alert".to_string(),
                             destinations::DestinationType::Http(destinations::Endpoint {
                                 url: old_dest.url,
                                 method: old_dest.method.into(),
                                 skip_tls_verify: old_dest.skip_tls_verify,
                                 headers: old_dest.headers,
-                            })
-                        }
-                        meta_destinations::DestinationType::Email => {
+                            }),
+                        ),
+                        meta_destinations::DestinationType::Email => (
+                            "alert".to_string(),
                             destinations::DestinationType::Email(destinations::Email {
                                 recipients: old_dest.emails,
-                            })
-                        }
-                        meta_destinations::DestinationType::Sns => {
+                            }),
+                        ),
+                        meta_destinations::DestinationType::Sns => (
+                            "alert".to_string(),
                             destinations::DestinationType::Sns(destinations::AwsSns {
                                 sns_topic_arn: old_dest.sns_topic_arn.ok_or(DbErr::Migration(
                                     "SNS destination missing sns_topic_arn".to_string(),
@@ -73,8 +76,17 @@ impl MigrationTrait for Migration {
                                 aws_region: old_dest.aws_region.ok_or(DbErr::Migration(
                                     "SNS destination missing aws region info".to_string(),
                                 ))?,
-                            })
-                        }
+                            }),
+                        ),
+                        meta_destinations::DestinationType::RemotePipeline => (
+                            "pipeline".to_string(),
+                            destinations::DestinationType::Http(destinations::Endpoint {
+                                url: old_dest.url,
+                                method: old_dest.method.into(),
+                                skip_tls_verify: old_dest.skip_tls_verify,
+                                headers: old_dest.headers,
+                            }),
+                        ),
                     };
                     let new_type =
                         json::to_value(new_type).map_err(|e| DbErr::Migration(e.to_string()))?;
@@ -89,7 +101,7 @@ impl MigrationTrait for Migration {
                                 id: Set(ider::uuid()),
                                 org: Set(meta.key1),
                                 name: Set(old_dest.name),
-                                module: Set("alert".to_string()),
+                                module: Set(module),
                                 template_id: Set(Some(template_id)),
                                 r#type: Set(new_type),
                             }))
@@ -144,6 +156,7 @@ mod meta_destinations {
         pub skip_tls_verify: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub headers: Option<HashMap<String, String>>,
+        #[serde(default)]
         pub template: String,
         #[serde(default)]
         pub emails: Vec<String>,
@@ -163,16 +176,7 @@ mod meta_destinations {
         Http,
         Email,
         Sns,
-    }
-
-    impl std::fmt::Display for DestinationType {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            match self {
-                DestinationType::Http => write!(f, "http"),
-                DestinationType::Email => write!(f, "email"),
-                DestinationType::Sns => write!(f, "sns"),
-            }
-        }
+        RemotePipeline,
     }
 
     #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
