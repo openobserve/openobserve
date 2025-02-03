@@ -21,7 +21,9 @@ async function login(page) {
       waitUntil: 'networkidle',
       timeout: 60000 
     });
-    
+    await page.waitForTimeout(1000);
+    await page.getByText('Login as internal user').click();
+    await page.waitForTimeout(1000);
     console.log('Waiting for login form...');
     // Wait for the login form with explicit timeout and visibility check
     await page.waitForSelector('[data-cy="login-user-id"]', { 
