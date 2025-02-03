@@ -150,14 +150,23 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing
           npm ci
-          # Install only required browser
           npx playwright install chromium --with-deps
-          # Run tests with xvfb
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npx playwright test ./playwright-tests/${{ matrix.testfilename }} --debug
 
-      # - name: Check OpenObserve logs
-      #   if: always()
-      #   run: cat o2.log
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ matrix.testfilename }}
+          path: |
+            tests/ui-testing/test-results
+            tests/ui-testing/*.png
+            tests/ui-testing/playwright-report
+          retention-days: 7
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
 
       - name: Sanitize Test Filename
         shell: bash 

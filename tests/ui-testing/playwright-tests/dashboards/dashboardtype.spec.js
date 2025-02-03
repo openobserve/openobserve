@@ -32,46 +32,83 @@ async function login(page) {
     
     // Wait for page load state
     await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     
     // Debug: Check if the page content is loaded
     const content = await page.content();
     console.log('Page content length:', content.length);
-    if (content.length < 100) {
-      console.log('Warning: Page content seems too short');
-      console.log('Content:', content);
-    }
     
-    // Wait for any initial animations/transitions
-    await page.waitForTimeout(2000);
-    
-    // Try to find the login form with a more flexible approach
-    const loginFormSelector = '[data-cy="login-user-id"], input[type="email"], input[name="email"]';
-    console.log('Waiting for login form...');
-    
-    const loginForm = await page.waitForSelector(loginFormSelector, {
-      state: 'visible',
-      timeout: 45000
+    // Debug: Log all data-cy attributes on the page
+    const dataCyElements = await page.evaluate(() => {
+      const elements = document.querySelectorAll('[data-cy]');
+      return Array.from(elements).map(el => ({
+        dataCy: el.getAttribute('data-cy'),
+        tag: el.tagName,
+        type: el.type,
+        visible: el.offsetParent !== null
+      }));
     });
+    console.log('Found data-cy elements:', dataCyElements);
     
-    if (!loginForm) {
-      throw new Error('Login form not found');
+    // Debug: Check for any error messages or overlays
+    const errorMessages = await page.evaluate(() => {
+      const errors = document.querySelectorAll('.error, .alert, [role="alert"]');
+      return Array.from(errors).map(el => el.textContent);
+    });
+    if (errorMessages.length > 0) {
+      console.log('Found error messages:', errorMessages);
     }
     
-    // Take a screenshot for debugging
-    await page.screenshot({ path: 'login-page.png', fullPage: true });
+    // Take a screenshot before looking for the form
+    await page.screenshot({ path: 'pre-login-form.png', fullPage: true });
     
-    // Fill in credentials with retry logic
-    await page.waitForTimeout(1000);
-    await page.locator(loginFormSelector).fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    // Try multiple selectors to find the login form
+    const selectors = [
+      '[data-cy="login-user-id"]',
+      'input[type="email"]',
+      'input[name="email"]',
+      'form input[type="text"]',
+      'form input[type="email"]'
+    ];
     
-    await page.locator('[data-cy="login-password"]').waitFor({ state: 'visible', timeout: 30000 });
-    await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+    console.log('Trying to find login form with selectors:', selectors);
     
-    // Wait for button and click with retry logic
+    let loginInput = null;
+    for (const selector of selectors) {
+      try {
+        loginInput = await page.waitForSelector(selector, {
+          state: 'visible',
+          timeout: 10000
+        });
+        if (loginInput) {
+          console.log('Found login input with selector:', selector);
+          break;
+        }
+      } catch (e) {
+        console.log(`Selector ${selector} not found`);
+      }
+    }
+    
+    if (!loginInput) {
+      // If we still can't find the form, let's check the DOM structure
+      const bodyContent = await page.evaluate(() => document.body.innerHTML);
+      console.log('Page body content:', bodyContent.substring(0, 1000) + '...');
+      throw new Error('Login form not found after trying multiple selectors');
+    }
+    
+    // Fill in credentials
+    await loginInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    
+    const passwordInput = await page.waitForSelector('[data-cy="login-password"]', {
+      state: 'visible',
+      timeout: 30000
+    });
+    await passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+    
+    // Click sign in button
     const signInButton = await page.locator('[data-cy="login-sign-in"]');
     await signInButton.waitFor({ state: 'visible', timeout: 30000 });
     
-    // Click with navigation wait
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
       signInButton.click()
@@ -82,6 +119,12 @@ async function login(page) {
     console.error('Login failed:', error);
     // Take error screenshot
     await page.screenshot({ path: 'login-error.png', fullPage: true });
+    
+    // Log the final state of the page
+    const finalContent = await page.content();
+    console.log('Final page content length:', finalContent.length);
+    console.log('Final page content preview:', finalContent.substring(0, 500));
+    
     throw error;
   }
 }
