@@ -96,14 +96,24 @@ impl MigrationTrait for Migration {
                         .get(&key)
                         .or_else(|| templates.get(&("default".to_string(), old_dest.template))) // template could be default org
                         .cloned();
-                    Ok(destinations::ActiveModel {
-                        id: Set(ider::uuid()),
-                        org: Set(meta.key1),
-                        name: Set(old_dest.name),
-                        module: Set(module),
-                        template_id: Set(template_id),
-                        r#type: Set(new_type),
-                    })
+
+                    if template_id.is_none() && module == "alert" {
+                        Ok(None)
+                    } else {
+                        Ok(Some(destinations::ActiveModel {
+                            id: Set(ider::uuid()),
+                            org: Set(meta.key1),
+                            name: Set(old_dest.name),
+                            module: Set(module),
+                            template_id: Set(template_id),
+                            r#type: Set(new_type),
+                        }))
+                    }
+                })
+                .filter_map(|result| match result {
+                    Ok(None) => None, // alert destination should have template. otherwise dropped 
+                    Ok(Some(temp)) => Some(Ok(temp)),
+                    Err(e) => Some(Err(e)),
                 })
                 .collect();
             let new_temps = new_temp_results?;
