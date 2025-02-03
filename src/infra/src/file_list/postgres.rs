@@ -113,7 +113,7 @@ impl super::FileList for PostgresFileList {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
                 DB_QUERY_NUMS
-                    .with_label_values(&["select", "file_list"])
+                    .with_label_values(&["select_id", "file_list"])
                     .inc();
                 let start = std::time::Instant::now();
                 let query_res = sqlx::query_scalar(
@@ -150,7 +150,7 @@ impl super::FileList for PostgresFileList {
             // delete files by ids
             if !ids.is_empty() {
                 DB_QUERY_NUMS
-                    .with_label_values(&["delete", "file_list"])
+                    .with_label_values(&["delete_id", "file_list"])
                     .inc();
                 let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
                 let start = std::time::Instant::now();
@@ -273,9 +273,7 @@ impl super::FileList for PostgresFileList {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["get", "file_list"]).inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
@@ -289,7 +287,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .fetch_one(&pool).await;
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["get_single", "file_list"])
+            .with_label_values(&["get", "file_list"])
             .observe(time);
         Ok(FileMeta::from(&ret?))
     }
@@ -299,7 +297,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
+            .with_label_values(&["contains", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query(
@@ -362,7 +360,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
+            .with_label_values(&["query", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = if flattened.is_some() {
@@ -395,7 +393,56 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         };
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["get_multiple", "file_list"])
+            .with_label_values(&["query", "file_list"])
+            .observe(time);
+        Ok(ret?
+            .into_iter()
+            .map(|r| {
+                (
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                    FileMeta::from(&r),
+                )
+            })
+            .collect())
+    }
+
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        if let Some((start, end)) = date_range.as_ref() {
+            if start.is_empty() && end.is_empty() {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["query_by_date", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+
+        let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
+        let sql = r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+    FROM file_list 
+    WHERE stream = $1 AND date >= $2 AND date <= $3;
+                "#;
+
+        let ret = sqlx::query_as::<_, super::FileRecord>(sql)
+            .bind(stream_key)
+            .bind(date_start)
+            .bind(date_end)
+            .fetch_all(&pool)
+            .await;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["query_by_date", "file_list"])
             .observe(time);
         Ok(ret?
             .into_iter()
@@ -428,7 +475,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 "SELECT id, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
-                .with_label_values(&["select", "file_list"])
+                .with_label_values(&["query_by_ids", "file_list"])
                 .inc();
             let start = std::time::Instant::now();
             let res = sqlx::query_as::<_, super::FileRecord>(&query_str)
@@ -436,7 +483,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .await;
             let time = start.elapsed().as_secs_f64();
             DB_QUERY_TIME
-                .with_label_values(&["get_by_id", "file_list"])
+                .with_label_values(&["query_by_ids", "file_list"])
                 .observe(time);
             ret.extend_from_slice(&res?);
         }
@@ -494,7 +541,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             tasks.push(tokio::task::spawn(async move {
                 let pool = CLIENT.clone();
                 DB_QUERY_NUMS
-                .with_label_values(&["select", "file_list"])
+                .with_label_values(&["query_ids", "file_list"])
                 .inc();
                 let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
                 let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
@@ -522,7 +569,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         }
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&["get_ids", "file_list"])
+            .with_label_values(&["query_ids", "file_list"])
             .observe(time);
         Ok(rets)
     }
@@ -544,7 +591,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
+            .with_label_values(&["query_old_data_hours", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
@@ -1451,6 +1498,11 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_stream_ts_idx",
             "file_list",
             &["stream", "max_ts", "min_ts"],
+        ),
+        (
+            "file_list_stream_date_idx",
+            "file_list",
+            &["stream", "date"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (

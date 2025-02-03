@@ -320,6 +320,7 @@ pub async fn merge_by_stream(
     job_id: i64,
     offset: i64,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     let start = std::time::Instant::now();
 
     // get schema
@@ -336,70 +337,30 @@ pub async fn merge_by_stream(
         offset
     );
 
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let offset_time_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    let offset_time_day = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            0,
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-
-    let cfg = get_config();
     // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
+        (
+            offset_time.format("%Y/%m/%d/00").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
         )
-        .unwrap()
-        .timestamp_micros();
-
-    // get current hour(day) all files
-    let (partition_offset_start, partition_offset_end) =
-        if partition_time_level == PartitionTimeLevel::Daily {
-            (offset_time_day, offset_time_day + hour_micros(24) - 1)
-        } else {
-            (offset_time_hour, offset_time_hour + hour_micros(1) - 1)
-        };
-    let files = file_list::query(
-        org_id,
-        stream_name,
-        stream_type,
-        partition_time_level,
-        partition_offset_start,
-        partition_offset_end,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    } else {
+        (
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+        )
+    };
+    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
+        .await
+        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
         org_id,
         stream_type,
         stream_name,
-        partition_offset_start,
-        partition_offset_end,
+        date_start,
+        date_end,
         files.len(),
     );
 
@@ -605,9 +566,6 @@ pub async fn merge_by_stream(
     metrics::COMPACT_USED_TIME
         .with_label_values(&[org_id, stream_type.as_str()])
         .inc_by(time);
-    metrics::COMPACT_DELAY_HOURS
-        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
-        .set((time_now_hour - offset_time_hour) / hour_micros(1));
 
     Ok(())
 }

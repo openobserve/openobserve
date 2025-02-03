@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -78,6 +78,13 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
+    ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
     ) -> Result<Vec<(String, FileMeta)>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
     async fn query_ids(
@@ -250,6 +257,19 @@ pub async fn query(
             time_range,
             flattened,
         )
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_by_date")]
+pub async fn query_by_date(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: Option<(String, String)>,
+) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT
+        .query_by_date(org_id, stream_type, stream_name, date_range)
         .await
 }
 

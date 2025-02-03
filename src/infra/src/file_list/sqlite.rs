@@ -354,6 +354,46 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        if let Some((start, end)) = date_range.as_ref() {
+            if start.is_empty() && end.is_empty() {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+    FROM file_list
+    WHERE stream = $1 AND date >= $2 AND date <= $3;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(date_start)
+            .bind(date_end)
+            .fetch_all(&pool)
+            .await;
+        Ok(ret?
+            .iter()
+            .map(|r| {
+                (
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                    r.into(),
+                )
+            })
+            .collect())
+    }
+
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
@@ -1300,6 +1340,11 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_stream_ts_idx",
             "file_list",
             &["stream", "max_ts", "min_ts"],
+        ),
+        (
+            "file_list_stream_date_idx",
+            "file_list",
+            &["stream", "date"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (
