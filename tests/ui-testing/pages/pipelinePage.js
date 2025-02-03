@@ -137,6 +137,7 @@ class PipelinePage {
   }
 
   async enterPipelineName(pipelineName) {
+    await this.page.waitForTimeout(1000);
     await this.pipelineNameInput.click();
     await this.pipelineNameInput.fill(pipelineName);
   }
