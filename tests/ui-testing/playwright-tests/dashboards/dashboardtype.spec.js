@@ -22,7 +22,7 @@ async function login(page) {
       timeout: 60000 
     });
     await page.waitForTimeout(1000);
-    await page.getByText('Login as internal user').toBeVisible();
+    await expect(page.getByText('Login as internal user')).toBeVisible();
     await page.waitForTimeout(1000);
     console.log('Waiting for login form...');
     // Wait for the login form with explicit timeout and visibility check
