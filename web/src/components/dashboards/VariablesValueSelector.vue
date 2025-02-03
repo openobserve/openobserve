@@ -429,7 +429,6 @@ export default defineComponent({
         }
       }
     };
-
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
       return new Promise(async (resolve, reject) => {
@@ -1024,6 +1023,7 @@ export default defineComponent({
             val.isLoading || val.isVariableLoadingPending,
         );
 
+        // Don't load child variables on dropdown open events
         // Load child variables if any
         const childVariables =
           variablesDependencyGraph[name]?.childVariables || [];
@@ -1032,11 +1032,14 @@ export default defineComponent({
             (variable: any) => childVariables.includes(variable.name),
           );
 
-          await Promise.all(
-            childVariableObjects.map((childVariable: any) =>
-              loadSingleVariableDataByName(childVariable),
-            ),
-          );
+          // Only load children if the parent value actually changed
+          if (oldVariablesData[name] !== variableObject.value) {
+            await Promise.all(
+              childVariableObjects.map((childVariable: any) =>
+                loadSingleVariableDataByName(childVariable),
+              ),
+            );
+          }
         }
 
         // Emit updated data
@@ -1047,9 +1050,22 @@ export default defineComponent({
     };
 
     const loadVariableOptions = async (variableObject: any) => {
+      // When a dropdown is opened, only load that specific variable
+      console.log(
+        `[loadVariableOptions] Loading options for ${variableObject.name}`,
+      );
       await loadSingleVariableDataByName(variableObject);
     };
+
+    let isLoading = false;
+
     const loadAllVariablesData = async () => {
+      if (isLoading) {
+        console.log("[loadAllVariablesData] Already running, skipping.");
+        return;
+      }
+      isLoading = true;
+
       console.log("[loadAllVariablesData] Function called.");
 
       if (
@@ -1057,42 +1073,79 @@ export default defineComponent({
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
         console.warn("[loadAllVariablesData] Invalid date detected, aborting.");
+        isLoading = false;
         return;
       }
 
-      console.log(
-        "[loadAllVariablesData] Setting isVariableLoadingPending to true for all variables.",
-      );
+      // Set loading state for all variables
       variablesData.values.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
-        console.log(
-          `[loadAllVariablesData] Variable ${variable.name} set to loading pending.`,
-        );
       });
 
-      console.log(
-        "[loadAllVariablesData] Initiating data load for all variables.",
+      const independentVariables = variablesData.values.filter(
+        (variable: any) =>
+          !variablesDependencyGraph[variable.name]?.parentVariables?.length,
       );
-      Promise.all(
-        variablesData.values.map((it: any, index: number) => {
-          console.log(
-            `[loadAllVariablesData] Loading data for variable at it ${JSON.stringify(it)}.`,
+
+      const dependentVariables = variablesData.values.filter(
+        (variable: any) =>
+          variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
+      );
+
+      console.log("[loadAllVariablesData] Loading independent variables first");
+
+      try {
+        await Promise.all(
+          independentVariables.map((variable: any) =>
+            loadSingleVariableDataByName(variable),
+          ),
+        );
+      } catch (error) {
+        console.error(
+          "[loadAllVariablesData] Error loading independent variables:",
+          error,
+        );
+      }
+
+      console.log("[loadAllVariablesData] Loading dependent variables");
+
+      const loadDependentVariables = async () => {
+        for (const variable of dependentVariables) {
+          const parentVariables =
+            variablesDependencyGraph[variable.name].parentVariables;
+          const areParentsLoaded = parentVariables.every(
+            (parentName: string) => {
+              const parentVariable = variablesData.values.find(
+                (v: any) => v.name === parentName,
+              );
+              return (
+                parentVariable &&
+                !parentVariable.isLoading &&
+                !parentVariable.isVariableLoadingPending &&
+                parentVariable.value !== null
+              );
+            },
           );
 
-          return loadVariableOptions(it);
-        }),
-      )
-        .then(() => {
-          console.log(
-            "[loadAllVariablesData] All variables data loaded successfully.",
-          );
-        })
-        .catch((error) => {
-          console.error(
-            "[loadAllVariablesData] Error loading variable data:",
-            error,
-          );
-        });
+          if (areParentsLoaded) {
+            await loadSingleVariableDataByName(variable);
+          }
+        }
+      };
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await loadDependentVariables();
+
+        const allLoaded = variablesData.values.every(
+          (variable: any) =>
+            !variable.isLoading && !variable.isVariableLoadingPending,
+        );
+
+        if (allLoaded) break;
+      }
+
+      console.log("[loadAllVariablesData] Completed loading all variables");
+      isLoading = false;
     };
 
     const setLoadingStateToAllChildNode = (currentVariable: string) => {
@@ -1106,49 +1159,51 @@ export default defineComponent({
       }
     };
 
-    const onVariablesValueUpdated = (variableIndex: number) => {
-      // if variableIndex is not valid, return
+    const onVariablesValueUpdated = async (variableIndex: number) => {
       if (variableIndex < 0) return;
 
-      // variables data
       const currentVariable = variablesData.values[variableIndex];
-
       // if currentVariable is undefined, return
       if (!currentVariable) {
+        return;
+      }
+
+      // Check if the value actually changed
+      if (oldVariablesData[currentVariable.name] === currentVariable.value) {
+        console.log(
+          `[onVariablesValueUpdated] Value didn't change for ${currentVariable.name}, skipping update`,
+        );
         return;
       }
 
       // Update the old variables data
       oldVariablesData[currentVariable.name] = currentVariable.value;
 
-      // Get all child variables that need to be updated
-      const childVariablesToUpdate = [];
-      const processChildren = (varName: string) => {
-        const children =
-          variablesDependencyGraph[varName]?.childVariables || [];
-        children.forEach((childName) => {
-          const childVar = variablesData.values.find(
-            (v: any) => v.name === childName,
-          );
-          if (childVar) {
-            childVariablesToUpdate.push(childVar);
-            // Recursively process children's children
-            processChildren(childName);
-          }
-        });
-      };
+      // Get immediate child variables
+      const immediateChildren =
+        variablesDependencyGraph[currentVariable.name]?.childVariables || [];
 
-      // Start processing from current variable
-      processChildren(currentVariable.name);
+      // Load data only for immediate child variables
+      const childrenToUpdate = variablesData.values.filter((v: any) =>
+        immediateChildren.includes(v.name),
+      );
 
-      // Set loading state only for affected children
-      childVariablesToUpdate.forEach((variable) => {
+      // Set loading state for immediate children
+      childrenToUpdate.forEach((variable) => {
         variable.isVariableLoadingPending = true;
+        // Reset the value of dependent variables when parent changes
+        if (variable.multiSelect) {
+          variable.value = [];
+        } else {
+          variable.value = null;
+        }
       });
 
-      // Only load data for affected child variables
-      Promise.all(
-        childVariablesToUpdate.map((variable) => loadVariableOptions(variable)),
+      // Load data for immediate children
+      await Promise.all(
+        childrenToUpdate.map((variable) =>
+          loadSingleVariableDataByName(variable),
+        ),
       ).catch((error) => {
         console.error(
           "[onVariablesValueUpdated] Error updating dependent variables:",
