@@ -87,8 +87,6 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
-      env:
-        NODE_VERSION: 18
     strategy:
       matrix:
         browser: [chrome]
@@ -126,13 +124,6 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Debug environment
-        run: |
-          node --version
-          npm --version
-          echo "Current directory: $(pwd)"
-          ls -la
-
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
@@ -145,6 +136,9 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -155,12 +149,15 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing
-          echo "Installing dependencies..."
-          npm ci --verbose
-          echo "Installing browsers..."
+          npm ci
+          # Install only required browser
           npx playwright install chromium --with-deps
-          echo "Running tests..."
-          PWDEBUG=1 npx playwright test ./playwright-tests/${{ matrix.testfilename }} --debug
+          # Run tests with xvfb
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+
+      # - name: Check OpenObserve logs
+      #   if: always()
+      #   run: cat o2.log
 
       - name: Sanitize Test Filename
         shell: bash 

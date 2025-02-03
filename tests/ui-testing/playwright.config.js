@@ -28,14 +28,16 @@ module.exports = defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env["ZO_BASE_URL"],
+    /* Configure headless mode */
     headless: true,
+    /* Configure browser launch options */
     launchOptions: {
-      args: ['--headless=new'],
-      slowMo: 100,
+      args: ['--headless=new']
     },
-    /* Add timeouts and other browser settings */
+    /* Configure timeouts */
     navigationTimeout: 60000,
     actionTimeout: 30000,
+    /* Configure viewport */
     viewport: { width: 1500, height: 1024 },
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -49,6 +51,9 @@ module.exports = defineConfig({
       use: { 
         ...devices['Desktop Chrome'],
         viewport: { width: 1500, height: 1024 },
+        launchOptions: {
+          args: ['--headless=new']
+        }
       },
     }
 
