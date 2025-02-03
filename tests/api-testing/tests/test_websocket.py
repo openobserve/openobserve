@@ -1,5 +1,4 @@
 
-
 def test_websocket_enable(create_session, base_url):
     """Running an E2E test for websocket enable."""
 
@@ -20,4 +19,5 @@ def test_websocket_enable(create_session, base_url):
     assert (
         resp_websocket.status_code == 200
     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
+    
     
