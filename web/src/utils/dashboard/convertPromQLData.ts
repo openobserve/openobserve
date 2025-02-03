@@ -26,6 +26,7 @@ import {
   getMetricMinMaxValue,
   getSeriesColor,
 } from "./colorPalette";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 let moment: any;
 let momentInitialized = false;
@@ -71,6 +72,7 @@ export const convertPromQLData = async (
   store: any,
   chartPanelRef: any,
   hoveredSeriesState: any,
+  annotations: any,
 ) => {
   // console.time("convertPromQLData");
 
@@ -162,6 +164,20 @@ export const convertPromQLData = async (
     legendConfig.left = "0"; // Apply left positioning
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
+
+  const { markLines, markAreas } = getAnnotationsData(
+    annotations,
+    store.state.timezone,
+  );
+
+  const getSeriesMarkArea = () => {
+    return {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.15)",
+      },
+      data: markAreas,
+    };
+  };
 
   const options: any = {
     backgroundColor: "transparent",
@@ -417,6 +433,7 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                zlevel: 2,
                 itemStyle: {
                   color: (() => {
                     try {
@@ -690,6 +707,24 @@ export const convertPromQLData = async (
     }
   });
 
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+
+  options.series.push({
+    type: "line",
+    data: [[convertedTimeStampToDataFormat, null]],
+    markLine: {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.5)",
+      },
+      silent: false,
+      animation: false,
+      data: markLines,
+    },
+    markArea: getSeriesMarkArea(),
+  zlevel: 1,
+  });
   options.series = options.series.flat();
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width

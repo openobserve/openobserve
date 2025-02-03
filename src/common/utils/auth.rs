@@ -401,7 +401,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || method.eq("DELETE") && path_columns[3] != "annotations"
             {
                 // for put on on-stream, non-pipeline such as specific alert/template/destination
                 // or delete on any such (stream/pipeline delete are not 4-part routes)

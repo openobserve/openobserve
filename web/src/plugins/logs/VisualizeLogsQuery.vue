@@ -397,7 +397,7 @@ export default defineComponent({
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors,true);
 
       if (errors.length) {
         // set errors into errorData
@@ -423,138 +423,145 @@ export default defineComponent({
       // extract all panelSchema alias
       const aliasList: any = [];
 
-      // remove panelschema fields from field list
+      // currently we only support auto sql for visualization
+      if (
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery === false
+      ) {
+        // remove panelschema fields from field list
 
-      // add x axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.x?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add x axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.x?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add breakdown alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.breakdown?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add y axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.y?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add z axis alias
+        dashboardPanelData?.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.z?.forEach((it: any) => {
+          if (!it.isDerived) {
+            aliasList.push(it.alias);
+          }
+        });
+
+        // add latitude alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.latitude?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.latitude.alias,
+          );
         }
-      });
 
-      // add breakdown alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.breakdown?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add longitude alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.longitude?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.longitude.alias,
+          );
         }
-      });
 
-      // add y axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.y?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add weight alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.weight?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.weight.alias,
+          );
         }
-      });
 
-      // add z axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.z?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
+        // add source alias
+        if (
+          dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.source?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.source.alias,
+          );
         }
-      });
 
-      // add latitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.isDerived
-      ) {
-        aliasList.push(
+        // add target alias
+        if (
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias
-        );
-      }
+          ]?.fields?.target?.alias &&
+          !dashboardPanelData?.data?.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.target?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.target.alias,
+          );
+        }
 
-      // add longitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.isDerived
-      ) {
-        aliasList.push(
+        // add source alias
+        if (
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias
-        );
-      }
-
-      // add weight alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
+          ]?.fields?.value?.alias &&
+          !dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias
-        );
-      }
-
-      // add target alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias
-        );
+          ]?.fields?.value?.isDerived
+        ) {
+          aliasList.push(
+            dashboardPanelData?.data?.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.fields?.value.alias,
+          );
+        }
       }
 
       // remove custom query fields from field list

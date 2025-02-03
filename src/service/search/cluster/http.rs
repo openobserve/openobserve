@@ -37,6 +37,7 @@ pub async fn search(
     query: SearchQuery,
     _req_regions: Vec<String>,
     _req_clusters: Vec<String>,
+    _need_super_cluster: bool,
 ) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.trace_id.clone();
@@ -60,9 +61,10 @@ pub async fn search(
 
     // handle query function
     #[cfg(feature = "enterprise")]
-    let ret = if o2_enterprise::enterprise::common::infra::config::get_config()
-        .super_cluster
-        .enabled
+    let ret = if _need_super_cluster
+        && o2_enterprise::enterprise::common::infra::config::get_config()
+            .super_cluster
+            .enabled
         && !local_cluster_search
     {
         super::super::super_cluster::leader::search(

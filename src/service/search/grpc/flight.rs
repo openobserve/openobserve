@@ -83,7 +83,7 @@ pub async fn search(
     let mut ctx =
         prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num).await?;
 
-    // register UDF
+    // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 

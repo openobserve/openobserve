@@ -57,7 +57,6 @@ mod meta {
         pub key1: String,
         pub key2: String,
         pub start_dt: i64,
-        #[sea_orm(column_type = "Text")]
         pub value: String,
     }
 
