@@ -270,7 +270,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDelete();
   });
 
-  test("should add source & destination node and then delete the pipeline", async ({
+  test.only("should add source & destination node and then delete the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
