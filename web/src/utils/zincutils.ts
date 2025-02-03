@@ -503,7 +503,12 @@ export const formatSizeFromMB = (sizeInMB: string) => {
     index++;
   }
 
-  return `${size.toFixed(2)} ${units[index]}`;
+  let new_size = size.toFixed(2);
+  if (new_size == "0.00" && size > 0) {
+    new_size = "0.01";
+  }
+
+  return `${new_size} ${units[index]}`;
 };
 
 export const addCommasToNumber = (number: number) => {
