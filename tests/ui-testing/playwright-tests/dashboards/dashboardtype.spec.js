@@ -15,52 +15,76 @@ async function login(page) {
   console.log('Starting login process...');
   
   try {
-    // Navigate to the login page with explicit wait until load
     console.log('Navigating to:', process.env["ZO_BASE_URL"]);
     const response = await page.goto(process.env["ZO_BASE_URL"] + "/web/login", {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
       timeout: 60000
     });
     
-    if (!response || !response.ok()) {
-      throw new Error(`Navigation failed: ${response ? response.status() : 'no response'}`);
-    }
+    // Log response status
+    console.log('Navigation response status:', response.status());
     
-    // Debug: Log page title and URL
-    console.log('Page title:', await page.title());
-    console.log('Current URL:', page.url());
-    
-    // Wait for page load state
+    // Wait for network and DOM to be fully loaded
     await page.waitForLoadState('domcontentloaded');
     await page.waitForLoadState('networkidle');
     
-    // Debug: Check if the page content is loaded
-    const content = await page.content();
-    console.log('Page content length:', content.length);
+    // Log page information
+    console.log('\n=== Page Information ===');
+    console.log('Title:', await page.title());
+    console.log('URL:', page.url());
     
-    // Debug: Log all data-cy attributes on the page
+    // Get and log the full HTML content
+    const content = await page.content();
+    console.log('\n=== Page Content ===');
+    console.log('Content length:', content.length);
+    console.log('First 1000 characters:');
+    console.log(content.substring(0, 1000));
+    
+    // Log all elements with data-cy attributes
     const dataCyElements = await page.evaluate(() => {
       const elements = document.querySelectorAll('[data-cy]');
       return Array.from(elements).map(el => ({
         dataCy: el.getAttribute('data-cy'),
-        tag: el.tagName,
-        type: el.type,
-        visible: el.offsetParent !== null
+        tagName: el.tagName,
+        isVisible: el.offsetParent !== null,
+        rect: el.getBoundingClientRect(),
+        text: el.textContent,
+        html: el.outerHTML
       }));
     });
-    console.log('Found data-cy elements:', dataCyElements);
+    console.log('\n=== Data-cy Elements ===');
+    console.log(JSON.stringify(dataCyElements, null, 2));
     
-    // Debug: Check for any error messages or overlays
-    const errorMessages = await page.evaluate(() => {
-      const errors = document.querySelectorAll('.error, .alert, [role="alert"]');
-      return Array.from(errors).map(el => el.textContent);
+    // Log all form elements
+    const formElements = await page.evaluate(() => {
+      const forms = document.querySelectorAll('form');
+      return Array.from(forms).map(form => ({
+        id: form.id,
+        className: form.className,
+        action: form.action,
+        method: form.method,
+        inputs: Array.from(form.querySelectorAll('input')).map(input => ({
+          type: input.type,
+          id: input.id,
+          name: input.name,
+          className: input.className,
+          isVisible: input.offsetParent !== null
+        }))
+      }));
     });
-    if (errorMessages.length > 0) {
-      console.log('Found error messages:', errorMessages);
-    }
+    console.log('\n=== Form Elements ===');
+    console.log(JSON.stringify(formElements, null, 2));
     
-    // Take a screenshot before looking for the form
-    await page.screenshot({ path: 'pre-login-form.png', fullPage: true });
+    // Take a screenshot
+    await page.screenshot({ 
+      path: 'page-load.png',
+      fullPage: true
+    });
+    
+    // Log any console messages from the page
+    page.on('console', msg => {
+      console.log('Browser console:', msg.type(), '=>', msg.text());
+    });
     
     // Try multiple selectors to find the login form
     const selectors = [
