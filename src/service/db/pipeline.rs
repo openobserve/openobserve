@@ -91,27 +91,11 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
 ///
 /// Used for pipeline execution.
 pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
-    if let Some(exec_pl) = STREAM_EXECUTABLE_PIPELINES.read().await.get(stream_params) {
-        return Some(exec_pl.clone());
-    }
-    match get_by_stream(stream_params).await {
-        Some(pl) if pl.enabled => match ExecutablePipeline::new(&pl).await {
-            Ok(exec_pl) => {
-                let mut stream_exec_pl_cache = STREAM_EXECUTABLE_PIPELINES.write().await;
-                stream_exec_pl_cache.insert(stream_params.to_owned(), exec_pl.clone());
-                drop(stream_exec_pl_cache);
-                Some(exec_pl)
-            }
-            Err(e) => {
-                log::error!(
-                    "[Pipeline]: failed to initialize ExecutablePipeline from Pipeline read from database, {}",
-                    e
-                );
-                None
-            }
-        },
-        _ => None,
-    }
+    STREAM_EXECUTABLE_PIPELINES
+        .read()
+        .await
+        .get(stream_params)
+        .cloned()
 }
 
 /// Returns the pipeline by id.
