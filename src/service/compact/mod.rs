@@ -253,6 +253,7 @@ pub async fn run_merge(
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
+    let mut need_done_ids = Vec::new();
     for job in jobs.iter() {
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
@@ -271,7 +272,8 @@ pub async fn run_merge(
             data_lifecycle_end
         };
         if job.offsets <= stream_data_retention_end.timestamp_micros() {
-            continue; // the data will be deleted by retention, just skip
+            need_done_ids.push(job.id); // the data will be deleted by retention, just skip
+            continue;
         }
         if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
@@ -285,6 +287,15 @@ pub async fn run_merge(
             }
         }
     }
+
+    if !need_done_ids.is_empty() {
+        // set those jobs to done
+        if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
+            log::error!("[COMPACT] set_job_done failed: {}", e);
+        }
+        jobs.retain(|job| !need_done_ids.contains(&job.id));
+    }
+
     if !need_release_ids.is_empty() {
         // release those jobs
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {

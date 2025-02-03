@@ -152,7 +152,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
-    async fn set_job_done(&self, id: i64) -> Result<()>;
+    async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
@@ -403,8 +403,8 @@ pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
 }
 
 #[inline]
-pub async fn set_job_done(id: i64) -> Result<()> {
-    CLIENT.set_job_done(id).await
+pub async fn set_job_done(ids: &[i64]) -> Result<()> {
+    CLIENT.set_job_done(ids).await
 }
 
 #[inline]

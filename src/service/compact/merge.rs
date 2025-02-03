@@ -405,7 +405,7 @@ pub async fn merge_by_stream(
 
     if files.is_empty() {
         // update job status
-        if let Err(e) = infra_file_list::set_job_done(job_id).await {
+        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
             log::error!("[COMPACT] set_job_done failed: {e}");
         }
         return Ok(());
@@ -596,7 +596,7 @@ pub async fn merge_by_stream(
     }
 
     // update job status
-    if let Err(e) = infra_file_list::set_job_done(job_id).await {
+    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACT] set_job_done failed: {e}");
     }
 

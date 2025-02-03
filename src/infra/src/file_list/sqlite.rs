@@ -935,13 +935,19 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
-    async fn set_job_done(&self, id: i64) -> Result<()> {
+    async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(r#"UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id = $3;"#)
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
-            .bind(id)
             .execute(&*client)
             .await?;
         Ok(())
