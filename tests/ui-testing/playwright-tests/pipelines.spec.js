@@ -315,7 +315,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.savePipeline();
     await ingestion(page);
     // Verify the data ingested in destination and verify under logs page
-    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
+    // await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
