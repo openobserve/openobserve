@@ -9,4 +9,5 @@ pub use super::{
     search_queue::Entity as SearchQueue, templates::Entity as Templates,
     timed_annotation_panels::Entity as TimedAnnotationPanels,
     timed_annotations::Entity as TimedAnnotations,
+
 };

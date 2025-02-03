@@ -38,6 +38,7 @@ pub mod short_urls;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+pub mod vs_patterns;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;

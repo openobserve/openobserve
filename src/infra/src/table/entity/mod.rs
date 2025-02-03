@@ -16,3 +16,4 @@ pub mod search_queue;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+pub mod vs_patterns;
