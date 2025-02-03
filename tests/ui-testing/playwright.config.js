@@ -28,19 +28,28 @@ module.exports = defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env["ZO_BASE_URL"],
-
+    headless: true,
+    launchOptions: {
+      args: ['--headless=new'],
+      slowMo: 100,
+    },
+    /* Add timeouts and other browser settings */
+    navigationTimeout: 60000,
+    actionTimeout: 30000,
+    viewport: { width: 1500, height: 1024 },
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
-    },
-   timeout: 5 * 60 * 1000,
+  },
+  timeout: 5 * 60 * 1000,
    
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
-     
-      
+      use: { 
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1500, height: 1024 },
+      },
     }
 
     /* Test against mobile viewports. */
@@ -71,4 +80,3 @@ module.exports = defineConfig({
   //   reuseExistingServer: !process.env.CI,
   // },
 });
-

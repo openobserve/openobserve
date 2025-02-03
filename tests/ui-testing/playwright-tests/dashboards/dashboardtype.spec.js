@@ -15,50 +15,54 @@ async function login(page) {
   console.log('Starting login process...');
   
   try {
-    // Navigate to the page with a longer timeout
+    // Navigate to the login page
     console.log('Navigating to:', process.env["ZO_BASE_URL"]);
-    await page.goto(process.env["ZO_BASE_URL"] + "/web/login", { 
-      waitUntil: 'networkidle',
-      timeout: 60000 
-    });
-
-    const generatedHTML = await page.evaluate(() => document.documentElement.outerHTML);
-    console.log("#######################");
-    console.log(generatedHTML);
-    console.log("#######################");
+    await page.goto(process.env["ZO_BASE_URL"] + "/web/login");
     
-    await page.waitForTimeout(1000);
-    await expect(page.getByText('Login as internal user')).toBeVisible();
-    await page.waitForTimeout(1000);
-    console.log('Waiting for login form...');
-    // Wait for the login form with explicit timeout and visibility check
-    await page.waitForSelector('[data-cy="login-user-id"]', { 
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState('networkidle');
+    
+    // Debug: Log the current URL
+    console.log('Current URL:', page.url());
+    
+    // Wait for the login form to be visible and interactive
+    const loginForm = await page.waitForSelector('[data-cy="login-user-id"]', {
       state: 'visible',
-      timeout: 60000 
+      timeout: 30000
     });
     
-    // Log the page content if the selector is not found (for debugging)
-    const content = await page.content();
-    console.log('Page content length:', content.length);
-    console.log('First 500 chars of content:', content.substring(0, 500));
+    if (!loginForm) {
+      throw new Error('Login form not found');
+    }
     
-    // Fill in login details
-    console.log('Filling login credentials...');
+    // Fill in credentials with proper waits
+    await page.locator('[data-cy="login-user-id"]').waitFor({ state: 'visible' });
     await page.locator('[data-cy="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
     
-    await page.locator('label').filter({ hasText: 'Password *' }).click();
+    await page.locator('[data-cy="login-password"]').waitFor({ state: 'visible' });
     await page.locator('[data-cy="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     
-    // Click login button and wait for navigation
-    console.log('Submitting login form...');
+    // Wait for the sign-in button and click
+    const signInButton = await page.locator('[data-cy="login-sign-in"]');
+    await signInButton.waitFor({ state: 'visible' });
+    
+    // Wait for navigation and response after clicking login
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle' }),
-      page.locator('[data-cy="login-sign-in"]').click()
+      signInButton.click()
     ]);
+    
+    // Verify successful login by waiting for a post-login element
+    await page.waitForSelector('[data-cy="user-menu"]', {
+      state: 'visible',
+      timeout: 30000
+    });
     
     console.log('Login successful');
   } catch (error) {
     console.error('Login failed:', error);
+    // Take a screenshot on failure
+    await page.screenshot({ path: 'login-error.png', fullPage: true });
     throw error;
   }
 }
