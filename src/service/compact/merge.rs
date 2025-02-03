@@ -133,6 +133,9 @@ pub async fn generate_job_by_stream(
         return Ok(()); // no data
     }
 
+    // format to hour with zero minutes, seconds
+    let offset = offset - offset % hour_micros(1);
+
     let cfg = get_config();
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
@@ -181,8 +184,6 @@ pub async fn generate_job_by_stream(
 
     // write new offset
     let offset = offset + hour_micros(1);
-    // format to hour with zero minutes, seconds
-    let offset = offset - offset % hour_micros(1);
     db::compact::files::set_offset(
         org_id,
         stream_type,
