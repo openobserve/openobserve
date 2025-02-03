@@ -150,7 +150,7 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing
           npm ci
-          npx playwright install chromium --with-deps
+          npx playwright install --only-shell chromium
           xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npx playwright test ./playwright-tests/${{ matrix.testfilename }} --debug
 
       - name: Upload test results
