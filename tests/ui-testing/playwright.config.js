@@ -27,6 +27,7 @@ module.exports = defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     headless: true,
+    channel: 'chromium',
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env["ZO_BASE_URL"],
 
@@ -60,8 +61,11 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Edge'], channel: 'msedge' },
     },
     {
-      name: 'Google Chrome',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      name: 'Google Chrome (Old Headless)',
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+      },
     },
   ],
 
