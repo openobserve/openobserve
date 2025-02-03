@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -441,8 +441,6 @@ pub async fn merge_by_stream(
                     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
                 }
             }
-            // delete duplicated files
-            files_with_size.dedup_by(|a, b| a.key == b.key);
             // partition files by size
             if files_with_size.len() <= 1 {
                 return Ok(());
@@ -507,6 +505,7 @@ pub async fn merge_by_stream(
             }
 
             let mut last_error = None;
+            let mut check_guard = HashSet::with_capacity(batch_groups.len());
             for ret in worker_results {
                 let (batch_id, mut new_file) = match ret {
                     Ok(v) => v,
@@ -516,6 +515,17 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
+                if check_guard.contains(&batch_id) {
+                    log::error!(
+                        "[COMPACT] merge files for stream: [{}/{}/{}] batch_id: {} duplicate",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        batch_id
+                    );
+                    continue;
+                }
+                check_guard.insert(batch_id);
                 let new_file_name = std::mem::take(&mut new_file.key);
                 let new_file_meta = std::mem::take(&mut new_file.meta);
                 let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
@@ -534,7 +544,7 @@ pub async fn merge_by_stream(
 
                 // collect stream stats
                 let mut stream_stats: StreamStats = StreamStats::default();
-                for file in new_file_list.iter() {
+                for file in new_file_list {
                     stream_stats = stream_stats - file.meta.clone();
                     events.push(FileKey {
                         key: file.key.clone(),

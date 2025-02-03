@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
+use hashbrown::HashSet;
 use infra::{
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
@@ -114,6 +115,11 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.name.ne(&node_name) {
             continue; // not this node
         }
+
+        // lock the stream to avoid compacting conflict with retention
+        let lock_key = generate_retention_lock_key(org_id, &stream_type, stream_name);
+        let lock = infra::local_lock::lock(&lock_key).await?;
+        let _lock_guard = lock.lock().await;
 
         let ret = if retention.eq("all") {
             retention::delete_all(org_id, stream_type, stream_name).await
@@ -247,21 +253,32 @@ pub async fn run_merge(
         return Ok(());
     }
 
+    let now = config::utils::time::now();
+    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
+    let mut need_lock_ids = HashSet::new();
     for job in jobs.iter() {
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2].to_string();
-        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+        let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
         let partition_time_level =
-            unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
-        if partition_time_level == PartitionTimeLevel::Daily {
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        // to avoid compacting conflict with retention, need check the data retention time
+        let stream_data_retention_end = if stream_settings.data_retention > 0 {
+            now - Duration::try_days(stream_settings.data_retention).unwrap()
+        } else {
+            data_lifecycle_end
+        };
+        let need_lock = job.offsets < stream_data_retention_end.timestamp_micros();
+        if partition_time_level == PartitionTimeLevel::Daily || need_lock {
             // check if this stream need process by this node
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -270,6 +287,8 @@ pub async fn run_merge(
             };
             if LOCAL_NODE.name.ne(&node_name) {
                 need_release_ids.push(job.id); // not this node
+            } else if need_lock {
+                need_lock_ids.insert(job.id); // need lock
             }
         }
     }
@@ -335,6 +354,14 @@ pub async fn run_merge(
                 &stream_name,
             );
             continue;
+        }
+
+        // lock the stream to avoid compacting conflict with retention
+        let lock_key = generate_retention_lock_key(&org_id, &stream_type, &stream_name);
+        let lock = infra::local_lock::lock(&lock_key).await?;
+        let lock_guard = lock.lock().await;
+        if !need_lock_ids.contains(&job.id) {
+            drop(lock_guard);
         }
 
         let org_id = org_id.clone();
@@ -429,4 +456,15 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+fn generate_retention_lock_key(
+    org_id: &str,
+    stream_type: &StreamType,
+    stream_name: &str,
+) -> String {
+    format!(
+        "lock_for_retention_{}/{}/{}",
+        org_id, stream_type, stream_name
+    )
 }

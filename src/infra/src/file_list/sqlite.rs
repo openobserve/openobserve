@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -720,9 +720,9 @@ UPDATE stream_stats
             .bind(stats.doc_time_min)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
-            .bind(stats.storage_size)
-            .bind(stats.compressed_size)
-            .bind(stats.index_size)
+            .bind(stats.storage_size as i64)
+            .bind(stats.compressed_size as i64)
+            .bind(stats.index_size as i64)
             .bind(stream_key)
             .execute(&mut *tx)
             .await
