@@ -265,7 +265,7 @@ pub async fn generate_old_data_job_by_stream(
         org_id,
         stream_type,
         stream_name,
-        Some((start_time, end_time)),
+        Some((start_time, end_time - 1)),
     )
     .await?;
 
