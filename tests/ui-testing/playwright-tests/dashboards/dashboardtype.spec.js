@@ -13,144 +13,152 @@ const dashboardName = `AutomatedDashboard${Date.now()}`
 
 async function login(page) {
   console.log('Starting login process...');
+
+  await page.goto(process.env["ZO_BASE_URL"]);
+  await page.waitForTimeout(1000);
+  await page.locator('[data-test="login-user-id"]').click();
+  await page.locator('[data-test="login-user-id"]').fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  await page.locator('[data-test="login-user-id"]').press('Tab');
+  await page.locator('[data-test="login-password"]').fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.getByRole('button', { name: 'Login' }).click();
   
-  try {
-    console.log('Navigating to:', process.env["ZO_BASE_URL"]);
-    const response = await page.goto(process.env["ZO_BASE_URL"] + "/web/login", {
-      waitUntil: 'networkidle',
-      timeout: 60000
-    });
+  // try {
+  //   console.log('Navigating to:', process.env["ZO_BASE_URL"]);
+  //   const response = await page.goto(process.env["ZO_BASE_URL"] + "/web/login", {
+  //     waitUntil: 'networkidle',
+  //     timeout: 60000
+  //   });
     
-    // Log response status
-    console.log('Navigation response status:', response.status());
+  //   // Log response status
+  //   console.log('Navigation response status:', response.status());
     
-    // Wait for network and DOM to be fully loaded
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForLoadState('networkidle');
+  //   // Wait for network and DOM to be fully loaded
+  //   await page.waitForLoadState('domcontentloaded');
+  //   await page.waitForLoadState('networkidle');
     
-    // Log page information
-    console.log('\n=== Page Information ===');
-    console.log('Title:', await page.title());
-    console.log('URL:', page.url());
+  //   // Log page information
+  //   console.log('\n=== Page Information ===');
+  //   console.log('Title:', await page.title());
+  //   console.log('URL:', page.url());
     
-    // Get and log the full HTML content
-    const content = await page.content();
-    console.log('\n=== Page Content ===');
-    console.log('Content length:', content.length);
-    console.log('First 1000 characters:');
-    console.log(content.substring(0, 1000));
+  //   // Get and log the full HTML content
+  //   const content = await page.content();
+  //   console.log('\n=== Page Content ===');
+  //   console.log('Content length:', content.length);
+  //   console.log('First 1000 characters:');
+  //   console.log(content.substring(0, 1000));
     
-    // Log all elements with data-cy attributes
-    const dataCyElements = await page.evaluate(() => {
-      const elements = document.querySelectorAll('[data-cy]');
-      return Array.from(elements).map(el => ({
-        dataCy: el.getAttribute('data-cy'),
-        tagName: el.tagName,
-        isVisible: el.offsetParent !== null,
-        rect: el.getBoundingClientRect(),
-        text: el.textContent,
-        html: el.outerHTML
-      }));
-    });
-    console.log('\n=== Data-cy Elements ===');
-    console.log(JSON.stringify(dataCyElements, null, 2));
+  //   // Log all elements with data-cy attributes
+  //   const dataCyElements = await page.evaluate(() => {
+  //     const elements = document.querySelectorAll('[data-cy]');
+  //     return Array.from(elements).map(el => ({
+  //       dataCy: el.getAttribute('data-cy'),
+  //       tagName: el.tagName,
+  //       isVisible: el.offsetParent !== null,
+  //       rect: el.getBoundingClientRect(),
+  //       text: el.textContent,
+  //       html: el.outerHTML
+  //     }));
+  //   });
+  //   console.log('\n=== Data-cy Elements ===');
+  //   console.log(JSON.stringify(dataCyElements, null, 2));
     
-    // Log all form elements
-    const formElements = await page.evaluate(() => {
-      const forms = document.querySelectorAll('form');
-      return Array.from(forms).map(form => ({
-        id: form.id,
-        className: form.className,
-        action: form.action,
-        method: form.method,
-        inputs: Array.from(form.querySelectorAll('input')).map(input => ({
-          type: input.type,
-          id: input.id,
-          name: input.name,
-          className: input.className,
-          isVisible: input.offsetParent !== null
-        }))
-      }));
-    });
-    console.log('\n=== Form Elements ===');
-    console.log(JSON.stringify(formElements, null, 2));
+  //   // Log all form elements
+  //   const formElements = await page.evaluate(() => {
+  //     const forms = document.querySelectorAll('form');
+  //     return Array.from(forms).map(form => ({
+  //       id: form.id,
+  //       className: form.className,
+  //       action: form.action,
+  //       method: form.method,
+  //       inputs: Array.from(form.querySelectorAll('input')).map(input => ({
+  //         type: input.type,
+  //         id: input.id,
+  //         name: input.name,
+  //         className: input.className,
+  //         isVisible: input.offsetParent !== null
+  //       }))
+  //     }));
+  //   });
+  //   console.log('\n=== Form Elements ===');
+  //   console.log(JSON.stringify(formElements, null, 2));
     
-    // Take a screenshot
-    await page.screenshot({ 
-      path: 'page-load.png',
-      fullPage: true
-    });
+  //   // Take a screenshot
+  //   await page.screenshot({ 
+  //     path: 'page-load.png',
+  //     fullPage: true
+  //   });
     
-    // Log any console messages from the page
-    page.on('console', msg => {
-      console.log('Browser console:', msg.type(), '=>', msg.text());
-    });
+  //   // Log any console messages from the page
+  //   page.on('console', msg => {
+  //     console.log('Browser console:', msg.type(), '=>', msg.text());
+  //   });
     
-    // Try multiple selectors to find the login form
-    const selectors = [
-      '[data-cy="login-user-id"]',
-      'input[type="email"]',
-      'input[name="email"]',
-      'form input[type="text"]',
-      'form input[type="email"]'
-    ];
+  //   // Try multiple selectors to find the login form
+  //   const selectors = [
+  //     '[data-cy="login-user-id"]',
+  //     'input[type="email"]',
+  //     'input[name="email"]',
+  //     'form input[type="text"]',
+  //     'form input[type="email"]'
+  //   ];
     
-    console.log('Trying to find login form with selectors:', selectors);
+  //   console.log('Trying to find login form with selectors:', selectors);
     
-    let loginInput = null;
-    for (const selector of selectors) {
-      try {
-        loginInput = await page.waitForSelector(selector, {
-          state: 'visible',
-          timeout: 10000
-        });
-        if (loginInput) {
-          console.log('Found login input with selector:', selector);
-          break;
-        }
-      } catch (e) {
-        console.log(`Selector ${selector} not found`);
-      }
-    }
+  //   let loginInput = null;
+  //   for (const selector of selectors) {
+  //     try {
+  //       loginInput = await page.waitForSelector(selector, {
+  //         state: 'visible',
+  //         timeout: 10000
+  //       });
+  //       if (loginInput) {
+  //         console.log('Found login input with selector:', selector);
+  //         break;
+  //       }
+  //     } catch (e) {
+  //       console.log(`Selector ${selector} not found`);
+  //     }
+  //   }
     
-    if (!loginInput) {
-      // If we still can't find the form, let's check the DOM structure
-      const bodyContent = await page.evaluate(() => document.body.innerHTML);
-      console.log('Page body content:', bodyContent.substring(0, 1000) + '...');
-      throw new Error('Login form not found after trying multiple selectors');
-    }
+  //   if (!loginInput) {
+  //     // If we still can't find the form, let's check the DOM structure
+  //     const bodyContent = await page.evaluate(() => document.body.innerHTML);
+  //     console.log('Page body content:', bodyContent.substring(0, 1000) + '...');
+  //     throw new Error('Login form not found after trying multiple selectors');
+  //   }
     
-    // Fill in credentials
-    await loginInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  //   // Fill in credentials
+  //   await loginInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     
-    const passwordInput = await page.waitForSelector('[data-cy="login-password"]', {
-      state: 'visible',
-      timeout: 30000
-    });
-    await passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  //   const passwordInput = await page.waitForSelector('[data-cy="login-password"]', {
+  //     state: 'visible',
+  //     timeout: 30000
+  //   });
+  //   await passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
     
-    // Click sign in button
-    const signInButton = await page.locator('[data-cy="login-sign-in"]');
-    await signInButton.waitFor({ state: 'visible', timeout: 30000 });
+  //   // Click sign in button
+  //   const signInButton = await page.locator('[data-cy="login-sign-in"]');
+  //   await signInButton.waitFor({ state: 'visible', timeout: 30000 });
     
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
-      signInButton.click()
-    ]);
+  //   await Promise.all([
+  //     page.waitForNavigation({ waitUntil: 'networkidle', timeout: 60000 }),
+  //     signInButton.click()
+  //   ]);
     
-    console.log('Login successful');
-  } catch (error) {
-    console.error('Login failed:', error);
-    // Take error screenshot
-    await page.screenshot({ path: 'login-error.png', fullPage: true });
+  //   console.log('Login successful');
+  // } catch (error) {
+  //   console.error('Login failed:', error);
+  //   // Take error screenshot
+  //   await page.screenshot({ path: 'login-error.png', fullPage: true });
     
-    // Log the final state of the page
-    const finalContent = await page.content();
-    console.log('Final page content length:', finalContent.length);
-    console.log('Final page content preview:', finalContent.substring(0, 500));
+  //   // Log the final state of the page
+  //   const finalContent = await page.content();
+  //   console.log('Final page content length:', finalContent.length);
+  //   console.log('Final page content preview:', finalContent.substring(0, 500));
     
-    throw error;
-  }
+  //   throw error;
+  // }
 }
 
 async function ingestion(page) {
