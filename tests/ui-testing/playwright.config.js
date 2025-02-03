@@ -38,33 +38,34 @@ module.exports = defineConfig({
    
   /* Configure projects for major browsers */
   projects: [
-    // {
-    //   name: 'chromium',
-    //   use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, channel: 'chromium', },
-     
-      
-    // }
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
     {
-      name: 'Microsoft Edge',
-      use: { ...devices['Desktop Edge'], channel: 'msedge' },
+      name: 'chromium',
+      use: { 
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1500, height: 1024 },
+        launchOptions: {
+          args: ['--headless=new']
+        }
+      },
     },
     {
-      name: 'Google Chrome (Old Headless)',
-      use: {
-        ...devices['Desktop Chrome'],
-        channel: 'chromium',
+      name: 'Microsoft Edge',
+      use: { 
+        ...devices['Desktop Edge'], 
+        channel: 'msedge',
+        launchOptions: {
+          args: ['--headless=new']
+        }
+      },
+    },
+    {
+      name: 'Google Chrome',
+      use: { 
+        ...devices['Desktop Chrome'], 
+        channel: 'chrome',
+        launchOptions: {
+          args: ['--headless=new']
+        }
       },
     },
   ],
@@ -76,4 +77,3 @@ module.exports = defineConfig({
   //   reuseExistingServer: !process.env.CI,
   // },
 });
-
