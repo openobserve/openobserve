@@ -148,7 +148,9 @@ export default defineComponent({
     let chart: any;
     let lmap: any;
     let lmapComponent: any;
-    const lmapOptions = { ...props.data.options?.lmap } || {};
+    const lmapOptions = props.data.options?.lmap
+      ? { ...props.data.options.lmap }
+      : {};
 
     const store = useStore();
     const windowResizeEventCallback = async () => {
