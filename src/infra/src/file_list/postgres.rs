@@ -100,10 +100,11 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>> {
         if files.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
+        let mut error_files = Vec::new();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
@@ -131,6 +132,7 @@ impl super::FileList for PostgresFileList {
                 let ret: Option<i64> = match query_res {
                     Ok(v) => v,
                     Err(sqlx::Error::RowNotFound) => {
+                        error_files.push(file.to_string());
                         continue;
                     }
                     Err(e) => {
@@ -161,7 +163,7 @@ impl super::FileList for PostgresFileList {
                     .observe(time);
             }
         }
-        Ok(())
+        Ok(error_files)
     }
 
     async fn batch_add_deleted(

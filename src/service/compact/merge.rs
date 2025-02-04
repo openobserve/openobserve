@@ -507,7 +507,7 @@ pub async fn merge_by_stream(
                 // collect stream stats
                 let mut stream_stats: StreamStats = StreamStats::default();
                 for file in new_file_list {
-                    stream_stats = stream_stats - file.meta.clone();
+                    stream_stats = stream_stats - &file.meta;
                     events.push(FileKey {
                         key: file.key.clone(),
                         meta: file.meta.clone(),
@@ -519,7 +519,16 @@ pub async fn merge_by_stream(
 
                 // write file list to storage
                 match write_file_list(&org_id, &events).await {
-                    Ok(_) => {
+                    Ok(error_files) => {
+                        // recalculate stream stats
+                        if !error_files.is_empty() {
+                            log::debug!("[COMPACT] found error files: {:?}", error_files);
+                            for file in new_file_list {
+                                if error_files.contains(&file.key) {
+                                    stream_stats = stream_stats + &file.meta;
+                                }
+                            }
+                        }
                         // update stream stats
                         if stream_stats.doc_num != 0 {
                             let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
@@ -777,7 +786,7 @@ pub async fn merge_files(
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
-            "merge_parquet_files error: compressed_size is 0"
+            "merge_parquet_files err: compressed_size is 0"
         ));
     }
 
@@ -842,7 +851,7 @@ pub async fn merge_files(
         .await
         .map_err(|e| {
             anyhow::anyhow!(
-                "generate_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                "generate_index_on_compactor for file: {}, err: {}, need delete files: {:?}",
                 new_file_key,
                 e,
                 retain_file_list
@@ -869,7 +878,7 @@ pub async fn merge_files(
             .await
             {
                 log::error!(
-                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                    "generate_index_on_compactor write to file list: {}, err: {}, need delete files: {:?}",
                     file_name,
                     e.to_string(),
                     retain_file_list
@@ -883,7 +892,7 @@ pub async fn merge_files(
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        let index_size =  create_tantivy_index(
+        let index_size = create_tantivy_index(
             "COMPACTOR",
             &new_file_key,
             &full_text_search_fields,
@@ -891,9 +900,10 @@ pub async fn merge_files(
             schema,
             &mut reader,
         )
-        .await.map_err(|e| {
+        .await
+        .map_err(|e| {
             anyhow::anyhow!(
-                "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                "create_tantivy_index_on_compactor for file: {}, err: {}, need delete files: {:?}",
                 new_file_key,
                 e,
                 retain_file_list
@@ -905,9 +915,12 @@ pub async fn merge_files(
     Ok((new_file_key, new_file_meta, retain_file_list))
 }
 
-async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
+async fn write_file_list(
+    org_id: &str,
+    events: &[FileKey],
+) -> Result<HashSet<String>, anyhow::Error> {
     if events.is_empty() {
-        return Ok(());
+        return Ok(HashSet::new());
     }
 
     let put_items = events
@@ -924,38 +937,37 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             flattened: v.meta.flattened,
         })
         .collect::<Vec<_>>();
-    // set to external db
+
+    // set to db
     // retry 5 times
     let mut success = false;
     let created_at = config::utils::time::now_micros();
+    let mut error_files = HashSet::new();
     for _ in 0..5 {
         if !del_items.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
-                log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                    e
-                );
+                log::error!("[COMPACT] batch_add_deleted to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
         }
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
+            log::error!("[COMPACT] batch_add to db failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
         if !del_items.is_empty() {
             let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
+            match infra_file_list::batch_remove(&del_files).await {
+                Ok(v) => error_files.extend(v),
+                Err(e) => {
+                    log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
+                }
             }
-        }
+        };
         // send broadcast to other nodes
         if get_config().memory_cache.cache_latest_files {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
@@ -967,9 +979,9 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         break;
     }
     if !success {
-        Err(anyhow::anyhow!("batch_write to external db failed"))
+        Err(anyhow::anyhow!("batch_write to db failed"))
     } else {
-        Ok(())
+        Ok(error_files)
     }
 }
 
@@ -1088,7 +1100,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     }
                     Some(file_name)
                 } else {
-                    log::error!("[COMPACT] download file to cache err: {}", e);
+                    log::warn!(
+                        "[COMPACT] download file to cache err: {}, file: {}",
+                        e,
+                        file_name
+                    );
                     // remove downloaded file
                     let _ = file_data::disk::remove("", &file_name).await;
                     None

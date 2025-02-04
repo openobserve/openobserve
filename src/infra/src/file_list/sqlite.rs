@@ -70,7 +70,19 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        self.batch_remove(&[file.to_string()]).await
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let pool = client.clone();
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
+        Ok(())
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
@@ -89,10 +101,11 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>> {
         if files.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
+        let mut error_files = Vec::new();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
@@ -113,7 +126,10 @@ impl super::FileList for SqliteFileList {
                 .await
                 {
                     Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => continue,
+                    Err(sqlx::Error::RowNotFound) => {
+                        error_files.push(file.to_string());
+                        continue;
+                    }
                     Err(e) => return Err(e.into()),
                 };
                 match ret {
@@ -131,7 +147,7 @@ impl super::FileList for SqliteFileList {
                 _ = pool.execute(sql.as_str()).await?;
             }
         }
-        Ok(())
+        Ok(error_files)
     }
 
     async fn batch_add_deleted(

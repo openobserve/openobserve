@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -341,8 +341,8 @@ async fn cache_files(
         let trace_id = trace_id.to_string();
         let file_name = file.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> =
-            tokio::task::spawn(async move {
+        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
+            async move {
                 let cfg = get_config();
                 let ret = match cache_type {
                     file_data::CacheType::Memory => {
@@ -380,8 +380,9 @@ async fn cache_files(
                 // return file_name if download failed
                 let file_name = if let Some(e) = ret.0 {
                     log::warn!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}",
-                        e
+                        "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
+                        e,
+                        file_name
                     );
                     Some(file_name)
                 } else {
@@ -389,7 +390,8 @@ async fn cache_files(
                 };
                 drop(permit);
                 (file_name, ret.1, ret.2)
-            });
+            },
+        );
         tasks.push(task);
     }
 

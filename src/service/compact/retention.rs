@@ -24,6 +24,7 @@ use config::{
     },
     utils::time::{hour_micros, BASE_TIME},
 };
+use hashbrown::HashSet;
 use infra::{cache, dist_lock, file_list as infra_file_list};
 use itertools::Itertools;
 
@@ -485,7 +486,7 @@ async fn delete_from_file_list(
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
         let index_size = file.meta.index_size;
-        stream_stats = stream_stats - file.meta;
+        stream_stats = stream_stats - &file.meta;
         let file_name = file.key.clone();
         let columns: Vec<_> = file_name.split('/').collect();
         let hour_key = format!(
@@ -505,7 +506,19 @@ async fn delete_from_file_list(
     }
 
     // write file list to storage
-    write_file_list(org_id, hours_files).await?;
+    let error_files = write_file_list(org_id, &hours_files).await?;
+
+    // recalculate stream stats
+    if !error_files.is_empty() {
+        log::debug!("[COMPACT] found error files: {:?}", error_files);
+        for files in hours_files.values() {
+            for file in files {
+                if error_files.contains(&file.key) {
+                    stream_stats = stream_stats + &file.meta;
+                }
+            }
+        }
+    }
 
     // update stream stats
     if stream_stats.doc_num != 0 {
@@ -524,9 +537,10 @@ async fn delete_from_file_list(
 
 async fn write_file_list(
     org_id: &str,
-    hours_files: HashMap<String, Vec<FileKey>>,
-) -> Result<(), anyhow::Error> {
-    for (_key, events) in hours_files {
+    hours_files: &HashMap<String, Vec<FileKey>>,
+) -> Result<HashSet<String>, anyhow::Error> {
+    let mut error_files = HashSet::new();
+    for events in hours_files.values() {
         let put_items = events
             .iter()
             .filter(|v| !v.deleted)
@@ -541,46 +555,41 @@ async fn write_file_list(
                 flattened: v.meta.flattened,
             })
             .collect::<Vec<_>>();
-        // set to external db
+        // set to db
         // retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
-                log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                    e
-                );
+                log::error!("[COMPACT] batch_add_deleted to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             if let Err(e) = infra_file_list::batch_add(&put_items).await {
-                log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
+                log::error!("[COMPACT] batch_add to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
             if !del_items.is_empty() {
                 let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-                if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                    log::error!(
-                        "[COMPACT] batch_delete to external db failed, retrying: {}",
-                        e
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
+                match infra_file_list::batch_remove(&del_files).await {
+                    Ok(v) => error_files.extend(v),
+                    Err(e) => {
+                        log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
                 }
             }
             success = true;
             break;
         }
         if !success {
-            return Err(anyhow::anyhow!(
-                "[COMPACT] batch_write to external db failed"
-            ));
+            return Err(anyhow::anyhow!("[COMPACT] batch_write to db failed"));
         }
     }
-    Ok(())
+    Ok(error_files)
 }
 
 fn generate_local_dirs(
