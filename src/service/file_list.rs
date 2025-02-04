@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -60,6 +60,38 @@ pub async fn query(
     Ok(file_keys)
 }
 
+#[tracing::instrument(
+    name = "service::file_list::query_by_date",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_by_date(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    date_start: &str,
+    date_end: &str,
+) -> Result<Vec<FileKey>> {
+    let files = file_list::query_by_date(
+        org_id,
+        stream_type,
+        stream_name,
+        Some((date_start.to_string(), date_end.to_string())),
+    )
+    .await?;
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+            segment_ids: None,
+        });
+    }
+    Ok(file_keys)
+}
+
+#[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
 pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     FILE_LIST_ID_SELECT_COUNT

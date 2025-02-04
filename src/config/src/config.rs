@@ -2237,6 +2237,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 7;
     }
+    if cfg.compact.old_data_min_hours < 1 {
+        cfg.compact.old_data_min_hours = 2;
+    }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;
     }
