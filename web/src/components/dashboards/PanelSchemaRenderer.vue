@@ -454,6 +454,11 @@ export default defineComponent({
     const validatePanelData = computed(() => {
       const errors: any = [];
 
+      // fields validation is not for promql
+      if (panelSchema.value?.queryType == "promql") {
+        return errors;
+      }
+
       const currentXLabel =
         panelSchema?.value?.type == "table"
           ? "First Column"
