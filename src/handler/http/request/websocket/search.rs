@@ -315,7 +315,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = format!("{vrl}\n.");
                     req.payload.query.query_fn = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it

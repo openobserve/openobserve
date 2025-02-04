@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -58,7 +58,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn batch_remove(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>>;
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -78,6 +78,13 @@ pub trait FileList: Sync + Send + 'static {
         time_level: PartitionTimeLevel,
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
+    ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
     ) -> Result<Vec<(String, FileMeta)>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
     async fn query_ids(
@@ -152,7 +159,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
-    async fn set_job_done(&self, id: i64) -> Result<()>;
+    async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
@@ -192,7 +199,7 @@ pub async fn batch_add_history(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_remove(files: &[String]) -> Result<()> {
+pub async fn batch_remove(files: &[String]) -> Result<Vec<String>> {
     CLIENT.batch_remove(files).await
 }
 
@@ -250,6 +257,19 @@ pub async fn query(
             time_range,
             flattened,
         )
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_by_date")]
+pub async fn query_by_date(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: Option<(String, String)>,
+) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT
+        .query_by_date(org_id, stream_type, stream_name, date_range)
         .await
 }
 
@@ -403,8 +423,8 @@ pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
 }
 
 #[inline]
-pub async fn set_job_done(id: i64) -> Result<()> {
-    CLIENT.set_job_done(id).await
+pub async fn set_job_done(ids: &[i64]) -> Result<()> {
+    CLIENT.set_job_done(ids).await
 }
 
 #[inline]
