@@ -864,7 +864,7 @@ const useLogs = () => {
         req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3473,7 +3473,7 @@ const useLogs = () => {
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
         );
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
