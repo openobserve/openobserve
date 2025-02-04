@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, watch } from "vue";
+import { getCurrentInstance, onMounted, ref, watch } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -148,7 +148,10 @@ export default defineComponent({
       resetVariablesData();
 
       // check if variables config list is not empty
-      if (!props?.variablesConfig) return;
+      if (!props?.variablesConfig) {
+        console.log("variables config not found, returning");
+        return;
+      }
 
       // make list of variables using variables config list
       // set initial variables values from props
@@ -243,7 +246,7 @@ export default defineComponent({
       rejectAllPromises();
 
       // load all variables
-      loadAllVariablesData();
+      loadAllVariablesData(true);
     });
 
     watch(
@@ -254,9 +257,9 @@ export default defineComponent({
 
         // reject all promises
         rejectAllPromises();
-
+        skipAPILoad.value = false;
         // load all variables
-        loadAllVariablesData();
+        loadAllVariablesData(true);
       },
     );
 
@@ -268,7 +271,8 @@ export default defineComponent({
         // reject all promises
         rejectAllPromises();
 
-        loadAllVariablesData();
+        loadAllVariablesData(false);
+        skipAPILoad.value = true;
       },
     );
 
@@ -940,9 +944,7 @@ export default defineComponent({
      * @param {object} variableObject - The variable object to handle
      * @returns {Promise<boolean>} - true if the variable was handled successfully, false if it was not
      */
-    const handleVariableType = async (
-      variableObject: any,
-    ) => {
+    const handleVariableType = async (variableObject: any) => {
       switch (variableObject.type) {
         case "query_values": {
           try {
@@ -1174,6 +1176,7 @@ export default defineComponent({
     };
 
     let isLoading = false;
+    const skipAPILoad = ref(false);
 
     /**
      * Loads all variables data.
@@ -1182,14 +1185,25 @@ export default defineComponent({
      * @async
      * @returns {Promise<void>} - A promise that resolves when all variables data has been loaded.
      */
-    const loadAllVariablesData = async () => {
+    const loadAllVariablesData = async (isInitialLoad = false) => {
       if (isLoading) {
         console.log("[loadAllVariablesData] Already running, skipping.");
         return;
       }
-      isLoading = true;
+      console.log("isInitialLoad", isInitialLoad, "skipAPILoad", skipAPILoad);
 
-      console.log("[loadAllVariablesData] Function called.");
+      if (!isInitialLoad && skipAPILoad.value) {
+        console.log(
+          "[loadAllVariablesData] Skipping API load - not initial load",
+        );
+        return;
+      }
+
+      isLoading = true;
+      console.log(
+        "[loadAllVariablesData] Function called. Initial load:",
+        isInitialLoad,
+      );
 
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
