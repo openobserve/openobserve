@@ -25,6 +25,8 @@ export class CipherKeys {
         
          this.updateButton = cipherName => `//td[contains(text(),'${cipherName}')]/following-sibling::td/button[@title='Edit']`;
  
+         this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
+         this.signOutButton = page.getByText('Sign Out');
 
 
     }
@@ -201,7 +203,10 @@ export class CipherKeys {
         await expect(this.alert).toContainText(expectedText);
       }
     
-
+      async signOut() {
+        await this.profileButton.click();
+        await this.signOutButton.click();
+      }
 
 
 }

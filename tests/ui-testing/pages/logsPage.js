@@ -438,4 +438,26 @@ export class LogsPage {
     await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
   }
 
+  async decryptLogSQL(cipherName) {
+    // Construct the SQL query using the passed variable
+    const sqlQuery = `SELECT decrypt(log, "${cipherName}") from "default"`;
+
+    // Fill the query editor with the constructed SQL query
+    await this.page
+        .locator('[data-test="logs-search-bar-query-editor"]')
+        .getByLabel("Editor content;Press Alt+F1")
+        .fill(sqlQuery);
+
+    // Wait for a specified time (consider adjusting this based on your needs)
+    await this.page.waitForTimeout(5000);
+}
+
+async selectIndexDefault() {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+  await this.page.waitForTimeout(3000);
+  
+}
+
 }

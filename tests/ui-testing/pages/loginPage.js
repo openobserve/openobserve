@@ -15,7 +15,7 @@ export class LoginPage {
   async loginAsInternalUser() {
   
     await this.page.getByText('Login as internal user').click();
-    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
        waitUntil: "networkidle",
        });
     
@@ -36,4 +36,35 @@ export class LoginPage {
   
     
   }
+
+  async gotoLoginPageSc() {
+    await this.page.goto(process.env["ZO_BASE_URL_SC"]);
+    console.log("ZO_BASE_URL_SC", process.env["ZO_BASE_URL_SC"]);
+  }
+
+  async loginAsInternalUserSc() {
+  
+    await this.page.getByText('Login as internal user').click();
+    await this.page.waitForURL(process.env["ZO_BASE_URL_SC"] + "/web/login", {
+       waitUntil: "networkidle",
+       });
+    
+  }
+
+  async loginSc() {
+    await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    const waitForLogin = this.page.waitForResponse(
+      (response) =>
+        response.url().includes("/auth/login") && response.status() === 200
+    );
+    await this.passwordInput.fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+    await this.waitForLogin;
+    await this.loginButton.click();
+    await this.page.waitForURL(process.env["ZO_BASE_URL_SC"] + "/web/", {
+      waitUntil: "networkidle",
+    });
+  
+    
+  }
+
 }
