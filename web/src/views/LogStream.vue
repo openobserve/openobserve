@@ -315,16 +315,16 @@ export default defineComponent({
     const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
     const duplicateStreamList: Ref<any[]> = ref([]);
-    const selectedStreamType = ref("all");
+    const selectedStreamType = ref("logs");
     const loadingState = ref(true);
 
     const streamFilterValues = [
-      { label: t("logStream.labelAll"), value: "all" },
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
       { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
+      { label: t("logStream.labelAll"), value: "all" },
     ];
     const { getStreams, resetStreams, removeStream, getStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
@@ -431,14 +431,14 @@ export default defineComponent({
 
     // As filter data don't gets called when search input is cleared.
     // So calling onChangeStreamFilter to filter again
-    watch(
-      () => filterQuery.value,
-      (value) => {
-        if (!value) {
-          onChangeStreamFilter(selectedStreamType.value);
-        }
-      },
-    );
+    // watch(
+    //   () => filterQuery.value,
+    //   (value) => {
+    //     if (!value) {
+    //       onChangeStreamFilter(selectedStreamType.value);
+    //     }
+    //   },
+    // );
 
     const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
@@ -454,14 +454,15 @@ export default defineComponent({
         if (refresh) resetStreams();
 
         let counter = 1;
-        getStreams("", false, false)
+        getStreams(selectedStreamType.value || "", false, false)
           .then((res: any) => {
+            console.log(res.list)
             logStream.value = [];
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
             let index_size = "";
-            resultTotal.value += res.list.length;
+            resultTotal.value = res.list.length;
             logStream.value.push(
               ...res.list.map((data: any) => {
                 doc_num = "--";
@@ -494,7 +495,7 @@ export default defineComponent({
               }
             });
 
-            onChangeStreamFilter(selectedStreamType.value);
+            // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
             dismiss();
           })
@@ -769,11 +770,12 @@ export default defineComponent({
 
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
-      logStream.value = filterData(
-        duplicateStreamList.value,
-        filterQuery.value.toLowerCase(),
-      );
-      resultTotal.value = logStream.value.length;
+      getLogStream(true);
+      // logStream.value = filterData(
+      //   duplicateStreamList.value,
+      //   filterQuery.value.toLowerCase(),
+      // );
+      // resultTotal.value = logStream.value.length;
     };
 
     const getSelectedItems = () => {
