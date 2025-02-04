@@ -313,6 +313,7 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
+    await page.waitForTimeout(2000);
     await ingestion(page);
     // Verify the data ingested in destination and verify under logs page
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
