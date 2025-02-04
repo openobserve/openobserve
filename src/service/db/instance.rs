@@ -13,22 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
 use infra::errors::Result;
 
 pub async fn get() -> Result<Option<String>> {
     let ret = super::get("/instance/").await?;
-    let loc_value = json::from_slice(&ret).unwrap();
+    let loc_value = String::from_utf8_lossy(&ret).to_string();
+    let loc_value = loc_value.trim().trim_matches('"').to_string();
     let value = Some(loc_value);
     Ok(value)
 }
 
 pub async fn set(id: &str) -> Result<()> {
-    super::put(
-        "/instance/",
-        json::to_vec(&id).unwrap().into(),
-        super::NO_NEED_WATCH,
-        None,
-    )
-    .await
+    let data = bytes::Bytes::from(id.to_string());
+    super::put("/instance/", data, super::NO_NEED_WATCH, None).await
 }
