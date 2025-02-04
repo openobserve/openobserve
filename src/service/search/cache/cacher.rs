@@ -736,7 +736,9 @@ fn calculate_deltas_multi(
             // There is a gap (delta) between current coverage and the next meta
             deltas.push(QueryDelta {
                 delta_start_time: current_end_time,
-                delta_end_time,
+                // Subtracting histogram interval to ensure the next query fetches the data
+                // up to the last cache result timestamp, thereby avoiding duplicates
+                delta_end_time: delta_end_time - histogram_interval,
                 delta_removed_hits: false,
             });
         }
