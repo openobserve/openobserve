@@ -15,11 +15,12 @@
 
 use std::collections::HashMap;
 
-use config::{ider, utils::json};
+use config::utils::json;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
+use svix_ksuid::KsuidLike;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -50,6 +51,7 @@ impl MigrationTrait for Migration {
                 .map(|meta| {
                     let old_dest: meta_destinations::Destination =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
+                    let id = ksuid_from_hash(&old_dest, &meta.key1).to_string();
 
                     let (module, new_type) = match old_dest.destination_type {
                         meta_destinations::DestinationType::Http => (
@@ -101,7 +103,7 @@ impl MigrationTrait for Migration {
                         Ok(None)
                     } else {
                         Ok(Some(destinations::ActiveModel {
-                            id: Set(ider::uuid()),
+                            id: Set(id),
                             org: Set(meta.key1),
                             name: Set(old_dest.name),
                             module: Set(module),
@@ -111,7 +113,7 @@ impl MigrationTrait for Migration {
                     }
                 })
                 .filter_map(|result| match result {
-                    Ok(None) => None, // alert destination should have template. otherwise dropped 
+                    Ok(None) => None, // alert destination should have template. otherwise dropped
                     Ok(Some(temp)) => Some(Ok(temp)),
                     Err(e) => Some(Err(e)),
                 })
@@ -344,4 +346,17 @@ impl From<meta_destinations::HTTPType> for destinations::HTTPType {
             meta_destinations::HTTPType::Post => Self::Post,
         }
     }
+}
+
+fn ksuid_from_hash(
+    destination: &meta_destinations::Destination,
+    org_id: &str,
+) -> svix_ksuid::Ksuid {
+    use sha1::{Digest, Sha1};
+
+    let mut hasher = Sha1::new();
+    hasher.update(org_id);
+    hasher.update(destination.name.clone());
+    let hash = hasher.finalize();
+    svix_ksuid::Ksuid::from_bytes(hash.into())
 }

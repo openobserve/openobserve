@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{ider, utils::json};
+use config::utils::json;
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
+use svix_ksuid::KsuidLike;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -40,6 +41,7 @@ impl MigrationTrait for Migration {
                 .map(|meta| {
                     let old_temp: meta_templates::Template =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
+                    let id = ksuid_from_hash(&old_temp, &meta.key1).to_string();
                     let title =
                         if let meta_templates::DestinationType::Email = old_temp.template_type {
                             Some(old_temp.title)
@@ -53,7 +55,7 @@ impl MigrationTrait for Migration {
                         Ok(None)
                     } else {
                         Ok(Some(template::ActiveModel {
-                            id: Set(ider::uuid()),
+                            id: Set(id),
                             org: Set(meta.key1),
                             name: Set(old_temp.name),
                             is_default: Set(old_temp.is_default.unwrap_or_default()),
@@ -180,4 +182,14 @@ mod template {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+fn ksuid_from_hash(template: &meta_templates::Template, org_id: &str) -> svix_ksuid::Ksuid {
+    use sha1::{Digest, Sha1};
+
+    let mut hasher = Sha1::new();
+    hasher.update(org_id);
+    hasher.update(template.name.clone());
+    let hash = hasher.finalize();
+    svix_ksuid::Ksuid::from_bytes(hash.into())
 }
