@@ -180,7 +180,7 @@ async fn recursive_process_multiple_metas(
             cached_response.hits.retain(|hit| {
                 let hit_ts = get_ts_value(&cache_req.ts_column, hit);
                 hit_ts < hits_allowed_end_time &&
-                    hit_ts >= hits_allowed_start_time &&
+                    hit_ts > hits_allowed_start_time &&
                     hit_ts < discard_ts
             });
 

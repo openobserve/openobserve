@@ -735,9 +735,7 @@ fn calculate_deltas_multi(
         if meta.response_start_time > current_end_time {
             // There is a gap (delta) between current coverage and the next meta
             deltas.push(QueryDelta {
-                // Subtracting histogram interval to ensure the next query fetches the data
-                // up to the last cache result timestamp, thereby avoiding duplicates
-                delta_start_time: current_end_time - histogram_interval.abs(),
+                delta_start_time: current_end_time,
                 delta_end_time,
                 delta_removed_hits: false,
             });
