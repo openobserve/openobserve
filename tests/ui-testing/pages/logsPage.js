@@ -446,7 +446,7 @@ export class LogsPage {
 }
   async decryptLogSQL(cipherName) {
     // Construct the SQL query using the passed variable
-    const sqlQuery = `SELECT decrypt(log, "${cipherName}") from "default"`;
+    const sqlQuery = `SELECT decrypt(log, '${cipherName}') from "default"`;
 
     // Fill the query editor with the constructed SQL query
     await this.page
@@ -466,4 +466,22 @@ async selectIndexDefault() {
   
 }
 
+async validateDecryResult(cipherName) {
+  if (!cipherName) {
+    throw new Error("cipherName must be provided and cannot be undefined.");
+  }
+  
+  await this.page.waitForTimeout(10000);
+  
+  const expandMenuLocator = this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+  await expect(expandMenuLocator).toBeVisible();
+  await expandMenuLocator.click();
+  
+  const decryptTextLocator = this.page.locator(`[data-test="log-expand-detail-key-decrypt\\(default\\.log\\,Utf8\\(\\"${cipherName}\\"\\)\\)-text"]`);
+  await expect(decryptTextLocator).toContainText(`decrypt(default.log,Utf8("${cipherName}")):`);
 }
+
+
+}
+
+
