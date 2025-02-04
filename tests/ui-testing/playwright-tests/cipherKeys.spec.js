@@ -7,13 +7,41 @@ import { LogsPage } from '../pages/logsPage.js';
 
 
 test.describe("Cipher Keys for security", () => {
+
     let loginPage, ingestionPage, cipherKeys, logsPage;
     const cipherName = `c${Date.now()}`;
     const simpleSecret = process.env['SIMPLE_KEYS'];
     const simpleSecretUp = process.env['SIMPLE_KEYS_UP'];
 
-    const tinkeySecret = `{"primaryKeyId":2736465847,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkATbqipZ/Ki/pWbVP/13iabG5tGrWoWZ65FQ/sNdiAShyWgw9La/pPJ1CKVOEvH29U/KAWBaCQ0dq0PkVopgSfc","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2736465847,"outputPrefixType":"TINK"}]}`;
-    const tinkeySecretUp = `{"primaryKeyId":2855908267,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2855908267,"outputPrefixType":"TINK"}]}`;
+    
+    const tinkeySecret = `{
+      "primaryKeyId": ${process.env['PRIMARY_KEY_ID']},
+      "key": [{
+        "keyData": {
+          "typeUrl": "type.googleapis.com/google.crypto.tink.AesSivKey",
+          "value": "${process.env['PRIMARY_KEY_ID_VAL']}",
+          "keyMaterialType": "SYMMETRIC"
+        },
+        "status": "ENABLED",
+        "keyId": ${process.env['PRIMARY_KEY_ID']},
+        "outputPrefixType": "TINK"
+      }]
+    }`;
+    
+    
+    const tinkeySecretUp = `{
+      "primaryKeyId": ${process.env['PRIMARY_KEY_ID_UP']},
+      "key": [{
+        "keyData": {
+          "typeUrl": "type.googleapis.com/google.crypto.tink.AesSivKey",
+          "value": "${process.env['PRIMARY_KEY_ID_VAL_UP']}",
+          "keyMaterialType": "SYMMETRIC"
+        },
+        "status": "ENABLED",
+        "keyId": ${process.env['PRIMARY_KEY_ID_UP']},
+        "outputPrefixType": "TINK"
+      }]
+    }`;
     
     const baseURL = `https://api.akeyless.io`;
     const accessID = `p-c7k3ogiwk1z9am`;
@@ -48,6 +76,55 @@ test.describe("Cipher Keys for security", () => {
 
     });
 
+    test("Tink cipher keys created, updated and deleted to store at OpenObserve", async ({ page }) => {
+      
+      await cipherKeys.navigateToSettingsMenu();
+        // Navigate to Cipher Key Management
+      await cipherKeys.navigateToCipherKeyTab();
+  
+        // Add Cipher Key
+      
+      await cipherKeys.addCipherKey();
+      await cipherKeys.addCipherKeyName(cipherName);
+      await cipherKeys.addCipherKeyOO(tinkeySecret);
+      await cipherKeys.addCipherKeyContinue();
+      await cipherKeys.addCipherKeyTink();
+      await cipherKeys.addCipherKeySave();
+      await cipherKeys.verifyAlertMessage('check_circleCipher key created successfully');
+      await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+      await cipherKeys.navigateToSettingsMenu();
+      await cipherKeys.navigateToCipherKeyTab();
+      await cipherKeys.updateCipherKeys(cipherName);
+      await cipherKeys.updateCipherKeysSecret();
+      await cipherKeys.updateCipherKeysSecretCancel();
+      await cipherKeys.updateCipherKeysCancel();
+      await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+      await cipherKeys.navigateToSettingsMenu();
+      await cipherKeys.navigateToCipherKeyTab();
+      await cipherKeys.updateCipherKeys(cipherName);
+      await cipherKeys.updateCipherKeysSecret();
+      await cipherKeys.addCipherKeyOO(tinkeySecretUp); 
+      await cipherKeys.addCipherKeyContinue();
+      await cipherKeys.addCipherKeyTink();
+      await cipherKeys.addCipherKeySave();
+      await cipherKeys.verifyAlertMessage('check_circleCipher key updated successfully');
+      
+      await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+      await cipherKeys.navigateToSettingsMenu();
+      await cipherKeys.navigateToCipherKeyTab();
+      await cipherKeys.deletedCipherKeys(cipherName);
+      await cipherKeys.requestCipherKeysCancel();
+      await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+      await cipherKeys.navigateToSettingsMenu();
+      await cipherKeys.navigateToCipherKeyTab();
+      await cipherKeys.deletedCipherKeys(cipherName);
+      await cipherKeys.requestCipherKeysOk();
+      await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
+
+
+  
+      });
+  
 
     test("Simple cipher keys created, updated and deleteded to store at OpenObserve", async ({ page }) => {
     await cipherKeys.navigateToSettingsMenu();
@@ -92,77 +169,78 @@ test.describe("Cipher Keys for security", () => {
 
     await logsPage.navigateToLogs();
     await logsPage.selectIndexDefault();
-    await logsPage.decrptLogSQL(cipherName);
+    await logsPage.decryptLogSQL(cipherName);
     await logsPage.enableSQLMode();
     await logsPage.selectRunQuery();
-    await logsPage.validateResult();
+    await logsPage.validateDecryResult(cipherName);
     
 
 
-    // await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
-    // await cipherKeys.navigateToSettingsMenu();
-    // await cipherKeys.navigateToCipherKeyTab();
-    // await cipherKeys.deletedCipherKeys(cipherName);
-    // await cipherKeys.requestCipherKeysCancel();
-    // await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
-    // await cipherKeys.navigateToSettingsMenu();
-    // await cipherKeys.navigateToCipherKeyTab();
-    // await cipherKeys.deletedCipherKeys(cipherName);
-    // await cipherKeys.requestCipherKeysOk();
-    // await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
+    await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
+    await cipherKeys.navigateToSettingsMenu();
+    await cipherKeys.navigateToCipherKeyTab();
+    await cipherKeys.deletedCipherKeys(cipherName);
+    await cipherKeys.requestCipherKeysCancel();
+    await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
+    await cipherKeys.navigateToSettingsMenu();
+    await cipherKeys.navigateToCipherKeyTab();
+    await cipherKeys.deletedCipherKeys(cipherName);
+    await cipherKeys.requestCipherKeysOk();
+    await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
 
 
 
     });
 
-    test("Tink cipher keys created, updated and deleted to store at OpenObserve", async ({ page }) => {
-        await cipherKeys.navigateToSettingsMenu();
-          // Navigate to Cipher Key Management
-        await cipherKeys.navigateToCipherKeyTab();
+    // test("Tink cipher keys created, updated and deleted to store at OpenObserve", async ({ page }) => {
+    //     await cipherKeys.navigateToSettingsMenu();
+    //       // Navigate to Cipher Key Management
+    //     await cipherKeys.navigateToCipherKeyTab();
     
-          // Add Cipher Key
+    //       // Add Cipher Key
         
-        await cipherKeys.addCipherKey();
-        await cipherKeys.addCipherKeyName(cipherName);
-        await cipherKeys.addCipherKeyOO(tinkeySecret);
-        await cipherKeys.addCipherKeyContinue();
-        await cipherKeys.addCipherKeyTink();
-        await cipherKeys.addCipherKeySave();
-        await cipherKeys.verifyAlertMessage('check_circleCipher key created successfully');
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-        await cipherKeys.navigateToSettingsMenu();
-        await cipherKeys.navigateToCipherKeyTab();
-        await cipherKeys.updateCipherKeys(cipherName);
-        await cipherKeys.updateCipherKeysSecret();
-        await cipherKeys.updateCipherKeysSecretCancel();
-        await cipherKeys.updateCipherKeysCancel();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-        await cipherKeys.navigateToSettingsMenu();
-        await cipherKeys.navigateToCipherKeyTab();
-        await cipherKeys.updateCipherKeys(cipherName);
-        await cipherKeys.updateCipherKeysSecret();
-        await cipherKeys.addCipherKeyOO(tinkeySecretUp); 
-        await cipherKeys.addCipherKeyContinue();
-        await cipherKeys.addCipherKeyTink();
-        await cipherKeys.addCipherKeySave();
-        await cipherKeys.verifyAlertMessage('check_circleCipher key updated successfully');
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-        await cipherKeys.navigateToSettingsMenu();
-        await cipherKeys.navigateToCipherKeyTab();
-        await cipherKeys.deletedCipherKeys(cipherName);
-        await cipherKeys.requestCipherKeysCancel();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-        await cipherKeys.navigateToSettingsMenu();
-        await cipherKeys.navigateToCipherKeyTab();
-        await cipherKeys.deletedCipherKeys(cipherName);
-        await cipherKeys.requestCipherKeysOk();
-        await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
+    //     await cipherKeys.addCipherKey();
+    //     await cipherKeys.addCipherKeyName(cipherName);
+    //     await cipherKeys.addCipherKeyOO(tinkeySecret);
+    //     await cipherKeys.addCipherKeyContinue();
+    //     await cipherKeys.addCipherKeyTink();
+    //     await cipherKeys.addCipherKeySave();
+    //     await cipherKeys.verifyAlertMessage('check_circleCipher key created successfully');
+    //     await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+    //     await cipherKeys.navigateToSettingsMenu();
+    //     await cipherKeys.navigateToCipherKeyTab();
+    //     await cipherKeys.updateCipherKeys(cipherName);
+    //     await cipherKeys.updateCipherKeysSecret();
+    //     await cipherKeys.updateCipherKeysSecretCancel();
+    //     await cipherKeys.updateCipherKeysCancel();
+    //     await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+    //     await cipherKeys.navigateToSettingsMenu();
+    //     await cipherKeys.navigateToCipherKeyTab();
+    //     await cipherKeys.updateCipherKeys(cipherName);
+    //     await cipherKeys.updateCipherKeysSecret();
+    //     await cipherKeys.addCipherKeyOO(tinkeySecretUp); 
+    //     await cipherKeys.addCipherKeyContinue();
+    //     await cipherKeys.addCipherKeyTink();
+    //     await cipherKeys.addCipherKeySave();
+    //     await cipherKeys.verifyAlertMessage('check_circleCipher key updated successfully');
+        
+    //     await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+    //     await cipherKeys.navigateToSettingsMenu();
+    //     await cipherKeys.navigateToCipherKeyTab();
+    //     await cipherKeys.deletedCipherKeys(cipherName);
+    //     await cipherKeys.requestCipherKeysCancel();
+    //     await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+    //     await cipherKeys.navigateToSettingsMenu();
+    //     await cipherKeys.navigateToCipherKeyTab();
+    //     await cipherKeys.deletedCipherKeys(cipherName);
+    //     await cipherKeys.requestCipherKeysOk();
+    //     await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
 
 
     
-        });
+    //     });
     
-    test("Error Message displayed if Cipher Key Name Blank", async ({ page }) => {  
+     test("Error Message displayed if Cipher Key Name Blank", async ({ page }) => {  
         await cipherKeys.navigateToSettingsMenu();
           // Navigate to Cipher Key Management
         await cipherKeys.navigateToCipherKeyTab();
