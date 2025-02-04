@@ -17,7 +17,7 @@ use infra::errors::Result;
 
 pub async fn get() -> Result<Option<String>> {
     let ret = super::get("/instance/").await?;
-    let loc_value = String::from_utf8_lossy(&ret.to_vec()).to_string();
+    let loc_value = String::from_utf8_lossy(&ret).to_string();
     let loc_value = loc_value.trim().trim_matches('"').to_string();
     let value = Some(loc_value);
     Ok(value)
