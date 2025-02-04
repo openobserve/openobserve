@@ -942,7 +942,7 @@ export default defineComponent({
      */
     const handleVariableType = async (
       variableObject: any,
-    ): Promise<boolean> => {
+    ) => {
       switch (variableObject.type) {
         case "query_values": {
           try {
@@ -982,7 +982,7 @@ export default defineComponent({
      * @param variableObject The variable object containing the query data.
      * @returns The query context as a string.
      */
-    const buildQueryContext = async (variableObject: any): Promise<string> => {
+    const buildQueryContext = async (variableObject: any) => {
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
       let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
