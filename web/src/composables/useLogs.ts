@@ -4701,18 +4701,28 @@ const useLogs = () => {
         return;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, {
+      const payload = {
         type: "search",
         content: {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
-          },
+          } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
         },
-      });
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(requestId, payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
