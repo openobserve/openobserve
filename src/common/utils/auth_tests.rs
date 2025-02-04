@@ -2963,6 +2963,7 @@ mod tests {
                 inverted_index_cache_max_entries: usize::default(),
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
+                db_text_data_type: String::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),

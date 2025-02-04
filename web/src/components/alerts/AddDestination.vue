@@ -334,7 +334,7 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: props.isAlerts ? "http" : "remote_pipeline",
+  type: "http",
 });
 const isUpdatingDestination = ref(false);
 
@@ -458,9 +458,9 @@ const saveDestination = () => {
       .map((email: string) => email.trim());
   }
 
-  if (!props.isAlerts) {
-    payload["type"] = "remote_pipeline";
-  }
+  // if (!props.isAlerts) {
+  //   payload["type"] = "remote_pipeline";
+  // }
 
   if (isUpdatingDestination.value) {
     destinationService

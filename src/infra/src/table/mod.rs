@@ -26,6 +26,7 @@ pub mod action_scripts;
 pub mod alerts;
 pub mod cipher;
 pub mod dashboards;
+pub mod destinations;
 pub mod distinct_values;
 #[allow(unused_imports)]
 pub mod entity;
@@ -34,6 +35,7 @@ mod migration;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
+pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
 

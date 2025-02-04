@@ -280,7 +280,7 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "remote_pipeline",
+  type: "http",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
@@ -328,7 +328,7 @@ watch(
         template: "",
         headers: {},
         emails: "",
-        type: "remote_pipeline",
+        type: "http",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
     }
@@ -364,7 +364,7 @@ const createDestination = () => {
     template: formData.value.template,
     headers: headers,
     name: formData.value.name,
-    type: "remote_pipeline",
+    type: "http",
   };
 
   destinationService
@@ -451,7 +451,7 @@ const getDestinations = () => {
       sort_by: "name",
       desc: false,
       org_identifier: store.state.selectedOrganization.identifier,
-      dst_type: "remote_pipeline",
+      module: "pipeline",
     })
     .then((res) => {
       destinations.value = res.data;

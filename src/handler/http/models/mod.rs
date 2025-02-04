@@ -19,4 +19,5 @@
 pub mod action;
 pub mod alerts;
 pub mod dashboards;
+pub mod destinations;
 pub mod folders;
