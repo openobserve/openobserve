@@ -29,7 +29,7 @@ async function login(page) {
 }
 async function ingestion(page) {
   const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_test";
+  const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString('base64');
@@ -154,7 +154,7 @@ test.describe("Pipeline testcases", () => {
 
     // ("ingests logs via API", () => {
     const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_test";
+    const streamName = "e2e_automate";
     const basicAuthCredentials = Buffer.from(
       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
     ).toString("base64");
@@ -226,7 +226,7 @@ test.describe("Pipeline testcases", () => {
 
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -258,7 +258,7 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await page.waitForTimeout(2000);
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -284,7 +284,7 @@ test.describe("Pipeline testcases", () => {
 
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -313,9 +313,9 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
-    // await ingestion(page);
+    await ingestion(page);
     // Verify the data ingested in destination and verify under logs page
-    // await exploreStreamAndNavigateToPipeline(page, 'destination_node');
+    await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
@@ -389,7 +389,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
     await pipelinePage.selectLogs();
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -538,7 +538,7 @@ test.describe("Pipeline testcases", () => {
 
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -643,7 +643,7 @@ test.describe("Pipeline testcases", () => {
 
     // Interact with stream name and save
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -696,7 +696,7 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await page.waitForTimeout(2000);
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
@@ -730,7 +730,7 @@ test.describe("Pipeline testcases", () => {
     // Interact with stream name and save
     await page.waitForTimeout(2000);
     await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_test");
+    await pipelinePage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
