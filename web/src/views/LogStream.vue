@@ -456,7 +456,6 @@ export default defineComponent({
         let counter = 1;
         getStreams(selectedStreamType.value || "", false, false)
           .then((res: any) => {
-            console.log(res.list)
             logStream.value = [];
             let doc_num = "";
             let storage_size = "";
