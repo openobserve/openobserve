@@ -728,16 +728,16 @@ fn calculate_deltas_multi(
                     end_time = start_time;
                 }
             }
-            // Subtracting histogram interval to ensure the next query fetches the data
-            // up to the last cache result timestamp, thereby avoiding duplicates
-            end_time - histogram_interval
+            end_time
         } else {
             meta.response_start_time
         };
         if meta.response_start_time > current_end_time {
             // There is a gap (delta) between current coverage and the next meta
             deltas.push(QueryDelta {
-                delta_start_time: current_end_time,
+                // Subtracting histogram interval to ensure the next query fetches the data
+                // up to the last cache result timestamp, thereby avoiding duplicates
+                delta_start_time: current_end_time - histogram_interval.abs(),
                 delta_end_time,
                 delta_removed_hits: false,
             });
@@ -752,15 +752,10 @@ fn calculate_deltas_multi(
             !last_meta.cached_response.hits.is_empty()
         })
     {
-        let delta_start_time = if histogram_interval > 0 {
+        deltas.push(QueryDelta {
             // Adding histogram interval to the current end time to ensure the next query
             // fetches the data after the last cache result timestamp, thereby avoiding duplicates
-            current_end_time + histogram_interval
-        } else {
-            current_end_time
-        };
-        deltas.push(QueryDelta {
-            delta_start_time,
+            delta_start_time: current_end_time + histogram_interval.abs(),
             delta_end_time: end_time,
             delta_removed_hits: false,
         });
