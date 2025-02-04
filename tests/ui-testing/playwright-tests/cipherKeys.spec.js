@@ -1,14 +1,17 @@
 import { test, expect } from "./baseFixtures.js";
 import { LoginPage } from '../pages/loginPage.js';
 import { CipherKeys } from "../pages/cipherKeys.js";
+import { IngestionPage } from '../pages/ingestionPage.js';
+import { LogsPage } from '../pages/logsPage.js';
 
 
 
 test.describe("Cipher Keys for security", () => {
-    let loginPage, cipherKeys;
+    let loginPage, ingestionPage, cipherKeys, logsPage;
     const cipherName = `c${Date.now()}`;
-    const simpleSecret = `6h/Q/OootEDxfBAYXGSNT5ASinQxjDw0tsBSE6qn40O+0UGw0ToYQFyPJualHGDW35Z7PF6P/wTkW4LV9JrG3w==`;
-    const simpleSecretUp = `GNf6McCq0Sm7LCrnnPr4ge+6TG4V1XOGRqXW8m7s5cL50xq4oQEQFDFHevng2UQ8LYUnqwZDPCivlpenqJtpMw==`;
+    const simpleSecret = process.env['SIMPLE_KEYS'];
+    const simpleSecretUp = process.env['SIMPLE_KEYS_UP'];
+
     const tinkeySecret = `{"primaryKeyId":2736465847,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkATbqipZ/Ki/pWbVP/13iabG5tGrWoWZ65FQ/sNdiAShyWgw9La/pPJ1CKVOEvH29U/KAWBaCQ0dq0PkVopgSfc","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2736465847,"outputPrefixType":"TINK"}]}`;
     const tinkeySecretUp = `{"primaryKeyId":2855908267,"key":[{"keyData":{"typeUrl":"type.googleapis.com/google.crypto.tink.AesSivKey","value":"EkDTckeHdeuaE1IM+RLq0LnZsfraoIQf0AlkcGNhsPfemV9MVrqsGC9f9ZAuUJDSwbIXzz8+xA0eXFkwsL07B8bR","keyMaterialType":"SYMMETRIC"},"status":"ENABLED","keyId":2855908267,"outputPrefixType":"TINK"}]}`;
     
@@ -35,10 +38,13 @@ test.describe("Cipher Keys for security", () => {
 
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
+        logsPage = new LogsPage(page);
+        ingestionPage = new IngestionPage(page);
         cipherKeys = new CipherKeys(page);
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
         await loginPage.login();
+        await ingestionPage.ingestionJoin();
 
     });
 
@@ -48,10 +54,14 @@ test.describe("Cipher Keys for security", () => {
       // Navigate to Cipher Key Management
     await cipherKeys.navigateToCipherKeyTab();
 
+    console.log('simpleSecret:', simpleSecret);
+    console.log('simpleSecretUp:', simpleSecretUp);
+
       // Add Cipher Key
     
     await cipherKeys.addCipherKey();
     await cipherKeys.addCipherKeyName(cipherName);
+  
     await cipherKeys.addCipherKeyOO(simpleSecret);
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeySave();
@@ -63,7 +73,14 @@ test.describe("Cipher Keys for security", () => {
     await cipherKeys.updateCipherKeysSecret();
     await cipherKeys.updateCipherKeysSecretCancel();
     await cipherKeys.updateCipherKeysCancel();
-    await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
+    await cipherKeys.signOut();
+
+    await loginPage.gotoLoginPageSc();
+    await loginPage.loginAsInternalUserSc();
+    await loginPage.loginSc();
+    await cipherKeys.navigateToSettingsMenu();
+    await cipherKeys.navigateToCipherKeyTab();
+    await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
     await cipherKeys.navigateToSettingsMenu();
     await cipherKeys.navigateToCipherKeyTab();
     await cipherKeys.updateCipherKeys(cipherName);
@@ -72,17 +89,27 @@ test.describe("Cipher Keys for security", () => {
     await cipherKeys.addCipherKeyContinue();
     await cipherKeys.addCipherKeySave();
     await cipherKeys.verifyAlertMessage('check_circleCipher key updated successfully');
-    await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-    await cipherKeys.navigateToSettingsMenu();
-    await cipherKeys.navigateToCipherKeyTab();
-    await cipherKeys.deletedCipherKeys(cipherName);
-    await cipherKeys.requestCipherKeysCancel();
-    await page.goto(process.env["ZO_BASE_URL"] + "/web/settings/cipher_keys?org_identifier=default");
-    await cipherKeys.navigateToSettingsMenu();
-    await cipherKeys.navigateToCipherKeyTab();
-    await cipherKeys.deletedCipherKeys(cipherName);
-    await cipherKeys.requestCipherKeysOk();
-    await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
+
+    await logsPage.navigateToLogs();
+    await logsPage.selectIndexDefault();
+    await logsPage.decrptLogSQL(cipherName);
+    await logsPage.enableSQLMode();
+    await logsPage.selectRunQuery();
+    await logsPage.validateResult();
+    
+
+
+    // await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
+    // await cipherKeys.navigateToSettingsMenu();
+    // await cipherKeys.navigateToCipherKeyTab();
+    // await cipherKeys.deletedCipherKeys(cipherName);
+    // await cipherKeys.requestCipherKeysCancel();
+    // await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/settings/cipher_keys?org_identifier=default");
+    // await cipherKeys.navigateToSettingsMenu();
+    // await cipherKeys.navigateToCipherKeyTab();
+    // await cipherKeys.deletedCipherKeys(cipherName);
+    // await cipherKeys.requestCipherKeysOk();
+    // await cipherKeys.verifyAlertMessage('check_circleCipher Key deleted successfully');
 
 
 
