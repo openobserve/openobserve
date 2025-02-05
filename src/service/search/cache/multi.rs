@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::{get_config, meta::search::Response, utils::json};
 use infra::cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta};
 
-use super::cacher::get_results;
+use super::{cacher::get_results, sort_response};
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
@@ -180,15 +180,30 @@ async fn recursive_process_multiple_metas(
             cached_response.hits.retain(|hit| {
                 let hit_ts = get_ts_value(&cache_req.ts_column, hit);
                 hit_ts < hits_allowed_end_time &&
-                    hit_ts >= hits_allowed_start_time &&
+                    hit_ts > hits_allowed_start_time &&
                     hit_ts < discard_ts
             });
+
+            // Sort the hits by the order
+            sort_response(cache_req.is_descending, &mut cached_response, &cache_req.ts_column);
 
             cached_response.total = cached_response.hits.len();
             if cache_req.discard_interval < 0 {
                 matching_cache_meta.end_time = discard_ts;
             }
             if !cached_response.hits.is_empty() {
+                let last_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.last().unwrap());
+                let first_rec_ts = get_ts_value(&cache_req.ts_column, cached_response.hits.first().unwrap());
+                let response_start_time = if cache_req.is_descending {
+                    last_rec_ts
+                } else {
+                    first_rec_ts
+                };
+                let response_end_time = if cache_req.is_descending {
+                    first_rec_ts
+                } else {
+                    last_rec_ts
+                };
                 log::info!(
                     "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} , len {}",
                     query_key,
@@ -201,8 +216,8 @@ async fn recursive_process_multiple_metas(
                     deltas: vec![],
                     has_cached_data: true,
                     cache_query_response: true,
-                    response_start_time: matching_cache_meta.start_time,
-                    response_end_time: matching_cache_meta.end_time,
+                    response_start_time,
+                    response_end_time,
                     ts_column: cache_req.ts_column.to_string(),
                     is_descending: cache_req.is_descending,
                     limit: -1,
