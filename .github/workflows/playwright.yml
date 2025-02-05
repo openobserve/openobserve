@@ -19,6 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
+  WS_ZO_BASE_URL: ws://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -176,7 +177,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${{ env.SANITIZED_FILENAME }}
+          name: playwright-coverage-${env.SANITIZED_FILENAME}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
