@@ -79,12 +79,14 @@ impl super::FileList for PostgresFileList {
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list"])
             .inc();
-        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
-            .bind(stream_key)
-            .bind(date_key)
-            .bind(file_name)
-            .execute(&pool)
-            .await?;
+        sqlx::query(
+            r#"UPDATE file_list SET deleted = true WHERE stream = $1 AND date = $2 AND file = $3;"#,
+        )
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 
@@ -100,11 +102,10 @@ impl super::FileList for PostgresFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>> {
+    async fn batch_remove(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
-            return Ok(Vec::new());
+            return Ok(());
         }
-        let mut error_files = Vec::new();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
@@ -131,13 +132,8 @@ impl super::FileList for PostgresFileList {
                     .observe(time);
                 let ret: Option<i64> = match query_res {
                     Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => {
-                        error_files.push(file.to_string());
-                        continue;
-                    }
-                    Err(e) => {
-                        return Err(e.into());
-                    }
+                    Err(sqlx::Error::RowNotFound) => continue,
+                    Err(e) => return Err(e.into()),
                 };
                 match ret {
                     Some(v) => ids.push(v.to_string()),
@@ -154,7 +150,10 @@ impl super::FileList for PostgresFileList {
                 DB_QUERY_NUMS
                     .with_label_values(&["delete_id", "file_list"])
                     .inc();
-                let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+                let sql = format!(
+                    "UPDATE file_list SET deleted = true WHERE id IN({});",
+                    ids.join(",")
+                );
                 let start = std::time::Instant::now();
                 _ = pool.execute(sql.as_str()).await?;
                 let time = start.elapsed().as_secs_f64();
@@ -163,7 +162,7 @@ impl super::FileList for PostgresFileList {
                     .observe(time);
             }
         }
-        Ok(error_files)
+        Ok(())
     }
 
     async fn batch_add_deleted(
@@ -398,12 +397,16 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .with_label_values(&["query", "file_list"])
             .observe(time);
         Ok(ret?
-            .into_iter()
-            .map(|r| {
-                (
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    FileMeta::from(&r),
-                )
+            .iter()
+            .filter_map(|r| {
+                if r.deleted {
+                    None
+                } else {
+                    Some((
+                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                        r.into(),
+                    ))
+                }
             })
             .collect())
     }
@@ -447,12 +450,16 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .with_label_values(&["query_by_date", "file_list"])
             .observe(time);
         Ok(ret?
-            .into_iter()
-            .map(|r| {
-                (
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    FileMeta::from(&r),
-                )
+            .iter()
+            .filter_map(|r| {
+                if r.deleted {
+                    None
+                } else {
+                    Some((
+                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                        r.into(),
+                    ))
+                }
             })
             .collect())
     }
@@ -546,7 +553,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
                 let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
+                let query = "SELECT id, records, original_size, deleted FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4;";
                 sqlx::query_as::<_, super::FileId>(query)
                 .bind(stream_key)
                 .bind(time_start)
@@ -560,7 +567,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut rets = Vec::new();
         for task in tasks {
             match task.await {
-                Ok(Ok(r)) => rets.extend(r),
+                Ok(Ok(r)) => rets.extend(r.into_iter().filter(|r| !r.deleted)),
                 Ok(Err(e)) => {
                     return Err(e.into());
                 }

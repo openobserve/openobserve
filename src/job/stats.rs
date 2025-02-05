@@ -28,7 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if (!LOCAL_NODE.is_querier()) && !LOCAL_NODE.is_compactor() {
+    if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 

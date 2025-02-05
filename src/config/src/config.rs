@@ -1056,7 +1056,7 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
