@@ -191,10 +191,6 @@ impl ObjectStore for Remote {
         Ok(data)
     }
 
-    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
-        Err(Error::NotImplemented)
-    }
-
     async fn delete(&self, location: &Path) -> Result<()> {
         let mut result: Result<()> = Ok(());
         for _ in 0..3 {
