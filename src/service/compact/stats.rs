@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,9 +26,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     }
 
     // before starting, set current node to lock the job
-    if config::get_config().common.meta_store_external
-        && (node.is_empty() || LOCAL_NODE.uuid.ne(&node))
-    {
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
         offset = match update_stats_lock_node().await {
             Ok(Some(offset)) => offset,
             Ok(None) => return Ok(None),

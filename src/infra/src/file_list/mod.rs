@@ -445,7 +445,7 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
-        if cfg.common.local_mode || !cfg.common.meta_store_external {
+        if cfg.common.local_mode {
             return;
         }
 

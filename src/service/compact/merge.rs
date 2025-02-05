@@ -478,8 +478,8 @@ pub async fn merge_by_stream(
                     }
                 };
                 if check_guard.contains(&batch_id) {
-                    log::error!(
-                        "[COMPACT] merge files for stream: [{}/{}/{}] batch_id: {} duplicate",
+                    log::warn!(
+                        "[COMPACT] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
                         org_id,
                         stream_type,
                         stream_name,
@@ -522,7 +522,7 @@ pub async fn merge_by_stream(
                     Ok(error_files) => {
                         // recalculate stream stats
                         if !error_files.is_empty() {
-                            log::debug!("[COMPACT] found error files: {:?}", error_files);
+                            log::warn!("[COMPACT] found error files: {:?}", error_files);
                             for file in new_file_list {
                                 if error_files.contains(&file.key) {
                                     stream_stats = stream_stats + &file.meta;
