@@ -48,7 +48,7 @@ use {
     crate::service::self_reporting::audit,
     config::{ider, utils::base64},
     o2_dex::{
-        config::get_config as get_dex_config,
+        config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     o2_enterprise::enterprise::common::{
@@ -56,7 +56,9 @@ use {
         infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_text},
     },
-    o2_openfga::config::get_config as get_openfga_config,
+    o2_openfga::config::{
+        get_config as get_openfga_config, refresh_config as refresh_openfga_config,
+    },
     std::io::ErrorKind,
 };
 
@@ -382,7 +384,10 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = refresh_o2_config() {
+    if let Err(e) = refresh_o2_config()
+        .and_then(|_| refresh_dex_config())
+        .and_then(|_| refresh_openfga_config())
+    {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
