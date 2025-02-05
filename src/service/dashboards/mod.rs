@@ -439,7 +439,7 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_openfga_config().openfga.enabled {
+        if get_openfga_config().enabled {
             set_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
@@ -471,7 +471,7 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_openfga_config().openfga.enabled {
+        if get_openfga_config().enabled {
             remove_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),

@@ -74,7 +74,7 @@ pub async fn post_user(
     };
 
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_openfga_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // Permission already checked through RBAC
         true
     } else {
@@ -114,7 +114,7 @@ pub async fn post_user(
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
-                if get_openfga_config().openfga.enabled {
+                if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(
                         &usr_req.role.to_string(),
@@ -334,7 +334,7 @@ pub async fn update_user(
                             {
                                 use o2_openfga::authorizer::authz::update_user_role;
 
-                                if get_openfga_config().openfga.enabled
+                                if get_openfga_config().enabled
                                     && old_role.is_some()
                                     && new_role.is_some()
                                 {
@@ -465,7 +465,7 @@ pub async fn add_user_to_org(
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
-                if get_openfga_config().openfga.enabled {
+                if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
                     get_org_creation_tuples(
@@ -658,7 +658,7 @@ pub async fn remove_user_from_org(
                             } else {
                                 user_role.to_string()
                             };
-                            if get_openfga_config().openfga.enabled {
+                            if get_openfga_config().enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
                                 delete_user_from_org(org_id, email_id, &user_fga_role).await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
@@ -704,8 +704,7 @@ pub async fn remove_user_from_org(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if get_openfga_config().openfga.enabled && _user_fga_role.is_some()
-                                {
+                                if get_openfga_config().enabled && _user_fga_role.is_some() {
                                     delete_user_from_org(
                                         org_id,
                                         email_id,

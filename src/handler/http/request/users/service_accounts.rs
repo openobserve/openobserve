@@ -35,7 +35,7 @@ pub async fn exchange_token(
             let token_ver = verify_decode_token(
                 &response.access_token,
                 &keys,
-                &get_dex_config().dex.client_id,
+                &get_dex_config().client_id,
                 true,
                 false,
             )

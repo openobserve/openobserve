@@ -312,7 +312,7 @@ impl Metadata for DistinctValues {
                 };
 
                 // set ownership only in the first time
-                if _is_new && get_openfga_config().openfga.enabled {
+                if _is_new && get_openfga_config().enabled {
                     set_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, distinct_stream_name),

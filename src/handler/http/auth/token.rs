@@ -52,7 +52,7 @@ pub async fn token_validator(
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &get_dex_config().dex.client_id,
+        &get_dex_config().client_id,
         false,
         true,
     )
@@ -128,7 +128,7 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
     match jwt::verify_decode_token(
         auth_str.strip_prefix("Bearer").unwrap().trim(),
         &keys,
-        &get_dex_config().dex.client_id,
+        &get_dex_config().client_id,
         false,
         true,
     )

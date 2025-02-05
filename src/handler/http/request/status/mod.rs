@@ -197,16 +197,16 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     let openfga_cfg = get_openfga_config();
     #[cfg(feature = "enterprise")]
-    let sso_enabled = dex_cfg.dex.dex_enabled;
+    let sso_enabled = dex_cfg.dex_enabled;
     #[cfg(not(feature = "enterprise"))]
     let sso_enabled = false;
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = dex_cfg.dex.native_login_enabled;
+    let native_login_enabled = dex_cfg.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
     #[cfg(feature = "enterprise")]
-    let rbac_enabled = openfga_cfg.openfga.enabled;
+    let rbac_enabled = openfga_cfg.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
 
@@ -500,7 +500,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let token_ver = verify_decode_token(
                 &access_token,
                 &keys,
-                &get_dex_config().dex.client_id,
+                &get_dex_config().client_id,
                 true,
                 true,
             )

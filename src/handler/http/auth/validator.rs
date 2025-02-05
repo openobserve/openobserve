@@ -184,7 +184,7 @@ pub async fn validate_credentials(
 
     #[cfg(feature = "enterprise")]
     {
-        if !get_dex_config().dex.native_login_enabled && !user.is_external {
+        if !get_dex_config().native_login_enabled && !user.is_external {
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
@@ -196,7 +196,7 @@ pub async fn validate_credentials(
             });
         }
 
-        if get_dex_config().dex.root_only_login && !is_root_user(user_id) {
+        if get_dex_config().root_only_login && !is_root_user(user_id) {
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
@@ -758,7 +758,7 @@ pub(crate) async fn check_permissions(
     role: UserRole,
     _is_external: bool,
 ) -> bool {
-    if !get_openfga_config().openfga.enabled || role.eq(&UserRole::Root) {
+    if !get_openfga_config().enabled || role.eq(&UserRole::Root) {
         return true;
     }
 
@@ -813,10 +813,7 @@ pub(crate) async fn list_objects_for_user(
     object_type: &str,
 ) -> Result<Option<Vec<String>>, Error> {
     let openfga_config = get_openfga_config();
-    if !is_root_user(user_id)
-        && openfga_config.openfga.enabled
-        && openfga_config.openfga.list_only_permitted
-    {
+    if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
         match crate::handler::http::auth::validator::list_objects(
             user_id,
             permission,

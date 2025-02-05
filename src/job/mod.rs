@@ -219,7 +219,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if get_openfga_config().openfga.enabled {
+    if get_openfga_config().enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }

@@ -251,7 +251,7 @@ pub async fn authentication(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = get_dex_config().dex.native_login_enabled;
+    let native_login_enabled = get_dex_config().native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
@@ -311,8 +311,7 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_dex_config().dex.root_only_login
-            && !crate::common::utils::auth::is_root_user(&auth.name)
+        if get_dex_config().root_only_login && !crate::common::utils::auth::is_root_user(&auth.name)
         {
             audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
