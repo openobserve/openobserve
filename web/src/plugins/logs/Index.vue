@@ -536,6 +536,7 @@ export default defineComponent({
       extractFields,
       resetHistogramWithError,
       isLimitQuery,
+      enableRefreshInterval,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1024,6 +1025,13 @@ export default defineComponent({
     };
 
     const onChangeInterval = () => {
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+      }
+
       updateUrlQueryParams();
       refreshData();
     };
@@ -1201,7 +1209,7 @@ export default defineComponent({
     };
 
     //validate the data
-    const isValid = (onlyChart = false) => {
+    const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
       const errors = visualizeErrorData.errors;
       errors.splice(0);
       const dashboardData = dashboardPanelData;
@@ -1217,7 +1225,7 @@ export default defineComponent({
       }
 
       // will push errors in errors array
-      validatePanel(errors);
+      validatePanel(errors, isFieldsValidationRequired);
 
       if (errors.length) {
         showErrorNotification(
@@ -1268,6 +1276,24 @@ export default defineComponent({
         logsQuery ?? "",
         store.state.zoConfig.timestamp_column ?? "_timestamp",
       );
+
+      // if fields length is 0, then add default fields
+      if (fields.length == 0) {
+        const timeField = store.state.zoConfig.timestamp_column ?? "_timestamp";
+        // Add histogram(_timestamp) and count(_timestamp) to the fields array
+        fields.push(
+          {
+            column: timeField,
+            alias: "x_axis_1",
+            aggregationFunction: "histogram",
+          },
+          {
+            column: timeField,
+            alias: "y_axis_1",
+            aggregationFunction: "count",
+          },
+        );
+      }
 
       // set stream type and stream name
       if (streamName && streamName != "undefined") {
@@ -1378,8 +1404,8 @@ export default defineComponent({
 
     const handleRunQueryFn = () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-        if (!isValid(true)) {
-          return;
+        if (!isValid(true, true)) {
+          // return;
         }
 
         // refresh the date time

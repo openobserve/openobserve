@@ -41,7 +41,10 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
+    handler::http::request::websocket::{
+        session::send_message,
+        utils::{TimeOffset, WsServerEvents},
+    },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
     },
@@ -132,7 +135,8 @@ pub async fn handle_search_request(
 
     // handle search result size
     let req_size = if req.payload.query.size == 0 {
-        cfg.limit.query_default_limit
+        req.payload.query.size = cfg.limit.query_default_limit;
+        req.payload.query.size
     } else {
         req.payload.query.size
     };
@@ -311,7 +315,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = format!("{vrl}\n.");
                     req.payload.query.query_fn = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it
@@ -636,7 +640,10 @@ async fn process_delta(
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
-                time_offset: end_time,
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
                 streaming_aggs: is_streaming_aggs,
             };
             log::info!(
@@ -712,8 +719,7 @@ async fn get_partitions(
         clusters: search_payload.clusters.clone(),
         // vrl is not required for _search_partition
         query_fn: Default::default(),
-        // TODO: push a fix for this as an update
-        streaming_output: false,
+        streaming_output: true,
     };
 
     let res = SearchService::search_partition(
@@ -784,7 +790,10 @@ async fn send_cached_responses(
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
         results: Box::new(cached.cached_response.clone()),
-        time_offset: cached.response_end_time,
+        time_offset: TimeOffset {
+            start_time: cached.response_start_time,
+            end_time: cached.response_end_time,
+        },
         streaming_aggs: false, // streaming aggs is not supported for cached responses
     };
     log::info!(
@@ -912,7 +921,10 @@ async fn do_partitioned_search(
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
-                time_offset: end_time,
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
                 streaming_aggs: is_streaming_aggs,
             };
             send_message(req_id, ws_search_res.to_json().to_string()).await?;
@@ -938,7 +950,10 @@ async fn do_partitioned_search(
         let ws_search_res = WsServerEvents::SearchResponse {
             trace_id: trace_id.to_string(),
             results: Box::new(Response::default()),
-            time_offset: req.payload.query.end_time,
+            time_offset: TimeOffset {
+                start_time: req.payload.query.start_time,
+                end_time: req.payload.query.end_time,
+            },
             streaming_aggs: is_streaming_aggs,
         };
         send_message(req_id, ws_search_res.to_json().to_string()).await?;
@@ -978,7 +993,10 @@ async fn send_partial_search_resp(
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
         results: Box::new(s_resp),
-        time_offset: 0,
+        time_offset: TimeOffset {
+            start_time: new_start_time,
+            end_time: new_end_time,
+        },
         streaming_aggs: is_streaming_aggs,
     };
     log::info!(

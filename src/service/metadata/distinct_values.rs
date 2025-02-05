@@ -292,7 +292,7 @@ impl Metadata for DistinctValues {
             let writer = ingester::get_writer(
                 0,
                 &org_id,
-                &StreamType::Metadata.to_string(),
+                StreamType::Metadata.as_str(),
                 &distinct_stream_name,
             )
             .await;

@@ -19,7 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
-  ZO_QUICK_MODE_NUM_FIELDS: 5
+  ZO_QUICK_MODE_NUM_FIELDS: 100
   ZO_QUICK_MODE_STRATEGY: first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
@@ -27,6 +27,7 @@ env:
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
+  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
 
 jobs:
   build_binary:
@@ -59,7 +60,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Build frontend code
         env:
@@ -84,7 +85,7 @@ jobs:
     runs-on:
       labels: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
     strategy:
       matrix:
@@ -114,8 +115,8 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
-            
-            
+            # "remotepipeline.spec.js",
+
           ]
 
     steps:

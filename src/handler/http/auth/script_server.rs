@@ -13,25 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use actix_web::{dev::ServiceRequest, Error};
+use actix_web_httpauth::extractors::basic::BasicAuth;
+use config::get_config;
 
-use super::destinations::DestinationType;
-
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct Template {
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub body: String,
-    #[serde(rename = "isDefault")]
-    #[serde(default)]
-    pub is_default: Option<bool>,
-    /// Indicates whether the body is
-    /// http or email body
-    #[serde(rename = "type")]
-    #[serde(default)]
-    pub template_type: DestinationType,
-    #[serde(default)]
-    pub title: String,
+pub async fn validator(
+    req: ServiceRequest,
+    credentials: BasicAuth,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let cfg = get_config();
+    if !credentials.user_id().eq(&cfg.auth.script_server_token) {
+        return Err((actix_web::error::ErrorUnauthorized("auth incorrect"), req));
+    }
+    Ok(req)
 }

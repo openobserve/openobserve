@@ -34,7 +34,7 @@ pub async fn check_stream_permissions(
 ) -> Option<HttpResponse> {
     if !is_root_user(user_id) {
         let user: User = get_user(Some(org_id), user_id).await.unwrap();
-        let stream_type_str = stream_type.to_string();
+        let stream_type_str = stream_type.as_str();
 
         if !crate::handler::http::auth::validator::check_permissions(
             user_id,
@@ -44,8 +44,8 @@ pub async fn check_stream_permissions(
                 o2_type: format!(
                     "{}:{}",
                     OFGA_MODELS
-                        .get(stream_type_str.as_str())
-                        .map_or(stream_type_str.as_str(), |model| model.key),
+                        .get(stream_type_str)
+                        .map_or(stream_type_str, |model| model.key),
                     stream_name
                 ),
                 org_id: org_id.to_string(),

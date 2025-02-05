@@ -29,30 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-method="filterData"
       >
         <template #no-data>
-          <div
-            v-if="!templates.length"
-            class="full-width flex column justify-center items-center text-center"
-          >
-            <div style="width: 600px" class="q-mt-xl">
-              <template v-if="!templates.length">
-                <div class="text-subtitle1">
-                  It looks like you haven't created any Templates yet. To create
-                  an Alert, you'll need to have at least one Destination and one
-                  Template in place
-                </div>
-                <q-btn
-                  class="q-mt-md"
-                  label="Create Template"
-                  size="md"
-                  color="primary"
-                  no-caps
-                  style="border-radius: 4px"
-                  @click="routeTo('alertTemplates')"
-                />
-              </template>
-            </div>
-          </div>
-          <template v-else>
+          <template>
             <NoData />
           </template>
         </template>
@@ -86,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top="scope">
           <div class="q-table__title" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
+            {{ t("pipeline_destinations.header") }}
           </div>
           <q-input
             data-test="destination-list-search-input"
@@ -107,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             padding="sm lg"
             color="secondary"
             no-caps
-            :disable="!templates.length"
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
           />
@@ -135,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else>
       <AddDestination
+        :is-alerts="false"
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
@@ -276,8 +253,12 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
+          module: "pipeline",
         })
         .then((res) => {
+          // res.data = res.data.filter(
+          //   (destination: any) => destination.type == "external_destination",
+          // );
           resultTotal.value = res.data.length;
           destinations.value = res.data.map((data: any, index: number) => ({
             ...data,
@@ -322,7 +303,7 @@ export default defineComponent({
       resetEditingDestination();
       if (!destination) {
         router.push({
-          name: "alertDestinations",
+          name: "pipelineDestinations",
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
@@ -331,7 +312,7 @@ export default defineComponent({
       } else {
         editingDestination.value = { ...destination };
         router.push({
-          name: "alertDestinations",
+          name: "pipelineDestinations",
           query: {
             action: "update",
             name: destination.name,
@@ -385,7 +366,7 @@ export default defineComponent({
       showDestinationEditor.value = !showDestinationEditor.value;
       if (!showDestinationEditor.value)
         router.push({
-          name: "alertDestinations",
+          name: "pipelineDestinations",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },

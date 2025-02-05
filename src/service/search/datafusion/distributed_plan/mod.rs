@@ -63,6 +63,39 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
     }
 }
 
+pub struct EmptyExecVisitor {
+    data: Option<Arc<dyn ExecutionPlan>>,
+}
+
+impl EmptyExecVisitor {
+    pub fn new() -> Self {
+        Self { data: None }
+    }
+
+    pub fn get_data(&self) -> Option<&Arc<dyn ExecutionPlan>> {
+        self.data.as_ref()
+    }
+}
+
+impl Default for EmptyExecVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for EmptyExecVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "EmptyExec" {
+            self.data = Some(node.clone());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
 pub struct ReplaceTableScanExec {
     input: Arc<dyn ExecutionPlan>,
 }

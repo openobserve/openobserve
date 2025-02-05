@@ -15,7 +15,9 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
+use aes_siv::{siv::Aes256Siv, KeyInit};
 use arc_swap::ArcSwap;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
@@ -211,7 +213,7 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
     map
 });
 
-static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
+pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
@@ -373,7 +375,9 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
+    pub pipeline: Pipeline,
     pub health_check: HealthCheck,
+    pub encryption: Encryption,
 }
 
 #[derive(EnvConfig)]
@@ -473,6 +477,8 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(name = "O2_SCRIPT_SERVER_TOKEN")]
+    pub script_server_token: String,
 }
 
 #[derive(EnvConfig)]
@@ -1233,6 +1239,12 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
+    #[env_config(
+        name = "ZO_TEXT_DATA_TYPE",
+        default = "longtext",
+        help = "Default data type for LongText compliant DB's"
+    )]
+    pub db_text_data_type: String,
 }
 
 #[derive(EnvConfig)]
@@ -1541,6 +1553,59 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
+#[derive(Debug, EnvConfig)]
+pub struct Pipeline {
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_WAL_DIR",
+        default = "",
+        help = "For the remote stream WAL directory, if the pipeline destination is a remote stream, we use a separate path to distinguish between local WAL and remote WAL"
+    )]
+    pub remote_stream_wal_dir: String,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_STREAM_CONCURRENT_COUNT",
+        default = 30,
+        help = "control the remote stream wal send concurrent count"
+    )]
+    pub remote_stream_wal_concurrent_count: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_OFFSET_FLUSH_INTERVAL",
+        default = 10,
+        help = "flush remote stream wal sended-ok-offset interval"
+    )]
+    pub offset_flush_interval: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_TIMEOUT",
+        default = 600,
+        help = "pipeline exporter client request timeout"
+    )]
+    pub remote_request_timeout: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOTE_REQUEST_MAX_RETRY_TIME",
+        default = 86400,
+        help = "pipeline exporter client request max retry times, default 1440 minutes(24 hours)， unit is seconds"
+    )]
+    pub remote_request_max_retry_time: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_WAL_SIZE_LIMIT",
+        default = 0,
+        help = "pipeline wal dir data size limit, default is 50% of local volume available space, unit is MB"
+    )]
+    pub wal_size_limit: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_CONNECTIONS",
+        default = 1024,
+        help = "pipeline exporter client max connections"
+    )]
+    pub max_connections: usize,
+}
+
+#[derive(EnvConfig)]
+pub struct Encryption {
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
+    pub algorithm: String,
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
+    pub master_key: String,
+}
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
@@ -1709,9 +1774,17 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
+    }
+
+    // check pipeline config
+    if let Err(e) = check_pipeline_config(&mut cfg) {
+        panic!("pipeline config error: {e}");
     }
 
     cfg
@@ -1779,6 +1852,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
+    }
+
+    if local_node_role.contains(&cluster::Role::ScriptServer) {
+        // script server does not have external dep, so can ignore their config check
+        return Ok(());
     }
 
     // format local_mode_storage
@@ -1931,6 +2009,7 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
+
     Ok(())
 }
 
@@ -2174,6 +2253,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 7;
     }
+    if cfg.compact.old_data_min_hours < 1 {
+        cfg.compact.old_data_min_hours = 2;
+    }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;
     }
@@ -2246,6 +2328,36 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // pipeline
+    if cfg.pipeline.remote_stream_wal_dir.is_empty() {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}remote_stream_wal/", cfg.common.data_dir);
+    }
+
+    if !cfg.pipeline.remote_stream_wal_dir.is_empty()
+        && !cfg.pipeline.remote_stream_wal_dir.ends_with('/')
+    {
+        cfg.pipeline.remote_stream_wal_dir = format!("{}/", cfg.pipeline.remote_stream_wal_dir);
+    }
+
+    if cfg.pipeline.offset_flush_interval == 0 {
+        cfg.pipeline.offset_flush_interval = 10;
+    }
+    if cfg.pipeline.remote_request_max_retry_time == 0 {
+        cfg.pipeline.remote_request_max_retry_time = 86400; // 24 hours, in seconds
+    }
+
+    if cfg.pipeline.wal_size_limit == 0 {
+        cfg.pipeline.wal_size_limit = cfg.limit.disk_free as u64 / 2; // 50%
+        if cfg.pipeline.wal_size_limit > 1024 * 1024 * 1024 * 100 {
+            cfg.pipeline.wal_size_limit = 1024 * 1024 * 1024 * 100; // 100GB
+        }
+    } else {
+        cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+    Ok(())
+}
+
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
         cfg.health_check.timeout = 10;
@@ -2271,6 +2383,34 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
+}
+
+fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.encryption.algorithm.is_empty() {
+        if cfg.encryption.algorithm != "aes-256-siv" {
+            return Err(anyhow::anyhow!(
+                "invalid algorithm specified, only [aes-256-siv] is supported"
+            ));
+        }
+        // this is basically a duplication of code from tables/cipher.rs
+        // but we only support one algorithm for now, so ok. Once we support more
+        // we have to extract this into proper functions and use the same in both places
+        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "master encryption key is not properly base64 encoded : {e}"
+                ));
+            }
+        };
+        match Aes256Siv::new_from_slice(&key) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -64,7 +64,7 @@ impl StreamType {
         )
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
@@ -118,6 +118,13 @@ pub struct StreamParams {
     pub org_id: faststr::FastStr,
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(default)]
+pub struct RemoteStreamParams {
+    pub org_id: faststr::FastStr,
+    pub destination_name: faststr::FastStr,
 }
 
 impl Default for StreamParams {
@@ -378,10 +385,10 @@ impl From<Stats> for StreamStats {
     }
 }
 
-impl std::ops::Sub<FileMeta> for StreamStats {
+impl std::ops::Sub<&FileMeta> for StreamStats {
     type Output = Self;
 
-    fn sub(self, rhs: FileMeta) -> Self::Output {
+    fn sub(self, rhs: &FileMeta) -> Self::Output {
         let mut ret = Self {
             created_at: self.created_at,
             file_num: self.file_num - 1,
@@ -391,6 +398,27 @@ impl std::ops::Sub<FileMeta> for StreamStats {
             storage_size: self.storage_size - rhs.original_size as f64,
             compressed_size: self.compressed_size - rhs.compressed_size as f64,
             index_size: self.index_size - rhs.index_size as f64,
+        };
+        if ret.doc_time_min == 0 {
+            ret.doc_time_min = rhs.min_ts;
+        }
+        ret
+    }
+}
+
+impl std::ops::Add<&FileMeta> for StreamStats {
+    type Output = Self;
+
+    fn add(self, rhs: &FileMeta) -> Self::Output {
+        let mut ret = Self {
+            created_at: self.created_at,
+            file_num: self.file_num + 1,
+            doc_num: self.doc_num + rhs.records,
+            doc_time_min: self.doc_time_min.min(rhs.min_ts),
+            doc_time_max: self.doc_time_max.max(rhs.max_ts),
+            storage_size: self.storage_size + rhs.original_size as f64,
+            compressed_size: self.compressed_size + rhs.compressed_size as f64,
+            index_size: self.index_size + rhs.index_size as f64,
         };
         if ret.doc_time_min == 0 {
             ret.doc_time_min = rhs.min_ts;

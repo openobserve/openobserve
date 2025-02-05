@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Debug;
+
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use base64::Engine;
 use config::{
@@ -22,6 +24,8 @@ use config::{
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -37,6 +41,8 @@ use crate::common::{
         user::{AuthTokens, UserOrgRole},
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::service::users::get_user;
 
 pub static RE_OFGA_UNSUPPORTED_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
@@ -214,7 +220,7 @@ impl FromRequest for UserEmail {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AuthExtractor {
     pub auth: String,
     pub method: String,
@@ -261,6 +267,8 @@ impl FromRequest for AuthExtractor {
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
 
+        // This is case for ingestion endpoints where we need to check
+        // permissions on the stream
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
             if let Some(auth_header) = req.headers().get("Authorization") {
                 if let Ok(auth_str) = auth_header.to_str() {
@@ -278,7 +286,12 @@ impl FromRequest for AuthExtractor {
                 "Unauthorized Access",
             )));
         }
+
+        // get ofga object type from the url
+        // depends on the url path count
         let object_type = if url_len == 1 {
+            // for organization entity itself, get requires the list
+            // permissions, and the object is a special format string
             if path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
@@ -289,6 +302,10 @@ impl FromRequest for AuthExtractor {
                 path_columns[0].to_string()
             }
         } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
+            // for settings, the post/delete require PUT permissions, GET needs LIST permissions
+            // also the special settings exception is for 3-part urls for logo /text
+            // which are of path /org/settings/logo , which need permission of operating
+            // on permission in general
             if path_columns[1].starts_with("settings") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
@@ -296,6 +313,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("GET") {
                 method = "LIST".to_string();
             }
+            // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
             } else if path_columns[1].eq("rename") && method.eq("PUT") {
@@ -309,6 +327,8 @@ impl FromRequest for AuthExtractor {
                 path_columns[0]
             )
         } else if path_columns[1].starts_with("groups") || path_columns[1].starts_with("roles") {
+            // for groups or roles, path will be of format /org/roles/id , so we need
+            // to check permission on role:org/id for permissions on that specific role
             format!(
                 "{}:{org_id}/{}",
                 OFGA_MODELS
@@ -317,6 +337,10 @@ impl FromRequest for AuthExtractor {
                 path_columns[2]
             )
         } else if url_len == 3 {
+            // these are cases where the entity is "sub-entity" of some other entity,
+            // for example, alerts are on route /org/stream/alerts
+            // or templates are on route /org/alerts/templates and so on
+            // users/roles is one of the special exception here
             if path_columns[2].starts_with("alerts")
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
@@ -326,6 +350,10 @@ impl FromRequest for AuthExtractor {
                     method = "LIST".to_string();
                 }
                 if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
+                    // for put/delete actions i.e. updations, we need permissions
+                    // on that particular "sub-entity", and this will take form of
+                    // alert:templates or alerts:destinations or stream:alerts
+                    // search jobs also fall under this 3 length case
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -334,6 +362,8 @@ impl FromRequest for AuthExtractor {
                         path_columns[2]
                     )
                 } else {
+                    // otherwise for listing/creating we need permissions on that "sub-entity"
+                    // in general such as org:templates or org:destinations or org:alerts
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -345,6 +375,8 @@ impl FromRequest for AuthExtractor {
             } else if path_columns[2].starts_with("_values")
                 || path_columns[2].starts_with("_around")
             {
+                // special case of _values/_around , where we need permission on that stream,
+                // as it is part of search, but still 3-part route
                 format!(
                     "{}:{}",
                     OFGA_MODELS.get("streams").unwrap().key,
@@ -363,7 +395,16 @@ impl FromRequest for AuthExtractor {
                 || path_columns[1].starts_with("savedviews")
                 || path_columns[1].starts_with("functions")
                 || path_columns[1].starts_with("service_accounts")
+                || path_columns[1].starts_with("cipher_keys")
             {
+                // Similar to the alerts/templates etc, but for other entities such as specific
+                // pipeline, specific stream, specific alert/destination etc.
+                // and these are not "sub-entities" under some other entities, hence
+                // a separate else-if clause
+                // Similarly, for the put/delete or any operation on these
+                // entities, we need access to that particular item
+                // so url will be of form /org/reports/name or /org/functions/name etc.
+                // nd this will take form name:reports or name:function
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -371,7 +412,10 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
-            } else if method.eq("GET") && path_columns[1].starts_with("dashboards") {
+            } else if method.eq("GET")
+                && (path_columns[1].starts_with("dashboards")
+                    || path_columns[1].starts_with("actions"))
+            {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -380,6 +424,8 @@ impl FromRequest for AuthExtractor {
                     path_columns[2] // dashboard id
                 )
             } else {
+                // for things like dashboards and folders etc,
+                // this will take form org:dashboard or org:folders
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -389,7 +435,11 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
+            // this is for specific sub-items like specific alert, destination etc.
+            // and sub-items such as schema, stream settings, or enabling/triggering reports
             if method.eq("PUT") && path_columns[1].eq("reports") {
+                // for report enable/trigger, we need permissions on that specific
+                // report, so this will be name:reports
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -400,8 +450,11 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || method.eq("DELETE") && path_columns[3] != "annotations"
             {
+                // for put on on-stream, non-pipeline such as specific alert/template/destination
+                // or delete on any such (stream/pipeline delete are not 4-part routes)
+                // this will take form of name:alert or name:destination or name:template etc
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -421,7 +474,23 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
                 )
+            } else if method.eq("GET")
+                && path_columns[1].eq("actions")
+                && path_columns[2].eq("download")
+            {
+                // To access actions download name, you need GET permission on actions
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
             } else {
+                // for other get/put requests on any entities such as templates,
+                // alerts, enable pipeline, update dashboard etc, we need permission
+                // on that entity in general, this will take form of
+                // alerts:destinations or roles:role_name or stream_name:alerts etc
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -431,10 +500,15 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if method.eq("PUT") || method.eq("DELETE") {
+            // this block is for all other urls
+            // specifically checking PUT /org_id/streams/stream_name/delete_fields
+            // even though method is put, we actually need to check delete permissions
             if path_columns[url_len - 1].eq("delete_fields") {
                 method = "DELETE".to_string();
             }
+            //  this is specifically for enabling alerts
             if path_columns[url_len - 1].eq("enable") {
+                // this will take form name:alert
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -443,6 +517,9 @@ impl FromRequest for AuthExtractor {
                     path_columns[3]
                 )
             } else {
+                // This is specifically for triggering the alert on url
+                // /org_id/stream_name/alerts/alert_name/trigger
+                // and will take form stream_name:alerts
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -452,6 +529,8 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else {
+            // This is the final catch-all for what did not fit in above cases,
+            // and for the prometheus urls this will be ignored below.
             format!(
                 "{}:{}",
                 OFGA_MODELS
@@ -465,9 +544,8 @@ impl FromRequest for AuthExtractor {
 
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
-            if (method.eq("POST")
-                && path_columns.len() > 1
-                && path_columns[1].starts_with("_search"))
+            if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
+                || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")
                 || path.contains("/format_query")
@@ -672,6 +750,62 @@ pub fn generate_presigned_url(
         "{}/auth/login?request_time={}&exp_in={}&auth={}",
         base_url, time, exp_in, auth
     )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_permissions(
+    _object_id: Option<String>,
+    _org_id: &str,
+    _user_id: &str,
+    _object_type: &str,
+    _method: &str,
+) -> bool {
+    false
+}
+
+/// Returns false if Auth fails
+#[cfg(feature = "enterprise")]
+pub async fn check_permissions(
+    object_id: Option<String>,
+    org_id: &str,
+    user_id: &str,
+    object_type: &str,
+    method: &str,
+) -> bool {
+    if !is_root_user(user_id) {
+        let user: config::meta::user::User = match get_user(Some(&org_id), user_id).await {
+            Some(user) => user.clone(),
+            None => return false,
+        }
+        .clone();
+
+        let object_id = match object_id {
+            Some(id) => id,
+            None => org_id.to_string(),
+        };
+
+        return crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: method.to_string(),
+                o2_type: format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(object_type)
+                        .map_or(object_type, |model| model.key),
+                    object_id
+                ),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            },
+            user.role,
+            user.is_external,
+        )
+        .await;
+    }
+    true
 }
 
 #[cfg(test)]

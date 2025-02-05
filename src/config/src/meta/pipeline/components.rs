@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
-    stream::{RoutingCondition, StreamParams, StreamType},
+    stream::{RemoteStreamParams, RoutingCondition, StreamParams, StreamType},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -111,6 +111,7 @@ impl Edge {
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
 pub enum NodeData {
+    RemoteStream(RemoteStreamParams),
     Stream(StreamParams),
     Query(DerivedStream),
     Function(FunctionParams),
@@ -193,6 +194,20 @@ mod tests {
             org_id: "default".into(),
             stream_name: "default".into(),
             stream_type: StreamType::Logs,
+        });
+        assert_eq!(node_data, node);
+
+        let data = json::json!({
+          "node_type": "remote_stream",
+          "org_id": "default",
+          "stream_name": "default",
+          "stream_type": "logs",
+          "destination_name": "4423",
+        });
+        let node: NodeData = json::from_value(data).unwrap();
+        let node_data = NodeData::RemoteStream(RemoteStreamParams {
+            org_id: "default".into(),
+            destination_name: "4423".into(),
         });
         assert_eq!(node_data, node);
     }

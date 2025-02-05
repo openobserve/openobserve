@@ -24,6 +24,8 @@ export interface Query {
 export interface SearchRequestPayload {
   query: QueryPayload;
   aggs?: HistogramQueryPayload;
+  regions?: string[];
+  clusters?: string[];
 }
 
 export interface QueryPayload {
@@ -51,6 +53,7 @@ export interface WebSocketSearchResponse {
       new_end_time?: number;
       scan_size?: number;
     };
+    streaming_aggs?: boolean;
   };
 }
 

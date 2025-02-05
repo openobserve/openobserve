@@ -172,7 +172,7 @@ class="padding-none" />
             {{ t("menu.slack") }}
           </q-tooltip>
         </q-btn>
-        <q-btn round flat dense :ripple="false">
+        <q-btn round flat dense :ripple="false" data-test="menu-link-help-item">
           <div class="row items-center no-wrap">
             <q-icon
               name="help_outline"
@@ -214,6 +214,14 @@ class="padding-none" />
                 <q-item-section>
                   <q-item-label>
                     {{ t(`menu.docs`) }}
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item to="/about" data-test="menu-link-about-item">
+                <q-item-section>
+                  <q-item-label>
+                    {{ t(`menu.about`) }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -474,6 +482,7 @@ import {
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
+  outlinedCode,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -639,6 +648,13 @@ export default defineComponent({
         name: "alertList",
       },
       {
+        title: t("menu.actions"),
+        icon: outlinedCode,
+        link: "/action-scripts",
+        name: "actionScripts",
+        hide: config.isEnterprise == "true" ? false : true
+      },
+      {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
         link: "/ingestion",
@@ -650,12 +666,6 @@ export default defineComponent({
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
-      },
-      {
-        title: t("menu.about"),
-        icon: outlinedFormatListBulleted,
-        link: "/about",
-        name: "about",
       },
     ]);
 
@@ -772,12 +782,12 @@ export default defineComponent({
           ?.split(",")
           ?.filter((val: string) => val?.trim()) || [],
       );
-
       store.dispatch("setHiddenMenus", disableMenus);
 
-      linksList.value = linksList.value.filter(
-        (link: { name: string }) => !disableMenus.has(link.name),
-      );
+      linksList.value = linksList.value.filter((link) => {
+          const hide = link.hide === undefined ? false : link.hide; // Handle unknown hide values
+          return !disableMenus.has(link.name) && !hide;
+        });
     };
 
     // additional links based on environment and conditions

@@ -166,7 +166,7 @@ pub async fn get_latest_traces(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
                 .await
                 .unwrap();
-            let stream_type_str = StreamType::Traces.to_string();
+            let stream_type_str = StreamType::Traces.as_str();
 
             if !crate::handler::http::auth::validator::check_permissions(
                 user_id.to_str().unwrap(),
@@ -176,8 +176,8 @@ pub async fn get_latest_traces(
                     o2_type: format!(
                         "{}:{}",
                         OFGA_MODELS
-                            .get(stream_type_str.as_str())
-                            .map_or(stream_type_str.as_str(), |model| model.key),
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
                         stream_name
                     ),
                     org_id: org_id.clone(),
@@ -320,7 +320,7 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     "default",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -329,7 +329,7 @@ pub async fn get_latest_traces(
                     "500",
                     &org_id,
                     "default",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             log::error!("get traces latest data error: {:?}", err);
@@ -411,7 +411,7 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         &stream_name,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -420,7 +420,7 @@ pub async fn get_latest_traces(
                         "500",
                         &org_id,
                         &stream_name,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
@@ -504,7 +504,7 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             &stream_name,
-            stream_type.to_string().as_str(),
+            stream_type.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -513,7 +513,7 @@ pub async fn get_latest_traces(
             "200",
             &org_id,
             &stream_name,
-            stream_type.to_string().as_str(),
+            stream_type.as_str(),
         ])
         .inc();
 

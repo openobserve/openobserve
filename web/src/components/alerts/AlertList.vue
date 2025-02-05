@@ -564,6 +564,7 @@ export default defineComponent({
       destinationService
         .list({
           org_identifier: store.state.selectedOrganization.identifier,
+          module: "alert",
         })
         .then((res) => {
           destinations.value = res.data;

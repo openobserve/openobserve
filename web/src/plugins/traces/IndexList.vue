@@ -437,12 +437,9 @@ export default defineComponent({
     };
 
     const filterExpandedFieldValues = () => {
-      const fields =
-        [
-          ...expandedFilters.value.filter(
-            (_value) => !["operation_name", "service_name"].includes(_value)
-          ),
-        ] || [];
+      const fields = expandedFilters.value?.filter(
+        (_value) => !["operation_name", "service_name"].includes(_value)
+      ) || [];
 
       if (expandedFilters.value.includes("operation_name")) {
         getSpecialFieldsValues("operation_name");

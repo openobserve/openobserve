@@ -67,8 +67,11 @@ const ApiDashboard = () =>
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
+const ActionScipts = () =>
+  import("@/components/actionScripts/ActionScipts.vue");
+
 import useIngestionRoutes from "./useIngestionRoutes";
-import useIamRoutes from "./useIamRoutes";
+import useEnterpriseRoutes from "./useEnterpriseRoutes";
 import config from "@/aws-exports";
 import useManagementRoutes from "./useManagementRoutes";
 import Login from "@/views/Login.vue";
@@ -403,7 +406,7 @@ const useRoutes = () => {
       ],
     },
     ...useIngestionRoutes(),
-    ...useIamRoutes(),
+    ...useEnterpriseRoutes(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,

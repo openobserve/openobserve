@@ -27,10 +27,21 @@ const destination = {
       data
     );
   },
-  list: ({ org_identifier, page_num, page_size, desc, sort_by }: any) => {
-    return http().get(
-      `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`
-    );
+  list: ({
+    org_identifier,
+    page_num,
+    page_size,
+    desc,
+    sort_by,
+    module,
+  }: any) => {
+    // Construct the base URL with required parameters
+    let url = `/api/${org_identifier}/alerts/destinations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}`;
+    // Append module if it is defined
+    if (module) {
+      url += `&module=${module}`;
+    }
+    return http().get(url);
   },
   get_by_name: ({ org_identifier, destination_name }: any) => {
     return http().get(

@@ -428,8 +428,7 @@ pub async fn handle_otlp_request(
 
             let timestamp = val_map
                 .get(&cfg.common.column_timestamp)
-                .unwrap()
-                .as_i64()
+                .and_then(|ts| ts.as_i64())
                 .unwrap_or(Utc::now().timestamp_micros());
 
             let value_str = json::to_string(&val_map).unwrap();
@@ -544,7 +543,7 @@ pub async fn handle_otlp_request(
 
         // write to file
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await;
@@ -578,22 +577,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            "",
-            StreamType::Metrics.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            "",
-            StreamType::Metrics.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
         .inc();
 
     // only one trigger per request, as it updates etcd

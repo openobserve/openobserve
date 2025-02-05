@@ -329,7 +329,10 @@ impl QueryConditionExt for QueryCondition {
                 index_type: "".to_string(),
                 per_query_response: false, // Will return results in single array
             };
-
+            log::debug!(
+                "evaluate_scheduled begin to call SearchService::search_multi, {:?}",
+                req
+            );
             SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             // fire the query
@@ -370,6 +373,10 @@ impl QueryConditionExt for QueryCondition {
                 search_event_context,
                 use_cache: None,
             };
+            log::debug!(
+                "evaluate_scheduled begin to call SearchService::search, {:?}",
+                req
+            );
             SearchService::search(&trace_id, org_id, stream_type, None, &req).await
         };
 
