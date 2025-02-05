@@ -30,9 +30,12 @@ use config::{
 use hashbrown::HashMap;
 use proto::cluster_rpc;
 
-use crate::{common::meta::ingestion, service};
+use crate::{authorization::AuthorizationClientTrait, common::meta::ingestion, service};
 
-pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
+pub(super) async fn ingest_usages<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    mut curr_usages: Vec<UsageData>,
+) {
     if curr_usages.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no usages reported ");
         return;
@@ -181,7 +184,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             .collect::<Vec<_>>();
         // report usage data
         let usage_stream = StreamParams::new(&cfg.common.usage_org, USAGE_STREAM, StreamType::Logs);
-        if ingest_reporting_data(report_data, usage_stream)
+        if ingest_reporting_data(auth_client, report_data, usage_stream)
             .await
             .is_err()
             && &cfg.common.usage_reporting_mode != "both"
@@ -201,7 +204,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     }
 }
 
-pub(super) async fn ingest_reporting_data(
+pub(super) async fn ingest_reporting_data<A: AuthorizationClientTrait>(
+    auth_client: &A,
     reporting_data_json: Vec<json::Value>,
     stream_params: StreamParams,
 ) -> Result<()> {
@@ -218,7 +222,9 @@ pub(super) async fn ingest_reporting_data(
         );
         let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
         let req = ingestion::IngestionRequest::Usage(&bytes);
-        match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None).await {
+        match service::logs::ingest::ingest(auth_client, 0, &org_id, &stream_name, req, "", None)
+            .await
+        {
             Ok(resp) if resp.code == 200 => {
                 log::info!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

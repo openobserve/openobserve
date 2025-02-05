@@ -35,7 +35,8 @@ use serde_json::{Map, Value};
 
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
-    common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
+    authorization::AuthorizationClientTrait,
+    common::meta::{ingestion::StreamSchemaChk, stream::SchemaEvolution},
     service::db,
 };
 
@@ -56,7 +57,8 @@ pub(crate) fn get_request_columns_limit_error(
     )
 }
 
-pub async fn check_for_schema(
+pub async fn check_for_schema<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -146,6 +148,7 @@ pub async fn check_for_schema(
 
     // slow path
     let ret = handle_diff_schema(
+        auth_client,
         org_id,
         stream_name,
         stream_type,
@@ -163,6 +166,7 @@ pub async fn check_for_schema(
     // if need_insert_new_latest, create a new version with start_dt = now
     if need_insert_new_latest {
         _ = handle_diff_schema(
+            auth_client,
             org_id,
             stream_name,
             stream_type,
@@ -207,7 +211,8 @@ pub async fn get_merged_schema(
 // 2. get schema from db for update,
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
-async fn handle_diff_schema(
+async fn handle_diff_schema<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -281,12 +286,9 @@ async fn handle_diff_schema(
     };
 
     if is_new {
-        crate::common::utils::auth::set_ownership(
-            org_id,
-            stream_type.as_str(),
-            Authz::new(stream_name),
-        )
-        .await;
+        auth_client
+            .set_ownership(org_id, stream_type.into(), stream_name)
+            .await;
     }
 
     // check defined_schema_fields
@@ -516,9 +518,11 @@ mod tests {
     use datafusion::arrow::datatypes::DataType;
 
     use super::*;
+    use crate::authorization::client::MockAuthorizationClient;
 
     #[tokio::test]
     async fn test_check_for_schema() {
+        let auth_client = MockAuthorizationClient::new();
         let stream_name = "Sample";
         let org_name = "nexus";
         let record: json::Value =
@@ -534,6 +538,7 @@ mod tests {
 
         map.insert(stream_name.to_string(), SchemaCache::new(schema));
         let (result, _) = check_for_schema(
+            &auth_client,
             org_name,
             stream_name,
             StreamType::Logs,

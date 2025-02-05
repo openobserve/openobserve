@@ -19,6 +19,7 @@ use config::utils::json;
 use o2_enterprise::enterprise::{
     common::infra::config::*,
     openfga::{
+        authorizer::OpenFgaConfig,
         meta::mapping::OFGAModel,
         model::{create_open_fga_store, read_ofga_model, write_auth_models},
     },
@@ -26,8 +27,11 @@ use o2_enterprise::enterprise::{
 
 use crate::service::db;
 
-pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
-    let meta = read_ofga_model().await;
+pub async fn set_ofga_model(
+    conf: &OpenFgaConfig,
+    existing_meta: Option<OFGAModel>,
+) -> Result<String, anyhow::Error> {
+    let meta = read_ofga_model(OFGA_MODEL).await;
     if let Some(existing_model) = existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");

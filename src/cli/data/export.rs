@@ -33,9 +33,15 @@ use crate::{
 
 pub struct Export {}
 
+impl Export {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 #[async_trait]
 impl Context for Export {
-    async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
+    async fn operator(&self, c: Cli) -> Result<bool, anyhow::Error> {
         let map = HashMap::from([("type".to_string(), c.stream_type)]);
         let query_map = Query(map);
 

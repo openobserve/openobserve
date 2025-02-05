@@ -17,15 +17,13 @@ use actix_web::http;
 use config::meta::alerts::destinations::{Destination, DestinationType, DestinationWithTemplate};
 
 use crate::{
-    common::{
-        infra::config::STREAM_ALERTS,
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
+    authorization::{AuthorizationClientTrait, ObjectType},
+    common::{infra::config::STREAM_ALERTS, utils::auth::is_ofga_unsupported},
     service::db::{self, user},
 };
 
-pub async fn save(
+pub async fn save<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     name: &str,
     mut destination: Destination,
@@ -155,7 +153,9 @@ pub async fn save(
     match db::alerts::destinations::set(org_id, &destination).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "destinations", Authz::new(&destination.name)).await;
+                auth_client
+                    .set_ownership(org_id, ObjectType::Destination, name)
+                    .await;
             }
             Ok(())
         }
@@ -205,7 +205,11 @@ pub async fn list(
     Ok(result)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
     let cacher = STREAM_ALERTS.read().await;
     for (stream_key, alerts) in cacher.iter() {
         for alert in alerts.iter() {
@@ -239,7 +243,9 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
 
     match db::alerts::destinations::delete(org_id, name).await {
         Ok(_) => {
-            remove_ownership(org_id, "destinations", Authz::new(name)).await;
+            auth_client
+                .remove_ownership(org_id, ObjectType::Destination, name)
+                .await;
             Ok(())
         }
         Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),

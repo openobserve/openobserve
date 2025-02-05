@@ -22,9 +22,12 @@ use o2_enterprise::enterprise::cipher::{http_repr::merge_updates, Cipher, Cipher
 
 #[cfg(feature = "enterprise")]
 use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
-use crate::common::{
-    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-    utils::auth::{remove_ownership, set_ownership},
+use crate::{
+    authorization::{AuthorizationClient, AuthorizationClientTrait, ObjectType},
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{remove_ownership, set_ownership},
+    },
 };
 
 /// Store a key credential in db
@@ -52,6 +55,7 @@ pub async fn save(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    auth_client: web::Data<AuthorizationClient>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -101,7 +105,9 @@ pub async fn save(
         .await
         {
             Ok(_) => {
-                set_ownership(&org_id, "cipher_keys", Authz::new(&req.name)).await;
+                auth_client
+                    .set_ownership(&org_id, ObjectType::CipherKey, &req.name)
+                    .await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
                     "Key created successfully".to_string(),
@@ -241,6 +247,7 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
 pub async fn delete(
     _req: HttpRequest,
     path: web::Path<(String, String)>,
+    auth_client: web::Data<AuthorizationClient>,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -253,7 +260,9 @@ pub async fn delete(
         .await
         {
             Ok(_) => {
-                remove_ownership(&org_id, "cipher_keys", Authz::new(&key_name)).await;
+                auth_client
+                    .remove_ownership(&org_id, ObjectType::CipherKey, &key_name)
+                    .await;
                 Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                     http::StatusCode::OK.into(),
                     "cipher key removed successfully".to_string(),

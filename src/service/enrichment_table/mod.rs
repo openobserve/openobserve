@@ -42,6 +42,7 @@ use infra::{
 };
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
@@ -55,7 +56,8 @@ use crate::{
 
 pub mod geoip;
 
-pub async fn save_enrichment_data(
+pub async fn save_enrichment_data<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     table_name: &str,
     payload: Vec<json::Map<String, json::Value>>,
@@ -143,6 +145,7 @@ pub async fn save_enrichment_data(
         // check for schema evolution
         if !schema_evolved
             && check_for_schema(
+                auth_client,
                 org_id,
                 stream_name,
                 StreamType::EnrichmentTables,

@@ -28,17 +28,11 @@ use infra::table::{
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
-};
+use crate::authorization::{AuthorizationClientTrait, ObjectType};
 pub mod reports;
 
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-    openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
-};
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -270,8 +264,9 @@ pub fn get_query_variables(
     map
 }
 
-#[tracing::instrument(skip(dashboard))]
-pub async fn create_dashboard(
+#[tracing::instrument(skip(auth_client, dashboard))]
+pub async fn create_dashboard<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     folder_id: &str,
     dashboard: Dashboard,
@@ -282,16 +277,15 @@ pub async fn create_dashboard(
     let dashboard = if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
-        set_ownership(
-            org_id,
-            "dashboards",
-            Authz {
-                obj_id: dashboard_id,
-                parent_type: "folders".to_owned(),
-                parent: folder_id.to_owned(),
-            },
-        )
-        .await;
+        auth_client
+            .set_ownership_and_parent(
+                org_id,
+                ObjectType::Dashboard,
+                &dashboard_id,
+                ObjectType::DashboardFolder,
+                folder_id,
+            )
+            .await;
         Ok(saved)
     } else if folder_id == DEFAULT_FOLDER {
         let folder = Folder {
@@ -299,21 +293,20 @@ pub async fn create_dashboard(
             name: DEFAULT_FOLDER.to_string(),
             description: DEFAULT_FOLDER.to_string(),
         };
-        folders::save_folder(org_id, folder, FolderType::Dashboards, true)
+        folders::save_folder(auth_client, org_id, folder, FolderType::Dashboards, true)
             .await
             .map_err(|_| DashboardError::CreateDefaultFolder)?;
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
-        set_ownership(
-            org_id,
-            "dashboards",
-            Authz {
-                obj_id: dashboard_id,
-                parent_type: "folders".to_owned(),
-                parent: folder_id.to_owned(),
-            },
-        )
-        .await;
+        auth_client
+            .set_ownership_and_parent(
+                org_id,
+                ObjectType::Dashboard,
+                &dashboard_id,
+                ObjectType::DashboardFolder,
+                folder_id,
+            )
+            .await;
         Ok(saved)
     } else {
         Err(DashboardError::CreateFolderNotFound)
@@ -371,24 +364,27 @@ pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<Dashboard
         .map(|(_f, d)| d)
 }
 
-#[tracing::instrument]
-pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), DashboardError> {
+#[tracing::instrument(skip(auth_client))]
+pub async fn delete_dashboard<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<(), DashboardError> {
     let Some((folder, _dashboard)) = table::dashboards::get_by_id(org_id, dashboard_id).await?
     else {
         return Err(DashboardError::DashboardNotFound);
     };
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
     distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
-    remove_ownership(
-        org_id,
-        "dashboards",
-        Authz {
-            obj_id: dashboard_id.to_owned(),
-            parent_type: "folders".to_owned(),
-            parent: folder.folder_id.clone(),
-        },
-    )
-    .await;
+    auth_client
+        .remove_ownership_and_parent(
+            org_id,
+            ObjectType::Dashboard,
+            dashboard_id,
+            ObjectType::DashboardFolder,
+            &folder.folder_id,
+        )
+        .await;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
@@ -403,8 +399,9 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     Ok(())
 }
 
-#[tracing::instrument]
-pub async fn move_dashboard(
+#[tracing::instrument(skip(auth_client))]
+pub async fn move_dashboard<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     dashboard_id: &str,
     from_folder: &str,
@@ -437,13 +434,15 @@ pub async fn move_dashboard(
             .await;
         }
         if get_o2_config().openfga.enabled {
-            set_parent_relation(
-                dashboard_id,
-                &get_ofga_type("dashboards"),
-                to_folder,
-                &get_ofga_type("folders"),
-            )
-            .await;
+            auth_client
+                .set_parent(
+                    org_id,
+                    ObjectType::Dashboard,
+                    dashboard_id,
+                    ObjectType::DashboardFolder,
+                    to_folder,
+                )
+                .await;
         }
     }
 
@@ -469,13 +468,15 @@ pub async fn move_dashboard(
             .await;
         }
         if get_o2_config().openfga.enabled {
-            remove_parent_relation(
-                dashboard_id,
-                &get_ofga_type("dashboards"),
-                from_folder,
-                &get_ofga_type("folders"),
-            )
-            .await;
+            auth_client
+                .remove_parent(
+                    org_id,
+                    ObjectType::Dashboard,
+                    dashboard_id,
+                    ObjectType::DashboardFolder,
+                    from_folder,
+                )
+                .await;
         }
     }
     Ok(())

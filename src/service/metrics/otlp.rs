@@ -47,6 +47,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt,
@@ -63,7 +64,11 @@ use crate::{
     },
 };
 
-pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_proto<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    body: web::Bytes,
+) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
@@ -78,7 +83,7 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf).await {
+    match handle_otlp_request(auth_client, org_id, request, OtlpRequestType::HttpProtobuf).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
@@ -91,7 +96,11 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
     }
 }
 
-pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+pub async fn otlp_json<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    body: web::Bytes,
+) -> Result<HttpResponse, std::io::Error> {
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
@@ -102,7 +111,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson).await {
+    match handle_otlp_request(auth_client, org_id, request, OtlpRequestType::HttpJson).await {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
@@ -114,7 +123,8 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
     }
 }
 
-pub async fn handle_otlp_request(
+pub async fn handle_otlp_request<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
@@ -453,6 +463,7 @@ pub async fn handle_otlp_request(
             drop(schema_fields);
             if need_schema_check
                 && check_for_schema(
+                    auth_client,
                     org_id,
                     &local_metric_name,
                     StreamType::Metrics,

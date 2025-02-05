@@ -18,13 +18,11 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-    openfga::authorizer::authz::delete_service_account_from_org,
-};
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use regex::Regex;
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         meta::{
@@ -39,7 +37,8 @@ use crate::{
     service::db,
 };
 
-pub async fn post_user(
+pub async fn post_user<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     usr_req: UserRequest,
     initiator_id: &str,
@@ -109,10 +108,7 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{
-                        get_org_creation_tuples, get_service_account_creation_tuple,
-                        get_user_role_tuple, update_tuples,
-                    },
+                    authorizer::authz::{get_service_account_creation_tuple, get_user_role_tuple},
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_o2_config().openfga.enabled {
@@ -126,17 +122,18 @@ pub async fn post_user(
                     if usr_req.role.eq(&UserRole::ServiceAccount) {
                         get_service_account_creation_tuple(&org_id, &usr_req.email, &mut tuples);
                     }
-                    get_org_creation_tuples(
-                        &org_id,
-                        &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
-                            .collect(),
-                        NON_OWNING_ORG.to_vec(),
-                    )
-                    .await;
-                    match update_tuples(tuples, vec![]).await {
+                    auth_client
+                        .get_org_creation_tuples(
+                            &org_id,
+                            &mut tuples,
+                            OFGA_MODELS
+                                .iter()
+                                .map(|(_, fga_entity)| fga_entity.key)
+                                .collect(),
+                            NON_OWNING_ORG.to_vec(),
+                        )
+                        .await;
+                    match auth_client.update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User saved successfully in openfga");
                         }
@@ -185,7 +182,8 @@ pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
     db::user::set(&db_user).await
 }
 
-pub async fn update_user(
+pub async fn update_user<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     email: &str,
     self_update: bool,
@@ -333,8 +331,6 @@ pub async fn update_user(
 
                             #[cfg(feature = "enterprise")]
                             {
-                                use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
-
                                 if get_o2_config().openfga.enabled
                                     && old_role.is_some()
                                     && new_role.is_some()
@@ -358,7 +354,8 @@ pub async fn update_user(
                                             log::debug!(
                                                 "updating openfga role for {email} from {old_str} to {new_str}"
                                             );
-                                            update_user_role(&old_str, &new_str, email, org_id)
+                                            auth_client
+                                                .update_user_role(&old_str, &new_str, email, org_id)
                                                 .await;
                                         }
                                     }
@@ -400,7 +397,8 @@ pub async fn update_user(
     }
 }
 
-pub async fn add_user_to_org(
+pub async fn add_user_to_org<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     email: &str,
     role: UserRole,
@@ -461,25 +459,24 @@ pub async fn add_user_to_org(
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
-                    },
+                    authorizer::authz::get_user_role_tuple,
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_o2_config().openfga.enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
-                    get_org_creation_tuples(
-                        org_id,
-                        &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
-                            .collect(),
-                        NON_OWNING_ORG.to_vec(),
-                    )
-                    .await;
-                    match update_tuples(tuples, vec![]).await {
+                    auth_client
+                        .get_org_creation_tuples(
+                            org_id,
+                            &mut tuples,
+                            OFGA_MODELS
+                                .iter()
+                                .map(|(_, fga_entity)| fga_entity.key)
+                                .collect(),
+                            NON_OWNING_ORG.to_vec(),
+                        )
+                        .await;
+                    match auth_client.update_tuples(tuples, vec![]).await {
                         Ok(_) => {
                             log::info!("User added to org successfully in openfga");
                         }
@@ -613,7 +610,8 @@ pub async fn list_users(
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
-pub async fn remove_user_from_org(
+pub async fn remove_user_from_org<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     email_id: &str,
     initiator_id: &str,
@@ -650,7 +648,6 @@ pub async fn remove_user_from_org(
                         let _ = db::user::delete(email_id).await;
                         #[cfg(feature = "enterprise")]
                         {
-                            use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
                             let user_role = &orgs[0].role;
                             let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
                                 || user_role.eq(&UserRole::User)
@@ -661,9 +658,13 @@ pub async fn remove_user_from_org(
                             };
                             if get_o2_config().openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                                auth_client
+                                    .delete_user_from_org(org_id, email_id, &user_fga_role)
+                                    .await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
-                                    delete_service_account_from_org(org_id, email_id).await;
+                                    auth_client
+                                        .delete_service_account_from_org(org_id, email_id)
+                                        .await;
                                 }
                             }
                         }
@@ -700,20 +701,22 @@ pub async fn remove_user_from_org(
                             USERS.remove(&format!("{org_id}/{email_id}"));
                             #[cfg(feature = "enterprise")]
                             {
-                                use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
                                 log::debug!(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
                                 if get_o2_config().openfga.enabled && _user_fga_role.is_some() {
-                                    delete_user_from_org(
-                                        org_id,
-                                        email_id,
-                                        _user_fga_role.unwrap().as_str(),
-                                    )
-                                    .await;
+                                    auth_client
+                                        .delete_user_from_org(
+                                            org_id,
+                                            email_id,
+                                            _user_fga_role.unwrap().as_str(),
+                                        )
+                                        .await;
                                     if is_service_account {
-                                        delete_service_account_from_org(org_id, email_id).await;
+                                        auth_client
+                                            .delete_service_account_from_org(org_id, email_id)
+                                            .await;
                                     }
                                 }
                             }
@@ -805,6 +808,7 @@ mod tests {
     use infra::db as infra_db;
 
     use super::*;
+    use crate::authorization::client::MockAuthorizationClient;
 
     async fn set_up() {
         USERS.insert(
@@ -848,7 +852,9 @@ mod tests {
         infra_db::create_table().await.unwrap();
         set_up().await;
 
+        let auth_client = MockAuthorizationClient::new();
         let resp = post_user(
+            &auth_client,
             "dummy",
             UserRequest {
                 email: "user@zo.dev".to_string(),
@@ -869,7 +875,10 @@ mod tests {
         infra_db::create_table().await.unwrap();
         set_up().await;
 
+        let auth_client = MockAuthorizationClient::new();
+
         let resp = update_user(
+            &auth_client,
             "dummy",
             "user2@example.com",
             true,
@@ -889,6 +898,7 @@ mod tests {
         assert!(resp.is_ok());
 
         let resp = update_user(
+            &auth_client,
             "dummy",
             "user2@example.com",
             false,
@@ -908,6 +918,7 @@ mod tests {
         assert!(resp.is_ok());
 
         let resp = add_user_to_org(
+            &auth_client,
             "dummy",
             "user2@example.com",
             UserRole::Member,
@@ -917,7 +928,8 @@ mod tests {
 
         assert!(resp.is_ok());
 
-        let resp = remove_user_from_org("dummy", "user2@example.com", "admin@zo.dev").await;
+        let resp =
+            remove_user_from_org(&auth_client, "dummy", "user2@example.com", "admin@zo.dev").await;
 
         assert!(resp.is_ok());
     }

@@ -37,6 +37,7 @@ use prost::Message;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::ingestion::{IngestionStatus, StreamStatus},
     handler::http::request::CONTENT_TYPE_PROTO,
     service::{
@@ -50,7 +51,8 @@ use crate::{
     },
 };
 
-pub async fn handle_grpc_request(
+pub async fn handle_grpc_request<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     request: ExportLogsServiceRequest,
@@ -362,6 +364,7 @@ pub async fn handle_grpc_request(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        auth_client,
         thread_id,
         org_id,
         user_email,
@@ -440,6 +443,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_logs_request() {
+        let auth_client = crate::authorization::client::MockAuthorizationClient::new();
         let org_id = "test_org_id";
 
         let log_rec = LogRecord {
@@ -490,8 +494,16 @@ mod tests {
             resource_logs: vec![res_logs],
         };
 
-        let result =
-            handle_grpc_request(0, org_id, request, true, Some("test_stream"), "a@a.com").await;
+        let result = handle_grpc_request(
+            &auth_client,
+            0,
+            org_id,
+            request,
+            true,
+            Some("test_stream"),
+            "a@a.com",
+        )
+        .await;
         assert!(result.is_ok());
     }
 }

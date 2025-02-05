@@ -153,12 +153,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     // init infra, create data dir & tables
     infra::init().await.expect("infra init failed");
+
+    let auth_client = crate::authorization::client::AuthorizationClient::new(); // TODO
+
     match name {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
                     let _ = users::update_user(
+                        &auth_client,
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
                         false,
@@ -274,10 +278,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            import::Import::operator(dataCli::arg_matches(command.clone())).await?;
+            import::Import::new(auth_client)
+                .operator(dataCli::arg_matches(command.clone()))
+                .await?;
         }
         "export" => {
-            export::Export::operator(dataCli::arg_matches(command.clone())).await?;
+            export::Export::new()
+                .operator(dataCli::arg_matches(command.clone()))
+                .await?;
         }
         "migrate-schemas" => {
             println!("Running schema migration to row per schema version");

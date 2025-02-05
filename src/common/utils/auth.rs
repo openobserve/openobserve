@@ -21,9 +21,10 @@ use base64::Engine;
 use config::utils::json;
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    openfga::{authorizer::OpenFgaConfig, meta::mapping::OFGA_MODELS},
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -32,7 +33,6 @@ use crate::common::infra::config::USER_SESSIONS;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
     meta::{
-        authz::Authz,
         organization::DEFAULT_ORG,
         user::{AuthTokens, UserRole},
     },
@@ -110,58 +110,79 @@ pub fn get_role(_role: UserRole) -> UserRole {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+pub async fn set_ownership(
+    conf: &OpenFgaConfig,
+    store_id: &str,
+    org_id: &str,
+    obj_type: &str,
+    obj_id: &str,
+    parent_type: &str,
+    parent_id: &str,
+) {
     if get_o2_config().openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj_id);
 
-        let parent_type = if obj.parent_type.is_empty() {
+        let parent_type = if parent_type.is_empty() {
             ""
         } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+            OFGA_MODELS.get(parent_type).unwrap().key
         };
 
         // Default folder is already created in case of new org, this handles the case for old org
         if obj_type.eq("folders")
-            && authorizer::authz::check_folder_exists(org_id, &obj.obj_id).await
+            && authorizer::authz::check_folder_exists(conf, store_id, org_id, &obj_id).await
         {
             // If the folder tuples are missing, it automatically creates them
             // So we can return here
             log::debug!(
                 "folder tuples already exists for org: {org_id}; folder: {}",
-                &obj.obj_id
+                &obj_id
             );
             return;
-        } else if obj.parent_type.eq("folders") {
-            log::debug!("checking parent folder tuples for folder: {}", &obj.parent);
+        } else if parent_type.eq("folders") {
+            log::debug!("checking parent folder tuples for folder: {}", &parent_id);
             // In case of dashboard, we need to check if the tuples for its folder exist
             // If not, the below function creates the proper tuples for the folder
-            authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
+            authorizer::authz::check_folder_exists(conf, store_id, org_id, &parent_id).await;
         }
-        authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::set_ownership(conf, store_id, org_id, &obj_str, parent_id, parent_type)
+            .await;
     }
 }
-#[cfg(not(feature = "enterprise"))]
-pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 #[cfg(feature = "enterprise")]
-pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+pub async fn remove_ownership(
+    conf: &OpenFgaConfig,
+    store_id: &str,
+    org_id: &str,
+    obj_type: &str,
+    obj_id: &str,
+    parent_type: &str,
+    parent_id: &str,
+) {
     if get_o2_config().openfga.enabled {
         use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj_id);
 
-        let parent_type = if obj.parent_type.is_empty() {
+        let parent_type = if parent_type.is_empty() {
             ""
         } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+            OFGA_MODELS.get(parent_type).unwrap().key
         };
 
-        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::remove_ownership(
+            conf,
+            store_id,
+            org_id,
+            &obj_str,
+            parent_id,
+            parent_type,
+        )
+        .await;
     }
 }
-#[cfg(not(feature = "enterprise"))]
-pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 pub struct UserEmail {
     pub user_id: String,

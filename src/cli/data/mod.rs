@@ -21,7 +21,7 @@ pub mod import;
 
 #[async_trait]
 pub trait Context {
-    async fn operator(c: cli::Cli) -> Result<bool, anyhow::Error>;
+    async fn operator(&self, c: cli::Cli) -> Result<bool, anyhow::Error>;
 }
 
 #[cfg(test)]
@@ -50,13 +50,14 @@ mod tests {
 
         let cli = cli::Cli::args(args);
 
-        if let Err(err) = export::Export::operator(cli.clone()).await {
+        if let Err(err) = export::Export::new().operator(cli.clone()).await {
             println!("Error: {}", err);
         }
     }
 
     #[tokio::test]
     async fn test_import_operator() {
+        let auth_client = crate::authorization::client::MockAuthorizationClient::new();
         let args = vec![
             "openobserve",
             "--c",
@@ -77,7 +78,7 @@ mod tests {
 
         let cli = cli::Cli::args(args);
 
-        if let Err(err) = import::Import::operator(cli.clone()).await {
+        if let Err(err) = import::Import::new(auth_client).operator(cli.clone()).await {
             println!("Error: {}", err);
         }
     }

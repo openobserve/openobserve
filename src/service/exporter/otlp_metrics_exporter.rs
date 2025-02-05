@@ -27,7 +27,7 @@ use opentelemetry_sdk::metrics::{
     InstrumentKind,
 };
 
-use crate::service::metrics::otlp::handle_otlp_request;
+use crate::{authorization::AuthorizationClientTrait, service::metrics::otlp::handle_otlp_request};
 
 /// An interface for OTLP metrics clients
 #[async_trait]
@@ -83,24 +83,29 @@ impl O2MetricsExporter {
     }
 }
 
-pub(crate) struct O2MetricsClient {}
+pub(crate) struct O2MetricsClient<A: AuthorizationClientTrait> {
+    auth_client: A,
+}
 
-impl fmt::Debug for O2MetricsClient {
+impl<A: AuthorizationClientTrait> fmt::Debug for O2MetricsClient<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("O2MetricsClient")
     }
 }
 
-impl O2MetricsClient {
-    pub fn new() -> Self {
-        O2MetricsClient {}
+impl<A: AuthorizationClientTrait> O2MetricsClient<A> {
+    pub fn new(auth_client: &A) -> Self {
+        O2MetricsClient {
+            auth_client: auth_client.clone(),
+        }
     }
 }
 
 #[async_trait]
-impl MetricsClient for O2MetricsClient {
+impl<A: AuthorizationClientTrait + 'static> MetricsClient for O2MetricsClient<A> {
     async fn export(&self, metrics: &mut ResourceMetrics) -> Result<()> {
         if let Err(e) = handle_otlp_request(
+            &self.auth_client,
             "default",
             ExportMetricsServiceRequest::from(&*metrics),
             OtlpRequestType::Grpc,

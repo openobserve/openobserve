@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 
 use crate::{
+    authorization::{AuthorizationClient, AuthorizationClientTrait, ObjectType},
     common::{
         meta::{
             authz::Authz,
@@ -129,11 +130,16 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
     )
 )]
 #[delete("/{org_id}/savedviews/{view_id}")]
-pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_view(
+    path: web::Path<(String, String)>,
+    auth_client: web::Data<AuthorizationClient>,
+) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
     match saved_view::delete_view(&org_id, &view_id).await {
         Ok(_) => {
-            remove_ownership(&org_id, "savedviews", Authz::new(&view_id)).await;
+            auth_client
+                .remove_ownership(&org_id, ObjectType::SavedView, &view_id)
+                .await;
             Ok(MetaHttpResponse::json(DeleteViewResponse {
                 org_id,
                 view_id,
@@ -171,12 +177,15 @@ pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpRespon
 pub async fn create_view(
     path: web::Path<String>,
     view: web::Json<CreateViewRequest>,
+    auth_client: web::Data<AuthorizationClient>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
     match saved_view::set_view(&org_id, &view).await {
         Ok(created_view) => {
-            set_ownership(&org_id, "savedviews", Authz::new(&created_view.view_id)).await;
+            auth_client
+                .set_ownership(&org_id, ObjectType::SavedView, &created_view.view_id)
+                .await;
             Ok(MetaHttpResponse::json(CreateViewResponse {
                 org_id,
                 view_id: created_view.view_id,

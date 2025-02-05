@@ -26,10 +26,7 @@ use infra::{
     table,
 };
 
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
-};
+use crate::authorization::AuthorizationClientTrait;
 
 /// Errors that can occur when interacting with folders.
 #[derive(Debug, thiserror::Error)]
@@ -75,8 +72,9 @@ pub enum FolderError {
     PermittedFoldersValidator(String),
 }
 
-#[tracing::instrument(skip(folder))]
-pub async fn save_folder(
+#[tracing::instrument(skip(folder, auth_client))]
+pub async fn save_folder<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     mut folder: Folder,
     folder_type: FolderType,
@@ -104,7 +102,9 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+    auth_client
+        .set_ownership(org_id, folder_type.into(), &folder.folder_id)
+        .await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()
@@ -211,8 +211,9 @@ pub async fn get_folder_by_name(
         .ok_or(FolderError::NotFound)
 }
 
-#[tracing::instrument()]
-pub async fn delete_folder(
+#[tracing::instrument(skip(auth_client))]
+pub async fn delete_folder<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     folder_id: &str,
     folder_type: FolderType,
@@ -240,7 +241,9 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+    auth_client
+        .remove_ownership(org_id, folder_type.into(), folder_id)
+        .await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::infra::config::get_config()

@@ -20,7 +20,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::try_join;
 
-use crate::service::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem};
+use crate::{
+    authorization::AuthorizationClientTrait,
+    service::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem},
+};
 
 pub mod distinct_values;
 pub mod trace_list_index;
@@ -38,7 +41,9 @@ pub enum MetadataType {
     DistinctValues,
 }
 
-pub struct MetadataManager {}
+pub struct MetadataManager<A: AuthorizationClientTrait> {
+    auth_client: A,
+}
 
 pub trait Metadata {
     fn generate_schema(&self) -> Arc<Schema>;
@@ -51,15 +56,15 @@ pub trait Metadata {
     fn stop(&self) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
 }
 
-impl Default for MetadataManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for MetadataManager {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
-impl MetadataManager {
-    pub fn new() -> Self {
-        Self {}
+impl<A: AuthorizationClientTrait> MetadataManager<A> {
+    pub fn new(auth_client: A) -> Self {
+        Self { auth_client }
     }
 
     pub async fn close(&self) -> infra::errors::Result<()> {

@@ -37,6 +37,7 @@ use prost::Message;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         ingestion::{IngestionStatus, StreamStatus},
@@ -53,7 +54,8 @@ use crate::{
 const SERVICE_NAME: &str = "service.name";
 const SERVICE: &str = "service";
 
-pub async fn logs_proto_handler(
+pub async fn logs_proto_handler<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     body: web::Bytes,
@@ -62,6 +64,7 @@ pub async fn logs_proto_handler(
 ) -> Result<HttpResponse> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
     match super::otlp_grpc::handle_grpc_request(
+        auth_client,
         thread_id,
         org_id,
         request,
@@ -86,7 +89,8 @@ pub async fn logs_proto_handler(
 
 // example at: https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
 // otel collector handling json request for logs https://github.com/open-telemetry/opentelemetry-collector/blob/main/pdata/plog/json.go
-pub async fn logs_json_handler(
+pub async fn logs_json_handler<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     body: web::Bytes,
@@ -494,6 +498,7 @@ pub async fn logs_json_handler(
 
     let mut status = IngestionStatus::Record(stream_status.status);
     let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+        auth_client,
         thread_id,
         org_id,
         user_email,

@@ -29,9 +29,10 @@ use o2_enterprise::enterprise::actions::action_manager::{
 use svix_ksuid::Ksuid;
 
 use crate::{
+    authorization::{AuthorizationClient, AuthorizationClientTrait, ObjectType},
     common::{
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{check_permissions, remove_ownership, set_ownership, UserEmail},
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::auth::{check_permissions, UserEmail},
     },
     handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
     service::organization::get_passcode,
@@ -58,11 +59,16 @@ const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
     )
 )]
 #[delete("/{org_id}/actions/{ksuid}")]
-pub async fn delete_action(path: web::Path<(String, Ksuid)>) -> Result<HttpResponse, Error> {
+pub async fn delete_action(
+    path: web::Path<(String, Ksuid)>,
+    auth_client: web::Data<AuthorizationClient>,
+) -> Result<HttpResponse, Error> {
     let (org_id, ksuid) = path.into_inner();
     match delete_app_from_target_cluster(&org_id, ksuid).await {
         Ok(_) => {
-            remove_ownership(&org_id, "actions", Authz::new(&ksuid.to_string())).await;
+            auth_client
+                .remove_ownership(&org_id, ObjectType::Action, &ksuid.to_string())
+                .await;
             Ok(MetaHttpResponse::ok("Action deleted"))
         }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -245,6 +251,7 @@ pub async fn upload_zipped_action(
     mut payload: Multipart,
     req: HttpRequest,
     user_email: UserEmail,
+    auth_client: web::Data<AuthorizationClient>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut file_data = Vec::new();
@@ -534,7 +541,9 @@ pub async fn upload_zipped_action(
             match register_app(action, archive, &file_path, &passcode).await {
                 Ok(uuid) => {
                     if !is_update {
-                        set_ownership(&org_id, "actions", Authz::new(&uuid.to_string())).await;
+                        auth_client
+                            .set_ownership(&org_id, ObjectType::Action, &uuid.to_string())
+                            .await;
                     }
                     Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid})))
                 }

@@ -41,10 +41,10 @@ use tokio::{
 };
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::stream::SchemaRecords,
-    service,
     service::{
-        ingestion,
+        self, ingestion,
         metadata::{Metadata, MetadataItem},
     },
 };
@@ -56,10 +56,11 @@ pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new
 
 type MemTable = FxIndexMap<String, FxIndexMap<DvItem, u32>>;
 
-pub struct DistinctValues {
+pub struct DistinctValues<A: AuthorizationClientTrait> {
     channel: Arc<mpsc::Sender<DvEvent>>,
     shutdown: Arc<AtomicBool>,
     mem_table: Arc<RwLock<MemTable>>,
+    auth_client: A,
 }
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
@@ -102,19 +103,20 @@ impl DvEvent {
     }
 }
 
-impl Default for DistinctValues {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for DistinctValues {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
-impl DistinctValues {
-    pub fn new() -> Self {
+impl<A: AuthorizationClientTrait> DistinctValues<A> {
+    pub fn new(auth_client: A) -> Self {
         tokio::task::spawn(async move { run_flush().await });
         Self {
             channel: handle_channel(),
             shutdown: Arc::new(AtomicBool::new(false)),
             mem_table: Arc::new(RwLock::new(FxIndexMap::default())),
+            auth_client,
         }
     }
 }
@@ -147,7 +149,7 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
     Arc::new(tx)
 }
 
-impl Metadata for DistinctValues {
+impl<A: AuthorizationClientTrait> Metadata for DistinctValues<A> {
     fn generate_schema(&self) -> Arc<Schema> {
         // distinct values will always have _timestamp and
         // count, rest will be dynamically determined
@@ -306,18 +308,17 @@ impl Metadata for DistinctValues {
 
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::{
-                    common::infra::config::get_config as get_o2_config,
-                    openfga::authorizer::authz::set_ownership_if_not_exists,
-                };
+                use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
                 // set ownership only in the first time
                 if _is_new && get_o2_config().openfga.enabled {
-                    set_ownership_if_not_exists(
-                        &org_id,
-                        &format!("{}:{}", StreamType::Metadata, distinct_stream_name),
-                    )
-                    .await;
+                    self.auth_client
+                        .set_ownership_if_not_exists(
+                            &org_id,
+                            StreamType::Metadata.into(),
+                            &distinct_stream_name,
+                        )
+                        .await;
                 }
             }
         }

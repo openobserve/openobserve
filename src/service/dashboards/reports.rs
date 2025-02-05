@@ -40,14 +40,13 @@ use lettre::{
 use reqwest::Client;
 
 use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
+    authorization::{AuthorizationClientTrait, ObjectType},
+    common::utils::auth::is_ofga_unsupported,
     service::{db, short_url},
 };
 
-pub async fn save(
+pub async fn save<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     name: &str,
     mut report: Report,
@@ -169,7 +168,10 @@ pub async fn save(
     match db::dashboards::reports::set(org_id, &report, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "reports", Authz::new(&report.name)).await;
+                auth_client
+                    // Using name as the report ID seems like a potential bug. Is the report name unique?
+                    .set_ownership(org_id, ObjectType::Report, &report.name)
+                    .await;
             }
             Ok(())
         }
@@ -235,7 +237,11 @@ pub async fn list(
     }
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
     if db::dashboards::reports::get(org_id, name).await.is_err() {
         return Err((
             http::StatusCode::NOT_FOUND,
@@ -245,7 +251,10 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
 
     match db::dashboards::reports::delete(org_id, name).await {
         Ok(_) => {
-            remove_ownership(org_id, "reports", Authz::new(name)).await;
+            // Using name as the report ID seems like a potential bug. Is the report name unique?
+            auth_client
+                .remove_ownership(org_id, ObjectType::Report, name)
+                .await;
             Ok(())
         }
         Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),

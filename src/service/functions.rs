@@ -28,11 +28,8 @@ use config::{
 };
 
 use crate::{
-    common,
-    common::{
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{remove_ownership, set_ownership},
-    },
+    authorization::{AuthorizationClientTrait, ObjectType},
+    common::{self, meta::http::HttpResponse as MetaHttpResponse},
     service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
 };
 
@@ -43,7 +40,11 @@ const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
     "Function is associated with streams, please remove association from streams before deleting:";
 
-pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+pub async fn save_function<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: String,
+    mut func: Transform,
+) -> Result<HttpResponse, Error> {
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.into(),
@@ -70,7 +71,9 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                 )),
             )
         } else {
-            set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
+            auth_client
+                .set_ownership(&org_id, ObjectType::Function, &func.name)
+                .await;
 
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
@@ -282,7 +285,11 @@ pub async fn list_functions(
     }
 }
 
-pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResponse, Error> {
+pub async fn delete_function<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: String,
+    fn_name: String,
+) -> Result<HttpResponse, Error> {
     let existing_fn = match check_existing_fn(&org_id, &fn_name).await {
         Some(function) => function,
         None => {
@@ -331,7 +338,9 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     let result = db::functions::delete(&org_id, &fn_name).await;
     match result {
         Ok(_) => {
-            remove_ownership(&org_id, "functions", Authz::new(&fn_name)).await;
+            auth_client
+                .remove_ownership(&org_id, ObjectType::Function, &fn_name)
+                .await;
 
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
@@ -398,9 +407,12 @@ mod tests {
     use config::meta::{function::StreamOrder, stream::StreamType};
 
     use super::*;
+    use crate::authorization::client::MockAuthorizationClient;
 
     #[tokio::test]
     async fn test_functions() {
+        let auth_client = MockAuthorizationClient::new();
+
         let mut trans = Transform {
             function: "function(row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"
                 .to_owned(),
@@ -433,15 +445,17 @@ mod tests {
 
         assert_eq!(trans.num_args, 1);
 
-        let res = save_function("nexus".to_owned(), trans).await;
+        let res = save_function(&auth_client, "nexus".to_owned(), trans).await;
         assert!(res.is_ok());
 
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function(&auth_client, "nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

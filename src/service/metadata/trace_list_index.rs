@@ -33,6 +33,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::stream::SchemaRecords,
     service::{
         db, ingestion,
@@ -48,9 +49,10 @@ static PARTITION_KEYS: Lazy<[StreamPartition; 1]> =
 
 pub(crate) static INSTANCE: Lazy<TraceListIndex> = Lazy::new(TraceListIndex::new);
 
-pub struct TraceListIndex {
+pub struct TraceListIndex<A: AuthorizationClientTrait> {
     schema: Arc<Schema>,
     db_schema_init: AtomicBool,
+    auth_client: A,
 }
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
@@ -61,7 +63,7 @@ pub struct TraceListItem {
     pub trace_id: String,
 }
 
-impl Metadata for TraceListIndex {
+impl<A: AuthorizationClientTrait> Metadata for TraceListIndex<A> {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new(
@@ -133,18 +135,13 @@ impl Metadata for TraceListIndex {
 
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::{
-                common::infra::config::get_config as get_o2_config,
-                openfga::authorizer::authz::set_ownership_if_not_exists,
-            };
+            use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
             // set ownership only in the first time
             if _is_new && get_o2_config().openfga.enabled {
-                set_ownership_if_not_exists(
-                    org_id,
-                    &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
-                )
-                .await;
+                self.auth_client
+                    .set_ownership_if_not_exists(org_id, StreamType::Metadata.into(), STREAM_NAME)
+                    .await;
             }
         }
 
@@ -161,20 +158,21 @@ impl Metadata for TraceListIndex {
     }
 }
 
-impl Default for TraceListIndex {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for TraceListIndex {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
-impl TraceListIndex {
-    pub fn new() -> Self {
+impl<A: AuthorizationClientTrait> TraceListIndex<A> {
+    pub fn new(auth_client: A) -> Self {
         let mut res = Self {
             schema: Arc::new(Schema {
                 fields: Default::default(),
                 metadata: Default::default(),
             }),
             db_schema_init: AtomicBool::new(false),
+            auth_client,
         };
 
         res.schema = res.generate_schema();
@@ -238,6 +236,7 @@ mod tests {
     use infra::schema::unwrap_partition_time_level;
 
     use crate::{
+        authorization::client::MockAuthorizationClient,
         common::meta::stream::SchemaRecords,
         service::{
             ingestion,
@@ -250,7 +249,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_write() {
-        let t = TraceListIndex::new();
+        let auth_client = MockAuthorizationClient::new();
+        let t = TraceListIndex::new(auth_client);
         let data = vec![MetadataItem::TraceListIndexer(TraceListItem::default())];
 
         let res = t.write("default", data).await;
@@ -259,7 +259,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_trace_list_index_write_file() {
-        let t = TraceListIndex::new();
+        let auth_client = MockAuthorizationClient::new();
+        let t = TraceListIndex::new(auth_client);
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
         let item = TraceListItem {
             stream_name: "default".to_string(),

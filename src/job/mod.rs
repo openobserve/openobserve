@@ -22,6 +22,7 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 use regex::Regex;
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::{
         infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
@@ -46,7 +47,9 @@ mod telemetry;
 
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
-pub async fn init() -> Result<(), anyhow::Error> {
+pub async fn init<A: AuthorizationClientTrait>(
+    auth_client: &AuthorizationClientTrait,
+) -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
     )
@@ -98,7 +101,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
 
-    tokio::task::spawn(async move { promql_self_consume::run().await });
+    tokio::task::spawn(async move { promql_self_consume::run(&auth_client.clone()).await });
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -200,7 +203,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    tokio::task::spawn(async move { files::run().await });
+    tokio::task::spawn(async move { files::run(&auth_client.clone()).await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
     tokio::task::spawn(async move { flatten_compactor::run().await });

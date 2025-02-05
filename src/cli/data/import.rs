@@ -20,22 +20,35 @@ use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     cli::data::{cli::Cli, Context},
     common::meta::ingestion::IngestionRequest,
     service::logs,
 };
 
-pub struct Import {}
+pub struct Import<A: AuthorizationClientTrait> {
+    auth_client: A,
+}
+
+impl<A: AuthorizationClientTrait> Import<A> {
+    pub fn new(auth_client: A) -> Self {
+        Self { auth_client }
+    }
+}
 
 #[async_trait]
-impl Context for Import {
-    async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
-        read_files_in_directory(c.clone(), c.data.as_str()).await
+impl<A: AuthorizationClientTrait> Context for Import<A> {
+    async fn operator(&self, c: Cli) -> Result<bool, anyhow::Error> {
+        read_files_in_directory(&self.auth_client, c.clone(), c.data.as_str()).await
     }
 }
 
 #[async_recursion]
-async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow::Error> {
+async fn read_files_in_directory<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    c: Cli,
+    dir_path: &str,
+) -> Result<bool, anyhow::Error> {
     let entries = fs::read_dir(dir_path)?;
     for entry in entries {
         let entry = entry?;
@@ -43,6 +56,7 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
         if path.is_file() {
             let content = fs::read(&path)?;
             if let Err(e) = logs::ingest::ingest(
+                auth_client,
                 0,
                 &c.org,
                 &c.stream_name,
@@ -56,7 +70,7 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
                 return Ok(false);
             }
         } else if path.is_dir()
-            && !read_files_in_directory(c.clone(), &path.to_string_lossy()).await?
+            && !read_files_in_directory(auth_client, c.clone(), &path.to_string_lossy()).await?
         {
             return Ok(false);
         }

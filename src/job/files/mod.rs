@@ -20,16 +20,20 @@ use config::{
     FILE_EXT_PARQUET,
 };
 
+use crate::authorization::AuthorizationClientTrait;
+
 pub mod broadcast;
 pub mod idx;
 pub mod parquet;
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run<A: AuthorizationClientTrait + 'static>(
+    auth_client: A,
+) -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    tokio::task::spawn(async move { parquet::run().await });
+    tokio::task::spawn(async move { parquet::run(auth_client).await });
     tokio::task::spawn(async move { broadcast::run().await });
     tokio::task::spawn(async move { clean_empty_dirs().await });
 

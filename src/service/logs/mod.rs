@@ -49,6 +49,7 @@ use super::{
     schema::stream_schema_exists,
 };
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
@@ -195,7 +196,8 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
-async fn write_logs_by_stream(
+async fn write_logs_by_stream<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     user_email: &str,
@@ -213,7 +215,15 @@ async fn write_logs_by_stream(
         }
 
         // write json data by stream
-        let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
+        let mut req_stats = write_logs(
+            auth_client,
+            thread_id,
+            org_id,
+            &stream_name,
+            status,
+            json_data,
+        )
+        .await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time_took;
@@ -257,7 +267,8 @@ async fn write_logs_by_stream(
     Ok(())
 }
 
-async fn write_logs(
+async fn write_logs<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     stream_name: &str,
@@ -315,6 +326,7 @@ async fn write_logs(
     // start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let (schema_evolution, infer_schema) = check_for_schema(
+        auth_client,
         org_id,
         stream_name,
         StreamType::Logs,

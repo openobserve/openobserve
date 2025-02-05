@@ -30,11 +30,13 @@ use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
 use log::LevelFilter;
+use o2_enterprise::enterprise::openfga::authorizer::OpenFgaConfig;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
     auth::script_server::validator as script_server_validator, request::script_server,
 };
 use openobserve::{
+    authorization::AuthorizationClient,
     cli::basic::cli,
     common::{
         infra::{self as common_infra, cluster, config::VERSION},
@@ -590,18 +592,20 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 )
                 .app_data(web::Data::new(http_client))
         } else {
-            app = app.service({
-                let scope = web::scope(&cfg.common.base_uri)
-                    .configure(get_config_routes)
-                    .configure(get_service_routes)
-                    .configure(get_other_service_routes)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes);
-                #[cfg(feature = "enterprise")]
-                let scope = scope.configure(get_script_server_routes);
+            app = app
+                .app_data(web::Data::new(AuthorizationClient::new()))
+                .service({
+                    let scope = web::scope(&cfg.common.base_uri)
+                        .configure(get_config_routes)
+                        .configure(get_service_routes)
+                        .configure(get_other_service_routes)
+                        .configure(get_basic_routes)
+                        .configure(get_proxy_routes);
+                    #[cfg(feature = "enterprise")]
+                    let scope = scope.configure(get_script_server_routes);
 
-                scope
-            })
+                    scope
+                })
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
@@ -694,18 +698,20 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 )
                 .app_data(web::Data::new(http_client))
         } else {
-            app = app.service({
-                let scope = web::scope(&cfg.common.base_uri)
-                    .configure(get_config_routes)
-                    .configure(get_service_routes)
-                    .configure(get_other_service_routes)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes);
-                #[cfg(feature = "enterprise")]
-                let scope = scope.configure(get_script_server_routes);
+            app = app
+                .app_data(web::Data::new(AuthorizationClient::new()))
+                .service({
+                    let scope = web::scope(&cfg.common.base_uri)
+                        .configure(get_config_routes)
+                        .configure(get_service_routes)
+                        .configure(get_other_service_routes)
+                        .configure(get_basic_routes)
+                        .configure(get_proxy_routes);
+                    #[cfg(feature = "enterprise")]
+                    let scope = scope.configure(get_script_server_routes);
 
-                scope
-            })
+                    scope
+                })
         }
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes

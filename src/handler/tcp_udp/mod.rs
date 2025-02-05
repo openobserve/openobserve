@@ -19,11 +19,13 @@ use tokio::{
     net::{TcpListener, UdpSocket},
 };
 
-use crate::{job::syslog_server::BROADCASTER, service::logs::syslog};
+use crate::{
+    authorization::AuthorizationClientTrait, job::syslog_server::BROADCASTER, service::logs::syslog,
+};
 
 pub static STOP_SRV: &str = "ZO_STOP_TCP_UDP";
 
-pub async fn udp_server(socket: UdpSocket) {
+pub async fn udp_server<A: AuthorizationClientTrait>(auth_client: &A, socket: UdpSocket) {
     let mut buf_udp = vec![0u8; 1472];
     let sender = BROADCASTER.read().await;
     let mut udp_receiver_rx = sender.subscribe();
@@ -44,7 +46,7 @@ pub async fn udp_server(socket: UdpSocket) {
             }
         };
         if input_str != STOP_SRV {
-            let _ = syslog::ingest(&input_str, addr).await;
+            let _ = syslog::ingest(auth_client, &input_str, addr).await;
         }
         if let Ok(val) = udp_receiver_rx.try_recv() {
             if !val {
@@ -55,10 +57,14 @@ pub async fn udp_server(socket: UdpSocket) {
     }
 }
 
-pub async fn tcp_server(listener: TcpListener) {
+pub async fn tcp_server<A: AuthorizationClientTrait + 'static>(
+    auth_client: &A,
+    listener: TcpListener,
+) {
     let sender = BROADCASTER.read().await;
     let mut tcp_receiver_rx = sender.subscribe();
     loop {
+        let auth_client = auth_client.clone();
         let (mut stream, _) = match listener.accept().await {
             Ok(val) => val,
             Err(e) => {
@@ -77,6 +83,7 @@ pub async fn tcp_server(listener: TcpListener) {
             };
             log::info!("spawned new syslog tcp receiver for peer {}", peer_addr);
             loop {
+                let auth_client = auth_client.clone();
                 let n = match stream.read(&mut buf_tcp).await {
                     Ok(0) => {
                         log::info!("received 0 bytes, closing for peer {}", peer_addr);
@@ -97,7 +104,7 @@ pub async fn tcp_server(listener: TcpListener) {
                     }
                 };
                 if input_str != STOP_SRV {
-                    if let Err(e) = syslog::ingest(&input_str, peer_addr).await {
+                    if let Err(e) = syslog::ingest(&auth_client, &input_str, peer_addr).await {
                         log::error!("Error while ingesting TCP message: {}", e);
                     }
                 } else {

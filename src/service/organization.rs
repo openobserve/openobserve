@@ -246,10 +246,14 @@ mod tests {
     use infra::db as infra_db;
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{
+        authorization::client::MockAuthorizationClient, common::meta::user::UserRequest,
+        service::users,
+    };
 
     #[tokio::test]
     async fn test_organization() {
+        let auth_client = MockAuthorizationClient::new();
         let org_id = "default";
         let user_id = "user-org-1@example.com";
         let init_user = "root@example.com";
@@ -271,6 +275,7 @@ mod tests {
         .unwrap();
 
         let resp = users::post_user(
+            &auth_client,
             org_id,
             UserRequest {
                 email: user_id.to_string(),

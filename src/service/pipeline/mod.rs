@@ -20,10 +20,7 @@ use config::meta::{
 };
 
 use super::db::pipeline::{self, PipelineError};
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
-};
+use crate::authorization::{AuthorizationClientTrait, ObjectType};
 
 pub mod batch_execution;
 mod pipeline_entry;
@@ -35,8 +32,11 @@ pub(crate) mod pipeline_receiver;
 pub mod pipeline_wal_writer;
 mod pipeline_watcher;
 
-#[tracing::instrument(skip(pipeline))]
-pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+#[tracing::instrument(skip(auth_client, pipeline))]
+pub async fn save_pipeline<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    mut pipeline: Pipeline,
+) -> Result<(), PipelineError> {
     // check if another realtime pipeline with the same source stream already exists
     if let PipelineSource::Realtime(stream) = &pipeline.source {
         if pipeline::list_streams_with_pipeline(&pipeline.org)
@@ -69,7 +69,9 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
 
     pipeline::set(&pipeline).await?;
-    set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
+    auth_client
+        .set_ownership(&pipeline.org, ObjectType::Pipeline, &pipeline.id)
+        .await;
     Ok(())
 }
 
@@ -206,8 +208,11 @@ pub async fn enable_pipeline(
     Ok(())
 }
 
-#[tracing::instrument]
-pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
+#[tracing::instrument(skip(auth_client))]
+pub async fn delete_pipeline<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    pipeline_id: &str,
+) -> Result<(), PipelineError> {
     let Ok(existing_pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
@@ -226,11 +231,12 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     }
 
     pipeline::delete(pipeline_id).await?;
-    remove_ownership(
-        &existing_pipeline.org,
-        "pipelines",
-        Authz::new(&existing_pipeline.id),
-    )
-    .await;
+    auth_client
+        .remove_ownership(
+            &existing_pipeline.org,
+            ObjectType::Pipeline,
+            &existing_pipeline.id,
+        )
+        .await;
     Ok(())
 }

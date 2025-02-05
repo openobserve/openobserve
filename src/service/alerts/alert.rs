@@ -47,10 +47,8 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
 use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
+    authorization::{AuthorizationClientTrait, ObjectType},
+    common::utils::auth::is_ofga_unsupported,
     service::{
         alerts::{build_sql, destinations, QueryConditionExt},
         db, folders,
@@ -152,7 +150,8 @@ pub enum AlertError {
     NotSupportedAlertDestinationType(DestinationType),
 }
 
-pub async fn save(
+pub async fn save<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_name: &str,
     name: &str,
@@ -162,7 +161,7 @@ pub async fn save(
     // Currently all alerts are stored in the default folder so create the
     // default folder for the org if it doesn't exist yet.
     if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
-        create_default_alerts_folder(org_id).await?;
+        create_default_alerts_folder(auth_client, org_id).await?;
     };
 
     prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
@@ -172,7 +171,9 @@ pub async fn save(
     match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
+                auth_client
+                    .set_ownership(org_id, ObjectType::Alert, &alert_name)
+                    .await;
             }
             Ok(())
         }
@@ -180,15 +181,24 @@ pub async fn save(
     }
 }
 
-async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
+async fn create_default_alerts_folder<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+) -> Result<(), AlertError> {
     let default_folder = Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
     };
-    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
-        .await
-        .map_err(|_| AlertError::CreateDefaultFolderError)?;
+    folders::save_folder(
+        auth_client,
+        org_id,
+        default_folder,
+        FolderType::Alerts,
+        true,
+    )
+    .await
+    .map_err(|_| AlertError::CreateDefaultFolderError)?;
     Ok(())
 }
 
@@ -408,15 +418,16 @@ async fn prepare_alert(
 }
 
 /// Creates a new alert in the specified folder.
-pub async fn create<C: TransactionTrait>(
+pub async fn create<C: TransactionTrait, A: AuthorizationClientTrait>(
     conn: &C,
+    auth_client: &A,
     org_id: &str,
     folder_id: &str,
     mut alert: Alert,
 ) -> Result<Alert, AlertError> {
     if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
         if folder_id == DEFAULT_FOLDER {
-            create_default_alerts_folder(org_id).await?;
+            create_default_alerts_folder(auth_client, org_id).await?;
         } else {
             return Err(AlertError::CreateFolderNotFound);
         }
@@ -431,8 +442,9 @@ pub async fn create<C: TransactionTrait>(
 }
 
 /// Moves the alerts into the specified destination folder.
-pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
+pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait, A: AuthorizationClientTrait>(
     conn: &C,
+    auth_client: &A,
     org_id: &str,
     alert_ids: &[Ksuid],
     dst_folder_id: &str,
@@ -442,7 +454,7 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
             return Err(AlertError::AlertNotFound);
         };
 
-        update(conn, org_id, Some(dst_folder_id), alert).await?;
+        update(conn, auth_client, org_id, Some(dst_folder_id), alert).await?;
     }
     Ok(())
 }
@@ -450,8 +462,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
 /// Updates the alert.
 ///
 /// Updates the alert's parent folder if a `folder_id` is given.
-pub async fn update<C: ConnectionTrait + TransactionTrait>(
+pub async fn update<C: ConnectionTrait + TransactionTrait, A: AuthorizationClientTrait>(
     conn: &C,
+    auth_client: &A,
     org_id: &str,
     folder_id: Option<&str>,
     mut alert: Alert,
@@ -460,7 +473,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         // Ensure that the destination folder exists.
         if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
             if folder_id == DEFAULT_FOLDER {
-                create_default_alerts_folder(org_id).await?;
+                create_default_alerts_folder(auth_client, org_id).await?;
             } else {
                 return Err(AlertError::MoveDestinationFolderNotFound);
             }
@@ -567,8 +580,9 @@ pub async fn list_v2<C: ConnectionTrait>(
 }
 
 /// Deletes an alert by its KSUID primary key.
-pub async fn delete_by_id<C: ConnectionTrait>(
+pub async fn delete_by_id<C: ConnectionTrait, A: AuthorizationClientTrait>(
     conn: &C,
+    auth_client: &A,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
@@ -578,14 +592,17 @@ pub async fn delete_by_id<C: ConnectionTrait>(
 
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            auth_client
+                .remove_ownership(org_id, ObjectType::Alert, &alert.name)
+                .await;
             Ok(())
         }
         Err(e) => Err(e.into()),
     }
 }
 
-pub async fn delete_by_name(
+pub async fn delete_by_name<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -599,7 +616,9 @@ pub async fn delete_by_name(
     }
     match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(name)).await;
+            auth_client
+                .remove_ownership(org_id, ObjectType::Alert, name)
+                .await;
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -607,8 +626,9 @@ pub async fn delete_by_name(
 }
 
 /// Enables an alert.
-pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
+pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait, A: AuthorizationClientTrait>(
     conn: &C,
+    auth_client: &A,
     org_id: &str,
     alert_id: Ksuid,
     should_enable: bool,
@@ -617,7 +637,7 @@ pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
         return Err(AlertError::AlertNotFound);
     };
     alert.enabled = should_enable;
-    update(conn, org_id, None, alert).await?;
+    update(conn, auth_client, org_id, None, alert).await?;
     Ok(())
 }
 
@@ -1500,9 +1520,11 @@ async fn permitted_alerts(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::authorization::client::MockAuthorizationClient;
 
     #[tokio::test]
     async fn test_alert_create() {
+        let auth_client = MockAuthorizationClient::new();
         let org_id = "default";
         let stream_name = "default";
         let alert_name = "abc/alert";
@@ -1510,7 +1532,7 @@ mod tests {
             name: alert_name.to_string(),
             ..Default::default()
         };
-        let ret = save(org_id, stream_name, alert_name, alert, true).await;
+        let ret = save(&auth_client, org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

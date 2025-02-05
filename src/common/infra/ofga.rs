@@ -18,7 +18,7 @@ use std::cmp::Ordering;
 use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
+    common::infra::config::{get_config as get_o2_config, OFGA_STORE_ID},
     openfga::{
         authorizer::authz::{
             add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
@@ -39,8 +39,11 @@ use crate::{
 
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::openfga::{
-        authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
+        authorizer::authz::{get_tuple_for_new_index, open_fga_config},
+        get_all_init_tuples,
     };
+
+    let conf = open_fga_config("").await; // todo
 
     let mut init_tuples = vec![];
     let mut migrate_native_objects = false;
@@ -88,13 +91,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
+    let model_bytes = o2_enterprise::enterprise::common::infra::config::OFGA_MODEL;
+    let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model(model_bytes).await;
     get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
             if !init_tuples.is_empty() {
-                match update_tuples(init_tuples, vec![]).await {
+                let store_id = OFGA_STORE_ID.get("store_id").unwrap();
+                match update_tuples(&conf, &store_id, init_tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("Data migrated to openfga");
                     }
@@ -136,13 +141,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/ofga/model/", 0)
         .await
         .expect("Failed to acquire lock for openFGA");
-    match db::ofga::set_ofga_model(existing_meta).await {
+    match db::ofga::set_ofga_model(&conf, existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
                 log::error!("OFGA store id is empty");
             }
+
+            // We might be able to omit this now the store ID is always being
+            // passed as a parameter rather than read from global state.
             o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
-                .insert("store_id".to_owned(), store_id);
+                .insert("store_id".to_owned(), store_id.clone());
 
             let mut tuples = vec![];
             let r = infra::schema::STREAM_SCHEMAS.read().await;
@@ -165,6 +173,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if migrate_native_objects {
                 for org_name in orgs {
                     get_org_creation_tuples(
+                        &conf,
+                        &store_id,
                         org_name,
                         &mut tuples,
                         OFGA_MODELS
@@ -179,6 +189,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 // least default org
                 if tuples.is_empty() {
                     get_org_creation_tuples(
+                        &conf,
+                        &store_id,
                         DEFAULT_ORG,
                         &mut tuples,
                         OFGA_MODELS
@@ -207,7 +219,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             } else {
                 for org_name in orgs {
                     if need_migrate_index_streams {
-                        get_index_creation_tuples(org_name, &mut tuples).await;
+                        get_index_creation_tuples(&conf, &store_id, org_name, &mut tuples).await;
                     }
                     if need_cipher_keys_migration {
                         get_ownership_all_org_tuple(org_name, "cipher_keys", &mut tuples);
@@ -244,7 +256,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 log::info!("No orgs to update to the openfga");
             } else {
                 log::debug!("tuples not empty: {:#?}", tuples);
-                match update_tuples(tuples, vec![]).await {
+                match update_tuples(&conf, &store_id, tuples, vec![]).await {
                     Ok(_) => {
                         log::info!("Data migrated to openfga");
                     }

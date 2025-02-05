@@ -48,6 +48,7 @@ use super::{
     pipeline::batch_execution::ExecutablePipelineTraceInputs,
 };
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
         stream::SchemaRecords,
@@ -78,7 +79,8 @@ const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
 
-pub async fn otlp_proto(
+pub async fn otlp_proto<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
@@ -98,6 +100,7 @@ pub async fn otlp_proto(
         }
     };
     match handle_otlp_request(
+        auth_client,
         org_id,
         request,
         OtlpRequestType::HttpProtobuf,
@@ -117,7 +120,8 @@ pub async fn otlp_proto(
     }
 }
 
-pub async fn otlp_json(
+pub async fn otlp_json<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
@@ -132,7 +136,15 @@ pub async fn otlp_json(
             )));
         }
     };
-    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name).await {
+    match handle_otlp_request(
+        auth_client,
+        org_id,
+        request,
+        OtlpRequestType::HttpJson,
+        in_stream_name,
+    )
+    .await
+    {
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
@@ -144,7 +156,8 @@ pub async fn otlp_json(
     }
 }
 
-pub async fn handle_otlp_request(
+pub async fn handle_otlp_request<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     request: ExportTraceServiceRequest,
     req_type: OtlpRequestType,
@@ -512,7 +525,13 @@ pub async fn handle_otlp_request(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        auth_client,
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+    )
+    .await
     {
         log::error!("Error while writing traces: {}", e);
         return Ok(
@@ -564,7 +583,8 @@ pub async fn handle_otlp_request(
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
 /// Only accepts data that has already been validated against the otlp protocol.
 /// Please use other ingestion handlers when ingesting raw trace data.
-pub async fn ingest_json(
+pub async fn ingest_json<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     body: web::Bytes,
     req_type: OtlpRequestType,
@@ -668,7 +688,13 @@ pub async fn ingest_json(
         return format_response(partial_success, req_type);
     }
 
-    if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
+    if let Err(e) = write_traces_by_stream(
+        auth_client,
+        org_id,
+        (started_at, &start),
+        json_data_by_stream,
+    )
+    .await
     {
         log::error!("Error while writing traces: {}", e);
         return Ok(
@@ -752,18 +778,20 @@ fn format_response(
     }
 }
 
-async fn write_traces_by_stream(
+async fn write_traces_by_stream<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     time_stats: (i64, &Instant),
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        let mut req_stats =
+            match write_traces(auth_client, org_id, &traces_stream_name, json_data).await {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
         let time = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time;
         // metric + data usage
@@ -781,7 +809,8 @@ async fn write_traces_by_stream(
     Ok(())
 }
 
-async fn write_traces(
+async fn write_traces<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_name: &str,
     json_data: Vec<(i64, json::Map<String, json::Value>)>,
@@ -844,6 +873,7 @@ async fn write_traces(
     // Start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let _ = check_for_schema(
+        auth_client,
         org_id,
         stream_name,
         StreamType::Traces,

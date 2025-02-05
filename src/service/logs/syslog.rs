@@ -37,6 +37,7 @@ use super::{
     bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
 };
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::{
         infra::config::SYSLOG_ROUTES,
         meta::{
@@ -50,7 +51,11 @@ use crate::{
     },
 };
 
-pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
+pub async fn ingest<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    msg: &str,
+    addr: SocketAddr,
+) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let ip = addr.ip();
@@ -337,6 +342,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs_by_stream(
+            auth_client,
             0,
             org_id,
             "",
@@ -462,8 +468,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_ingest() {
+        let auth_client = crate::authorization::client::MockAuthorizationClient::new();
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let raw = r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog: [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] This is a test message"#;
-        ingest(raw, addr).await.unwrap();
+        ingest(&auth_client, raw, addr).await.unwrap();
     }
 }

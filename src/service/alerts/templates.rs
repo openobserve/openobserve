@@ -17,15 +17,13 @@ use actix_web::http;
 use config::meta::alerts::templates::Template;
 
 use crate::{
-    common::{
-        infra::config::ALERTS_DESTINATIONS,
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
+    authorization::{AuthorizationClientTrait, ObjectType},
+    common::{infra::config::ALERTS_DESTINATIONS, utils::auth::is_ofga_unsupported},
     service::db,
 };
 
-pub async fn save(
+pub async fn save<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     name: &str,
     mut template: Template,
@@ -67,7 +65,9 @@ pub async fn save(
     match db::alerts::templates::set(org_id, &mut template).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "templates", Authz::new(&template.name)).await;
+                auth_client
+                    .set_ownership(org_id, ObjectType::Template, &template.name)
+                    .await;
             }
             Ok(())
         }
@@ -108,7 +108,11 @@ pub async fn list(
     }
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    name: &str,
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
     for dest in ALERTS_DESTINATIONS.iter() {
         if dest.key().starts_with(org_id) && dest.value().template.eq(&name) {
             return Err((
@@ -129,7 +133,9 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
     }
     match db::alerts::templates::delete(org_id, name).await {
         Ok(_) => {
-            remove_ownership(org_id, "templates", Authz::new(name)).await;
+            auth_client
+                .remove_ownership(org_id, ObjectType::Template, name)
+                .await;
             Ok(())
         }
         Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),

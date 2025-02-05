@@ -36,6 +36,7 @@ use opentelemetry_sdk::{
 use tokio::{sync::RwLock, time};
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
     service::{
         db,
@@ -286,9 +287,11 @@ async fn update_memory_usage() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
+pub async fn init_meter_provider<A: AuthorizationClientTrait + 'static>(
+    auth_client: &A,
+) -> Result<SdkMeterProvider, anyhow::Error> {
     let exporter = O2MetricsExporter::new(
-        O2MetricsClient::new(),
+        O2MetricsClient::new(auth_client),
         Box::new(DefaultTemporalitySelector::new()),
     );
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)

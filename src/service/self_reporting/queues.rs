@@ -33,13 +33,15 @@ use tokio::{
     time,
 };
 
+use crate::authorization::AuthorizationClientTrait;
+
 pub(super) static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_usage_queue()));
 
 pub(super) static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_error_queue()));
 
-fn initialize_usage_queue() -> ReportingQueue {
+fn initialize_usage_queue<A: AuthorizationClientTrait>(auth_client: &A) -> ReportingQueue {
     let cfg = get_config();
     let timeout = time::Duration::from_secs(
         cfg.common
@@ -57,14 +59,16 @@ fn initialize_usage_queue() -> ReportingQueue {
     for thread_id in 0..cfg.limit.usage_reporting_thread_num {
         let msg_receiver = msg_receiver.clone();
         tokio::task::spawn(async move {
-            self_reporting_ingest_job(thread_id, msg_receiver, batch_size, timeout).await
+            let auth_client = auth_client.clone();
+            self_reporting_ingest_job(&auth_client, thread_id, msg_receiver, batch_size, timeout)
+                .await
         });
     }
 
     ReportingQueue::new(msg_sender)
 }
 
-fn initialize_error_queue() -> ReportingQueue {
+fn initialize_error_queue<A: AuthorizationClientTrait>(auth_client: &A) -> ReportingQueue {
     let cfg = get_config();
     let timeout = time::Duration::from_secs(
         cfg.common
@@ -82,14 +86,16 @@ fn initialize_error_queue() -> ReportingQueue {
     for thread_id in 0..cfg.limit.usage_reporting_thread_num {
         let msg_receiver = msg_receiver.clone();
         tokio::task::spawn(async move {
-            self_reporting_ingest_job(thread_id, msg_receiver, batch_size, timeout).await
+            self_reporting_ingest_job(auth_client, thread_id, msg_receiver, batch_size, timeout)
+                .await
         });
     }
 
     ReportingQueue::new(msg_sender)
 }
 
-async fn self_reporting_ingest_job(
+async fn self_reporting_ingest_job<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     msg_receiver: Arc<Mutex<mpsc::Receiver<ReportingMessage>>>,
     batch_size: usize,
@@ -113,7 +119,7 @@ async fn self_reporting_ingest_job(
                         // process any remaining data before shutting down
                         if !reporting_runner.pending.is_empty() {
                             let buffered = reporting_runner.take_batch();
-                            ingest_buffered_data(thread_id, buffered).await;
+                            ingest_buffered_data(auth_client, thread_id, buffered).await;
                         }
                         res_sender.send(()).ok();
                         break;
@@ -122,7 +128,7 @@ async fn self_reporting_ingest_job(
                         reporting_runner.push(reporting_data);
                         if reporting_runner.should_process() {
                             let buffered = reporting_runner.take_batch();
-                            ingest_buffered_data(thread_id, buffered).await;
+                            ingest_buffered_data(auth_client, thread_id, buffered).await;
                         }
                     }
                     None => break, // channel closed
@@ -131,14 +137,18 @@ async fn self_reporting_ingest_job(
             _ = interval.tick() => {
                 if reporting_runner.should_process() {
                     let buffered = reporting_runner.take_batch();
-                    ingest_buffered_data(thread_id, buffered).await;
+                    ingest_buffered_data(auth_client, thread_id, buffered).await;
                 }
             }
         }
     }
 }
 
-async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
+async fn ingest_buffered_data<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    thread_id: usize,
+    buffered: Vec<ReportingData>,
+) {
     log::debug!(
         "[SELF-REPORTING] thread_{thread_id} ingests {} buffered data",
         buffered.len()
@@ -159,7 +169,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     let cfg = get_config();
 
     if !usages.is_empty() {
-        super::ingestion::ingest_usages(usages).await;
+        super::ingestion::ingest_usages(auth_client, usages).await;
     }
 
     if !triggers.is_empty() {
@@ -169,7 +179,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             StreamType::Logs,
         );
         // on error in ingesting usage data, push back the data
-        if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
+        if super::ingestion::ingest_reporting_data(auth_client, triggers.clone(), trigger_stream)
             .await
             .is_err()
             && &cfg.common.usage_reporting_mode != "both"
@@ -191,7 +201,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
 
     if !errors.is_empty() {
         let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
-        if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
+        if super::ingestion::ingest_reporting_data(auth_client, errors.clone(), error_stream)
             .await
             .is_err()
             && &cfg.common.usage_reporting_mode != "both"

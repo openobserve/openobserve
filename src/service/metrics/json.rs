@@ -33,8 +33,8 @@ use infra::schema::{unwrap_partition_time_level, SchemaCache};
 
 use super::get_exclude_labels;
 use crate::{
+    authorization::{AuthorizationClientTrait, ObjectType},
     common::meta::{
-        authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
         stream::SchemaRecords,
     },
@@ -48,7 +48,11 @@ use crate::{
     },
 };
 
-pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
+pub async fn ingest<A: AuthorizationClientTrait>(
+    auth_client: &A,
+    org_id: &str,
+    body: web::Bytes,
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
 
@@ -358,18 +362,16 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                         Some(timestamp),
                     )
                     .await?;
-                    crate::common::utils::auth::set_ownership(
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        Authz::new(&stream_name),
-                    )
-                    .await;
+                    auth_client
+                        .set_ownership(org_id, ObjectType::MetricStream, &stream_name)
+                        .await;
                 }
                 stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
             }
 
             // check for schema evolution
             let _ = check_for_schema(
+                auth_client,
                 org_id,
                 &stream_name,
                 StreamType::Metrics,

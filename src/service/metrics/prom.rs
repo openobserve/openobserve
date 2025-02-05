@@ -42,6 +42,7 @@ use prost::Message;
 use proto::prometheus_rpc;
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::stream::SchemaRecords,
@@ -58,7 +59,8 @@ use crate::{
     },
 };
 
-pub async fn remote_write(
+pub async fn remote_write<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
@@ -442,6 +444,7 @@ pub async fn remote_write(
             drop(schema_fields);
             if need_schema_check
                 && check_for_schema(
+                    auth_client,
                     org_id,
                     &stream_name,
                     StreamType::Metrics,

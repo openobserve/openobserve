@@ -34,6 +34,7 @@ use config::{
 
 use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
     service::{
         format_stream_name,
@@ -48,7 +49,8 @@ pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
 
-pub async fn ingest(
+pub async fn ingest<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     body: web::Bytes,
@@ -536,6 +538,7 @@ pub async fn ingest(
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
         let write_result = super::write_logs_by_stream(
+            auth_client,
             thread_id,
             org_id,
             user_email,

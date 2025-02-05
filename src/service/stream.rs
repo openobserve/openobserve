@@ -41,12 +41,15 @@ use infra::{
 };
 
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::{
-        authz::Authz,
         http::HttpResponse as MetaHttpResponse,
         stream::{Stream, StreamProperty},
     },
-    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
+    service::{
+        db::{self, distinct_values},
+        metrics::get_prom_metadata_from_schema,
+    },
 };
 
 const LOCAL: &str = "disk";
@@ -540,8 +543,9 @@ pub async fn update_stream_settings(
     }
 }
 
-#[tracing::instrument]
-pub async fn delete_stream(
+#[tracing::instrument(skip(auth_client))]
+pub async fn delete_stream<A: AuthorizationClientTrait>(
+    auth_client: &A,
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -630,12 +634,9 @@ pub async fn delete_stream(
         }
     }
 
-    crate::common::utils::auth::remove_ownership(
-        org_id,
-        stream_type.as_str(),
-        Authz::new(stream_name),
-    )
-    .await;
+    auth_client
+        .remove_ownership(org_id, stream_type.into(), stream_name)
+        .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),

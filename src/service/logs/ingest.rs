@@ -42,6 +42,7 @@ use serde_json::json;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
+    authorization::AuthorizationClientTrait,
     common::meta::ingestion::{
         AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
         IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
@@ -53,7 +54,8 @@ use crate::{
     },
 };
 
-pub async fn ingest(
+pub async fn ingest<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     org_id: &str,
     in_stream_name: &str,
@@ -377,6 +379,7 @@ pub async fn ingest(
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs_by_stream(
+            auth_client,
             thread_id,
             org_id,
             user_email,

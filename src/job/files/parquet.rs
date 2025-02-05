@@ -70,10 +70,8 @@ use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use tokio::sync::{Mutex, RwLock};
 
 use crate::{
-    common::{
-        infra::wal,
-        meta::{authz::Authz, stream::SchemaRecords},
-    },
+    authorization::AuthorizationClientTrait,
+    common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_parquet_index_to_disk,
     service::{
         db,
@@ -86,7 +84,9 @@ static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run<A: AuthorizationClientTrait + 'static>(
+    auth_client: A,
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let (tx, rx) =
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(cfg.limit.file_move_thread_num);
@@ -94,6 +94,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // move files
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
+        let auth_client = auth_client.clone();
         tokio::spawn(async move {
             loop {
                 let ret = rx.lock().await.recv().await;
@@ -103,7 +104,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((prefix, files)) => {
-                        if let Err(e) = move_files(thread_id, &prefix, files).await {
+                        if let Err(e) = move_files(&auth_client, thread_id, &prefix, files).await {
                             log::error!("[INGESTER:JOB] Error moving parquet files to remote: {e}");
                         }
                     }
@@ -288,7 +289,8 @@ async fn prepare_files(
     Ok(partition_files_with_size)
 }
 
-async fn move_files(
+async fn move_files<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     prefix: &str,
     files: Vec<FileKey>,
@@ -476,15 +478,22 @@ async fn move_files(
         // yield to other tasks
         tokio::task::yield_now().await;
         // merge file and get the big file key
-        let (new_file_name, new_file_meta, new_file_list) =
-            match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!("[INGESTER:JOB] merge files failed: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-            };
+        let (new_file_name, new_file_meta, new_file_list) = match merge_files(
+            auth_client,
+            thread_id,
+            latest_schema.clone(),
+            &wal_dir,
+            &files_with_size,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[INGESTER:JOB] merge files failed: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
+            }
+        };
         if new_file_name.is_empty() {
             if new_file_list.is_empty() {
                 // no file need to merge
@@ -578,7 +587,8 @@ async fn move_files(
 
 /// merge some small files into one big file, upload to storage, returns the big
 /// file key and merged files
-async fn merge_files(
+async fn merge_files<A: AuthorizationClientTrait>(
+    auth_client: &A,
     thread_id: usize,
     latest_schema: Arc<Schema>,
     wal_dir: &Path,
@@ -787,6 +797,7 @@ async fn merge_files(
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
         generate_index_on_ingester(
+            auth_client,
             &new_file_key,
             &org_id,
             stream_type,
@@ -824,7 +835,8 @@ async fn merge_files(
 
 /// Create an inverted index file for the given file
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn generate_index_on_ingester(
+pub(crate) async fn generate_index_on_ingester<A: AuthorizationClientTrait>(
+    auth_client: &A,
     new_file_key: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -901,12 +913,9 @@ pub(crate) async fn generate_index_on_ingester(
         // update stream setting
         stream_setting = Some(settings);
 
-        crate::common::utils::auth::set_ownership(
-            org_id,
-            StreamType::Index.as_str(),
-            Authz::new(&index_stream_name),
-        )
-        .await;
+        auth_client
+            .set_ownership(org_id, StreamType::Index.into(), &index_stream_name)
+            .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
         if cfg.common.inverted_index_old_format
