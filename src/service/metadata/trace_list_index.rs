@@ -133,13 +133,13 @@ impl Metadata for TraceListIndex {
 
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::{
-                common::infra::config::get_config as get_o2_config,
-                openfga::authorizer::authz::set_ownership_if_not_exists,
+            use o2_openfga::{
+                authorizer::authz::set_ownership_if_not_exists,
+                config::get_config as get_openfga_config,
             };
 
             // set ownership only in the first time
-            if _is_new && get_o2_config().openfga.enabled {
+            if _is_new && get_openfga_config().openfga.enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
