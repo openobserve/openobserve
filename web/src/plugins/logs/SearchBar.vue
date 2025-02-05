@@ -1768,7 +1768,6 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef.value.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -1966,6 +1965,7 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
+                searchObj.meta.toggleFunction = true;
               } else {
                 populateFunctionImplementation(
                   {
