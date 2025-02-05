@@ -176,7 +176,7 @@ pub async fn search(
 
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
     let res = match handle.await {
