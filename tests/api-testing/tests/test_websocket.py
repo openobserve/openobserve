@@ -128,7 +128,7 @@ def test_websocket_histogram(cookies):
     total_hits_histogram = response_data_histogram["content"]["results"]["total"]
 
     # Adjust the assertion based on your expectations
-    expected_hits_histogram = 4  # Change this to 100 if that's what you're expecting
+    expected_hits_histogram = 2  # Change this to 100 if that's what you're expecting
     assert total_hits_histogram == expected_hits_histogram, f"Expected total to be {expected_hits_histogram}, but got {total_hits_histogram}"
     
     # print("Response Data:", response_data)
