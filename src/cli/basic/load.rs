@@ -16,7 +16,7 @@
 use config::utils::parquet::parse_file_key_columns;
 
 /// Read parquet file from object storage and generate file_list information
-pub async fn load_file_list_from_s3(prefix: &str) -> Result<(), anyhow::Error> {
+pub async fn load_file_list_from_s3(prefix: &str, insert: bool) -> Result<(), anyhow::Error> {
     if prefix.is_empty() {
         return Err(anyhow::anyhow!(
             "prefix is required, eg: files/default/logs/default/2025/"
@@ -34,19 +34,25 @@ pub async fn load_file_list_from_s3(prefix: &str) -> Result<(), anyhow::Error> {
         let (stream_key, date, file_name) = parse_file_key_columns(file)?;
         let (org, stream) = stream_key.split_once('/').unwrap();
         let file_meta = infra::storage::get_file_meta(file).await?;
-        println!(
-            "INSERT INTO file_list (org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size) VALUES ('{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, 0);",
-            org,
-            org,
-            stream,
-            date,
-            file_name,
-            file_meta.min_ts,
-            file_meta.max_ts,
-            file_meta.records,
-            file_meta.original_size,
-            file_meta.compressed_size
-        );
+        if insert {
+            if let Err(e) = infra::file_list::add(file, &file_meta).await {
+                println!("insert to db with file {} error: {}", file, e);
+            }
+        } else {
+            println!(
+                "INSERT INTO file_list (org, stream, date, file, deleted, flattened, min_ts, max_ts, records, original_size, compressed_size, index_size) VALUES ('{}', '{}/{}', '{}', '{}', FALSE, FALSE, {}, {}, {}, {}, {}, 0);",
+                org,
+                org,
+                stream,
+                date,
+                file_name,
+                file_meta.min_ts,
+                file_meta.max_ts,
+                file_meta.records,
+                file_meta.original_size,
+                file_meta.compressed_size
+            );
+        }
     }
 
     println!("Done, processed {} files", files.len());
