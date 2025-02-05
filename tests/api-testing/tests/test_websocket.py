@@ -17,7 +17,7 @@ ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment var
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
-one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+one_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 org_id = "default"
 stream_name = "default"
 
@@ -56,44 +56,44 @@ def cookies(create_session, base_url):
 
     resp_websocket = session.post(f"{url}api/{org_id}/settings", json=payload_websocket)
 
-    print(resp_websocket.content)
+    print("Enable Websocket", resp_websocket.content)
     assert (
         resp_websocket.status_code == 200
     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
     print("Websocket enable 200", resp_websocket.cookies)
     return resp_websocket.cookies  # Return cookies for the next request
 
-def test_websocket_connection(cookies):
-    """Test WebSocket connection."""
+def test_websocket_histogram(cookies):
+    """Test WebSocket connection and histogram endpoint."""
     # Prepare headers with cookies
-    cookie_header = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
+    cookie_header_histogram = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
                     f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
                     f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
 
 
     # Generate a dynamic UUID
-    dynamic_uuid = str(uuid.uuid4())  # Generates a new UUID
+    uuid_histogram = str(uuid.uuid4())  # Generates a new UUID
 
     # Construct the WebSocket URL
-    WS_URL = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{dynamic_uuid}"
+    WS_URL_histogram = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_histogram}"
 
     # Example of using the WS_URL
-    print("WebSocket URL:", WS_URL)
+    print("WebSocket Histogram URL:", WS_URL_histogram)
 
     # Now you can use WS_URL in your WebSocket connection
 
-    ws = websocket.create_connection(WS_URL, header={"Cookie": cookie_header})
+    ws_histogram = websocket.create_connection(WS_URL_histogram, header={"Cookie": cookie_header_histogram})
 
-    print("WebSocket connection established")
+    print("WebSocket histogram connection established", ws_histogram)
 
     # Generate a dynamic trace_id
-    dynamic_trace_id = str(uuid.uuid4())
+    trace_id_histogram = str(uuid.uuid4())
 
     # Prepare the message to send
-    message = {
+    message_histogram = {
         "type": "search",
         "content": {
-            "trace_id": dynamic_trace_id,  # Use dynamic trace_id
+            "trace_id": trace_id_histogram,  # Use dynamic trace_id
             "payload": {
                 "query": {
                     "sql": "SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"default\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
@@ -112,60 +112,63 @@ def test_websocket_connection(cookies):
     }
 
     # Send the message
-    ws.send(json.dumps(message))
+    ws_histogram.send(json.dumps(message_histogram))
 
     # Receive the response
-    response = ws.recv()
+    response_histogram = ws_histogram.recv()
 
-    print("WebSocket response:", response) 
+    print("WebSocket response Histogram:", response_histogram) 
 
     # Parse the JSON response
-    response_data = json.loads(response)
+    response_data_histogram = json.loads(response_histogram)
 
     # Validate the total in the response
-    total_hits = response_data["content"]["results"]["total"]
-    assert total_hits == 0, f"Expected total to be 0, but got {total_hits}"
+    total_hits_histogram = response_data_histogram["content"]["results"]["total"]
+
+    # Adjust the assertion based on your expectations
+    expected_hits_histogram = 4  # Change this to 100 if that's what you're expecting
+    assert total_hits_histogram == expected_hits_histogram, f"Expected total to be {expected_hits_histogram}, but got {total_hits_histogram}"
+    
+    # print("Response Data:", response_data)
 
 
-    ws.close()
+    ws_histogram.close()
 
 
-# def test_api_and_websocket(cookies):
-#     """Test API and WebSocket interaction."""
-#     test_websocket_connection(cookies)  # Call the WebSocket test
 
-def test_websocket_with_specific_message(cookies):
-    """Test WebSocket with specific message."""
+
+def test_websocket_sql(cookies):
+    """Test WebSocket with sql."""
     # Prepare headers with cookies
-    cookie_header = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
+    cookie_header_sql = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
                     f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
                     f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
 
     
     # Generate a dynamic UUID
-    dynamic_uuid = str(uuid.uuid4())  # Generates a new UUID
+    uuid_sql = str(uuid.uuid4())  # Generates a new UUID
 
     # Construct the WebSocket URL
-    WS_URL = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{dynamic_uuid}"
+    WS_URL_sql = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql}"
 
     # Example of using the WS_URL
-    print("WebSocket URL:", WS_URL)
+    print("WebSocket SQL URL:", WS_URL_sql)
 
     # Now you can use WS_URL in your WebSocket connection
 
-    ws = websocket.create_connection(WS_URL, header={"Cookie": cookie_header})
+    ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
 
-    print("WebSocket connection established")
+    print("WebSocket SQL connection established", ws_sql)
 
     # Generate a dynamic trace_id
-    dynamic_trace_id = str(uuid.uuid4())
+    trace_id_sql = str(uuid.uuid4())
 
 
     # Prepare the specific message to send
-    specific_message = {
+    message_sql = {
         "type": "search",
         "content": {
-            "trace_id": dynamic_trace_id,  # Use dynamic trace_id
+            "trace_id": trace_id_sql,  # Use dynamic trace_id
             "payload": {
                 "query": {
                     "sql": "SELECT * FROM \"default\"",
@@ -186,26 +189,26 @@ def test_websocket_with_specific_message(cookies):
     }
 
     # Send the specific message
-    ws.send(json.dumps(specific_message))
+    ws_sql.send(json.dumps(message_sql))
 
     # Receive the response
-    response = ws.recv()
+    response_sql = ws_sql.recv()
 
-    print("WebSocket response for specific message:", response)
+    print("WebSocket response for SQL:", response_sql)
 
     # Parse the JSON response
-    response_data = json.loads(response)
+    response_data_sql = json.loads(response_sql)
 
     # Validate the total in the response
-    total_hits = response_data["content"]["results"]["total"]
+    total_hits_sql = response_data_sql["content"]["results"]["total"]
 
     # Adjust the assertion based on your expectations
-    expected_hits = 10  # Change this to 100 if that's what you're expecting
-    assert total_hits == expected_hits, f"Expected total to be {expected_hits}, but got {total_hits}"
+    expected_hits_sql = 10  # Change this to 100 if that's what you're expecting
+    assert total_hits_sql == expected_hits_sql, f"Expected total to be {expected_hits_sql}, but got {total_hits_sql}"
     
     # print("Response Data:", response_data)
 
 
-    ws.close()
+    ws_sql.close()
 
 
