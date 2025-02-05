@@ -17,7 +17,7 @@ ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment var
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
-one_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
+ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 org_id = "default"
 stream_name = "default"
 
@@ -97,7 +97,7 @@ def test_websocket_histogram(cookies):
             "payload": {
                 "query": {
                     "sql": "SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"default\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-                    "start_time": one_min_ago,
+                    "start_time": ten_min_ago,
                     "end_time": end_time,
                     "size": -1,
                     "sql_mode": "full"
@@ -113,6 +113,8 @@ def test_websocket_histogram(cookies):
 
     # Send the message
     ws_histogram.send(json.dumps(message_histogram))
+
+    time.sleep(5)  # Increase this time if necessary
 
     # Receive the response
     response_histogram = ws_histogram.recv()
@@ -172,7 +174,7 @@ def test_websocket_sql(cookies):
             "payload": {
                 "query": {
                     "sql": "SELECT * FROM \"default\"",
-                    "start_time": one_min_ago,
+                    "start_time": ten_min_ago,
                     "end_time": end_time,
                     "from": 0,
                     "size": 10,
