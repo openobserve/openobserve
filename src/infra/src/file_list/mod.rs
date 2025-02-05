@@ -123,6 +123,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
         pk_value: Option<(i64, i64)>,
+        deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
@@ -136,8 +137,12 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<()>;
-    async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-        -> Result<()>;
+    async fn set_stream_stats(
+        &self,
+        org_id: &str,
+        streams: &[(String, StreamStats)],
+        pk_value: Option<(i64, i64)>,
+    ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,
@@ -337,9 +342,10 @@ pub async fn stats(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     pk_value: Option<(i64, i64)>,
+    deleted: bool,
 ) -> Result<Vec<(String, StreamStats)>> {
     CLIENT
-        .stats(org_id, stream_type, stream_name, pk_value)
+        .stats(org_id, stream_type, stream_name, pk_value, deleted)
         .await
 }
 
@@ -366,8 +372,12 @@ pub async fn del_stream_stats(
 }
 
 #[inline]
-pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -> Result<()> {
-    CLIENT.set_stream_stats(org_id, streams).await
+pub async fn set_stream_stats(
+    org_id: &str,
+    streams: &[(String, StreamStats)],
+    pk_value: Option<(i64, i64)>,
+) -> Result<()> {
+    CLIENT.set_stream_stats(org_id, streams, pk_value).await
 }
 
 #[inline]

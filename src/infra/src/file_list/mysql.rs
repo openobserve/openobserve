@@ -708,6 +708,7 @@ SELECT date
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
         pk_value: Option<(i64, i64)>,
+        deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (field, value) = if stream_type.is_some() && stream_name.is_some() {
             (
@@ -722,12 +723,13 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
+        let deleted_str = if deleted { "TRUE" } else { "FALSE" };
         let sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
     CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size, CAST(SUM(index_size) AS SIGNED) AS index_size
     FROM file_list 
-    WHERE {field} = '{value}'
+    WHERE {field} = '{value}' AND deleted IS {deleted_str}
             "#,
         );
         let sql = match pk_value {
@@ -801,6 +803,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         &self,
         org_id: &str,
         streams: &[(String, StreamStats)],
+        pk_value: Option<(i64, i64)>,
     ) -> Result<()> {
         let pool = CLIENT.clone();
         let old_stats = self.get_stream_stats(org_id, None, None).await?;
@@ -849,6 +852,7 @@ INSERT INTO stream_stats
         }
 
         let mut tx = pool.begin().await?;
+        // update stats
         for (stream_key, stats) in update_streams {
             DB_QUERY_NUMS
                 .with_label_values(&["update", "stream_stats"])
@@ -877,6 +881,26 @@ UPDATE stream_stats
                 return Err(e.into());
             }
         }
+        // delete files which already marked deleted
+        if let Some((min_id, max_id)) = pk_value {
+            if let Err(e) =
+                sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id > ? AND id <= ?;")
+                    .bind(min_id)
+                    .bind(max_id)
+                    .execute(&mut *tx)
+                    .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[MYSQL] rollback set stream stats error for delete file list: {}",
+                        e
+                    );
+                }
+                return Err(e.into());
+            }
+        }
+
+        // commit
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit set stream stats error: {}", e);
             return Err(e.into());

@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use config::{cluster::LOCAL_NODE, meta::stream::StreamStats};
+use hashbrown::HashMap;
 use infra::{dist_lock, file_list as infra_file_list};
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
@@ -45,9 +46,23 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     // get stats from file_list
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let stream_stats = infra_file_list::stats(&org_id, None, None, pk_value).await?;
+        let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
+            .await
+            .unwrap_or_default();
+        let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
+            .await
+            .unwrap_or_default();
+        let mut stream_stats = HashMap::new();
+        for (stream, stats) in add_stream_stats {
+            stream_stats.insert(stream, stats);
+        }
+        for (stream, stats) in del_stream_stats {
+            let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
+            *entry = &*entry - &stats;
+        }
         if !stream_stats.is_empty() {
-            infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
+            let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
+            infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value).await?;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
