@@ -656,7 +656,7 @@ export default defineComponent({
       {
         title: t("menu.rum"),
         icon: "devices",
-        link: "/rum/performance/overview",
+        link: "/rum",
         name: "rum",
       },
       {
