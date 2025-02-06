@@ -36,7 +36,7 @@
             ],
             "y": [
               {
-                "label": "",
+                "label": "Count",
                 "alias": "y_axis_1",
                 "column": "y_axis_1",
                 "color": "#5960b2",
