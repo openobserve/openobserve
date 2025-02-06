@@ -1702,8 +1702,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                // Is this correct? Should it be dfolder:TEST_FOLDER_ID?
-                o2_type: format!("dfolder:{ORG_ID}"),
+                o2_type: format!("dfolder:{FOLDER_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -1826,7 +1825,7 @@ mod tests {
                 method: format!("{GET_METHOD}"),
                 // Is this correct? Can two streams have the same name if they
                 // have different types?
-                o2_type: format!("{STREAM_NAME}:alerts"),
+                o2_type: format!("alert:{ALERT_NAME}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -1932,7 +1931,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                o2_type: format!("alert:templates"), // Is this correct?
+                o2_type: format!("template:{TEMPLATE_NAME}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -2019,7 +2018,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                o2_type: format!("alert:destinations"), // Is this correct?
+                o2_type: format!("destination:{DESTINATION_NAME}"), // Is this correct?
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
