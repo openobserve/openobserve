@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item style="padding: 0px 0px 0px 0px">
                 <q-item-section
                   class="column"
+                  no-hover
                   style="width: 60%; border-right: 1px solid lightgray"
                 >
                   <q-table
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-header
                     :wrap-cells="searchObj.meta.resultGrid.wrapCells"
                     class="saved-view-table full-height"
+                    no-hover
                     id="savedViewList"
                     :rows-per-page-options="[]"
                     :hide-bottom="
@@ -162,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list">
+                      <q-td :props="props" class="field_list" no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -189,29 +191,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
+                            <q-btn
+                              :icon="favoriteViews.includes(props.row.view_id)
                                   ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
+                                  : 'favorite_border'"
+                              :title="t('common.favourite')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
                               size="xs"
-                            />
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleUpdateSavedView(props.row)"
                           >
-                            <q-icon name="edit" color="grey" size="xs" />
+                            <q-btn
+                              icon="edit"
+                              :title="t('common.edit')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete" color="grey" size="xs" />
+                            <q-btn
+                              icon="delete"
+                              :title="t('common.delete')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -1745,7 +1768,6 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef.value.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -1943,6 +1965,7 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
+                searchObj.meta.toggleFunction = true;
               } else {
                 populateFunctionImplementation(
                   {
@@ -3067,6 +3090,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.logs-saved-view-icon:hover {
+  color: black !important;
+  background-color: lightgray !important;
+}
 .logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
