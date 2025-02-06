@@ -684,6 +684,9 @@ export default defineComponent({
       this.onStreamChange("");
     },
     handleSingleStreamSelect(opt: any) {
+      if (this.searchObj.data.stream.selectedStream.indexOf(opt.value) == -1) {
+        this.searchObj.data.stream.selectedFields = [];
+      }
       this.searchObj.data.stream.selectedStream = [opt.value];
       this.onStreamChange("");
     },
