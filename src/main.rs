@@ -115,21 +115,35 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let agent = if !cfg.profiling.enabled {
+    let pprof_guard = if !cfg.profiling.pprof_enabled {
         None
     } else {
-        let agent = PyroscopeAgent::builder(&cfg.profiling.server_url, &cfg.profiling.project_name)
-            .tags(
-                [
-                    ("role", cfg.common.node_role.as_str()),
-                    ("instance", cfg.common.instance_name.as_str()),
-                    ("version", VERSION),
-                ]
-                .to_vec(),
-            )
-            .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
             .build()
-            .expect("Failed to setup pyroscope agent");
+            .unwrap();
+        Some(guard)
+    };
+    #[cfg(feature = "profiling")]
+    let pyroscope_agent = if !cfg.profiling.pyroscope_enabled {
+        None
+    } else {
+        let agent = PyroscopeAgent::builder(
+            &cfg.profiling.pyroscope_server_url,
+            &cfg.profiling.pyroscope_project_name,
+        )
+        .tags(
+            [
+                ("role", cfg.common.node_role.as_str()),
+                ("instance", cfg.common.instance_name.as_str()),
+                ("version", VERSION),
+            ]
+            .to_vec(),
+        )
+        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+        .build()
+        .expect("Failed to setup pyroscope agent");
         #[cfg(feature = "profiling")]
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
@@ -376,9 +390,26 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "profiling")]
-    if let Some(agent) = agent {
-        let agent_ready = agent.stop().unwrap();
-        agent_ready.shutdown();
+    if let Some(guard) = pprof_guard {
+        if let Ok(report) = guard.report().build() {
+            match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
+                Ok(file) => {
+                    if let Err(e) = report.flamegraph(file) {
+                        log::error!("Failed to write flamegraph: {}", e);
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to create flamegraph file: {}", e);
+                }
+            }
+        };
+    }
+
+    #[cfg(feature = "profiling")]
+    if let Some(agent) = pyroscope_agent {
+        if let Ok(agent_ready) = agent.stop() {
+            agent_ready.shutdown();
+        }
     }
 
     log::info!("server stopped");

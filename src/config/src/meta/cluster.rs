@@ -82,7 +82,7 @@ impl Node {
         self.role.contains(&Role::Compactor) || self.role.contains(&Role::All)
     }
     pub fn is_flatten_compactor(&self) -> bool {
-        self.role.contains(&Role::FlattenCompactor) || self.role.contains(&Role::All)
+        self.role.contains(&Role::FlattenCompactor)
     }
     pub fn is_alert_manager(&self) -> bool {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)

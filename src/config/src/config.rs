@@ -368,7 +368,7 @@ pub struct Config {
     pub sns: Sns,
     pub tcp: TCP,
     pub prom: Prometheus,
-    pub profiling: Pyroscope,
+    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -446,16 +446,37 @@ pub struct Smtp {
 }
 
 #[derive(EnvConfig)]
-pub struct Pyroscope {
-    #[env_config(name = "ZO_PROF_PYROSCOPE_ENABLED", default = false)]
-    pub enabled: bool,
+pub struct Profiling {
+    #[env_config(
+        name = "ZO_PROF_PPROF_ENABLED",
+        default = false,
+        help = "Enable pprof profiling with pprof-rs"
+    )]
+    pub pprof_enabled: bool,
+    #[env_config(
+        name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
+        default = "./flamegraph.svg",
+        help = "Path to save flamegraph"
+    )]
+    pub pprof_flamegraph_path: String,
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_ENABLED",
+        default = false,
+        help = "Enable pyroscope profiling with pyroscope-rs"
+    )]
+    pub pyroscope_enabled: bool,
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040"
+        default = "http://localhost:4040",
+        help = "Pyroscope server URL"
     )]
-    pub server_url: String,
-    #[env_config(name = "ZO_PROF_PYROSCOPE_PROJECT_NAME", default = "openobserve")]
-    pub project_name: String,
+    pub pyroscope_server_url: String,
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
+        default = "openobserve",
+        help = "Pyroscope project name"
+    )]
+    pub pyroscope_project_name: String,
 }
 
 #[derive(EnvConfig)]
