@@ -827,7 +827,6 @@ UPDATE stream_stats
         }
 
         // commit
-
         if let Err(e) = tx.commit().await {
             log::error!("[SQLITE] commit set stream stats error: {}", e);
             return Err(e.into());
