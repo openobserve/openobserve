@@ -60,6 +60,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
+    // result cache can be enable only when its from the start
     let use_cache = if in_req.query.from == 0 {
         in_req.use_cache.unwrap_or(false)
     } else {
