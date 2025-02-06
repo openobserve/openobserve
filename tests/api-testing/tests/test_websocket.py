@@ -18,8 +18,8 @@ ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environme
 now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
 ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
-org_id = "default"
-stream_name = "default"
+org_id = "test_default"
+stream_name = "test_default"
 
 
 root_dir = Path(__file__).parent.parent.parent
