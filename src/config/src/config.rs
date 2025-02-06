@@ -454,6 +454,12 @@ pub struct Profiling {
     )]
     pub pprof_enabled: bool,
     #[env_config(
+        name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
+        default = false,
+        help = "Enable pprof profiling with pprof-rs encode to protobuf format"
+    )]
+    pub pprof_protobuf_enabled: bool,
+    #[env_config(
         name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
         default = "",
         help = "Path to save flamegraph"

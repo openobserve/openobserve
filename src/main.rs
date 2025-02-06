@@ -115,20 +115,18 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let pprof_guard = if !cfg.profiling.pprof_enabled {
-        None
-    } else {
+    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
         let guard = pprof::ProfilerGuardBuilder::default()
             .frequency(1000)
             .blocklist(&["libc", "libgcc", "pthread", "vdso"])
             .build()
             .unwrap();
         Some(guard)
+    } else {
+        None
     };
     #[cfg(feature = "profiling")]
-    let pyroscope_agent = if !cfg.profiling.pyroscope_enabled {
-        None
-    } else {
+    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
         let agent = PyroscopeAgent::builder(
             &cfg.profiling.pyroscope_server_url,
             &cfg.profiling.pyroscope_project_name,
@@ -147,6 +145,8 @@ async fn main() -> Result<(), anyhow::Error> {
         #[cfg(feature = "profiling")]
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
+    } else {
+        None
     };
 
     // cli mode
@@ -392,14 +392,36 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     if let Some(guard) = pprof_guard {
         if let Ok(report) = guard.report().build() {
-            match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
-                Ok(file) => {
-                    if let Err(e) = report.flamegraph(file) {
-                        log::error!("Failed to write flamegraph: {}", e);
+            if cfg.profiling.pprof_protobuf_enabled {
+                let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
+                match std::fs::File::create(&pb_file) {
+                    Ok(mut file) => {
+                        use std::io::Write;
+
+                        use pprof::protos::Message;
+
+                        if let Ok(profile) = report.pprof() {
+                            let mut content = Vec::new();
+                            profile.encode(&mut content).unwrap();
+                            if let Err(e) = file.write_all(&content) {
+                                log::error!("Failed to write flamegraph: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
                     }
                 }
-                Err(e) => {
-                    log::error!("Failed to create flamegraph file: {}", e);
+            } else {
+                match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
+                    Ok(file) => {
+                        if let Err(e) = report.flamegraph(file) {
+                            log::error!("Failed to write flamegraph: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
+                    }
                 }
             }
         };
