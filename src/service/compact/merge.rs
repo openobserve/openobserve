@@ -666,7 +666,7 @@ pub async fn merge_by_stream(
                         // recalculate stream stats
                         if !error_files.is_empty() {
                             log::debug!("[COMPACT] found error files: {:?}", error_files);
-                            for file in new_file_list {
+                            for file in delete_file_list {
                                 if error_files.contains(&file.key) {
                                     stream_stats = stream_stats + &file.meta;
                                 }
