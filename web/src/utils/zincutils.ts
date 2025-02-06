@@ -23,6 +23,7 @@ import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
 import store from "../stores";
+import cronParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -502,7 +503,12 @@ export const formatSizeFromMB = (sizeInMB: string) => {
     index++;
   }
 
-  return `${size.toFixed(2)} ${units[index]}`;
+  let new_size = size.toFixed(2);
+  if (new_size == "0.00" && size > 0) {
+    new_size = "0.01";
+  }
+
+  return `${new_size} ${units[index]}`;
 };
 
 export const addCommasToNumber = (number: number) => {
@@ -1013,4 +1019,28 @@ export function convertUnixToQuasarFormat(unixMicroseconds: any) {
   const dateToFormat = new Date(unixSeconds * 1000);
   const formattedDate = dateToFormat.toISOString();
   return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
+export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
+  } catch (err) {
+    throw new Error("Invalid cron expression");
+  }
+}
+
+export function isAboveMinRefreshInterval(
+  value: number,
+  config: { min_auto_refresh_interval?: string | number },
+) {
+  const minInterval = Number(config?.min_auto_refresh_interval) || 1;
+  return value >= minInterval;
 }

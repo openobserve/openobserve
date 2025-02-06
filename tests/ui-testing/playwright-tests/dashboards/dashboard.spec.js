@@ -1781,7 +1781,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-sort-by-item-asc"]').click(); //Filter A to C
 
-    await page.locator('[data-test="chart-renderer"] canvas').click({
+    await page.locator('[data-test="chart-renderer"] canvas').last().click({
       position: {
         x: 829,
         y: 31,

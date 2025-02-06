@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -70,7 +70,19 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
-        self.batch_remove(&[file.to_string()]).await
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let pool = client.clone();
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+
+        sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
+            .bind(stream_key)
+            .bind(date_key)
+            .bind(file_name)
+            .execute(&pool)
+            .await?;
+        Ok(())
     }
 
     async fn batch_add(&self, files: &[FileKey]) -> Result<()> {
@@ -89,10 +101,11 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>> {
         if files.is_empty() {
-            return Ok(());
+            return Ok(Vec::new());
         }
+        let mut error_files = Vec::new();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
@@ -113,7 +126,10 @@ impl super::FileList for SqliteFileList {
                 .await
                 {
                     Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => continue,
+                    Err(sqlx::Error::RowNotFound) => {
+                        error_files.push(file.to_string());
+                        continue;
+                    }
                     Err(e) => return Err(e.into()),
                 };
                 match ret {
@@ -131,7 +147,7 @@ impl super::FileList for SqliteFileList {
                 _ = pool.execute(sql.as_str()).await?;
             }
         }
-        Ok(())
+        Ok(error_files)
     }
 
     async fn batch_add_deleted(
@@ -343,6 +359,46 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .fetch_all(&pool)
             .await
         };
+        Ok(ret?
+            .iter()
+            .map(|r| {
+                (
+                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                    r.into(),
+                )
+            })
+            .collect())
+    }
+
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
+    ) -> Result<Vec<(String, FileMeta)>> {
+        if let Some((start, end)) = date_range.as_ref() {
+            if start.is_empty() && end.is_empty() {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT_RO.clone();
+        let (date_start, date_end) = date_range.unwrap_or(("".to_string(), "".to_string()));
+        let ret = sqlx::query_as::<_, super::FileRecord>(
+                r#"
+SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+    FROM file_list
+    WHERE stream = $1 AND date >= $2 AND date <= $3;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(date_start)
+            .bind(date_end)
+            .fetch_all(&pool)
+            .await;
         Ok(ret?
             .iter()
             .map(|r| {
@@ -720,9 +776,9 @@ UPDATE stream_stats
             .bind(stats.doc_time_min)
             .bind(stats.doc_time_max)
             .bind(stats.doc_num)
-            .bind(stats.storage_size)
-            .bind(stats.compressed_size)
-            .bind(stats.index_size)
+            .bind(stats.storage_size as i64)
+            .bind(stats.compressed_size as i64)
+            .bind(stats.index_size as i64)
             .bind(stream_key)
             .execute(&mut *tx)
             .await
@@ -935,13 +991,19 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(())
     }
 
-    async fn set_job_done(&self, id: i64) -> Result<()> {
+    async fn set_job_done(&self, ids: &[i64]) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(r#"UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id = $3;"#)
+        let sql = format!(
+            "UPDATE file_list_jobs SET status = $1, updated_at = $2 WHERE id IN ({});",
+            ids.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        sqlx::query(&sql)
             .bind(super::FileListJobStatus::Done)
             .bind(config::utils::time::now_micros())
-            .bind(id)
             .execute(&*client)
             .await?;
         Ok(())
@@ -1294,6 +1356,11 @@ pub async fn create_table_index() -> Result<()> {
             "file_list_stream_ts_idx",
             "file_list",
             &["stream", "max_ts", "min_ts"],
+        ),
+        (
+            "file_list_stream_date_idx",
+            "file_list",
+            &["stream", "date"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (

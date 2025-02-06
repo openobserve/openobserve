@@ -402,18 +402,6 @@ pub static COMPACT_MERGED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static COMPACT_DELAY_HOURS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "compact_delay_hours",
-            "Compactor delay hours. ".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
-    )
-    .expect("Metric created")
-});
 pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -835,9 +823,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_MERGED_BYTES.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(COMPACT_DELAY_HOURS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))

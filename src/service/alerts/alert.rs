@@ -25,8 +25,10 @@ use config::{
     meta::{
         alerts::{
             alert::{Alert, AlertListFilter, ListAlertsParams},
-            destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
+        },
+        destinations::{
+            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
         },
         folder::{Folder, FolderType, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
@@ -126,7 +128,7 @@ pub enum AlertError {
     SendNotificationError { error_message: String },
 
     #[error(transparent)]
-    GetDestinationWithTemplateError(anyhow::Error),
+    GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
     #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
     PeriodExceedsMaxQueryRange {
@@ -149,7 +151,7 @@ pub enum AlertError {
 
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
-    NotSupportedAlertDestinationType(DestinationType),
+    NotSupportedAlertDestinationType(Module),
 }
 
 pub async fn save(
@@ -285,10 +287,8 @@ async fn prepare_alert(
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
-                if d.is_remote_pipeline() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(
-                        d.destination_type,
-                    ));
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
                 }
             }
             Err(_) => {
@@ -731,12 +731,19 @@ impl AlertExt for Alert {
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
-            let dest = destinations::get_with_template(&self.org_id, dest)
-                .await
-                .map_err(AlertError::GetDestinationWithTemplateError)?;
+            let (dest, template) = destinations::get_with_template(&self.org_id, dest).await?;
+            let Module::Alert {
+                destination_type, ..
+            } = dest.module
+            else {
+                return Err(AlertError::GetDestinationWithTemplateError(
+                    db::alerts::destinations::DestinationError::UnsupportedType,
+                ));
+            };
             match send_notification(
                 self,
-                &dest,
+                &destination_type,
+                &template,
                 rows,
                 rows_end_time,
                 start_time,
@@ -778,7 +785,8 @@ impl AlertExt for Alert {
 
 async fn send_notification(
     alert: &Alert,
-    dest: &DestinationWithTemplate,
+    dest_type: &DestinationType,
+    template: &Template,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
@@ -789,9 +797,9 @@ async fn send_notification(
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let is_email = dest.destination_type == DestinationType::Email;
+    let is_email = matches!(dest_type, DestinationType::Email(_));
     let msg: String = process_dest_template(
-        &dest.template.body,
+        &template.body,
         alert,
         rows,
         &rows_tpl_val,
@@ -804,9 +812,9 @@ async fn send_notification(
     )
     .await;
 
-    let email_subject = if !dest.template.title.is_empty() {
+    let email_subject = if let TemplateType::Email { title } = &template.template_type {
         process_dest_template(
-            &dest.template.title,
+            title,
             alert,
             rows,
             &rows_tpl_val,
@@ -819,34 +827,26 @@ async fn send_notification(
         )
         .await
     } else {
-        dest.template.name.clone()
+        template.name.clone()
     };
 
-    match dest.destination_type {
-        DestinationType::Http => send_http_notification(dest, msg.clone()).await,
-        DestinationType::Email => send_email_notification(&email_subject, dest, msg).await,
-        DestinationType::Sns => send_sns_notification(&alert.name, dest, msg).await,
-        DestinationType::RemotePipeline => {
-            // do nothing
-            log::warn!("Remote pipeline destination not supported in send_notification");
-            Ok("".to_string())
-        }
+    match dest_type {
+        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
+        DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
+        DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
     }
 }
 
-async fn send_http_notification(
-    dest: &DestinationWithTemplate,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    let client = if dest.skip_tls_verify {
+async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
+    let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()?
     } else {
         reqwest::Client::new()
     };
-    let url = url::Url::parse(&dest.url)?;
-    let mut req = match dest.method {
+    let url = url::Url::parse(&endpoint.url)?;
+    let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),
         HTTPType::PUT => client.put(url),
         HTTPType::GET => client.get(url),
@@ -854,7 +854,7 @@ async fn send_http_notification(
 
     // Add additional headers if any from destination description
     let mut has_context_type = false;
-    if let Some(headers) = &dest.headers {
+    if let Some(headers) = &endpoint.headers {
         for (key, value) in headers.iter() {
             if !key.is_empty() && !value.is_empty() {
                 if key.to_lowercase().trim() == "content-type" {
@@ -874,7 +874,7 @@ async fn send_http_notification(
     let resp_body = resp.text().await?;
     log::debug!(
         "Alert sent to destination {} with status: {}, body: {:?}",
-        dest.url,
+        endpoint.url,
         resp_status,
         resp_body,
     );
@@ -897,7 +897,7 @@ async fn send_http_notification(
 
 async fn send_email_notification(
     email_subject: &str,
-    dest: &DestinationWithTemplate,
+    email: &Email,
     msg: String,
 ) -> Result<String, anyhow::Error> {
     let cfg = get_config();
@@ -905,11 +905,7 @@ async fn send_email_notification(
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
     }
 
-    let mut recipients = vec![];
-    for recipient in &dest.emails {
-        recipients.push(recipient);
-    }
-
+    let recipients = email.recipients.clone();
     let mut email = Message::builder()
         .from(cfg.smtp.smtp_from_email.parse()?)
         .subject(email_subject.to_string());
@@ -935,7 +931,7 @@ async fn send_email_notification(
 
 async fn send_sns_notification(
     alert_name: &str,
-    dest: &DestinationWithTemplate,
+    aws_sns: &AwsSns,
     msg: String,
 ) -> Result<String, anyhow::Error> {
     let mut message_attributes = HashMap::new();
@@ -950,11 +946,7 @@ async fn send_sns_notification(
     let sns_client = config::get_sns_client().await;
     let ret = sns_client
         .publish()
-        .topic_arn(
-            dest.sns_topic_arn
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("SNS Topic ARN is missing"))?,
-        )
+        .topic_arn(&aws_sns.sns_topic_arn)
         .message(msg)
         .set_message_attributes(Some(message_attributes))
         .send()

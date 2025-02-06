@@ -321,7 +321,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             data-test="logs-search-bar-function-dropdown"
             v-model="functionModel"
-            auto-close
             size="12px"
             icon="save"
             :icon-right="iconRight"
@@ -331,16 +330,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="fnSavedFunctionDialog"
           >
             <q-list data-test="logs-search-saved-function-list">
-              <q-item-label header class="q-pa-sm">{{
-                t("search.functionPlaceholder")
-              }}</q-item-label>
-              <q-separator inset></q-separator>
+              <!-- Search Input -->
+              <div>
+                <q-input
+                  v-model="searchTerm"
+                  dense
+                  filled
+                  borderless
+                  clearable
+                  debounce="300"
+                  :placeholder="t('search.searchSavedFunction')"
+                  data-test="function-search-input"
+                >
+                  <template #prepend>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+              </div>
 
-              <div v-if="functionOptions.length">
+              <div v-if="filteredFunctionOptions.length">
                 <q-item
-                  class="q-pa-sm saved-view-item"
+                  class="tw-border-b saved-view-item"
                   clickable
-                  v-for="(item, i) in functionOptions"
+                  v-for="(item, i) in filteredFunctionOptions"
                   :key="'saved-view-' + i"
                   v-close-popup
                 >
@@ -447,6 +459,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-xs q-px-none logs-auto-refresh-interval"
               v-model="searchObj.meta.refreshInterval"
               :trigger="true"
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval ?? 0
+              "
               @update:model-value="onRefreshIntervalUpdate"
               @trigger="$emit('onAutoIntervalTrigger')"
             />
@@ -804,7 +819,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!saveViewLoader"
             unelevated
             no-caps
-            :label="t('confirmDialog.ok')"
+            :label="t('common.save')"
             color="primary"
             class="text-bold"
             @click="handleSavedView"
@@ -1215,6 +1230,13 @@ export default defineComponent({
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
+    const searchTerm = ref(""); 
+    const filteredFunctionOptions = computed(() => {
+      if (!searchTerm.value) return functionOptions.value;
+      return functionOptions.value.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.value.toLowerCase())
+      );
+    });
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
 
@@ -2858,6 +2880,8 @@ export default defineComponent({
       fnParsedSQL,
       iconRight,
       functionToggleIcon,
+      searchTerm,
+      filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
       updateSavedViews,
@@ -3290,7 +3314,7 @@ export default defineComponent({
   }
 
   .saved-view-item {
-    padding: 4px 5px !important;
+    padding: 2px 4px !important;
   }
 
   .body--dark {

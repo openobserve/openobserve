@@ -45,6 +45,7 @@ import {
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
+import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -55,6 +56,7 @@ export const convertMultiSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  annotations: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     return { options: null };
@@ -73,6 +75,7 @@ export const convertMultiSQLData = async (
         [resultMetaData.value[i]],
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
+        annotations,
       ),
     );
   }
@@ -108,6 +111,7 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
   chartPanelStyle: any,
+  annotations: any,
 ) => {
   // if no data than return it
   if (
@@ -455,6 +459,10 @@ export const convertSQLData = async (
     }
   }
 
+  const convertedTimeStampToDataFormat = new Date(
+    annotations?.value?.[0]?.start_time / 1000,
+  ).toString();
+
   /**
    * Returns the largest label from the stacked chart data.
    * Calculates the largest value for each unique breakdown and sums those values.
@@ -633,8 +641,31 @@ export const convertSQLData = async (
 
       options.title = [];
 
+      // Store original series
+      const originalSeries = [...options.series];
+      options.series = [];
+
       // Configure each series with its corresponding grid index
-      options.series.forEach((series: any, index: number) => {
+      originalSeries.forEach((series: any, index: number) => {
+        // Add the original series
+        const updatedSeries = {
+          ...series,
+          xAxisIndex: index,
+          yAxisIndex: index,
+          zlevel: 2,
+        };
+        options.series.push(updatedSeries);
+
+        options.series.push({
+          type: "line",
+          xAxisIndex: index,
+          yAxisIndex: index,
+          data: [[convertedTimeStampToDataFormat, null]],
+          markArea: getSeriesMarkArea(),
+          markLine: getAnnotationMarkLine(),
+          zlevel: 1,
+        });
+
         if (index > 0) {
           options.xAxis.push({
             ...deepCopy(options.xAxis[0]),
@@ -721,7 +752,7 @@ export const convertSQLData = async (
           .flat()
           .filter((value: any) => typeof value === "number"),
       ),
-      panelSchema.config?.unit,
+      "null", // We don't need to add unit, as we are only calculating the max value. Unit will format the value
       panelSchema.config?.unit_custom,
       panelSchema.config?.decimals,
     );
@@ -741,7 +772,8 @@ export const convertSQLData = async (
 
     options.yAxis.forEach((it: any, index: number) => {
       if (addMaxValue) {
-        it.max = maxYValue.value;
+        const rounedMaxValue = Math.ceil(parseFloat(maxYValue.value));
+        it.max = rounedMaxValue + rounedMaxValue * 0.1; // Add 10% to the max value, to ensure that the max value is not at the top of the chart
       }
 
       it.axisLabel = {
@@ -1139,11 +1171,35 @@ export const convertSQLData = async (
     };
   };
 
+  const { markLines, markAreas } = getAnnotationsData(
+    annotations,
+    store.state.timezone,
+  );
+
   const getSeriesMarkLine = () => {
     return {
       silent: true,
       animation: false,
       data: getMarkLineData(panelSchema),
+    };
+  };
+
+  const getAnnotationMarkLine = () => {
+    return {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.5)",
+      },
+      silent: false,
+      animation: false,
+      data: markLines,
+    };
+  };
+  const getSeriesMarkArea = () => {
+    return {
+      itemStyle: {
+        color: "rgba(0, 191, 255, 0.15)",
+      },
+      data: markAreas,
     };
   };
 
@@ -1178,6 +1234,7 @@ export const convertSQLData = async (
       label: getSeriesLabel(),
       // markLine if exist
       markLine: getSeriesMarkLine(),
+      // markArea: getSeriesMarkArea(),
       // config to connect null values
       connectNulls: panelSchema.config?.connect_nulls ?? false,
       large: true,
@@ -1191,6 +1248,7 @@ export const convertSQLData = async (
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
+      zlevel: 2,
     };
   };
 
@@ -2424,7 +2482,7 @@ export const convertSQLData = async (
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
         const total = options?.series?.reduce(
           (sum: number, currentSeries: any) =>
-            sum + currentSeries?.data[i] ?? 0,
+            sum + (currentSeries?.data[i] ?? 0),
           0,
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
@@ -2506,6 +2564,29 @@ export const convertSQLData = async (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+
+  if (
+    [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.type) &&
+    isTimeSeriesFlag &&
+    !panelSchema.config.trellis?.layout
+  ) {
+    options.series.push({
+      type: "line",
+      data: [[convertedTimeStampToDataFormat, null]],
+      markLine: getAnnotationMarkLine(),
+      markArea: getSeriesMarkArea(),
+      zlevel: 1,
+    });
+  }
 
   return {
     options,

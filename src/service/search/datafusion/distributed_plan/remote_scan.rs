@@ -26,7 +26,7 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::meta::search::ScanStats;
+use config::{meta::search::ScanStats, utils::rand::generate_random_string};
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -189,7 +189,7 @@ async fn get_remote_batch(
     let is_querier = remote_scan_node.is_querier(partition);
 
     let mut request = remote_scan_node.get_flight_search_request(partition);
-    request.set_job_id(config::ider::uuid());
+    request.set_job_id(generate_random_string(7));
     request.set_partition(partition);
 
     log::info!(

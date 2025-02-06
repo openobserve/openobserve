@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -331,20 +331,34 @@ pub async fn run_merge(
         return Ok(());
     }
 
+    let now = config::utils::time::now();
+    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
+
     // check the stream, if the stream partition_time_level is daily or compact step secs less than
     // 1 hour, we only allow one compactor to working on it
     let mut need_release_ids = Vec::new();
+    let mut need_done_ids = Vec::new();
     for job in jobs.iter() {
         let columns = job.stream.split('/').collect::<Vec<&str>>();
         assert_eq!(columns.len(), 3);
         let org_id = columns[0].to_string();
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2].to_string();
-        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+        let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
         let partition_time_level =
-            unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        // to avoid compacting conflict with retention, need check the data retention time
+        let stream_data_retention_end = if stream_settings.data_retention > 0 {
+            now - Duration::try_days(stream_settings.data_retention).unwrap()
+        } else {
+            data_lifecycle_end
+        };
+        if job.offsets <= stream_data_retention_end.timestamp_micros() {
+            need_done_ids.push(job.id); // the data will be deleted by retention, just skip
+            continue;
+        }
         if partition_time_level == PartitionTimeLevel::Daily {
             // check if this stream need process by this node
             let Some(node_name) =
@@ -357,6 +371,15 @@ pub async fn run_merge(
             }
         }
     }
+
+    if !need_done_ids.is_empty() {
+        // set those jobs to done
+        if let Err(e) = infra_file_list::set_job_done(&need_done_ids).await {
+            log::error!("[COMPACT] set_job_done failed: {}", e);
+        }
+        jobs.retain(|job| !need_done_ids.contains(&job.id));
+    }
+
     if !need_release_ids.is_empty() {
         // release those jobs
         if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {

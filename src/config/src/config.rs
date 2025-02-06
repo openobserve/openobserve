@@ -1258,6 +1258,12 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
+    #[env_config(
+        name = "ZO_TEXT_DATA_TYPE",
+        default = "longtext",
+        help = "Default data type for LongText compliant DB's"
+    )]
+    pub db_text_data_type: String,
 }
 
 #[derive(EnvConfig)]
@@ -2269,6 +2275,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 7;
+    }
+    if cfg.compact.old_data_min_hours < 1 {
+        cfg.compact.old_data_min_hours = 2;
     }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;

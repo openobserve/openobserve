@@ -864,7 +864,7 @@ const useLogs = () => {
         req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3482,7 +3482,7 @@ const useLogs = () => {
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
         );
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3671,7 +3671,8 @@ const useLogs = () => {
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
+        router.currentRoute.value.name == "logs" &&
+        enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
@@ -3697,6 +3698,16 @@ const useLogs = () => {
         }
       } else {
         clearInterval(store.state.refreshIntervalID);
+      }
+
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs" &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+        clearInterval(store.state.refreshIntervalID);
+        store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
       console.log("Error while refreshing data", e);
@@ -3829,9 +3840,21 @@ const useLogs = () => {
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
-    if (queryParams.refresh) {
+
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
@@ -3878,6 +3901,12 @@ const useLogs = () => {
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
+  };
+
+  const enableRefreshInterval = (value: number) => {
+    return (
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
+    );
   };
 
   const showNotification = () => {
@@ -4672,18 +4701,28 @@ const useLogs = () => {
         return;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, {
+      const payload = {
         type: "search",
         content: {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
-          },
+          } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
         },
-      });
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(requestId, payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -5461,6 +5500,7 @@ const useLogs = () => {
     extractValueQuery,
     initialQueryPayload,
     refreshPagination,
+    enableRefreshInterval,
   };
 };
 

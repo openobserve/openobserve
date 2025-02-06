@@ -365,6 +365,7 @@ impl FromRequest for AuthExtractor {
                 )
             } else if method.eq("GET")
                 && (path_columns[1].starts_with("dashboards")
+                    || path_columns[1].starts_with("folders")
                     || path_columns[1].starts_with("actions"))
             {
                 format!(
@@ -401,7 +402,7 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("PUT")
                 && path_columns[1] != "streams"
                 && path_columns[1] != "pipelines"
-                || method.eq("DELETE")
+                || method.eq("DELETE") && path_columns[3] != "annotations"
             {
                 // for put on on-stream, non-pipeline such as specific alert/template/destination
                 // or delete on any such (stream/pipeline delete are not 4-part routes)
@@ -435,6 +436,19 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS
                         .get(path_columns[1])
                         .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("GET")
+                && (path_columns[2].eq("templates")
+                    || path_columns[2].eq("destinations")
+                    || path_columns[2].eq("alerts"))
+            {
+                // To access templates, you need GET permission on the template
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
                     path_columns[3]
                 )
             } else {

@@ -7,7 +7,7 @@ const streamName = `stream${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  //  await page.getByText('Login as internal user').click();
+  // await page.getByText('Login as internal user').click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -138,6 +138,12 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
 
     await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
+    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.keyboard.type("str_match(_all, \'test\')");
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    const errorMessage = page.locator('[data-test="logs-search-error-message"]');
+    await expect(errorMessage).not.toBeVisible();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');

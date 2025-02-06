@@ -19,6 +19,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
 use ingester::Entry;
@@ -150,11 +151,15 @@ impl PipelineReceiver {
         let destination_name = self.get_destination_name().await?;
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name.as_str()).await {
-            Ok(data) => {
-                if data.url.ends_with('/') {
-                    Ok(data.url.trim_end_matches('/').to_string())
+            Ok(dest) => {
+                if let meta_dest::Module::Pipeline { endpoint } = dest.module {
+                    if endpoint.url.ends_with('/') {
+                        Ok(endpoint.url.trim_end_matches('/').to_string())
+                    } else {
+                        Ok(endpoint.url)
+                    }
                 } else {
-                    Ok(data.url)
+                    Ok("".to_string())
                 }
             }
             Err(_) => Ok("".to_string()),
@@ -163,7 +168,13 @@ impl PipelineReceiver {
 
     pub async fn get_skip_tls_verify(&self, org_id: &str, destination_name: &str) -> bool {
         match destinations::get(org_id, destination_name).await {
-            Ok(data) => data.skip_tls_verify,
+            Ok(dest) => {
+                if let meta_dest::Module::Pipeline { endpoint } = dest.module {
+                    endpoint.skip_tls_verify
+                } else {
+                    true
+                }
+            }
             Err(_) => true,
         }
     }
@@ -172,7 +183,13 @@ impl PipelineReceiver {
         let destination_name = self.get_destination_name().await.unwrap_or("".to_string());
         let org_id = self.get_org_id();
         match destinations::get(org_id, destination_name.as_str()).await {
-            Ok(data) => data.headers,
+            Ok(dest) => {
+                if let meta_dest::Module::Pipeline { endpoint } = dest.module {
+                    endpoint.headers
+                } else {
+                    None
+                }
+            }
             Err(_) => None,
         }
     }
