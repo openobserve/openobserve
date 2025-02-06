@@ -60,7 +60,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Build frontend code
         env:
@@ -85,7 +85,7 @@ jobs:
     runs-on:
       labels: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
     strategy:
       matrix:

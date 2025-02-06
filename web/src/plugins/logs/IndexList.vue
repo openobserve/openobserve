@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="searchObj.data.stream.selectedStream"
         :options="streamOptions"
         data-cy="index-dropdown"
+        :placeholder="placeHolderText"
         input-debounce="0"
         behavior="menu"
         filled
         borderless
         dense
         use-input
-        fill-input
         multiple
         emit-value
         map-options
@@ -1184,6 +1184,12 @@ export default defineComponent({
       );
     };
 
+    const placeHolderText = computed(() => {
+      return searchObj.data.stream?.selectedStream?.length === 0
+        ? "Select Stream"
+        : "";
+    });
+
     return {
       t,
       store,
@@ -1253,6 +1259,7 @@ export default defineComponent({
       }),
       formatLargeNumber,
       sortedStreamFields,
+      placeHolderText
     };
   },
 });
