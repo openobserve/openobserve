@@ -728,6 +728,7 @@ pub async fn search_partition(
     if part_num > 1000 {
         part_num = 1000;
     }
+    part_num = 3;
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
     if step < min_step {
@@ -908,6 +909,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 }
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:search:cancel_query", skip_all, fields(trace_id = %trace_id))]
 pub async fn cancel_query(
     _org_id: &str,
     trace_id: &str,
