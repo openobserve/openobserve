@@ -21,7 +21,9 @@ use actix_web::{
 };
 use config::{get_config, utils::base64};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_dex::config::get_config as get_dex_config;
+#[cfg(feature = "enterprise")]
+use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::{
     common::{
@@ -182,11 +184,7 @@ pub async fn validate_credentials(
 
     #[cfg(feature = "enterprise")]
     {
-        if !o2_enterprise::enterprise::common::infra::config::get_config()
-            .dex
-            .native_login_enabled
-            && !user.is_external
-        {
+        if !get_dex_config().native_login_enabled && !user.is_external {
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
@@ -198,11 +196,7 @@ pub async fn validate_credentials(
             });
         }
 
-        if o2_enterprise::enterprise::common::infra::config::get_config()
-            .dex
-            .root_only_login
-            && !is_root_user(user_id)
-        {
+        if get_dex_config().root_only_login && !is_root_user(user_id) {
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
@@ -764,7 +758,7 @@ pub(crate) async fn check_permissions(
     role: UserRole,
     _is_external: bool,
 ) -> bool {
-    if !get_o2_config().openfga.enabled || role.eq(&UserRole::Root) {
+    if !get_openfga_config().enabled || role.eq(&UserRole::Root) {
         return true;
     }
 
@@ -780,7 +774,7 @@ pub(crate) async fn check_permissions(
         &auth_info.org_id
     };
 
-    o2_enterprise::enterprise::openfga::authorizer::authz::is_allowed(
+    o2_openfga::authorizer::authz::is_allowed(
         org_id,
         user_id,
         &auth_info.method,
@@ -808,13 +802,7 @@ async fn list_objects(
     object_type: &str,
     org_id: &str,
 ) -> Result<Vec<String>, anyhow::Error> {
-    o2_enterprise::enterprise::openfga::authorizer::authz::list_objects(
-        user_id,
-        permission,
-        object_type,
-        org_id,
-    )
-    .await
+    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id).await
 }
 
 #[cfg(feature = "enterprise")]
@@ -824,8 +812,8 @@ pub(crate) async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> Result<Option<Vec<String>>, Error> {
-    let o2cfg = get_o2_config();
-    if !is_root_user(user_id) && o2cfg.openfga.enabled && o2cfg.openfga.list_only_permitted {
+    let openfga_config = get_openfga_config();
+    if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
         match crate::handler::http::auth::validator::list_objects(
             user_id,
             permission,
