@@ -59,7 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">#</div>
           <div class="header-item">{{ t("dashboard.name") }}</div>
           <div class="header-item">{{ t("dashboard.type") }}</div>
-          <div class="header-item q-ml-lg">{{ t("dashboard.actions") }}</div>
+          <div class="header-item q-ml-lg q-pl-lg">
+            {{ t("dashboard.actions") }}
+          </div>
         </div>
 
         <draggable
@@ -377,7 +379,6 @@ export default defineComponent({
   display: grid;
   grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 120px;
   padding: 8px 0;
-  margin-bottom: 8px;
   font-weight: 900;
   border-bottom: 1px solid #cccccc70;
 
@@ -393,8 +394,10 @@ export default defineComponent({
   grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
   border-radius: 4px;
-  margin-bottom: 4px;
   border-bottom: 1px solid #cccccc70;
+  &:hover {
+    background-color: #cccccc10;
+  }
 }
 
 .draggable-handle {
@@ -410,7 +413,6 @@ export default defineComponent({
   display: grid;
   grid-template-columns: 80px minmax(200px, 1fr) 150px 120px;
   align-items: center;
-  padding: 8px 16px 8px 0;
 
   .item-name {
     padding-right: 16px;
