@@ -67,10 +67,6 @@ use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
     query_cache_server::QueryCacheServer, search_server::SearchServer,
 };
-#[cfg(feature = "profiling")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
@@ -80,6 +76,11 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+#[cfg(feature = "pyroscope")]
+use {
+    pyroscope::PyroscopeAgent,
+    pyroscope_pprofrs::{pprof_backend, PprofConfig},
+};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -125,7 +126,9 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         None
     };
-    #[cfg(feature = "profiling")]
+
+    // setup pyroscope
+    #[cfg(feature = "pyroscope")]
     let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
         let agent = PyroscopeAgent::builder(
             &cfg.profiling.pyroscope_server_url,
@@ -142,7 +145,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
         .build()
         .expect("Failed to setup pyroscope agent");
-        #[cfg(feature = "profiling")]
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
     } else {
@@ -389,6 +391,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .await;
     }
 
+    // stop profiling
     #[cfg(feature = "profiling")]
     if let Some(guard) = pprof_guard {
         if let Ok(report) = guard.report().build() {
@@ -427,7 +430,8 @@ async fn main() -> Result<(), anyhow::Error> {
         };
     }
 
-    #[cfg(feature = "profiling")]
+    // stop pyroscope
+    #[cfg(feature = "pyroscope")]
     if let Some(agent) = pyroscope_agent {
         if let Ok(agent_ready) = agent.stop() {
             agent_ready.shutdown();
