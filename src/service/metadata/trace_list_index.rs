@@ -218,6 +218,7 @@ impl TraceListIndex {
                 distinct_value_fields: vec![],
                 index_updated_at: 0,
                 extended_retention_days: vec![],
+                scan_keys: vec![],
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

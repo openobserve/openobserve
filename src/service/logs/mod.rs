@@ -201,11 +201,11 @@ use rayon::prelude::*;
 fn parallel_batch_redact(
     org_id: &str,
     records: &mut [(i64, serde_json::Map<String, serde_json::Value>)],
-    keys: &[&str],
+    keys: &Vec<String>,
 ) {
     records.par_iter_mut().for_each(|(_, map)| {
         for key in keys {
-            if let Some(value) = map.get_mut(*key) {
+            if let Some(value) = map.get_mut(&*key) {
                 if let Some(text) = value.as_str() {
                     *value = serde_json::Value::String(
                         PATTERN_MANAGER
@@ -221,11 +221,11 @@ fn parallel_batch_redact(
 fn parallel_batch_scan(
     org_id: &str,
     records: &mut [(i64, serde_json::Map<String, serde_json::Value>)],
-    keys: &[&str],
+    keys: &Vec<String>,
 ) {
     records.par_iter_mut().for_each(|(_, map)| {
         for key in keys {
-            if let Some(value) = map.get_mut(*key) {
+            if let Some(value) = map.get_mut(&*key) {
                 if let Some(text) = value.as_str() {
                     let _ = PATTERN_MANAGER.scan(org_id, text).unwrap();
                 }
@@ -249,14 +249,17 @@ async fn write_logs_by_stream(
             log::warn!("stream [{stream_name}] is being deleted");
             continue; // skip
         }
-        if get_config().common.enable_redaction {
-            let start = Instant::now();
-            parallel_batch_redact(org_id, &mut json_data, &["message"]);
-            println!("redact time: {:?}", start.elapsed());
+
+        let stream_settings = infra::schema::get_settings(org_id, &stream_name, StreamType::Logs)
+        .await
+        .unwrap_or_default();
+
+        let scan_keys = stream_settings.scan_keys;
+
+        if !scan_keys.is_empty() {
+            parallel_batch_redact(org_id, &mut json_data, &scan_keys);
         } else {
-            let start = Instant::now();
-            parallel_batch_scan(org_id, &mut json_data, &["message"]);
-            println!("scan time: {:?}", start.elapsed());
+            parallel_batch_scan(org_id, &mut json_data, &scan_keys);
         }
         // write json data by stream
         let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;

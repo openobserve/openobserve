@@ -841,54 +841,54 @@ fn construct_values_from_open_telemetry_v1_metric(
     Ok(events)
 }
 
-fn redact_keys_in_map(
-    org_id: &str,
-    vec_of_maps: &mut [&mut json::Map<String, json::Value>],
-    keys_to_redact: &[&str],
-) {
-    if !get_config().common.enable_redaction {
-        return;
-    }
-    vec_of_maps.iter_mut().for_each(|map| {
-        keys_to_redact.iter().for_each(|&key| {
-            if let Some(value) = map.get_mut(key) {
-                match value {
-                    serde_json::Value::String(str_value) => {
-                        // Handle string fields
-                        if let Ok(redacted_value) =
-                            PATTERN_MANAGER.scan_and_replace(org_id, str_value)
-                        {
-                            *value = serde_json::Value::String(redacted_value);
-                        }
-                    }
-                    serde_json::Value::Number(num_value) => {
-                        // Convert the number to a string, redact, and replace
-                        let num_str = num_value.to_string();
-                        if let Ok(redacted_value) =
-                            PATTERN_MANAGER.scan_and_replace(org_id, &num_str)
-                        {
-                            *value = serde_json::Value::String(redacted_value);
-                        }
-                    }
-                    _ => {
-                        // For other types (bool, null), skip redaction
-                    }
-                }
-            }
-        });
-    });
-}
+// fn redact_keys_in_map(
+//     org_id: &str,
+//     vec_of_maps: &mut [&mut json::Map<String, json::Value>],
+//     keys_to_redact: &[&str],
+// ) {
+//     if !get_config().common.enable_redaction {
+//         return;
+//     }
+//     vec_of_maps.iter_mut().for_each(|map| {
+//         keys_to_redact.iter().for_each(|&key| {
+//             if let Some(value) = map.get_mut(key) {
+//                 match value {
+//                     serde_json::Value::String(str_value) => {
+//                         // Handle string fields
+//                         if let Ok(redacted_value) =
+//                             PATTERN_MANAGER.scan_and_replace(org_id, str_value)
+//                         {
+//                             *value = serde_json::Value::String(redacted_value);
+//                         }
+//                     }
+//                     serde_json::Value::Number(num_value) => {
+//                         // Convert the number to a string, redact, and replace
+//                         let num_str = num_value.to_string();
+//                         if let Ok(redacted_value) =
+//                             PATTERN_MANAGER.scan_and_replace(org_id, &num_str)
+//                         {
+//                             *value = serde_json::Value::String(redacted_value);
+//                         }
+//                     }
+//                     _ => {
+//                         // For other types (bool, null), skip redaction
+//                     }
+//                 }
+//             }
+//         });
+//     });
+// }
 
-fn redact_keys_in_record(org_id: &str, record: &str) -> Option<String> {
-    if !get_config().common.enable_redaction {
-        return None;
-    }
-    if let Ok(redacted_value) = PATTERN_MANAGER.scan_and_replace(org_id, record) {
-        return Some(redacted_value);
-    } else {
-        return None;
-    }
-}
+// fn redact_keys_in_record(org_id: &str, record: &str) -> Option<String> {
+//     if !get_config().common.enable_redaction {
+//         return None;
+//     }
+//     if let Ok(redacted_value) = PATTERN_MANAGER.scan_and_replace(org_id, record) {
+//         return Some(redacted_value);
+//     } else {
+//         return None;
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

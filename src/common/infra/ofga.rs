@@ -48,7 +48,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
-    let mut existing_meta = match db::ofga::get_ofga_model().await {
+    let mut existing_meta: Option<o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel> = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
             migrate_native_objects = true;
