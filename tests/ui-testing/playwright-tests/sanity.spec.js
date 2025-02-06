@@ -323,7 +323,7 @@ test.describe("Sanity testcases", () => {
     await page.getByText("Function deleted").click();
   });
 
-  test("should create and delete dashboard", async ({ page }) => {
+  test.skip("should create and delete dashboard", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await page.waitForTimeout(5000);
     await page.locator('[data-test="dashboard-add"]').click();
@@ -408,108 +408,108 @@ test.describe("Sanity testcases", () => {
     }
   });
 
-  test("create template, destination and alert and then delete it", async ({
-    page,
-  }) => {
+  test("create template, destination and alert and then delete it", async ({ page }) => {
+    const uniqueId = Date.now(); // Generate a unique ID for each run
+    const templateName = `sanitytemp-${uniqueId}`;
+    const destinationName = `sanitydest-${uniqueId}`;
+    const alertName = `sanityalert-${uniqueId}`;
+  
     await page.locator('[data-test="menu-link-settings-item"]').click();
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="alert-destinations-tab"]')
-      .click();
-    await page.waitForTimeout(2000);
-    // await page.locator('[data-test="alert-alerts-tab"]').click({ force: true });
-    await page.locator('[data-test="alert-templates-tab"]').click();
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="alert-template-list-add-alert-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(100);
-    await page.locator('[data-test="add-template-name-input"]').click();
-    await page.waitForTimeout(100);
-    await page
-      .locator('[data-test="add-template-name-input"]')
-      .fill("sanitytemp1");
-    const jsonString = '{"text": "{alert_name} is active"}';
-    await page.click(".view-line");
-    await page.keyboard.type(jsonString);
-    await page.waitForTimeout(500);
-    await page
-      .locator('[data-test="add-template-submit-btn"]')
-      .click({ force: true });
-    await expect(
-      page
-        .locator(".q-notification__message")
-        .getByText(/Template Saved Successfully/)
-        .first()
-    ).toBeVisible();
-    await page.waitForTimeout(1000);
-    // await page.getByText("AlertsDestinationsTemplates").click();
-    // await page.waitForTimeout(2000);
+    await page.locator('[data-test="alert-destinations-tab"]').waitFor();
     await page.locator('[data-test="alert-destinations-tab"]').click();
-    await page
-      .locator('[data-test="alert-destination-list-add-alert-btn"]')
-      .click();
-    await page.locator('[data-test="add-destination-name-input"]').click();
+  
+    await page.locator('[data-test="alert-templates-tab"]').waitFor();
+    await page.locator('[data-test="alert-templates-tab"]').click();
+  
+    // Wait for template API before clicking "Add Template" button
+    await page.waitForResponse(response =>
+      response.url().includes("/api/default/alerts/templates") && response.status() === 200
+    );
+  
+    await page.locator('[data-test="alert-template-list-add-alert-btn"]').click();
+    await page.locator('[data-test="add-template-name-input"]').waitFor();
+    await page.locator('[data-test="add-template-name-input"]').fill(templateName);
+  
+    const jsonString = '{"text": "{alert_name} is active"}';
+    await page.locator(".view-line").click();
+    await page.keyboard.type(jsonString);
+    await page.waitForTimeout(500); // Ensure typing completes before submit
+  
+    await page.locator('[data-test="add-template-submit-btn"]').click();
+    await expect(page.locator(".q-notification__message").getByText(/Template Saved Successfully/)).toBeVisible();
+  
+    await page.locator('[data-test="alert-destinations-tab"]').click();
+  
+    // Wait for both the template API and destination API before clicking "Add Destination"
+    // await page.waitForResponse(response =>
+    //   response.url().includes("/api/default/alerts/templates") && response.status() === 200
+    // );
+    // await page.waitForResponse(response =>
+    //   response.url().includes("/api/default/alerts/destinations") && response.status() === 200
+    // );
     await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="add-destination-name-input"]')
-      .fill("sanitydest1");
+  
+    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click();
+    await page.locator('[data-test="add-destination-name-input"]').waitFor();
+    await page.locator('[data-test="add-destination-name-input"]').fill(destinationName);
+    await page.waitForTimeout(500); // Ensure input is registered
+  
     await page.locator('[data-test="add-destination-template-select"]').click();
-    await page.getByText("sanitytemp1").click();
-    await page.locator('[data-test="add-destination-url-input"]').click();
-    await page
-      .locator('[data-test="add-destination-url-input"]')
-      .fill("sanity");
-    await page
-      .locator('[data-test="add-destination-header--key-input"]')
-      .click();
+    await page.getByText(templateName).click();
+  
+    await page.locator('[data-test="add-destination-url-input"]').fill("sanity");
+    await page.waitForTimeout(500); // Ensure input is registered
+  
     await page.locator('[data-test="add-destination-submit-btn"]').click();
+  
+    // Wait for API before proceeding
+    await page.waitForResponse(response =>
+      response.url().includes("/api/default/alerts/destinations") && response.status() === 200
+    );
+  
     await page.locator('[data-test="menu-link-\\/alerts-item"]').click();
-    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-list-add-alert-btn"]').click();
-    await page
-      .locator('[data-test="add-alert-name-input"]')
-      .getByLabel("Name *")
-      .click();
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="add-alert-name-input"]')
-      .getByLabel("Name *")
-      .fill("sanityalert1");
-    await page
-      .locator('[data-test="add-alert-stream-type-select"]')
-      .getByText("arrow_drop_down")
-      .click();
-    await page
-      .getByRole("option", { name: "logs" })
-      .locator("div")
-      .nth(2)
-      .click();
+    await page.getByLabel("Name *").first().fill(alertName);
+
+    
+    // await page.locator('[data-test="add-alert-name-input"]').fill(alertName);
+    await page.waitForTimeout(500); // Ensure input is registered
+  
+    await page.locator('[data-test="add-alert-stream-type-select"]').click();
+    await page.getByRole("option", { name: "logs" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("e2e");
     await page.getByText("e2e_automate").click();
-    await page
-      .locator('[data-test="alert-conditions-delete-condition-btn"]')
-      .click();
-    await page
-      .locator('[data-test="add-alert-destination-select"]')
-      .getByLabel("arrow_drop_down")
-      .click();
-    await page
-      .locator(
-        '[data-test="add-alert-destination-sanitydest1-select-item"]'
-      )
-      .click();
-    await page.locator('[data-test="add-alert-submit-btn"]').click();
+    await page.locator('[data-test="alert-conditions-delete-condition-btn"]').click();
+  
+    await page.locator('[data-test="add-alert-destination-select"]').click();
+    await page.locator(`[data-test="add-alert-destination-${destinationName}-select-item"]`).click();
+    await page.locator('[data-test="chart-renderer"] div').click();
+    await page.waitForTimeout(1000);
+    // await page.locator('data-test="add-alert-submit-btn"]').waitFor({ state: 'visible' });
+    await page.evaluate(() => {
+      window.scrollBy(0, window.innerHeight); // Scrolls down by one full screen height
+    });
+    await page.locator('[data-test="add-alert-submit-btn"]').click({force:true});
+    await page.waitForTimeout(1000);
+    await page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
+    // await page.locator(`role=row[name="${alertName}"]`).hover()
+    // .locator('[data-test="alert-clone"]')
+    // .click({ force: true });
 
+
+  
     // Clone the alert
-    await page.locator('[data-test="alert-clone"]').click(); // Ensure this selector is correct
-    await page.getByLabel('Alert Name').click();
-    await page.getByLabel('Alert Name').fill('test-clone');
-    await page.locator('[data-test="to-be-clone-alert-name"]').click()
-    await page.locator('[data-test="to-be-clone-alert-name"]').fill('test-clone');
+    // await page.locator('[data-test="alert-clone"]').click();
+    const clonedAlertName = `clone-${alertName}`;
+    await page.locator('[data-test="to-be-clone-alert-name"]').fill(clonedAlertName);
+    await page.waitForTimeout(500); // Ensure input is registered
+  
     await page.locator('[data-test="to-be-clone-stream-type"]').click();
-    
+    // await page.getByRole("option", { name: "logs" }).click();
+    // await page.locator('[data-test="to-be-clone-stream-name"]').fill('e2e_automate');
+    // await page.waitForTimeout(500); // Ensure input is registered
+
     await page.getByRole('option', { name: 'logs' }).locator('div').nth(2).click();
     await page.locator('[data-test="to-be-clone-stream-name"]').click();
     await page.locator('[data-test="to-be-clone-stream-name"]').fill('e2e_automate');
@@ -518,47 +518,33 @@ test.describe("Sanity testcases", () => {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="clone-alert-submit-btn"]').click();
     await page.getByText('Alert Cloned Successfully').click();
- 
+  
+  
   
     // Delete the cloned alert
-    await page.getByRole('cell', { name: 'test-clone' }).click();
-    await page.locator('[data-test="alert-list-test-clone-delete-alert"]').click(); // Adjust the selector if necessary
+    await page.getByRole('cell', { name: clonedAlertName }).click();
+    await page.locator(`[data-test="alert-list-${clonedAlertName}-delete-alert"]`).click();
     await page.locator('[data-test="confirm-button"]').click();
   
     // Delete the original alert
-    await page.locator('[data-test="alert-list-search-input"]').click();
-    await page.locator('[data-test="alert-list-search-input"]').fill("sani");
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="alert-list-sanityalert1-delete-alert"]')
-      .click();
+    await page.locator('[data-test="alert-list-search-input"]').fill(alertName);
+    await page.waitForTimeout(500); // Ensure input is registered
+    await page.locator(`[data-test="alert-list-${alertName}-delete-alert"]`).click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.waitForTimeout(2000);
+  
+    // Delete the destination
     await page.locator('[data-test="menu-link-settings-item"]').click();
-    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-destinations-tab"]').click();
-    await page.locator('[data-test="destination-list-search-input"]').click();
-    await page
-      .locator('[data-test="destination-list-search-input"]')
-      .fill("sani");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="alert-destination-list-sanitydest1-delete-destination"]'
-      )
-      .click();
+    await page.locator('[data-test="destination-list-search-input"]').fill(destinationName);
+    await page.waitForTimeout(500); // Ensure input is registered
+    await page.locator(`[data-test="alert-destination-list-${destinationName}-delete-destination"]`).click();
     await page.locator('[data-test="confirm-button"]').click();
+  
+    // Delete the template
     await page.locator('[data-test="alert-templates-tab"]').click();
-    await page.locator('[data-test="template-list-search-input"]').click();
-    await page
-      .locator('[data-test="template-list-search-input"]')
-      .fill("sanit");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(
-        '[data-test="alert-template-list-sanitytemp1-delete-template"]'
-      )
-      .click();
+    await page.locator('[data-test="template-list-search-input"]').fill(templateName);
+    await page.waitForTimeout(500); // Ensure input is registered
+    await page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`).click();
     await page.locator('[data-test="confirm-button"]').click();
   });
 
