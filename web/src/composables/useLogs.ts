@@ -4020,6 +4020,15 @@ const useLogs = () => {
         }
       }
 
+      if(searchObj.data.stream.selectedFields.length > 0) {
+        const fieldNames: string[] = searchObj.data.stream.selectedStreamFields.map((item: { name: string }) => item.name);
+        for (const fieldName of searchObj.data.stream.selectedFields) {
+          if(fieldNames.indexOf(fieldName) == -1) {
+            searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields.filter(name => name !== fieldName);
+          }
+        }
+      }
+
       if (
         searchObj.data.stream.selectedStreamFields == undefined ||
         searchObj.data.stream.selectedStreamFields.length == 0
