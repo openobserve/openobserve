@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon
                 name="drag_indicator"
                 color="grey-13"
-                size="sm"
+                class="'q-mr-xs"
                 data-test="dashboard-variable-settings-drag-handle"
               />
             </div>
@@ -378,7 +378,7 @@ export default defineComponent({
   grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 120px;
   padding: 8px 0;
   margin-bottom: 8px;
-  font-weight: 600;
+  font-weight: 900;
   border-bottom: 1px solid #cccccc70;
 
   .header-item {
@@ -404,13 +404,6 @@ export default defineComponent({
   height: 100%;
   cursor: move;
   box-sizing: border-box;
-
-  .q-icon {
-    opacity: 0.5;
-    &:hover {
-      opacity: 1;
-    }
-  }
 }
 
 .draggable-content {
