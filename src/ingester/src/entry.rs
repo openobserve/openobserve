@@ -28,7 +28,6 @@ use crate::errors::*;
 
 pub struct Entry {
     pub stream: Arc<str>,
-    pub schema: Option<Arc<Schema>>,
     pub schema_key: Arc<str>,
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
     pub data: Vec<Arc<serde_json::Value>>,
@@ -39,7 +38,6 @@ impl Entry {
     pub fn new() -> Self {
         Self {
             stream: "".into(),
-            schema: None,
             schema_key: "".into(),
             partition_key: "".into(),
             data: Vec::new(),
@@ -91,7 +89,6 @@ impl Entry {
         let data = serde_json::from_slice(&data).context(JSONSerializationSnafu)?;
         Ok(Self {
             stream: stream.into(),
-            schema: None,
             schema_key: schema_key.into(),
             partition_key: partition_key.into(),
             data,
