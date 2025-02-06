@@ -5,7 +5,7 @@ import { expect } from '@playwright/test';
 export class RumPage {
     constructor(page) {
         this.page = page;
-        this.rumPageMenu = page.locator('[data-test="menu-link-\\/rum"]');
+        this.rumPageMenu = page.locator('[data-test="menu-link-\\/rum-item"]');
 
     }
     async gotoRumPage() {
