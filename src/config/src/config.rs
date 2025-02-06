@@ -659,6 +659,12 @@ pub struct Common {
         help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
     )]
     pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_SKIP_WAL",
+        default = false,
+        help = "Skip WAL for query"
+    )]
+    pub feature_query_skip_wal: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]

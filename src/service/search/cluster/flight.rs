@@ -438,7 +438,13 @@ pub async fn get_online_querier_nodes(
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let cfg = get_config();
+    let nodes = if cfg.common.feature_query_skip_wal {
+        infra_cluster::get_cached_online_querier_nodes(node_group).await
+    } else {
+        infra_cluster::get_cached_online_query_nodes(node_group).await
+    };
+    let mut nodes = match nodes {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] flight->search: no querier node online");
