@@ -60,7 +60,11 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
-    let use_cache = in_req.use_cache.unwrap_or(false);
+    let use_cache = if in_req.query.from == 0 {
+        in_req.use_cache.unwrap_or(false)
+    } else {
+        false
+    };
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
