@@ -455,7 +455,7 @@ pub struct Profiling {
     pub pprof_enabled: bool,
     #[env_config(
         name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
-        default = "./flamegraph.svg",
+        default = "",
         help = "Path to save flamegraph"
     )]
     pub pprof_flamegraph_path: String,
@@ -1927,6 +1927,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.mmdb_data_dir.ends_with('/') {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
+
+    // check for pprof flamegraph
+    if cfg.profiling.pprof_flamegraph_path.is_empty() {
+        cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
+    }
+
     Ok(())
 }
 
