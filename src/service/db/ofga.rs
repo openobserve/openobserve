@@ -16,12 +16,10 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use o2_enterprise::enterprise::{
-    common::infra::config::*,
-    openfga::{
-        meta::mapping::OFGAModel,
-        model::{create_open_fga_store, read_ofga_model, write_auth_models},
-    },
+use o2_openfga::{
+    config::OFGA_STORE_ID,
+    meta::mapping::OFGAModel,
+    model::{create_open_fga_store, read_ofga_model, write_auth_models},
 };
 
 use crate::service::db;
