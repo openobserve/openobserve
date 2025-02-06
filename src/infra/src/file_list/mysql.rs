@@ -723,20 +723,26 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
-        let deleted_str = if deleted { "TRUE" } else { "FALSE" };
-        let sql = format!(
+        let mut sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
     CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size, CAST(SUM(index_size) AS SIGNED) AS index_size
     FROM file_list 
-    WHERE {field} = '{value}' AND deleted IS {deleted_str}
+    WHERE {field} = '{value}'
             "#,
         );
-        let sql = match pk_value {
+        if deleted {
+            sql = format!("{} AND deleted IS TRUE", sql);
+        }
+        match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some((0, 0)) => format!("{} GROUP BY stream", sql),
             Some((min, max)) => {
-                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                if deleted {
+                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                } else {
+                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                }
             }
         };
         let pool = CLIENT.clone();
@@ -882,13 +888,11 @@ UPDATE stream_stats
             }
         }
         // delete files which already marked deleted
-        if let Some((min_id, max_id)) = pk_value {
-            if let Err(e) =
-                sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id > ? AND id <= ?;")
-                    .bind(min_id)
-                    .bind(max_id)
-                    .execute(&mut *tx)
-                    .await
+        if let Some((_min_id, max_id)) = pk_value {
+            if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= ?;")
+                .bind(max_id)
+                .execute(&mut *tx)
+                .await
             {
                 if let Err(e) = tx.rollback().await {
                     log::error!(

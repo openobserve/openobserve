@@ -32,9 +32,11 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(
+    // should run it at least every 10 seconds
+    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
+        10,
         cfg.limit.calculate_stats_interval,
-    ));
+    )));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -60,10 +62,10 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // should run it every minute
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::min(
+    // should run it at least every 5 minutes
+    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
+        300,
         get_config().limit.calculate_stats_interval,
-        60,
     )));
     interval.tick().await; // trigger the first run
     loop {

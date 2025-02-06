@@ -658,19 +658,25 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
-        let deleted_str = if deleted { "TRUE" } else { "FALSE" };
-        let sql = format!(
+        let mut sql = format!(
             r#"
 SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_num, SUM(records) as records, SUM(original_size) as original_size, SUM(compressed_size) as compressed_size, SUM(index_size) as index_size
     FROM file_list
-    WHERE {field} = '{value}' AND deleted IS {deleted_str}
+    WHERE {field} = '{value}'
             "#,
         );
+        if deleted {
+            sql = format!("{} AND deleted IS TRUE", sql);
+        }
         let sql = match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some((0, 0)) => format!("{} GROUP BY stream", sql),
             Some((min, max)) => {
-                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                if deleted {
+                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                } else {
+                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                }
             }
         };
         let pool = CLIENT_RO.clone();
@@ -804,13 +810,11 @@ UPDATE stream_stats
         }
 
         // delete files which already marked deleted
-        if let Some((min_id, max_id)) = pk_value {
-            if let Err(e) =
-                sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id > $1 AND id <= $2;")
-                    .bind(min_id)
-                    .bind(max_id)
-                    .execute(&mut *tx)
-                    .await
+        if let Some((_min_id, max_id)) = pk_value {
+            if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= $1;")
+                .bind(max_id)
+                .execute(&mut *tx)
+                .await
             {
                 if let Err(e) = tx.rollback().await {
                     log::error!(
