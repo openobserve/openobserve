@@ -21,7 +21,12 @@
         class="remove-edge-button"
         aria-label="Remove edge"
       >
-      <q-icon name="close" />
+      <q-icon name="close"
+      flat
+      dense
+      size="8px"
+      style="padding: 0px !important;"
+       />
       </button>
     </div>
   </EdgeLabelRenderer>
@@ -110,7 +115,7 @@ export default {
   border: none;
   border-radius: 100%;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0px 4px !important;
 }
 </style>
 
