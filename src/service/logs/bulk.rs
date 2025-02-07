@@ -223,7 +223,7 @@ pub async fn ingest(
             value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
             if print_flatten && seconds == 30 {
                 log::info!(
-                    "time elapsed before write_logs_by_stream: {:?}",
+                    "time elapsed before flatten: {:?}",
                     _flatten_start.elapsed()
                 );
                 print_flatten = false;
