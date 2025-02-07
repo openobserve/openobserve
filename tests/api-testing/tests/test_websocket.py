@@ -192,7 +192,6 @@ test_data_sql = [
     (
 
         "logs or query",
-
         f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
         10,
     ),
