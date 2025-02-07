@@ -1265,6 +1265,12 @@ pub struct Limit {
         help = "Default data type for LongText compliant DB's"
     )]
     pub db_text_data_type: String,
+    #[env_config(
+        name = "ZO_HTTP_PROCESS_SLOW_TIME",
+        default = 2,
+        help = "Time to consider a request as slow in seconds"
+    )]
+    pub http_process_slow_time: u64,
 }
 
 #[derive(EnvConfig)]
