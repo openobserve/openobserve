@@ -348,7 +348,7 @@ pub async fn write_file(
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
-) -> RequestStats {
+) -> Result<RequestStats> {
     let mut req_stats = RequestStats::default();
     let entries = buf
         .into_iter()
@@ -380,11 +380,12 @@ pub async fn write_file(
             stream_name,
             e
         );
+        return Err(e.into());
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
     req_stats.records += entries_records as i64;
-    req_stats
+    Ok(req_stats)
 }
 
 pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {

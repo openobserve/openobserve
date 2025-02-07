@@ -516,7 +516,7 @@ async fn write_logs(
         write_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

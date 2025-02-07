@@ -960,7 +960,8 @@ async fn write_traces(
         data_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await
+    .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

@@ -206,7 +206,9 @@ pub async fn save_enrichment_data(
         stream_name,
     )
     .await;
-    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await;
+    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled)
+        .await
+        .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
 
     // notify update
     if stream_schema.has_fields {
