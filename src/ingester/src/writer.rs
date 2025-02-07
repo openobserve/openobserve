@@ -290,6 +290,15 @@ impl Writer {
         }
 
         // rotation wal
+        let start = std::time::Instant::now();
+        let mut wal = self.wal.write().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
+        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
+            return Ok(()); // check again to avoid race condition
+        }
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -311,15 +320,6 @@ impl Writer {
             cfg.limit.wal_write_buffer_size,
         )
         .context(WalSnafu)?;
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.write().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
-            return Ok(()); // check again to avoid race condition
-        }
         wal.sync().context(WalSnafu)?; // sync wal before rotation
         let old_wal = std::mem::replace(&mut *wal, new_wal);
         drop(wal);
