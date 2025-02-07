@@ -27,14 +27,14 @@ mdurl==0.1.2
 packaging==23.2
     # via pytest
     # via pytest-sugar
-pluggy==1.3.0
+pluggy==1.5.0
     # via pytest
 protobuf==4.25.6
     # via pytest-openobserve
     # via tink
 pygments==2.17.2
     # via rich
-pytest==7.4.3
+pytest==8.3.4
     # via pytest-openobserve
     # via pytest-pretty
     # via pytest-sugar
