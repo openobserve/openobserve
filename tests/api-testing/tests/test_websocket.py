@@ -190,7 +190,11 @@ test_data_sql = [
     ),
 
     (
+<<<<<<< Updated upstream
         "logs and query",
+=======
+        "logs or query",
+>>>>>>> Stashed changes
         f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
         10,
     ),
