@@ -95,6 +95,8 @@ pub async fn ingest(
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     let mut print_flatten = true;
+    let mut flatten_time = 0;
+    let mut uds_time = 0;
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
@@ -216,16 +218,10 @@ pub async fn ingest(
             };
 
             let _flatten_start = std::time::Instant::now();
-            if print_flatten && seconds == 30 {
-                log::info!("original record is: {:?}", serde_json::to_string(&value).unwrap());
-            }
             // JSON Flattening
             value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
+            flatten_time += _flatten_start.elapsed().as_millis();
             if print_flatten && seconds == 30 {
-                log::info!(
-                    "time elapsed before flatten: {:?}",
-                    _flatten_start.elapsed()
-                );
                 print_flatten = false;
             }
 
@@ -240,9 +236,11 @@ pub async fn ingest(
                 local_val.insert("_id".to_string(), json::Value::String(doc_id.to_owned()));
             }
 
+            let _uds_start = std::time::Instant::now();
             if let Some(fields) = user_defined_schema_map.get(&stream_name) {
                 local_val = crate::service::logs::refactor_map(local_val, fields);
             }
+            uds_time += _uds_start.elapsed().as_millis();
 
             // add `_original` and '_record_id` if required by StreamSettings
             if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
@@ -606,16 +604,12 @@ pub async fn ingest(
     // drop memory-intensive variables
     // drop(stream_pipeline_inputs);
 
-    if seconds == 30 {
-        log::info!(
-            "time elapsed before write_logs_by_stream: {:?}",
-            start.elapsed()
-        );
-    }
+    let before_write_time = start.elapsed().as_millis();
 
     drop(streams_need_original_set);
     drop(user_defined_schema_map);
 
+    let _write_start = std::time::Instant::now();
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
         let write_result = super::write_logs_by_stream(
@@ -642,6 +636,8 @@ pub async fn ingest(
         }
     };
 
+    let write_time = _write_start.elapsed().as_millis();
+
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -662,6 +658,18 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+
+    let total_time = start.elapsed().as_millis();
+    if before_write_time > 1000 || write_time > 1000 {
+        log::info!(
+            "total: {} ms, flatten: {} ms, convert_to_uds: {} ms, before_write: {} ms, write_to_channel: {} ms",
+            total_time,
+            flatten_time,
+            uds_time,
+            before_write_time,
+            write_time
+        );
+    }
 
     Ok(response_body)
 }
