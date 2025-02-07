@@ -93,6 +93,12 @@ test_data_histog = [
         -1,
     ),
 
+    (
+        "logs or query",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        -1,
+    ),
+
   
  
 
@@ -180,6 +186,12 @@ test_data_sql = [
     (
         "logs and query",
         f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
+        10,
+    ),
+
+    (
+        "logs and query",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
         10,
     ),
 
