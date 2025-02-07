@@ -2,12 +2,14 @@ import { test, expect } from './baseFixtures';
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
 const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
+ 
   await page.goto(process.env["ZO_BASE_URL"]);
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
@@ -57,19 +59,9 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
 
 test.describe("Sanity testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -86,11 +78,11 @@ test.describe("Sanity testcases", () => {
     });
     // get the data from the search variable
     await expect.poll(async () => (await search).status()).toBe(200);
-    // await search.hits.FIXME_should("be.an", "array");
   }
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -99,7 +91,7 @@ test.describe("Sanity testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -323,60 +315,6 @@ test.describe("Sanity testcases", () => {
     await page.getByText("Function deleted").click();
   });
 
-  test.skip("should create and delete dashboard", async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await page.waitForTimeout(5000);
-    await page.locator('[data-test="dashboard-add"]').click();
-    await page.waitForTimeout(5000);
-    await page.locator('[data-test="add-dashboard-name"]').click();
-
-    await page.locator('[data-test="add-dashboard-name"]').fill("sanitytest");
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .click();
-    await page.waitForTimeout(3000);
-    await page.locator('[data-test="index-dropdown-stream"]').click();
-    await page.locator('[data-test="index-dropdown-stream"]').fill("e2e");
-    await page
-      .getByRole("option", { name: "e2e_automate" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.waitForTimeout(3000);
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-5-d-btn"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await page.locator('[data-test="chart-renderer"] canvas').last().click({
-      position: {
-        x: 753,
-        y: 200,
-      },
-    });
-    await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("sanitydash");
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
-      .click();
-    await page.locator('[data-test="dashboard-delete-panel"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await page
-      .locator("#q-notify div")
-      .filter({ hasText: "check_circlePanel deleted" })
-      .nth(3)
-      .click();
-  });
 
   const randomFolderName = `Folder${Math.floor(Math.random() * 1000)}`;
   test("should create delete folder", async ({ page }) => {
