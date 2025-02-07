@@ -43,6 +43,7 @@ mod m20250125_132500_populate_templates_table;
 mod m20250125_133700_populate_destinations_table;
 mod m20250125_153005_delete_metas_destinations;
 mod m20250125_172300_delete_metas_templates;
+mod m20250206_000001_afolder_ofga;
 mod m20250213_000001_add_dashboard_updated_at;
 
 pub struct Migrator;
