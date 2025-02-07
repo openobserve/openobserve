@@ -84,7 +84,6 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
-
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -93,7 +92,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-use openobserve::service::tls::http_tls_config;
+use openobserve::{
+    handler::grpc::request::stream::StreamServiceImpl, service::tls::http_tls_config,
+};
+use proto::cluster_rpc::streams_server::StreamsServer;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -400,7 +402,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     log::info!("server stopped");
-
     Ok(())
 }
 
@@ -449,7 +450,11 @@ async fn init_common_grpc_server(
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-
+    let streams_svc = StreamsServer::new(StreamServiceImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -475,6 +480,7 @@ async fn init_common_grpc_server(
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
         .add_service(flight_svc)
+        .add_service(streams_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

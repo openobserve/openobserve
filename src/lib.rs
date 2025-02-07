@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(btree_cursors)]
-
 #[cfg(feature = "enterprise")]
 pub mod cipher;
 pub mod cli;
