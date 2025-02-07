@@ -544,7 +544,7 @@ async fn write_logs(
     evaluate_trigger(triggers).await;
 
     let process_time = start.elapsed().as_millis();
-    if process_time > 1000 {
+    if process_time > 2000 {
         log::warn!("[write_logs] total time: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, write_to_channel: {} ms", process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, write_time);
     }
 

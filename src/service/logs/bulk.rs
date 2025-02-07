@@ -662,7 +662,7 @@ pub async fn ingest(
         .inc();
 
     let total_time = start.elapsed().as_millis();
-    if before_write_time > 1000 || write_time > 1000 {
+    if before_write_time > 2000 || write_time > 2000 {
         log::info!(
             "total: {} ms, flatten: {} ms, convert_to_uds: {} ms, before_write: {} ms, write_to_channel: {} ms",
             total_time,
