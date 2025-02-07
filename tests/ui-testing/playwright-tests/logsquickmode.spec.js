@@ -1,12 +1,16 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: 'parallel' });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -57,6 +61,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
 };
 
 test.describe("Logs Quickmode testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -78,6 +83,7 @@ test.describe("Logs Quickmode testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -86,7 +92,8 @@ test.describe("Logs Quickmode testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate");
+ 
     await applyQueryButton(page);
     await page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
     // Get the toggle button element

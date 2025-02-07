@@ -17,8 +17,6 @@ async function login(page) {
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
 
-  // await page.getByText('Login as internal user').click();  // Commented out as it is not required
-  
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
