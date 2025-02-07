@@ -217,7 +217,7 @@ pub async fn ingest(
 
             let _flatten_start = std::time::Instant::now();
             if print_flatten && seconds == 30 {
-                log::info!("original record is: {:?}", &value);
+                log::info!("original record is: {:?}", serde_json::to_string(&value).unwrap());
             }
             // JSON Flattening
             value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
