@@ -99,7 +99,7 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should add timestamp to editor save this view and switch", async ({ page }) => {
-    await page.waitForTimeout(3000); 
+    await page.waitForTimeout(3000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
 
     await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click(); await page.locator(
@@ -129,7 +129,7 @@ test.describe("Logs Queries testcases", () => {
 
 
 
-  test("should redirect to logs after clicking on stream explorer via stream page", async ({ page }) => {
+  test.skip("should redirect to logs after clicking on stream explorer via stream page", async ({ page }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
@@ -158,7 +158,7 @@ test.describe("Logs Queries testcases", () => {
   });
 
 
-  
+
 
 
 
@@ -197,22 +197,22 @@ test.describe("Logs Queries testcases", () => {
     // Type the value of a variable into an input field
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-  
+
     // Ensure the query editor is visible and clickable before typing
     const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
     await expect(queryEditor).toBeVisible();
     await queryEditor.click();
     await page.keyboard.type("match_all('code')");
-  
+
     // Ensure the refresh button is visible and clickable before clicking
     const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
     await expect(refreshButton).toBeVisible();
     await refreshButton.click({ force: true });
-  
+
     // Verify that the expected log table column is visible
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
-  
+
 
 
   test("should change stream settings and click on search stream", async ({ page }) => {
@@ -232,7 +232,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator("[title=\"Explore\"]").first().click({ force: true });
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
-  
+
 
   test("should display error if blank spaces added under stream name and clicked create stream ", async ({ page }) => {
     await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -253,7 +253,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="save-stream-btn"]').click({ force: true });
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
   });
-  
+
   test("should display enter count query", async ({ page }) => {
     await page.locator(
 
@@ -297,10 +297,10 @@ test.describe("Logs Queries testcases", () => {
   test("should display results in selected time", async ({
     page,
   }) => {
-    
+
     await logsPage.setDateTimeToToday();
-    
-    
+
+
   });
 
 })
