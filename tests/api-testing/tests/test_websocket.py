@@ -82,8 +82,14 @@ def test_disable_websocket(create_session, base_url):
 # Define test data with different queries and expected response details for histogram
 test_data_histog = [
     (
-        "logs histo query",
+        "logs query",
         f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+        -1,
+    ),
+
+    (
+        "logs and query",
+        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
         -1,
     ),
 
@@ -166,8 +172,14 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
 # Define test data with different queries and expected response details for SQL when websocket is disabled
 test_data_sql = [
     (
-        "logs sql query",
+        "logs query",
         f"SELECT * FROM \"{stream_name}\"",
+        10,
+    ),
+
+    (
+        "logs and query",
+        f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
         10,
     ),
 
