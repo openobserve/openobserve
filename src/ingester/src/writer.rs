@@ -94,6 +94,10 @@ pub async fn get_writer(
 ) -> Arc<Writer> {
     let key = WriterKey::new(org_id, stream_type);
     let idx = get_table_idx(thread_id, stream_name);
+    if let Some(w) = WRITERS[idx].read().await.get(&key) {
+        return w.clone();
+    }
+    // slow path
     let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())

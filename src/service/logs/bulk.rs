@@ -97,11 +97,13 @@ pub async fn ingest(
     let mut print_flatten = true;
     let mut flatten_time = 0;
     let mut uds_time = 0;
+    let mut original_line = String::new();
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
+        original_line = line.to_string();
 
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
 
@@ -669,6 +671,9 @@ pub async fn ingest(
             before_write_time,
             write_time
         );
+    }
+    if before_write_time > 5000 {
+        log::info!("original_line: {}", original_line);
     }
 
     Ok(response_body)
