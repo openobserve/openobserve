@@ -47,8 +47,8 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.7"
-actix-http = "3.9"
-actix-multipart = { version = "0.7", features = ["derive"] }
+actix-http = "3.8"
+actix-multipart = { version = "0.6", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
@@ -67,7 +67,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-awc = { version = "3.5", features = ["rustls-0_23"] }
+awc = { version = "3.4", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.6.0"
@@ -210,7 +210,7 @@ wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = { version = "4.9", features = ["rustls-0_23"] }
+actix-web = { version = "4.8", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 actix-tls = { version = "3.4", features = [
     "connect",
