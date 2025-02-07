@@ -31,7 +31,7 @@ root_dir = Path(__file__).parent.parent.parent
 
 def generate_random_string(length=5):
     # Define the characters to choose from
-    characters = string.ascii_letters  # This includes both lowercase and uppercase letters
+    characters = string.ascii_lowercase  # This includes only lowercase letters
     random_string = ''.join(random.choice(characters) for _ in range(length))
     return random_string
 
@@ -39,7 +39,7 @@ def generate_random_string(length=5):
 random_string = generate_random_string()
 print("Random String:", random_string)
 
-stream_name = "tdefault" + random_string
+stream_name = "tdef" + random_string
 
 print("Random String:", stream_name)
 
@@ -107,6 +107,9 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
 
     session = create_session
     url = base_url
+
+    time.sleep(15)  # Increase this time if necessary
+
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
