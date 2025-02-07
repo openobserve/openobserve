@@ -514,7 +514,7 @@ async fn write_logs(
     }
 
     // write data to wal
-    let _write_start = std::time::Instant::now();
+    let _get_writer_start = std::time::Instant::now();
     let writer = ingester::get_writer(
         thread_id,
         org_id,
@@ -522,6 +522,8 @@ async fn write_logs(
         stream_name,
     )
     .await;
+    let get_writer_time = _get_writer_start.elapsed().as_millis();
+    let _write_start = std::time::Instant::now();
     let req_stats = write_file(
         &writer,
         stream_name,
@@ -545,7 +547,8 @@ async fn write_logs(
 
     let process_time = start.elapsed().as_millis();
     if process_time > 2000 {
-        log::warn!("[write_logs] total time: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, write_to_channel: {} ms", process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, write_time);
+        log::warn!("[write_logs] total time: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
+         process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
     }
 
     Ok(req_stats)
