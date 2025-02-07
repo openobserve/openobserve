@@ -4,6 +4,7 @@
     :style="style"
     :path="path[0]"
     :marker-end="markerEnd"
+    type="smoothstep"
   />
   <EdgeLabelRenderer v-if="!isInView">
     <div
@@ -94,7 +95,7 @@ onMounted(() => {
 })
 
 
-const path = computed(() => getSmoothStepPath(props))
+const path = computed(() => getBezierPath(props))
 function handleClick(event) {
   event.stopPropagation() // Prevent edge selection
   removeEdges(props.id)
