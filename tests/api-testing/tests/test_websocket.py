@@ -191,7 +191,11 @@ test_data_sql = [
 
     (
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         "logs and query",
+=======
+        "logs or query",
+>>>>>>> Stashed changes
 =======
         "logs or query",
 >>>>>>> Stashed changes
