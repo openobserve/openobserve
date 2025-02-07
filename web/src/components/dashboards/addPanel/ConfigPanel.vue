@@ -1221,6 +1221,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-input
+        v-if="promqlMode"
+        v-model="dashboardPanelData.data.config.step_value"
+        :value="0"
+        :min="0"
+        label="Step Value"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="Default: 0"
+        data-test="dashboard-config-step-value"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
       <Drilldown
         v-if="
           !['html', 'markdown', 'geomap', 'maps'].includes(
@@ -1490,6 +1511,11 @@ export default defineComponent({
       // Initialize map_type configuration
       if (!dashboardPanelData.data.config.map_type) {
         dashboardPanelData.data.config.map_type = { type: "world" };
+      }
+
+      // If no step value is set, set it to 0
+      if (!dashboardPanelData.data.config.step_value) {
+        dashboardPanelData.data.config.step_value = "0";
       }
     });
 
