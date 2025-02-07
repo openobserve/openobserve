@@ -24,6 +24,7 @@ use datafusion::{
     error::DataFusionError,
     logical_expr::{ColumnarValue, ScalarFunctionImplementation, ScalarUDF, Volatility},
     prelude::create_udf,
+    scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
@@ -63,15 +64,48 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
                 None,
             ));
         }
-        let args = ColumnarValue::values_to_arrays(args)?;
 
         // 1. cast both arguments to be aligned with the signature
-        let haystack = as_string_array(&args[0])?;
-        let needle = as_string_array(&args[1])?;
-
-        // because of the needle always same, we can use the first needle to pre-compute the result
-        let first_needle = needle.iter().find(|n| n.is_some()).unwrap().unwrap();
-        let mem_finder = memchr::memmem::Finder::new(first_needle);
+        let ColumnarValue::Array(haystack) = &args[0] else {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[haystack] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        };
+        let haystack = as_string_array(&haystack)?;
+        let ColumnarValue::Scalar(needle) = &args[1] else {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[needle] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        };
+        let needle = match needle {
+            ScalarValue::Utf8(v) => v,
+            ScalarValue::Utf8View(v) => v,
+            ScalarValue::LargeUtf8(v) => v,
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "Invalid argument types[needle] to str_match function".to_string(),
+                    ),
+                    None,
+                ))
+            }
+        };
+        if needle.is_none() || needle.as_ref().unwrap().is_empty() {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[needle] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        }
+        // pre-compute the needle
+        let mem_finder = memchr::memmem::Finder::new(needle.as_ref().unwrap().as_bytes());
 
         // 2. perform the computation
         let array = haystack
