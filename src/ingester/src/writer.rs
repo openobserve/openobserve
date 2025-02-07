@@ -31,7 +31,7 @@ use config::{
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -56,7 +56,7 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 pub struct Writer {
     idx: usize,
     key: WriterKey,
-    wal: Arc<Mutex<WalWriter>>,
+    wal: Arc<RwLock<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
@@ -182,7 +182,7 @@ impl Writer {
         Self {
             idx,
             key: key.clone(),
-            wal: Arc::new(Mutex::new(
+            wal: Arc::new(RwLock::new(
                 WalWriter::new(
                     wal_dir,
                     &key.org_id,
@@ -243,7 +243,7 @@ impl Writer {
 
         // write into wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
@@ -273,7 +273,7 @@ impl Writer {
 
         // check fsync
         if fsync {
-            let mut wal = self.wal.lock().await;
+            let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
             drop(wal);
         }
@@ -283,14 +283,7 @@ impl Writer {
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
-
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size)
+        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
             && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
         {
             return Ok(());
@@ -318,6 +311,15 @@ impl Writer {
             cfg.limit.wal_write_buffer_size,
         )
         .context(WalSnafu)?;
+        let start = std::time::Instant::now();
+        let mut wal = self.wal.write().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
+        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
+            return Ok(()); // check again to avoid race condition
+        }
         wal.sync().context(WalSnafu)?; // sync wal before rotation
         let old_wal = std::mem::replace(&mut *wal, new_wal);
         drop(wal);
@@ -349,7 +351,7 @@ impl Writer {
 
     pub async fn close(&self) -> Result<()> {
         // rotation wal
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         wal.sync().context(WalSnafu)?;
         let path = wal.path().clone();
         drop(wal);
