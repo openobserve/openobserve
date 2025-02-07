@@ -685,6 +685,12 @@ pub struct Common {
     pub bloom_filter_ndv_ratio: u64,
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
+    #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_FULL_REJECT",
+        default = false,
+        help = "Reject write when write queue is full"
+    )]
+    pub wal_write_queue_full_reject: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -1016,6 +1022,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
+    #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
+    pub wal_write_queue_size: usize,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -2046,6 +2054,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // wal
     if cfg.limit.wal_write_buffer_size < 4096 {
         cfg.limit.wal_write_buffer_size = 4096;
+    }
+    if cfg.limit.wal_write_queue_size == 0 {
+        cfg.limit.wal_write_queue_size = 10000;
     }
 
     // check query settings
