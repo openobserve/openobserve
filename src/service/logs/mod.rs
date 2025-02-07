@@ -546,7 +546,11 @@ async fn write_logs(
     evaluate_trigger(triggers).await;
 
     let process_time = start.elapsed().as_millis();
-    if process_time > 2000 {
+    let max_process_time: u128 = std::env::var("MAX_PROCESS_TIME")
+        .ok()
+        .and_then(|val| val.parse().ok())
+        .unwrap_or(2000);
+    if process_time > max_process_time {
         log::warn!("[write_logs] total time: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
          process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
     }
