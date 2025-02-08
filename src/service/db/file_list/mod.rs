@@ -12,22 +12,21 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+#[cfg(feature = "enterprise")]
 use std::collections::HashMap;
-use anyhow::anyhow;
-use config::{
-    meta::stream::FileMeta,
-    RwHashMap, RwHashSet,
-};
-use dashmap::{DashMap, DashSet};
-use futures_util::future::try_join_all;
-use infra::{cache, cache::stats, file_list};
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-};
-use once_cell::sync::Lazy;
+
+#[cfg(feature = "enterprise")]
 use config::meta::stream::StreamStats;
+use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
+use dashmap::{DashMap, DashSet};
+use infra::{cache, cache::stats, file_list};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use once_cell::sync::Lazy;
+#[cfg(feature = "enterprise")]
 use proto::cluster_rpc::StreamStatResponse;
+
+#[cfg(feature = "enterprise")]
 use crate::handler::grpc::request::stream::{ClusterStreamClient, StreamStatKey, StreamStatsEntry};
 
 pub mod broadcast;
@@ -88,22 +87,26 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
     // super cluster
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster_cache_stats().await?;
+        if let Err(err) = super_cluster_cache_stats().await {
+            log::error!("super_cluster_cache_stats error: {err}")
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]
     {
         // single cluster
-        single_cache_stats().await?;
+        if let Err(err) = single_cache_stats().await {
+            log::error!("single_cache_stats error: {err}")
+        }
     }
 
     Ok(())
 }
 #[cfg(not(feature = "enterprise"))]
 async fn single_cache_stats() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
+        let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
             log::error!("Load stream stats error: {}", ret.err().unwrap());
             continue;
@@ -127,32 +130,48 @@ async fn super_cluster_cache_stats() -> Result<(), anyhow::Error> {
     clusters.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
 
     if clusters.is_empty() {
-        return Err(anyhow!("No selected clusters online"));
+        return Err(anyhow::anyhow!("No selected clusters online"));
     }
 
-    let clients: Vec<_> = clusters
-        .iter()
-        .map(|cluster| ClusterStreamClient::new(cluster))
-        .collect();
-    let mut clients: Vec<_> = clients.into_iter().filter_map(|c| c.ok()).collect();
-    clients.push(ClusterStreamClient::new(&clusters[0])?);
+    let clients: Vec<_> = clusters.iter().map(ClusterStreamClient::new).collect();
+    let clients: Vec<_> = clients.into_iter().filter_map(|c| c.ok()).collect();
+
     let stat_futures: Vec<_> = clients
         .iter()
         .map(|client| client.get_stream_stats())
         .collect();
 
-    let results = try_join_all(stat_futures).await?;
+    let mut results = vec![];
+    let stat_results = futures_util::future::join_all(stat_futures).await;
+    for (i, result) in stat_results.into_iter().enumerate() {
+        match result {
+            Ok(stats) => {
+                log::debug!("Client {} stats: {:?}", i, stats);
+                results.push(stats);
+            }
+            Err(e) => {
+                // If the retrieval of stream stats for a cluster fails,
+                // the data of this cluster will not be updated in the cache.
+                // However, the previously added data will not be deleted during the merging
+                // process.
+                log::error!("Failed to get {i} stream stats: {}", e);
+            }
+        }
+    }
 
-    // Merge all stats
     let merged_stats = merge_stream_stats(results)?;
-
-    // Write merged stats
-    write_merged_stats(merged_stats)?;
+    if !merged_stats.is_empty() {
+        log::debug!("super_cluster_cache_stats Merged stats: {:?}", merged_stats);
+        // Write merged stats
+        write_merged_stats(merged_stats)?;
+    }
 
     Ok(())
 }
-
-fn merge_stream_stats(results: Vec<StreamStatResponse>) -> Result<HashMap<StreamStatKey, StreamStats>, anyhow::Error> {
+#[cfg(feature = "enterprise")]
+fn merge_stream_stats(
+    results: Vec<StreamStatResponse>,
+) -> Result<HashMap<StreamStatKey, StreamStats>, anyhow::Error> {
     let mut stats_map: HashMap<StreamStatKey, StreamStats> = HashMap::new();
 
     for response in results {
@@ -170,29 +189,24 @@ fn merge_stream_stats(results: Vec<StreamStatResponse>) -> Result<HashMap<Stream
                 .or_insert(stream_entry.stats);
         }
     }
+
     Ok(stats_map)
 }
-
+#[cfg(feature = "enterprise")]
 fn write_merged_stats(stats_map: HashMap<StreamStatKey, StreamStats>) -> Result<(), anyhow::Error> {
     for (key, stats) in stats_map {
-        stats::set_stream_stats(
-            &key.org_id,
-            &key.stream_name,
-            key.stream_type.into(),
-            stats,
-        );
+        stats::set_stream_stats(&key.org_id, &key.stream_name, key.stream_type.into(), stats);
     }
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use infra::cache::stats::get_stream_stats;
     use proto::cluster_rpc::{StreamStatEntry, StreamStatResponse};
 
-    // Helper function to create test stream stats
+    use super::*;
+
     fn create_test_stats(
         created_at: i64,
         doc_time_min: i64,
@@ -215,8 +229,12 @@ mod tests {
         }
     }
 
-    // Helper function to create test entry
-    fn create_test_entry(org_id: &str, stream_name: &str, stream_type: &str, stats: StreamStats) -> StreamStatEntry {
+    fn create_test_entry(
+        org_id: &str,
+        stream_name: &str,
+        stream_type: &str,
+        stats: StreamStats,
+    ) -> StreamStatEntry {
         StreamStatEntry {
             stream: format!("{}/{}/{}", org_id, stream_type, stream_name),
             stats: Some(proto::cluster_rpc::StreamStats {
@@ -267,14 +285,14 @@ mod tests {
         let merged_stats = merged.get(&key).unwrap();
 
         // Verify merged values
-        assert_eq!(merged_stats.created_at, 90);  // min
-        assert_eq!(merged_stats.doc_time_min, 40);  // min
-        assert_eq!(merged_stats.doc_time_max, 160);  // max
-        assert_eq!(merged_stats.doc_num, 25);  // sum
-        assert_eq!(merged_stats.file_num, 5);  // sum
-        assert_eq!(merged_stats.storage_size, 2500.0);  // sum
-        assert_eq!(merged_stats.compressed_size, 1250.0);  // sum
-        assert_eq!(merged_stats.index_size, 500.0);  // sum
+        assert_eq!(merged_stats.created_at, 90); // min
+        assert_eq!(merged_stats.doc_time_min, 40); // min
+        assert_eq!(merged_stats.doc_time_max, 160); // max
+        assert_eq!(merged_stats.doc_num, 25); // sum
+        assert_eq!(merged_stats.file_num, 5); // sum
+        assert_eq!(merged_stats.storage_size, 2500.0); // sum
+        assert_eq!(merged_stats.compressed_size, 1250.0); // sum
+        assert_eq!(merged_stats.index_size, 500.0); // sum
     }
 
     #[test]
@@ -302,7 +320,11 @@ mod tests {
         let result = write_merged_stats(stats_map);
         assert!(result.is_ok());
 
-        let sts1 = get_stream_stats(key1.org_id.as_str(), &key1.stream_name, key1.stream_type.into());
+        let sts1 = get_stream_stats(
+            key1.org_id.as_str(),
+            &key1.stream_name,
+            key1.stream_type.into(),
+        );
         assert_eq!(sts1.index_size, stats1.index_size);
         assert_eq!(sts1.storage_size, stats1.storage_size);
         assert_eq!(sts1.compressed_size, stats1.compressed_size);
@@ -312,7 +334,11 @@ mod tests {
         assert_eq!(sts1.doc_time_min, stats1.doc_time_min);
         assert_eq!(sts1.created_at, stats1.created_at);
 
-        let sts2 = get_stream_stats(key2.org_id.as_str(), &key2.stream_name, key2.stream_type.into());
+        let sts2 = get_stream_stats(
+            key2.org_id.as_str(),
+            &key2.stream_name,
+            key2.stream_type.into(),
+        );
         assert_eq!(sts2.index_size, stats2.index_size);
         assert_eq!(sts2.storage_size, stats2.storage_size);
         assert_eq!(sts2.compressed_size, stats2.compressed_size);

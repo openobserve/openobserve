@@ -12,21 +12,25 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#![cfg(feature = "enterprise")]
 
 use anyhow::{anyhow, Context};
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
-use o2_enterprise::enterprise::super_cluster::kv::cluster::{get_grpc_addr, get_local_grpc_addr, ClusterInfo};
-use o2_enterprise::enterprise::super_cluster::search::server_internal_error;
-use proto::cluster_rpc::{
-    streams_server::Streams, StreamStatEntry, StreamStatRequest, StreamStatResponse, StreamStats,
-};
-use tonic::{Request, Response, Status};
-use tonic::codec::CompressionEncoding;
-use tonic::metadata::MetadataValue;
-use tonic::transport::Channel;
 use infra::errors::ErrorCodes;
-use proto::cluster_rpc::streams_client::StreamsClient;
+use o2_enterprise::enterprise::super_cluster::{
+    kv::cluster::{get_grpc_addr, get_local_grpc_addr, ClusterInfo},
+    search::server_internal_error,
+};
+use proto::cluster_rpc::{
+    streams_client::StreamsClient, streams_server::Streams, StreamStatEntry, StreamStatRequest,
+    StreamStatResponse, StreamStats,
+};
+use tonic::{
+    codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request, Response,
+    Status,
+};
+
 use crate::service::db;
 
 const BATCH_DELAY_MS: u64 = 100;
@@ -66,7 +70,7 @@ impl StreamServiceImpl {
     }
 
     async fn process_orgs_batch(
-        orgs: Vec<String>,
+        orgs: &[String],
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Vec<StreamStatEntry> {
@@ -106,12 +110,17 @@ impl Streams for StreamServiceImpl {
         let stream_type = req.stream_type.map(|s| s.into());
         let stream_name = req.stream_name.as_deref();
 
-        let entries = Self::process_orgs_batch(orgs, stream_type, stream_name).await;
-
+        let entries = Self::process_orgs_batch(&orgs, stream_type, stream_name).await;
+        log::debug!(
+            "orgs:{:?}, stream_type:{:?}, stream_name:{:?}, stream stats: {:?}",
+            orgs,
+            stream_type,
+            stream_name,
+            entries
+        );
         Ok(Response::new(StreamStatResponse { entries }))
     }
 }
-
 
 pub struct ClusterStreamClient {
     grpc_addr: String,
@@ -153,7 +162,6 @@ impl ClusterStreamClient {
             .accept_compressed(CompressionEncoding::Gzip)
             .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
             .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-
 
         client
             .stream(request)

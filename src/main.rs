@@ -91,10 +91,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-use openobserve::{
-    handler::grpc::request::stream::StreamServiceImpl, service::tls::http_tls_config,
-};
+#[cfg(feature = "enterprise")]
+use openobserve::handler::grpc::request::stream::StreamServiceImpl;
+use openobserve::service::tls::http_tls_config;
+#[cfg(feature = "enterprise")]
 use proto::cluster_rpc::streams_server::StreamsServer;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -450,6 +450,7 @@ async fn init_common_grpc_server(
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    #[cfg(feature = "enterprise")]
     let streams_svc = StreamsServer::new(StreamServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -469,7 +470,7 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    builder
+    let builder = builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -479,14 +480,18 @@ async fn init_common_grpc_server(
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
-        .add_service(flight_svc)
-        .add_service(streams_svc)
+        .add_service(flight_svc);
+    #[cfg(feature = "enterprise")]
+    let builder = builder.add_service(streams_svc);
+
+    builder
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
         .await
         .expect("gRPC server init failed");
+
     stopped_tx.send(()).ok();
     Ok(())
 }
