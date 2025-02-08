@@ -26,11 +26,15 @@ use futures_util::future::LocalBoxFuture;
 
 pub struct SlowLog {
     threshold_secs: u64,
+    circuit_breaker_enabled: bool,
 }
 
 impl SlowLog {
-    pub fn new(threshold_secs: u64) -> Self {
-        SlowLog { threshold_secs }
+    pub fn new(threshold_secs: u64, circuit_breaker_enabled: bool) -> Self {
+        SlowLog {
+            threshold_secs,
+            circuit_breaker_enabled,
+        }
     }
 }
 
@@ -50,6 +54,7 @@ where
         ready(Ok(SlowLogMiddleware {
             service,
             threshold_secs: self.threshold_secs,
+            circuit_breaker_enabled: self.circuit_breaker_enabled,
         }))
     }
 }
@@ -57,6 +62,7 @@ where
 pub struct SlowLogMiddleware<S> {
     service: S,
     threshold_secs: u64,
+    circuit_breaker_enabled: bool,
 }
 
 impl<S, B> Service<ServiceRequest> for SlowLogMiddleware<S>
@@ -91,6 +97,7 @@ where
             .to_string();
         let method = req.method().to_string();
         let threshold = Duration::from_secs(self.threshold_secs);
+        let circuit_breaker_enabled = self.circuit_breaker_enabled;
 
         let fut = self.service.call(req);
 
@@ -99,7 +106,9 @@ where
             let duration = start.elapsed();
 
             // watch the request duration
-            crate::service::circuit_breaker::watch_request(duration.as_millis() as u64);
+            if circuit_breaker_enabled {
+                crate::service::circuit_breaker::watch_request(duration.as_millis() as u64);
+            }
 
             // log the slow request
             if duration > threshold {
