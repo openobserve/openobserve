@@ -39,6 +39,8 @@ pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
 
+pub use migration::rollback_142_to_122;
+
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;

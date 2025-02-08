@@ -142,6 +142,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .action(clap::ArgAction::SetTrue)
                     .help("insert file list into db"),
             ]),
+            clap::Command::new("downgrade-142-to-122").about("rollback database changes from version 14.2 to 12.2")
         ])
         .get_matches();
 
@@ -323,6 +324,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
             super::load::load_file_list_from_s3(prefix, insert).await?;
+        }
+        "downgrade-142-to-122" => {
+            infra::table::rollback_142_to_122::run().await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
