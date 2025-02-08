@@ -662,7 +662,7 @@ pub async fn ingest(
         .inc();
 
     let total_time = start.elapsed().as_millis();
-    let slow_time_threshold = cfg.limit.http_process_slow_time as u128;
+    let slow_time_threshold = std::cmp::max(1, cfg.limit.http_process_slow_time as u128) * 1000;
     if before_write_time > slow_time_threshold || write_time > slow_time_threshold {
         log::info!(
             "total: {} ms, flatten: {} ms, convert_to_uds: {} ms, before_write: {} ms, write_to_channel: {} ms",

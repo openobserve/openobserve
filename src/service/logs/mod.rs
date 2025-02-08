@@ -546,7 +546,8 @@ async fn write_logs(
     evaluate_trigger(triggers).await;
 
     let process_time = start.elapsed().as_millis();
-    if process_time > cfg.limit.http_process_slow_time as u128 {
+    let slow_time_threshold = std::cmp::max(1, cfg.limit.http_process_slow_time as u128) * 1000;
+    if process_time > slow_time_threshold {
         log::warn!("[write_logs] total time: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
          process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
     }
