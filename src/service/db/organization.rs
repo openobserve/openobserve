@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -98,23 +98,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
         if let db::Event::Put(ev) = ev {
             let item_key = ev.key;
-            let item_value = ev.value.unwrap();
-            let json_val: OrganizationSetting = if config::get_config().common.meta_store_external {
-                match db::get(&item_key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
+            let json_val: OrganizationSetting = match db::get(&item_key).await {
+                Ok(val) => match json::from_slice(&val) {
+                    Ok(val) => val,
                     Err(e) => {
                         log::error!("Error getting value: {}", e);
                         continue;
                     }
+                },
+                Err(e) => {
+                    log::error!("Error getting value: {}", e);
+                    continue;
                 }
-            } else {
-                json::from_slice(&item_value).unwrap()
             };
             ORGANIZATION_SETTING
                 .clone()

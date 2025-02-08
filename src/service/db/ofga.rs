@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -100,22 +100,18 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_value: OFGAModel = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                let item_value: OFGAModel = match db::get(&ev.key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
                             continue;
                         }
+                    },
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
                     }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
                 };
                 log::info!("[WATCH] Got store id {}", &item_value.store_id);
                 OFGA_STORE_ID.insert("store_id".to_owned(), item_value.store_id);
