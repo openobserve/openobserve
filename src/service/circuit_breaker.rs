@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
-        Arc, LazyLock,
-    },
-    time::Duration,
+use std::sync::{
+    atomic::{AtomicI64, AtomicU64, Ordering},
+    Arc, LazyLock,
 };
 
 use chrono::Utc;
@@ -86,17 +83,7 @@ impl CircuitBreaker {
         };
         // reset the current window
         cb.reset_current_window();
-        let cb = Arc::new(cb);
-        let cb_clone = cb.clone();
-        // start a timer to reset the current window
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(watching_window as u64));
-            loop {
-                interval.tick().await;
-                cb.reset_state().await;
-            }
-        });
-        cb_clone
+        Arc::new(cb)
     }
 
     fn watch(&self, req_took_time: u64) {
@@ -142,32 +129,35 @@ impl CircuitBreaker {
         });
     }
 
-    async fn reset_state(&self) {
+    fn reset_state(&self) {
         if self.state.load(Ordering::Relaxed) == CircuitBreakerState::Open as u64
             && self.will_reset_at.load(Ordering::Relaxed) < Utc::now().timestamp()
             && self.slow_requests.load(Ordering::Relaxed) < self.slow_request_threshold
         {
-            // here we only reset the state, maybe the window just reset soon
             self.state
                 .store(CircuitBreakerState::Closed as u64, Ordering::Relaxed);
 
             // change the cluster node status to schedulable
-            if crate::common::infra::cluster::set_schedulable()
-                .await
-                .is_ok()
-            {
-                log::warn!("[CIRCUIT_BREAKER] set the cluster node status to schedulable");
-            }
+            tokio::spawn(async move {
+                if crate::common::infra::cluster::set_schedulable()
+                    .await
+                    .is_ok()
+                {
+                    log::warn!("[CIRCUIT_BREAKER] set the cluster node status to schedulable");
+                }
+            });
         }
     }
 
     fn reset_current_window(&self) {
-        if self.current_window.load(Ordering::Relaxed) != self.get_current_window_timestamp() {
-            self.current_window
-                .store(self.get_current_window_timestamp(), Ordering::Relaxed);
-            self.total_requests.store(0, Ordering::Relaxed);
-            self.slow_requests.store(0, Ordering::Relaxed);
+        if self.current_window.load(Ordering::Relaxed) == self.get_current_window_timestamp() {
+            return;
         }
+        self.reset_state();
+        self.current_window
+            .store(self.get_current_window_timestamp(), Ordering::Relaxed);
+        self.total_requests.store(0, Ordering::Relaxed);
+        self.slow_requests.store(0, Ordering::Relaxed);
     }
 
     fn get_current_window_timestamp(&self) -> i64 {
