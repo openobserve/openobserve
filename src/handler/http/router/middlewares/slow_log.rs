@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -98,6 +98,10 @@ where
             let res = fut.await?;
             let duration = start.elapsed();
 
+            // watch the request duration
+            crate::service::circuit_breaker::watch_request(duration.as_millis() as u64);
+
+            // log the slow request
             if duration > threshold {
                 log::warn!(
                     "Slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
