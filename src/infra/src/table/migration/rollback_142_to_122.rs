@@ -284,18 +284,18 @@ impl From<crate::table::entity::dashboards::Model> for meta::dashboards::Dashboa
         let d: config::meta::dashboards::Dashboard = value.try_into().unwrap();
 
         if let Some(inner) = d.v1 {
-            return Self::V1(meta::dashboards::DashboardV1 {
+            Self::V1(meta::dashboards::DashboardV1 {
                 version: 1,
                 rest: inner,
-            });
+            })
         } else if let Some(inner) = d.v2 {
-            return Self::V2(inner);
+            Self::V2(inner)
         } else if let Some(inner) = d.v3 {
-            return Self::V3(inner);
+            Self::V3(inner)
         } else if let Some(inner) = d.v4 {
-            return Self::V4(inner);
+            Self::V4(inner)
         } else if let Some(inner) = d.v5 {
-            return Self::V5(inner);
+            Self::V5(inner)
         } else {
             panic!("dashboard does not contain data compatible with any version")
         }
