@@ -325,6 +325,14 @@ pub async fn merge_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    if schema == Schema::empty() {
+        // the stream was deleted, mark the job as done
+        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+            log::error!("[COMPACT] set_job_done failed: {e}");
+        }
+        return Ok(());
+    }
+
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
