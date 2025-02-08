@@ -20,6 +20,8 @@ use std::sync::{
 
 use chrono::Utc;
 
+const UPDATE_STATE_RETRY_TIMES: usize = 5;
+
 static CIRCUIT_BREAKER: LazyLock<Arc<CircuitBreaker>> = LazyLock::new(|| {
     let cfg = config::get_config();
     CircuitBreaker::new(
@@ -120,11 +122,21 @@ impl CircuitBreaker {
 
         // change the cluster node status to unSchedulable
         tokio::spawn(async move {
-            if crate::common::infra::cluster::set_unschedulable()
-                .await
-                .is_ok()
-            {
-                log::warn!("[CIRCUIT_BREAKER] set the cluster node status to unSchedulable");
+            for _ in 0..UPDATE_STATE_RETRY_TIMES {
+                match crate::common::infra::cluster::set_unschedulable().await {
+                    Ok(_) => {
+                        log::warn!(
+                            "[CIRCUIT_BREAKER] set the cluster node status to unSchedulable"
+                        );
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[CIRCUIT_BREAKER] failed to set the cluster node status to unSchedulable: {}",
+                            e
+                        );
+                    }
+                }
             }
         });
     }
@@ -139,11 +151,21 @@ impl CircuitBreaker {
 
             // change the cluster node status to schedulable
             tokio::spawn(async move {
-                if crate::common::infra::cluster::set_schedulable()
-                    .await
-                    .is_ok()
-                {
-                    log::warn!("[CIRCUIT_BREAKER] set the cluster node status to schedulable");
+                for _ in 0..UPDATE_STATE_RETRY_TIMES {
+                    match crate::common::infra::cluster::set_schedulable().await {
+                        Ok(_) => {
+                            log::warn!(
+                                "[CIRCUIT_BREAKER] set the cluster node status to schedulable"
+                            );
+                            break;
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[CIRCUIT_BREAKER] failed to set the cluster node status to schedulable: {}",
+                                e
+                            );
+                        }
+                    }
                 }
             });
         }
@@ -161,7 +183,6 @@ impl CircuitBreaker {
     }
 
     fn get_current_window_timestamp(&self) -> i64 {
-        let t = Utc::now().timestamp();
-        t - t % self.watching_window
+        Utc::now().timestamp() / self.watching_window
     }
 }
