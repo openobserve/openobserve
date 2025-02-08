@@ -746,12 +746,18 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
             }
         };
         let pool = CLIENT.clone();
+        let op_name = if deleted { "stats_deleted" } else { "stats" };
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
+            .with_label_values(&[op_name, "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
             .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&[op_name, "file_list"])
+            .observe(time);
         Ok(ret
             .iter()
             .map(|r| (r.stream.to_owned(), r.into()))
@@ -889,6 +895,10 @@ UPDATE stream_stats
         }
         // delete files which already marked deleted
         if let Some((_min_id, max_id)) = pk_value {
+            DB_QUERY_NUMS
+                .with_label_values(&["clean_deleted", "file_list"])
+                .inc();
+            let start = std::time::Instant::now();
             if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= ?;")
                 .bind(max_id)
                 .execute(&mut *tx)
@@ -902,6 +912,10 @@ UPDATE stream_stats
                 }
                 return Err(e.into());
             }
+            let time = start.elapsed().as_secs_f64();
+            DB_QUERY_TIME
+                .with_label_values(&["clean_deleted", "file_list"])
+                .observe(time);
         }
 
         // commit
@@ -1422,9 +1436,6 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1448,9 +1459,6 @@ CREATE TABLE IF NOT EXISTS file_list
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_history"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
@@ -1474,9 +1482,6 @@ CREATE TABLE IF NOT EXISTS file_list_history
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_deleted"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
@@ -1495,9 +1500,6 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_jobs"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_jobs
@@ -1516,9 +1518,6 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "stream_stats"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
@@ -1638,9 +1637,6 @@ pub async fn create_table_index() -> Result<()> {
 
         log::warn!("[MYSQL] starting delete duplicate records");
         // delete duplicate records
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&pool).await?;
@@ -1650,9 +1646,6 @@ pub async fn create_table_index() -> Result<()> {
             let date = r.get::<String, &str>("date");
             let file = r.get::<String, &str>("file");
             let id = r.get::<i64, &str>("id");
-            DB_QUERY_NUMS
-                .with_label_values(&["delete", "file_list"])
-                .inc();
             sqlx::query(
                 r#"DELETE FROM file_list WHERE id != ? AND stream = ? AND date = ? AND file = ?;"#,
             )
@@ -1687,9 +1680,6 @@ pub async fn create_table_index() -> Result<()> {
 
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["select", "information_schema.columns"])
-        .inc();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );
@@ -1702,7 +1692,6 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 
     let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
-    DB_QUERY_NUMS.with_label_values(&["alter", table]).inc();
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
         if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column
