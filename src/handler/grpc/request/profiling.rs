@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bytes::Bytes;
 use config::ider;
 use pprof::protos::{Message, Profile};
 use proto::profiling::{
@@ -11,25 +12,39 @@ use proto::profiling::{
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
 
-#[derive(Serialize, Debug, Clone)]
-struct FlameGraphNode {
+use crate::{common::meta::ingestion::IngestionRequest, service::logs};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FlameGraphNode {
     id: String,
     name: String,
     value: u64,
     children: Vec<FlameGraphNode>,
 }
 
-#[derive(Serialize, Debug, Clone)]
-struct FlameGraphData {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FlameGraphData {
     name: String,
     value: u64,
     children: Vec<FlameGraphNode>,
 }
 
-// TODO: Define metadata structure
-#[derive(Deserialize)]
-struct ProfileMetadata {
-    instance_name: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProfilingData {
+    pub raw_pprof: Vec<u8>,
+    pub metadata: ProfileMetadata,
+    pub flame_data: FlameGraphData,
+}
+
+impl ProfilingData {
+    fn to_json(&self) -> Result<String, String> {
+        serde_json::to_string(self).map_err(|e| e.to_string())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProfileMetadata {
+    pub instance_name: String,
     // TODO: Add more fields as needed:
     // - timestamp
     // - environment
@@ -174,14 +189,14 @@ impl ContinuousProfilingService for ContinuousProfilingServer {
         request: Request<ProfileData>,
     ) -> Result<Response<ProfileResponse>, Status> {
         log::info!("Received profile request");
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
         let ProfileData {
             raw_pprof,
             metadata,
         } = request.into_inner();
 
         // Parse metadata
-        let metadata: ProfileMetadata = serde_json::from_str(&metadata)
+        let _metadata: ProfileMetadata = serde_json::from_str(&metadata)
             .map_err(|e| Status::invalid_argument(format!("Invalid metadata: {}", e)))?;
 
         // Process profile in a blocking task
@@ -191,16 +206,37 @@ impl ContinuousProfilingService for ContinuousProfilingServer {
                 Profile::decode(&raw_pprof[..]).map(|profile| {
                     let flame_data = FlameGraphData::from_profile(&profile)
                         .map_err(|e| prost::DecodeError::new(e))?;
-                    Ok::<(Profile, FlameGraphData), prost::DecodeError>((profile, flame_data))
+                    Ok::<(Vec<u8>, FlameGraphData), prost::DecodeError>((raw_pprof, flame_data))
                 })
             }),
         )
         .await;
 
         match process_result {
-            Ok(Ok(Ok(Ok((_, _flame_data))))) => {
+            Ok(Ok(Ok(Ok((raw_pprof, flame_data))))) => {
                 let profile_id = ider::uuid();
-                Ok(Response::new(ProfileResponse { profile_id }))
+                let profiling_data = ProfilingData {
+                    raw_pprof,
+                    metadata: _metadata,
+                    flame_data,
+                };
+
+                match logs::ingest::ingest(
+                    0,
+                    "default",
+                    PROFILING_STREAM,
+                    IngestionRequest::JSON(&Bytes::from(profiling_data.to_json().unwrap())),
+                    "root@example.com",
+                    None,
+                )
+                .await
+                {
+                    Ok(_) => Ok(Response::new(ProfileResponse { profile_id })),
+                    Err(e) => {
+                        log::error!("Failed to ingest profile: {}", e);
+                        Err(Status::internal("Failed to ingest profile"))
+                    }
+                }
             }
             Ok(Ok(Ok(Err(e)))) => {
                 log::error!("Failed to process profile: {}", e);
