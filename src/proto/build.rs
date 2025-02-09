@@ -15,7 +15,7 @@
 
 use std::io::{Result, Write};
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=proto");
 
@@ -146,8 +146,19 @@ fn main() -> std::io::Result<()> {
 
     tonic_build::configure()
         .build_server(true)
-        .compile(&["proto/continuous-profiling/service.proto"], &["proto"])
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .compile(&["proto/profiling/service.proto"], &["proto"])?;
+
+    let path = "src/generated/profiling.rs";
+    let generated_source_path = out.join("profiling.rs");
+    println!("generated_source_path: {:?}", generated_source_path);
+    let code = std::fs::read_to_string(generated_source_path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+    file.write_all(code.as_str().as_ref()).unwrap();
 
     Ok(())
 }

@@ -460,6 +460,12 @@ pub struct Profiling {
     )]
     pub pprof_interval: u64,
     #[env_config(
+        name = "ZO_PROF_PPROF_ENDPOINT",
+        default = "http://localhost:5081",
+        help = "Endpoint to send pprof profile"
+    )]
+    pub pprof_endpoint: String,
+    #[env_config(
         name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
         default = false,
         help = "Enable pprof profiling with pprof-rs encode to protobuf format"

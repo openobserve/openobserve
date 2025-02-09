@@ -17,6 +17,7 @@ pub mod event;
 pub mod ingest;
 pub mod logs;
 pub mod metrics;
+pub mod profiling;
 pub mod query_cache;
 pub mod search;
 pub mod traces;

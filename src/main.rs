@@ -46,6 +46,7 @@ use openobserve::{
                 ingest::Ingester,
                 logs::LogsServer,
                 metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
+                profiling::ContinuousProfilingServer,
                 query_cache::QueryCacheServerImpl,
                 traces::TraceServer,
             },
@@ -69,7 +70,10 @@ use proto::{
         event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
         query_cache_server::QueryCacheServer, search_server::SearchServer,
     },
-    myservice::{my_service_client::MyServiceClient, Request},
+    profiling::{
+        continuous_profiling_service_client::ContinuousProfilingServiceClient,
+        continuous_profiling_service_server::ContinuousProfilingServiceServer, ProfileData,
+    },
 };
 use tokio::sync::oneshot;
 use tonic::{
@@ -362,21 +366,27 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let profiling_task = if let Some(guard) = pprof_guard {
         let interval_secs = cfg.profiling.pprof_interval;
+        let pprof_endpoint = cfg.profiling.pprof_endpoint.clone();
         Some(tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 let mut interval =
                     tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
-                let mut client = match MyServiceClient::connect("http://localhost:50051").await {
-                    Ok(client) => {
-                        log::info!("Connected to profiling service at http://localhost:50051");
-                        client
-                    }
-                    Err(e) => {
-                        log::error!("Failed to connect to profiling service: {}", e);
-                        return;
-                    }
-                };
+                let mut client =
+                    match ContinuousProfilingServiceClient::connect(pprof_endpoint.clone()).await {
+                        Ok(client) => {
+                            log::info!("Connected to profiling service at {}", pprof_endpoint);
+                            client
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to connect to profiling service at {}: {}",
+                                pprof_endpoint,
+                                e
+                            );
+                            return;
+                        }
+                    };
 
                 loop {
                     interval.tick().await;
@@ -386,13 +396,16 @@ async fn main() -> Result<(), anyhow::Error> {
                             let mut content = Vec::new();
                             if profile.encode(&mut content).is_ok() {
                                 log::debug!("Sending profile data of size {} bytes", content.len());
-                                let request = Request { data: content };
-                                match client.handle_request(request).await {
+                                let request = ProfileData {
+                                    raw_pprof: content,
+                                    metadata: "".to_string(),
+                                };
+                                match client.handle_profile(request).await {
                                     Ok(response) => {
-                                        let profile_id =
-                                            String::from_utf8_lossy(&response.into_inner().result)
-                                                .to_string();
-                                        log::info!("Successfully sent profile, ID: {}", profile_id);
+                                        log::info!(
+                                            "Successfully sent: {}",
+                                            response.into_inner().profile_id
+                                        );
                                     }
                                     Err(e) => {
                                         log::error!("Failed to send profile: {}", e);
@@ -514,6 +527,9 @@ async fn init_common_grpc_server(
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let profiling_svc = ContinuousProfilingServiceServer::new(ContinuousProfilingServer::default())
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
 
     log::info!(
         "starting gRPC server {} at {}",
@@ -540,6 +556,7 @@ async fn init_common_grpc_server(
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
         .add_service(flight_svc)
+        .add_service(profiling_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

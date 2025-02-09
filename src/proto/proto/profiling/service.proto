@@ -1,0 +1,15 @@
+syntax = "proto3";
+package profiling;
+
+service ContinuousProfilingService {
+    rpc HandleProfile (ProfileData) returns (ProfileResponse);
+}
+
+message ProfileData {
+    bytes raw_pprof = 1;
+    string metadata = 2;  // JSON encoded metadata
+}
+
+message ProfileResponse {
+    string profile_id = 1;
+} 
