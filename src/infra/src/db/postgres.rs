@@ -25,7 +25,7 @@ use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
-    ConnectOptions, Pool, Postgres,
+    Pool, Postgres,
 };
 use tokio::sync::{mpsc, OnceCell};
 
@@ -38,8 +38,7 @@ static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 fn connect() -> Pool<Postgres> {
     let cfg = config::get_config();
     let db_opts = PgConnectOptions::from_str(&cfg.common.meta_postgres_dsn)
-        .expect("postgres connect options create failed")
-        .disable_statement_logging();
+        .expect("postgres connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -127,6 +127,21 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .about("rollback last N SeaORM migration steps")
                     .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
+            clap::Command::new("recover-file-list").about("recover file list from s3").args([
+                clap::Arg::new("prefix")
+                    .short('p')
+                    .long("prefix")
+                    .value_name("prefix")
+                    .required(true)
+                    .help("only migrate specified prefix"),
+                clap::Arg::new("insert")
+                    .short('i')
+                    .long("insert")
+                    .value_name("insert")
+                    .required(false)
+                    .action(clap::ArgAction::SetTrue)
+                    .help("insert file list into db"),
+            ]),
         ])
         .get_matches();
 
@@ -304,6 +319,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 return Err(anyhow::anyhow!("missing sub command"));
             }
         },
+        "recover-file-list" => {
+            let prefix = command.get_one::<String>("prefix").unwrap();
+            let insert = command.get_flag("insert");
+            super::load::load_file_list_from_s3(prefix, insert).await?;
+        }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }

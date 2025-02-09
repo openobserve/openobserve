@@ -20,10 +20,7 @@ use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
 use promql_parser::parser;
 #[cfg(feature = "enterprise")]
-use {
-    config::meta::stream::StreamType,
-    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS,
-};
+use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},

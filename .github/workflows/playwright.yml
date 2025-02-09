@@ -115,6 +115,7 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
+            "sanity2.spec.js"
             # "remotepipeline.spec.js",
 
           ]
