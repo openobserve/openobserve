@@ -230,15 +230,30 @@ pub async fn get_settings(
     stream_type: StreamType,
 ) -> Option<StreamSettings> {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SETTINGS.read().await;
-    if let Some(v) = r.get(&key) {
-        return Some(v.clone());
+
+    // Try to get from read lock first
+    if let Some(settings) = STREAM_SETTINGS.read().await.get(&key).cloned() {
+        return Some(settings);
     }
-    // if not found in cache, get from db
-    get(org_id, stream_name, stream_type)
-        .await
-        .ok()
-        .and_then(|schema| unwrap_stream_settings(&schema))
+
+    // Get from DB without holding any locks
+    let settings = match get(org_id, stream_name, stream_type).await {
+        Ok(schema) => unwrap_stream_settings(&schema),
+        Err(_) => None,
+    };
+
+    // Only acquire write lock if we have settings to update
+    if let Some(ref s) = settings {
+        // Check cache again before updating as another thread might have updated while we were
+        // reading DB
+        let mut write_guard = STREAM_SETTINGS.write().await;
+        if !write_guard.contains_key(&key) {
+            write_guard.insert(key, s.clone());
+        }
+        drop(write_guard);
+    }
+
+    settings
 }
 
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {

@@ -500,6 +500,9 @@ pub async fn get_uds_and_original_data_streams(
 ) {
     let cfg = get_config();
     for stream in streams {
+        if user_defined_schema_map.contains_key(&stream.stream_name.to_string()) {
+            continue;
+        }
         let stream_settings =
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await
