@@ -73,7 +73,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               const cleanedCode = userCode.replace(/\\/\\*[\\s\\S]*?\\*\\/|\\/\\/.*|--.*/g, '').trim();
 
               // Execute code directly and expect option to be defined
-              const userFunction = new Function('data', 'echarts', userCode + '; return option;');
+              const userFunction = new Function('data', 'echarts', userCode + '; return option');
 
               const result = userFunction(data, echarts);
               const convertedData = convertFunctionsToString(result);

@@ -128,13 +128,22 @@ export default defineComponent({
 
       // Now, set the option with the executed functions
       chart.setOption(convertedData);
-
-      // Add event listeners for generic interactions
+      chart.on("click", (params) => emit("click", params));
       chart.on("mousemove", (params) => emit("mousemove", params));
       chart.on("mouseout", () => emit("mouseout"));
       chart.on("legendselectchanged", (params) =>
         emit("legendChanged", params),
       );
+
+      if (convertedData.o2_events) {
+        
+        // Add event listeners for custom interactions
+        for (const event in convertedData.o2_events) {
+          chart.off(event);
+          chart.on(event, (params) => convertedData.o2_events[event](params,chart));
+        }
+      }
+
     };
 
     const handleResize = async () => {
