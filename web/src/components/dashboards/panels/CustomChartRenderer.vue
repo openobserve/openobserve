@@ -85,27 +85,31 @@ export default defineComponent({
 
     const hoveredSeriesState = inject("hoveredSeriesState", null);
     const convertStringToFunction = (obj) => {
-            if (typeof obj === 'string' && obj.startsWith('function')) {
-              // Convert string back to function using eval
-              return eval(`(${obj})`);  // Wrap the string in parentheses to avoid syntax issues
-            }
+        if (typeof obj === 'string' && obj.startsWith('function')) {
+          try {
+            return new Function(`return ${obj}`)(); // Convert string to function
+          } catch (error) {
+            console.error("Error converting string to function:", error);
+          }
+        }
 
-            if (Array.isArray(obj)) {
-              return obj.map(item => convertStringToFunction(item));  // Recursively handle arrays
-            }
+        if (Array.isArray(obj)) {
+          return obj.map(item => convertStringToFunction(item)); // Recursively handle arrays
+        }
 
-            if (typeof obj === 'object' && obj !== null) {
-              const result = {};
-              for (const key in obj) {
-                if (obj.hasOwnProperty(key)) {
-                  result[key] = convertStringToFunction(obj[key]);  // Recursively handle object properties
-                }
-              }
-              return result;
+        if (typeof obj === 'object' && obj !== null) {
+          const result = {};
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
             }
+          }
+          return result;
+        }
 
-            return obj;  // If it's not a function string or an object, return it as is
-          };
+        return obj; // If it's not a function string or an object, return it as is
+      };
+
 
     const initChart = async () => {
       if (!chartRef.value) return;
