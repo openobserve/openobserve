@@ -30,7 +30,7 @@ root_dir = Path(__file__).parent.parent.parent
 
 
 def generate_random_string(length=5):
-    # Define the characters to choose from
+    # Define the characters to choose from lower case letters
     characters = string.ascii_lowercase  # This includes only lowercase letters
     random_string = ''.join(random.choice(characters) for _ in range(length))
     return random_string
@@ -41,7 +41,7 @@ print("Random String:", random_string)
 
 stream_name = "tdef" + random_string
 
-print("Random String:", stream_name)
+print("Random Stream:", stream_name)
 
 def test_ingest_data(create_session, base_url):
     """Ingest data into the openobserve running instance."""
@@ -55,7 +55,7 @@ def test_ingest_data(create_session, base_url):
     url_Ing = f"{base_url}api/{org_id}/{stream_name}/_json"
     resp_ing = session.post(url_Ing, data=data, headers={"Content-Type": "application/json"})
     print("Data ingested successfully for websocket, status code: ", resp_ing.status_code)
-    assert ( resp_ing.status_code == 200), f"Data ingested successfully for websocket, status code: {resp_ing.status_code}"
+    assert ( resp_ing.status_code == 200), f"Data ingested successfully for websocket test, status code: {resp_ing.status_code}"
 
 def test_disable_websocket(create_session, base_url):
     """Fixture to enable WebSocket and return cookies."""
@@ -76,7 +76,7 @@ def test_disable_websocket(create_session, base_url):
     print("Disable Websocket", resp_disable_webs.content)
     assert (
         resp_disable_webs.status_code == 200
-    ), f"Websocket enable 200, but got {resp_disable_webs.status_code} {resp_disable_webs.content}"
+    ), f"Websocket disable 200, but got {resp_disable_webs.status_code} {resp_disable_webs.content}"
 
 
 # Define test data with different queries and expected response details for histogram
@@ -124,11 +124,11 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
     json_data_hist = {
         "query": {
                 "sql": hist_query,
-                "start_time": one_min_ago,
+                "start_time": ten_min_ago,
                 "end_time": end_time,
                 "size": expected_size,
                 "sql_mode": "full"
@@ -151,7 +151,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
     total_hits_histog = res_data_histog["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_histog = 1  # Change this to 100 if that's what we're expecting
+    expected_hits_histog = 1  # we're expecting
     assert total_hits_histog == expected_hits_histog, f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
 
     # Generate request for histogram cache enabled
@@ -170,8 +170,8 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
     # Validate the total in the response
     total_hits_histog_cache = res_data_histog_cache["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_histog_cache = 1  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_histog_cache = 1  # what we're expecting
     assert total_hits_histog_cache == expected_hits_histog_cache, f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
 
 
@@ -218,11 +218,11 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
     url = base_url
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
     json_data_sql = {
     "query": {
         "sql": sql_query,
-        "start_time": one_min_ago,
+        "start_time": ten_min_ago,
         "end_time": end_time,
         "from": 0,
         "size": sql_size,
@@ -249,7 +249,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
     total_hits_sql = res_data_sql["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_sql = sql_size  # Change this to 100 if that's what we're expecting
+    expected_hits_sql = sql_size  # what we're expecting
     assert total_hits_sql == expected_hits_sql, f"Expected total {test_name_sql} to be {expected_hits_sql}, but got {total_hits_sql}"
 
     # Generate request for cache
@@ -268,8 +268,8 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
     # Validate the total in the response
     total_hits_sql_cache = res_data_sql_cache["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_sql_cache = sql_size  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_sql_cache = sql_size  # what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
 
@@ -295,8 +295,6 @@ def test_enable_websocket(create_session, base_url):
     assert (
         resp_websocket.status_code == 200
     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
-    # print("Websocket enable 200", resp_websocket.cookies)
-    # return resp_websocket.cookies  # Return cookies for the next request
 
 @pytest.mark.parametrize("test_name, hist_query, expected_size", test_data_histog)
 def test_websocket_histogram(create_session, base_url, test_name, hist_query, expected_size):
@@ -355,8 +353,6 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     # Send the message
     ws_histogram.send(json.dumps(message_histogram))
 
-    time.sleep(5)  # Increase this time if necessary
-
     # Receive the response
     response_histogram = ws_histogram.recv()
 
@@ -368,16 +364,13 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     # Validate the total in the response
     total_hits_histogram = response_data_histogram["content"]["results"]["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_histogram = 1  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_histogram = 1  #That's what we're expecting
     assert total_hits_histogram == expected_hits_histogram, f"Expected {test_name} total to be {expected_hits_histogram}, but got {total_hits_histogram}"
     
-    # print("Response Data:", response_data)
-
-
     ws_histogram.close()
 
-    # Generate a dynamic UUID for cache
+    # Generate a dynamic UUID for cache when websocket is enabled
 
     uuid_histogram_cache = str(uuid.uuid4())  # Generates a new UUID
 
@@ -423,8 +416,6 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     # Send the message
     ws_histogram_cache.send(json.dumps(message_histogram_cashe))
 
-    time.sleep(5)  # Increase this time if necessary
-
     # Receive the response
     response_histogram_cache = ws_histogram_cache.recv()
 
@@ -436,21 +427,16 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     # Validate the total in the response
     total_hits_histogram_cache = response_data_histogram_cache["content"]["results"]["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_histogram_cache = 1  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_histogram_cache = 1  # That's what you're expecting
     assert total_hits_histogram_cache == expected_hits_histogram_cache, f"Expected {test_name} cache total to be {expected_hits_histogram_cache}, but got {total_hits_histogram_cache}"
     
-    # print("Response Data:", response_data)
-
-
     ws_histogram_cache.close()
 
 
 @pytest.mark.parametrize("test_name_sql, sql_query, sql_size", test_data_sql)
-
-
 def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
-    """Test WebSocket with sql."""
+    """Test WebSocket with sql when websocket is enabled ."""
     # Prepare headers with cookies
 
     session = create_session
@@ -470,7 +456,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Example of using the WS_URL
     print("WebSocket SQL URL:", WS_URL_sql)
 
-    # Now you can use WS_URL in your WebSocket connection
+    # Now we can use WS_URL in our WebSocket connection
 
     ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
 
@@ -519,16 +505,13 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Validate the total in the response
     total_hits_sql = response_data_sql["content"]["results"]["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_sql = sql_size  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_sql = sql_size  # That's what we're expecting
     assert total_hits_sql == expected_hits_sql, f"Expected {test_name_sql} total to be {expected_hits_sql}, but got {total_hits_sql}"
     
-    # print("Response Data:", response_data)
-
-
     ws_sql.close()
 
-    # Generate a dynamic UUID for cache
+    # Generate a dynamic UUID for cache when websocket is enabled
 
     uuid_sql_cache = str(uuid.uuid4())  # Generates a new UUID
 
@@ -540,7 +523,6 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
 
     # Now we can use WS_URL in our WebSocket connection for cache
 
-
     ws_sql_cache = websocket.create_connection(WS_URL_sql_cache, header={"Cookie": cookie_header_sql})
 
     print("WebSocket Cache SQL connection established", ws_sql_cache)
@@ -549,7 +531,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     trace_id_sql_cache = str(uuid.uuid4())
 
     now = datetime.now(timezone.utc)
-
+    end_time = int(now.timestamp() * 1000000)
     # Prepare the specific message to send
     message_sql_cache = {
         "type": "search",
@@ -591,8 +573,8 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Validate the total in the response
     total_hits_sql_cache = response_data_sql_cache["content"]["results"]["total"]
 
-    # Adjust the assertion based on your expectations
-    expected_hits_sql_cache = sql_size  # Change this to 100 if that's what you're expecting
+    # Adjust the assertion based on our expectations
+    expected_hits_sql_cache = sql_size  # That's what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected cache {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
     ws_sql_cache.close()
@@ -611,7 +593,7 @@ def test_delete_stream(create_session, base_url):
 
     # Verify stream is deleted
     resp_verify = session.get(f"{url}api/{org_id}/streams/{stream_name}/schema?type=logs")
-    assert resp_verify.status_code == 404, f"Expected 404 for deleted stream, got {resp_verify.status_code}"
+    assert resp_verify.status_code == 404, f"Expected 404 for {stream_name} deleted stream, got {resp_verify.status_code}"
 
 
 
