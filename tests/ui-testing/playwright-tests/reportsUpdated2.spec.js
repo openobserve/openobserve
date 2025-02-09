@@ -18,8 +18,6 @@ function reportName() {
 
 
 
-
-
 test.describe("Report test cases Updated", () => {
     let loginPage, dashboardPage, reportsPage, ingestionPage;
 
@@ -29,164 +27,12 @@ test.describe("Report test cases Updated", () => {
         dashboardPage = new DashboardPage(page);
         reportsPage = new ReportsPage(page);
         await loginPage.gotoLoginPage();
-
         await loginPage.loginAsInternalUser();
-
         await loginPage.login();
         await ingestionPage.ingestion();
     });
-    test("Create, use, and delete dashboard and report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-
-        await loginPage.gotoLoginPageSC();
-
-        await loginPage.loginAsInternalUserSC();
-
-        await loginPage.loginSC();
-
-        await reportsPage.navigateToReports();
-
-
-        // await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        // await expect(page).toHaveURL(/.*\/reports/);
-        // await reportsPage.deleteReport(TEST_REPORT_NAME);
-        // await dashboardPage.navigateToDashboards();
-        // await dashboardPage.deleteDashboard();
-
-
-    });
-
-    test("Create, use, and delete dashboard and once Schedule Now type report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportOnce();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await expect(page).toHaveURL(/.*\/reports/);
-        await reportsPage.deleteReport(TEST_REPORT_NAME);
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.deleteDashboard();
-    });
-
-
-    test("Create, use, and delete dashboard and hours Schedule Now  type report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportHours();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await expect(page).toHaveURL(/.*\/reports/);
-        await reportsPage.deleteReport(TEST_REPORT_NAME);
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.deleteDashboard();
-    });
-
-    test("Create, use, and delete dashboard and days Schedule Now type report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportDays();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await expect(page).toHaveURL(/.*\/reports/);
-        await reportsPage.deleteReport(TEST_REPORT_NAME);
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.deleteDashboard();
-    });
-
-    test("Create, use, and delete dashboard and weeks Schedule Now type report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportWeeks();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await expect(page).toHaveURL(/.*\/reports/);
-        await reportsPage.deleteReport(TEST_REPORT_NAME);
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.deleteDashboard();
-    });
-
-    test("Create, use, and delete dashboard and months Schedule Now type report", async ({ page }) => {
-        const TEST_REPORT_NAME = reportName();
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.createDashboard();
-        await expect(page).toHaveURL(/.*\/dashboards/);
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await reportsPage.createReportAddReportButton();
-        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
-        await reportsPage.createReportFolderInput();
-        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
-        await reportsPage.createReportDashboardTabInput();
-        await reportsPage.createReportContinueButtonStep1();
-        await reportsPage.createReportMonths();
-        await reportsPage.createReportContinueButtonStep2();
-        await reportsPage.createReportFillDetail();
-        await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
-        await expect(page).toHaveURL(/.*\/reports/);
-        await reportsPage.deleteReport(TEST_REPORT_NAME);
-        await dashboardPage.navigateToDashboards();
-        await dashboardPage.deleteDashboard();
-    });
-
-    test("Create, use, and delete dashboard and custom Schedule Now type report", async ({ page }) => {
+    
+    test("Create, use, and delete dashboard and custom Schedule Later type report ", async ({ page }) => {
         const TEST_REPORT_NAME = reportName();
         await dashboardPage.navigateToDashboards();
         await dashboardPage.createDashboard();
@@ -199,6 +45,9 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportDashboardTabInput();
         await reportsPage.createReportContinueButtonStep1();
         await reportsPage.createReportCustom();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
@@ -209,6 +58,135 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.deleteDashboard();
     });
 
-    
+    test("Create, use, and delete dashboard and months Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportMonths();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.deleteDashboard();
+    });
+
+    test("Create, use, and delete dashboard and weeks Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportWeeks();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.deleteDashboard();
+    });
+
+    test("Create, use, and delete dashboard and days Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportDays();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.deleteDashboard();
+    });
+
+    test("Create, use, and delete dashboard and hours Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportHours();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.deleteDashboard();
+    });
+
+    test("Create, use, and delete dashboard and once Schedule Later type report ", async ({ page }) => {
+        const TEST_REPORT_NAME = reportName();
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.createDashboard();
+        await expect(page).toHaveURL(/.*\/dashboards/);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await reportsPage.createReportAddReportButton();
+        await reportsPage.createReportReportNameInput(TEST_REPORT_NAME);
+        await reportsPage.createReportFolderInput();
+        await reportsPage.createReportDashboardInput(dashboardPage.dashboardName);
+        await reportsPage.createReportDashboardTabInput();
+        await reportsPage.createReportContinueButtonStep1();
+        await reportsPage.createReportOnce();
+        await reportsPage.createReportScheduleLater();
+        await reportsPage.createReportDateTime();
+        await reportsPage.createReportZone();
+        await reportsPage.createReportContinueButtonStep2();
+        await reportsPage.createReportFillDetail();
+        await reportsPage.createReportSaveButton();
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+        await expect(page).toHaveURL(/.*\/reports/);
+        await reportsPage.deleteReport(TEST_REPORT_NAME);
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.deleteDashboard();
+    });
+
 
 });

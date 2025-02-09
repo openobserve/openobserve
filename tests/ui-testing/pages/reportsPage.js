@@ -66,9 +66,9 @@ async reportsURLValidation() {
     await this.addReportButton.click({ force: true });  
   }
 
-  async createReportReportNameInput() {
+  async createReportReportNameInput(TEST_REPORT_NAME) {
     await this.page.waitForSelector("[aria-label='Name *']");
-    await this.reportNameInput.fill("rreport1");
+    await this.reportNameInput.fill(TEST_REPORT_NAME);
     await this.page.waitForTimeout(5000);
   }
 
@@ -246,6 +246,16 @@ async reportsURLValidation() {
     await this.profileButton.click({ force: true });
     await this.signOutButton.click({ force: true });
   }
+
+
+  async logedOut() {
+    await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
+    await this.page.locator('[data-test="menu-link-logout-item"]').click();
+    await expect(this.page.locator('a')).toContainText('Login as internal user');
+    await expect(this.page.getByText('Login as internal user')).toBeVisible();
+    
+  }
+
 }
 
 
