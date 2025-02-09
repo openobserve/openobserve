@@ -79,7 +79,8 @@ use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
-    transport::{Identity, ServerTlsConfig},
+    transport::{Channel, Identity, ServerTlsConfig},
+    Request,
 };
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -367,26 +368,62 @@ async fn main() -> Result<(), anyhow::Error> {
     let profiling_task = if let Some(guard) = pprof_guard {
         let interval_secs = cfg.profiling.pprof_interval;
         let pprof_endpoint = cfg.profiling.pprof_endpoint.clone();
+        let auth_token = cfg.grpc.internal_grpc_token.clone();
+
         Some(tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 let mut interval =
                     tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
-                let mut client =
-                    match ContinuousProfilingServiceClient::connect(pprof_endpoint.clone()).await {
-                        Ok(client) => {
-                            log::info!("Connected to profiling service at {}", pprof_endpoint);
-                            client
+
+                // Create channel first
+                let channel = match Channel::from_shared(pprof_endpoint.clone())
+                    .unwrap()
+                    .connect()
+                    .await
+                {
+                    Ok(channel) => {
+                        log::info!("Connected to profiling service at {}", pprof_endpoint);
+                        channel
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Failed to connect to profiling service at {}: {}",
+                            pprof_endpoint,
+                            e
+                        );
+                        return;
+                    }
+                };
+
+                // Create metadata with auth token and organization
+                let mut metadata = MetadataMap::new();
+                if let Ok(auth_value) =
+                    MetadataValue::try_from("Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=")
+                {
+                    metadata.insert(MetadataKey::from_static("authorization"), auth_value);
+                }
+                // Add organization header using literal string
+                if let Ok(org_value) = MetadataValue::try_from("default") {
+                    metadata.insert(
+                        MetadataKey::from_static("organization"), // Use literal string
+                        org_value,
+                    );
+                }
+
+                // Create authenticated client using internal token
+                let mut client = ContinuousProfilingServiceClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
+                        // Copy metadata values individually
+                        for key_value in metadata.iter() {
+                            if let tonic::metadata::KeyAndValueRef::Ascii(key, value) = key_value {
+                                req.metadata_mut().insert(key, value.clone());
+                            }
                         }
-                        Err(e) => {
-                            log::error!(
-                                "Failed to connect to profiling service at {}: {}",
-                                pprof_endpoint,
-                                e
-                            );
-                            return;
-                        }
-                    };
+                        Ok(req)
+                    },
+                );
 
                 loop {
                     interval.tick().await;
@@ -398,7 +435,10 @@ async fn main() -> Result<(), anyhow::Error> {
                                 log::debug!("Sending profile data of size {} bytes", content.len());
                                 let request = ProfileData {
                                     raw_pprof: content,
-                                    metadata: "".to_string(),
+                                    metadata: serde_json::json!({
+                                        "instance_name": "default"
+                                    })
+                                    .to_string(),
                                 };
                                 match client.handle_profile(request).await {
                                     Ok(response) => {

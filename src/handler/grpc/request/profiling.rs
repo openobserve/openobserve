@@ -149,7 +149,7 @@ fn build_children(
     let mut visited = HashSet::new();
 
     while let Some((current_id, depth)) = stack.pop() {
-        if depth > 50 || !visited.insert(current_id) {
+        if depth > 3 || !visited.insert(current_id) {
             continue;
         }
 
