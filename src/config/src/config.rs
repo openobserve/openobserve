@@ -454,6 +454,12 @@ pub struct Profiling {
     )]
     pub pprof_enabled: bool,
     #[env_config(
+        name = "ZO_PROF_PPROF_INTERVAL",
+        default = 10,
+        help = "Interval to send pprof profile to server in seconds"
+    )]
+    pub pprof_interval: u64,
+    #[env_config(
         name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
         default = false,
         help = "Enable pprof profiling with pprof-rs encode to protobuf format"

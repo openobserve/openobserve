@@ -63,9 +63,16 @@ use opentelemetry_proto::tonic::collector::{
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
-use proto::cluster_rpc::{
-    event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer,
+use pprof::protos::Message;
+use proto::{
+    cluster_rpc::{
+        event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
+        query_cache_server::QueryCacheServer, search_server::SearchServer,
+    },
+    continuous_profiling::{
+        profiling_service_client::ProfilingServiceClient as MyServiceClient,
+        ProfileRequest as Request,
+    },
 };
 use tokio::sync::oneshot;
 use tonic::{
@@ -355,6 +362,51 @@ async fn main() -> Result<(), anyhow::Error> {
         });
     }
 
+    #[cfg(feature = "profiling")]
+    let profiling_task = if let Some(guard) = pprof_guard {
+        let interval_secs = cfg.profiling.pprof_interval.clone(); // Get the value before moving cfg
+        Some(tokio::task::spawn_blocking(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async move {
+                let mut interval =
+                    tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+                let mut client = match MyServiceClient::connect("http://localhost:50051").await {
+                    Ok(client) => client,
+                    Err(e) => {
+                        eprintln!("Failed to connect to profiling service: {}", e);
+                        return;
+                    }
+                };
+
+                loop {
+                    interval.tick().await;
+
+                    if let Ok(report) = guard.report().build() {
+                        if let Ok(profile) = report.pprof() {
+                            let mut content = Vec::new();
+                            if profile.encode(&mut content).is_ok() {
+                                let request = Request { data: content };
+                                match client.handle_profile(request).await {
+                                    Ok(response) => {
+                                        let profile_id =
+                                            String::from_utf8_lossy(&response.into_inner().result)
+                                                .to_string();
+                                        println!("Successfully sent profile, ID: {}", profile_id);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to send profile: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        }))
+    } else {
+        None
+    };
+
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
@@ -393,41 +445,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // stop profiling
     #[cfg(feature = "profiling")]
-    if let Some(guard) = pprof_guard {
-        if let Ok(report) = guard.report().build() {
-            if cfg.profiling.pprof_protobuf_enabled {
-                let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
-                match std::fs::File::create(&pb_file) {
-                    Ok(mut file) => {
-                        use std::io::Write;
-
-                        use pprof::protos::Message;
-
-                        if let Ok(profile) = report.pprof() {
-                            let mut content = Vec::new();
-                            profile.encode(&mut content).unwrap();
-                            if let Err(e) = file.write_all(&content) {
-                                log::error!("Failed to write flamegraph: {}", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Failed to create flamegraph file: {}", e);
-                    }
-                }
-            } else {
-                match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
-                    Ok(file) => {
-                        if let Err(e) = report.flamegraph(file) {
-                            log::error!("Failed to write flamegraph: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Failed to create flamegraph file: {}", e);
-                    }
-                }
-            }
-        };
+    if let Some(task) = profiling_task {
+        task.abort();
     }
 
     // stop pyroscope

@@ -33,3 +33,7 @@ impl cluster_rpc::KvItem {
         }
     }
 }
+
+pub mod continuous_profiling {
+    tonic::include_proto!("continuous_profiling");
+}

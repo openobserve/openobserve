@@ -15,7 +15,7 @@
 
 use std::io::{Result, Write};
 
-fn main() -> Result<()> {
+fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=proto");
 
@@ -143,6 +143,11 @@ fn main() -> Result<()> {
         .open(path)
         .unwrap();
     file.write_all(code.as_str().as_ref()).unwrap();
+
+    tonic_build::configure()
+        .build_server(true)
+        .compile(&["proto/continuous-profiling/service.proto"], &["proto"])
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(())
 }

@@ -1,0 +1,15 @@
+syntax = "proto3";
+package continuous_profiling;
+
+// Service for handling continuous profiling data
+service ProfilingService {
+    rpc HandleProfile (ProfileRequest) returns (ProfileResponse);
+}
+
+message ProfileRequest {
+    bytes data = 1;
+}
+
+message ProfileResponse {
+    bytes result = 1;
+} 
