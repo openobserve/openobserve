@@ -34,6 +34,6 @@ impl cluster_rpc::KvItem {
     }
 }
 
-pub mod continuous_profiling {
-    tonic::include_proto!("continuous_profiling");
+pub mod myservice {
+    tonic::include_proto!("myservice");
 }

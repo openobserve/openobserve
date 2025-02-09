@@ -1,15 +1,15 @@
 syntax = "proto3";
-package continuous_profiling;
+package myservice;
 
-// Service for handling continuous profiling data
-service ProfilingService {
-    rpc HandleProfile (ProfileRequest) returns (ProfileResponse);
+// Changed service name to match backend
+service MyService {
+    rpc HandleRequest (Request) returns (Response);
 }
 
-message ProfileRequest {
+message Request {
     bytes data = 1;
 }
 
-message ProfileResponse {
+message Response {
     bytes result = 1;
 } 

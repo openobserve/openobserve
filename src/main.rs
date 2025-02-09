@@ -69,10 +69,7 @@ use proto::{
         event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
         query_cache_server::QueryCacheServer, search_server::SearchServer,
     },
-    continuous_profiling::{
-        profiling_service_client::ProfilingServiceClient as MyServiceClient,
-        ProfileRequest as Request,
-    },
+    myservice::{my_service_client::MyServiceClient, Request},
 };
 use tokio::sync::oneshot;
 use tonic::{
@@ -364,16 +361,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "profiling")]
     let profiling_task = if let Some(guard) = pprof_guard {
-        let interval_secs = cfg.profiling.pprof_interval.clone(); // Get the value before moving cfg
+        let interval_secs = cfg.profiling.pprof_interval;
         Some(tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 let mut interval =
                     tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
                 let mut client = match MyServiceClient::connect("http://localhost:50051").await {
-                    Ok(client) => client,
+                    Ok(client) => {
+                        log::info!("Connected to profiling service at http://localhost:50051");
+                        client
+                    }
                     Err(e) => {
-                        eprintln!("Failed to connect to profiling service: {}", e);
+                        log::error!("Failed to connect to profiling service: {}", e);
                         return;
                     }
                 };
@@ -385,20 +385,27 @@ async fn main() -> Result<(), anyhow::Error> {
                         if let Ok(profile) = report.pprof() {
                             let mut content = Vec::new();
                             if profile.encode(&mut content).is_ok() {
+                                log::debug!("Sending profile data of size {} bytes", content.len());
                                 let request = Request { data: content };
-                                match client.handle_profile(request).await {
+                                match client.handle_request(request).await {
                                     Ok(response) => {
                                         let profile_id =
                                             String::from_utf8_lossy(&response.into_inner().result)
                                                 .to_string();
-                                        println!("Successfully sent profile, ID: {}", profile_id);
+                                        log::info!("Successfully sent profile, ID: {}", profile_id);
                                     }
                                     Err(e) => {
-                                        eprintln!("Failed to send profile: {}", e);
+                                        log::error!("Failed to send profile: {}", e);
                                     }
                                 }
+                            } else {
+                                log::error!("Failed to encode profile data");
                             }
+                        } else {
+                            log::error!("Failed to get pprof data from report");
                         }
+                    } else {
+                        log::error!("Failed to build profiling report");
                     }
                 }
             })
