@@ -113,7 +113,6 @@ maxminddb = "0.23.0"
 memchr.workspace = true
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true

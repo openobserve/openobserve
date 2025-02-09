@@ -2717,7 +2717,7 @@ pub struct KvItem {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct StreamStatRequest {
+pub struct StreamStatsRequest {
     #[prost(string, optional, tag = "1")]
     pub org_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "2")]
@@ -2727,13 +2727,13 @@ pub struct StreamStatRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct StreamStatResponse {
+pub struct StreamStatsResponse {
     #[prost(message, repeated, tag = "1")]
-    pub entries: ::prost::alloc::vec::Vec<StreamStatEntry>,
+    pub entries: ::prost::alloc::vec::Vec<StreamStatsEntry>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct StreamStatEntry {
+pub struct StreamStatsEntry {
     #[prost(string, tag = "1")]
     pub stream: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "2")]
@@ -2844,11 +2844,11 @@ pub mod streams_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn stream(
+        pub async fn stream_stats(
             &mut self,
-            request: impl tonic::IntoRequest<super::StreamStatRequest>,
+            request: impl tonic::IntoRequest<super::StreamStatsRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::StreamStatResponse>,
+            tonic::Response<super::StreamStatsResponse>,
             tonic::Status,
         > {
             self.inner
@@ -2861,9 +2861,12 @@ pub mod streams_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/cluster.Streams/stream");
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Streams/stream_stats",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("cluster.Streams", "stream"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Streams", "stream_stats"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -2875,11 +2878,11 @@ pub mod streams_server {
     /// Generated trait containing gRPC methods that should be implemented for use with StreamsServer.
     #[async_trait]
     pub trait Streams: Send + Sync + 'static {
-        async fn stream(
+        async fn stream_stats(
             &self,
-            request: tonic::Request<super::StreamStatRequest>,
+            request: tonic::Request<super::StreamStatsRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::StreamStatResponse>,
+            tonic::Response<super::StreamStatsResponse>,
             tonic::Status,
         >;
     }
@@ -2962,25 +2965,25 @@ pub mod streams_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/cluster.Streams/stream" => {
+                "/cluster.Streams/stream_stats" => {
                     #[allow(non_camel_case_types)]
-                    struct streamSvc<T: Streams>(pub Arc<T>);
+                    struct stream_statsSvc<T: Streams>(pub Arc<T>);
                     impl<
                         T: Streams,
-                    > tonic::server::UnaryService<super::StreamStatRequest>
-                    for streamSvc<T> {
-                        type Response = super::StreamStatResponse;
+                    > tonic::server::UnaryService<super::StreamStatsRequest>
+                    for stream_statsSvc<T> {
+                        type Response = super::StreamStatsResponse;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::StreamStatRequest>,
+                            request: tonic::Request<super::StreamStatsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Streams>::stream(&inner, request).await
+                                <T as Streams>::stream_stats(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -2992,7 +2995,7 @@ pub mod streams_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = streamSvc(inner);
+                        let method = stream_statsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

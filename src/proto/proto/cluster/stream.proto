@@ -9,20 +9,20 @@ package cluster;
 import "cluster/common.proto";
 
 service Streams {
-    rpc stream (StreamStatRequest) returns (StreamStatResponse) {}
+    rpc stream_stats (StreamStatsRequest) returns (StreamStatsResponse) {}
 }
 
-message StreamStatRequest {
+message StreamStatsRequest {
     optional string  org_id = 1;
     optional string  stream_type = 2;
     optional string  stream_name = 3;
 }
 
-message StreamStatResponse {
-    repeated StreamStatEntry entries = 1;
+message StreamStatsResponse {
+    repeated StreamStatsEntry entries = 1;
 }
 
-message StreamStatEntry {
+message StreamStatsEntry {
     string stream = 1;
     StreamStats stats = 2;
 }
