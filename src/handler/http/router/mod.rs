@@ -544,6 +544,15 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
     // NOTE: Here the order of middlewares matter. Once we consume the api-token in
     // `rum_auth`, we drop it in the RumExtraData data.
     // https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
+    #[cfg(feature = "profiling")]
+    svc.service(
+        web::scope("/pprof")
+            .service(pprof::ingest::log),
+    );
+
+    // NOTE: Here the order of middlewares matter. Once we consume the api-token in
+    // `rum_auth`, we drop it in the RumExtraData data.
+    // https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
     svc.service(
         web::scope("/rum")
             .wrap(cors)
