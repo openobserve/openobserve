@@ -290,10 +290,7 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = match field.content_disposition() {
-            Some(cd) => cd,
-            None => continue,
-        };
+        let content_disposition = field.content_disposition();
         let filename = content_disposition.get_filename();
         let mut data = bytes::Bytes::new();
 
