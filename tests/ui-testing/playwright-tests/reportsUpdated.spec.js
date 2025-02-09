@@ -30,7 +30,7 @@ test.describe("Report test cases Updated", () => {
         reportsPage = new ReportsPage(page);
         await loginPage.gotoLoginPage();
 
-        await loginPage.loginAsInternalUser();
+       // await loginPage.loginAsInternalUser();
 
         await loginPage.login();
         await ingestionPage.ingestion();
