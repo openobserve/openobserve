@@ -14,22 +14,50 @@ pub mod ingest {
     #[get("/report")]
     pub async fn log(params: web::Query<ProfileParams>) -> HttpResponse {
         let seconds = params.seconds.unwrap_or(10);
-        // Create a new profiler guard just for this request
-        let guard = pprof::ProfilerGuardBuilder::default()
+        
+        // Create a new profiler guard and handle potential errors
+        let guard = match pprof::ProfilerGuardBuilder::default()
             .frequency(1000)
             .blocklist(&["libc", "libgcc", "pthread", "vdso"])
             .build()
-            .unwrap();
+        {
+            Ok(guard) => guard,
+            Err(e) => {
+                return HttpResponse::ServiceUnavailable()
+                    .content_type("text/plain")
+                    .body(format!("Failed to start profiler: {}. This usually means another profiling session is already running.", e));
+            }
+        };
         
         // Sleep for the requested duration to collect profile data
         tokio::time::sleep(Duration::from_secs(seconds)).await;
         
-        let report = guard.report().build().unwrap();
-        let profile = report.pprof().unwrap();
+        // Get the report and handle potential errors
+        let report = match guard.report().build() {
+            Ok(report) => report,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .content_type("text/plain")
+                    .body(format!("Failed to generate profile report: {}", e));
+            }
+        };
+
+        let profile = match report.pprof() {
+            Ok(profile) => profile,
+            Err(e) => {
+                return HttpResponse::InternalServerError()
+                    .content_type("text/plain")
+                    .body(format!("Failed to generate pprof profile: {}", e));
+            }
+        };
 
         // Convert to protobuf format
         let mut protobuf = Vec::new();
-        profile.encode(&mut protobuf).unwrap();
+        if let Err(e) = profile.encode(&mut protobuf) {
+            return HttpResponse::InternalServerError()
+                .content_type("text/plain")
+                .body(format!("Failed to encode profile: {}", e));
+        }
         
         HttpResponse::Ok()
             .content_type("application/x-protobuf")
