@@ -71,6 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col"
           />
         </div>
+        <CustomChartRenderer
+          v-else-if="panelSchema.type == 'custom_chart'"
+            :data="panelData"
+            style="width: 100%; height: 100%"
+            class="col"
+          />
         <ChartRenderer
           v-else
           :data="
@@ -214,6 +220,9 @@ const HTMLRenderer = defineAsyncComponent(() => {
 const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
+const CustomChartRenderer = defineAsyncComponent(() => {
+  return import("./panels/CustomChartRenderer.vue");
+});
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -224,6 +233,7 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    CustomChartRenderer,
   },
   props: {
     selectedTimeObj: {
@@ -398,6 +408,7 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
+        if(panelData.value.chartType == 'custom_chart') errorDetail.value = '';
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
@@ -538,7 +549,8 @@ export default defineComponent({
       // if panel type is 'html' or 'markdown', return an empty string
       if (
         panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown"
+        panelSchema.value.type == "markdown" ||
+        panelSchema.value.type == "custom_chart"
       ) {
         return "";
       }

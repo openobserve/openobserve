@@ -22,6 +22,8 @@ import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
+import { runJavaScriptCode } from "./convertCustomChartData";
+
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -115,6 +117,16 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertSankeyData(panelSchema, data),
+      };
+    }
+    case "custom_chart": {
+      const result = await runJavaScriptCode(panelSchema, data);
+
+      // Ensure result is an object
+      const safeResult = result && typeof result === "object" ? result : {};
+      return {
+        chartType: panelSchema.type,
+        ...safeResult,
       };
     }
     default: {

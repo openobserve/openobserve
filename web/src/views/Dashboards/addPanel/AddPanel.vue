@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-tutorial-btn"
         ></q-btn>
         <q-btn
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
           outline
           padding="sm"
           class="q-mr-sm"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -329,6 +329,174 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
+      <div
+        v-if="dashboardPanelData.data.type == 'custom_chart'"
+        class="col column"
+        style="height: calc(100vh - 99px); overflow-y: auto"
+      >
+        <q-splitter
+          v-model="dashboardPanelData.layout.splitter"
+          @update:model-value="layoutSplitterUpdated"
+          style="width: 100%; height: 100%"
+        >
+          <template #before>
+            <div
+              class="col scroll"
+              style="height: calc(100vh - 99px); overflow-y: auto"
+            >
+              <div
+                v-if="dashboardPanelData.layout.showFieldList"
+                class="column"
+                style="height: 100%"
+              >
+                <div class="col-auto q-pa-sm">
+                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                </div>
+                <div class="col" style="width: 100%">
+                  <!-- <GetFields :editMode="editMode" /> -->
+                  <FieldList :editMode="editMode" />
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #separator>
+            <div class="splitter-vertical splitter-enabled"></div>
+            <q-btn
+              color="primary"
+              size="12px"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              :style="{
+                right: dashboardPanelData.layout.showFieldList
+                  ? '-20px'
+                  : '-0px',
+                left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
+              }"
+              @click="collapseFieldList"
+            />
+          </template>
+          <template #after>
+            <div
+              class="row"
+              style="height: calc(100vh - 99px); overflow-y: auto"
+            >
+              <div class="col" style="height: 100%">
+                <q-splitter
+                  class="query-editor-splitter"
+                  v-model="dashboardPanelData.layout.querySplitter"
+                  horizontal
+                  @update:model-value="querySplitterUpdated"
+                  reverse
+                  unit="px"
+                  :limits="
+                    !dashboardPanelData.layout.showQueryBar
+                      ? [43, 400]
+                      : [140, 400]
+                  "
+                  :disable="!dashboardPanelData.layout.showQueryBar"
+                  style="height: 100%"
+                >
+                  <template #before>
+                    <div
+                      class="layout-panel-container col"
+                      style="height: 100%"
+                    >
+                    <q-splitter
+                      class="query-editor-splitter"
+                      v-model="splitterModel"    
+                      style="height: 100%"
+                      @update:model-value="layoutSplitterUpdated"
+                    >
+                    <template #before>
+                      <CustomChartEditor
+                        v-model="dashboardPanelData.data.customChartContent"
+                        style="width: 100%; height: 100%"
+                      />
+                    </template>
+                    <template #separator>
+                      <div class="splitter-vertical splitter-enabled"></div>
+                      <q-avatar
+                        color="primary"
+                        text-color="white"
+                        size="20px"
+                        icon="drag_indicator"
+                        style="top: 10px; left: 3.5px"
+                        data-test="dashboard-markdown-editor-drag-indicator"
+                      />
+                    </template>
+                    <template #after>
+                      <PanelSchemaRenderer
+                          v-if="chartData"
+                          @metadata-update="metaDataValue"
+                          :key="dashboardPanelData.data.type"
+                          :panelSchema="chartData"
+                          :dashboard-id="queryParams?.dashboard"
+                          :folder-id="queryParams?.folder"
+                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                          :variablesData="updatedVariablesData"
+                          :width="6"
+                          @error="handleChartApiError"
+                          @updated:data-zoom="onDataZoom"
+                          @updated:vrlFunctionFieldList="
+                            updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
+                          "
+                          searchType="Dashboards"
+                        />
+
+                    </template>
+                     </q-splitter>
+
+
+
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
+                    </div>
+                  </template>
+                  <template #separator>
+                    <div
+                      class="splitter"
+                      :class="
+                        dashboardPanelData.layout.showQueryBar
+                          ? 'splitter-enabled'
+                          : ''
+                      "
+                    ></div>
+                  </template>
+                  <template #after>
+                    <div style="height: 100%; width: 100%" class="row column">
+                      <DashboardQueryEditor />
+                    </div>
+                  </template>
+                </q-splitter>
+              </div>
+              <q-separator vertical />
+              <div class="col-auto">
+                <PanelSidebar
+                  :title="t('dashboard.configLabel')"
+                  v-model="dashboardPanelData.layout.isConfigPanelOpen"
+                >
+                  <ConfigPanel
+                    :dashboardPanelData="dashboardPanelData"
+                    :variablesData="updatedVariablesData"
+                  />
+                </PanelSidebar>
+              </div>
+            </div>
+          </template>
+        </q-splitter>
+      </div>
     </div>
   </div>
 </template>
@@ -390,6 +558,10 @@ const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
 
+const CustomChartEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomChartEditor.vue");
+});
+
 export default defineComponent({
   name: "AddPanel",
   props: ["metaData"],
@@ -411,6 +583,7 @@ export default defineComponent({
     QueryInspector,
     CustomHTMLEditor,
     CustomMarkdownEditor,
+    CustomChartEditor,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
@@ -437,6 +610,7 @@ export default defineComponent({
     const editMode = ref(false);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
+    const splitterModel = ref(50);
     const errorData: any = reactive({
       errors: [],
     });
@@ -1016,6 +1190,19 @@ export default defineComponent({
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
+      if (!dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+      }
+    };
+
+    const collapseFieldList = () => {
+      if (dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+        dashboardPanelData.layout.showFieldList = false;
+      } else {
+        dashboardPanelData.layout.splitter = 20;
+        dashboardPanelData.layout.showFieldList = true;
+      }
     };
 
     const expandedSplitterHeight = ref(null);
@@ -1291,6 +1478,7 @@ export default defineComponent({
       traceIdRef.value = searchRequestTraceIds.value;
       cancelQuery();
     };
+    
 
     const disable = ref(false);
 
@@ -1343,6 +1531,8 @@ export default defineComponent({
       cancelAddPanelQuery,
       disable,
       config,
+      collapseFieldList,
+      splitterModel,
     };
   },
   methods: {

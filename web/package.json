@@ -42,6 +42,7 @@
     "date-fns-tz": "^3.1.3",
     "dompurify": "^3.1.6",
     "echarts": "^5.5.1",
+    "echarts-gl": "^2.0.9",
     "flag-icons": "^7.2.3",
     "js-cookie": "^3.0.5",
     "leaflet": "^1.9.4",
