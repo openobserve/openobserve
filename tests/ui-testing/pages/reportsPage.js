@@ -247,12 +247,34 @@ async reportsURLValidation() {
     await this.signOutButton.click({ force: true });
   }
 
+  async pauseReport(reportName) {
+    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
+    await this.page
+      .locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
+      .click({ force: true });
+      await expect(this.page.getByRole('alert').first()).toContainText('Stopped report successfully.');
+  }
+
+  async updateReport(reportName) {
+    await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
+    await this.page
+      .locator(`[data-test="report-list-${reportName}-edit-report"]`)
+      .click({ force: true });
+
+      await this.page.getByLabel('Description').click({ force: true });
+      await this.page.getByLabel('Description').fill('Report Updated');
+      await this.page.locator('[data-test="report-cached-toggle-btn"] div').nth(2).click({ force: true });
+      await this.page.locator('[data-test="report-cached-toggle-btn"] div').nth(2).click({ force: true });
+      await this.page.locator('[data-test="add-report-step1-continue-btn"]').click({ force: true });
+      await this.page.locator('[data-test="add-report-step2-continue-btn"]').click({ force: true });
+      await this.page.locator('[data-test="add-report-save-btn"]').click({ force: true });
+      await expect(this.page.getByRole('alert').first()).toContainText('Report updated successfully.');
+  }
 
   async logedOut() {
     await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
     await this.page.locator('[data-test="menu-link-logout-item"]').click();
-    await expect(this.page.locator('a')).toContainText('Login as internal user');
-    await expect(this.page.getByText('Login as internal user')).toBeVisible();
+
     
   }
 

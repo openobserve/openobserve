@@ -51,7 +51,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -77,7 +90,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -103,7 +129,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -129,7 +168,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -155,7 +207,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -181,7 +246,20 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await page.goto(process.env["ZO_BASE_URL"] + "/web/reports?org_identifier=default");
+
+        await reportsPage.logedOut();
+        await page.waitForTimeout(5000);
+        await loginPage.gotoLoginPageSC();
+        await page.waitForTimeout(5000);
+
+        // await loginPage.loginAsInternalUserSC();
+
+        await loginPage.loginSC();
+        await reportsPage.navigateToReports();
+        await reportsPage.pauseReport(TEST_REPORT_NAME);
+        await reportsPage.updateReport(TEST_REPORT_NAME);
+
+        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
