@@ -114,10 +114,6 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    #[cfg(feature = "profiling")]
-    {
-        let _ = openobserve::PROFILER.lock();
-    }
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
     let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
@@ -391,11 +387,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     log::info!("server stopped");
-
-    // Drop the profiler guard if it was initialized
-    if let Some(guard) = openobserve::PROFILER.try_lock() {
-        drop(guard);
-    }
 
     Ok(())
 }

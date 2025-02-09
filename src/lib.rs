@@ -22,13 +22,6 @@ pub mod job;
 pub mod router;
 pub mod service;
 
-
-#[cfg(feature = "profiling")]
-use {
-    once_cell::sync::Lazy,
-    parking_lot::Mutex,
-    pprof::{ProfilerGuard},
-};
 #[cfg(feature = "enterprise")]
 pub mod super_cluster_queue;
 
@@ -36,13 +29,3 @@ pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/ua_regex/regexes.yaml"
 ));
-
-#[cfg(feature = "profiling")]
-// Global profiler guard initialized once
-pub static PROFILER: Lazy<Mutex<ProfilerGuard<'static>>> = Lazy::new(|| {
-    Mutex::new(pprof::ProfilerGuardBuilder::default()
-    .frequency(1000)
-    .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    .build()
-    .unwrap())
-});
