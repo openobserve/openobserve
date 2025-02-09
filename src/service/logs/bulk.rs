@@ -87,6 +87,7 @@ pub async fn ingest(
     //     HashMap::new();
     // let mut stream_pipeline_inputs: HashMap<String, ExecutablePipelineBulkInputs> =
     // HashMap::new();
+    let prepare_time = start.elapsed().as_millis();
 
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut streams_need_original_set: HashSet<String> = HashSet::new();
@@ -95,8 +96,12 @@ pub async fn ingest(
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     let mut print_flatten = true;
+    let mut json_parse_time = 0;
     let mut flatten_time = 0;
     let mut uds_time = 0;
+    let mut get_uds_and_original_time = 0;
+    let mut format_stream_name_time = 0;
+    let mut handle_timestamp_time = 0;
     let mut original_line = String::new();
     for line in reader.lines() {
         let line = line?;
@@ -105,7 +110,9 @@ pub async fn ingest(
         }
         original_line = line.to_string();
 
+        let _json_parse_start = std::time::Instant::now();
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
+        json_parse_time += _json_parse_start.elapsed().as_millis();
 
         if !next_line_is_data {
             // check bulk operate
@@ -140,9 +147,11 @@ pub async fn ingest(
                 continue; // skip
             }
 
+            let _format_stream_name_start = std::time::Instant::now();
             if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(&stream_name);
             }
+            format_stream_name_time += _format_stream_name_start.elapsed().as_millis();
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
@@ -177,12 +186,14 @@ pub async fn ingest(
             // }
             // End pipeline params construction
 
+            let _get_uds_and_original_start = std::time::Instant::now();
             crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
                 &mut user_defined_schema_map,
                 &mut streams_need_original_set,
             )
             .await;
+            get_uds_and_original_time += _get_uds_and_original_start.elapsed().as_millis();
 
             next_line_is_data = true;
         } else {
@@ -244,6 +255,7 @@ pub async fn ingest(
             }
             uds_time += _uds_start.elapsed().as_millis();
 
+            let _get_uds_and_original_start = std::time::Instant::now();
             // add `_original` and '_record_id` if required by StreamSettings
             if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
                 local_val.insert(
@@ -260,7 +272,9 @@ pub async fn ingest(
                     json::Value::String(record_id.to_string()),
                 );
             }
+            get_uds_and_original_time += _get_uds_and_original_start.elapsed().as_millis();
 
+            let _handle_timestamp_start = std::time::Instant::now();
             // handle timestamp
             let timestamp = match local_val.get(&cfg.common.column_timestamp) {
                 Some(v) => match parse_timestamp_micro_from_value(v) {
@@ -319,6 +333,7 @@ pub async fn ingest(
                 cfg.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
+            handle_timestamp_time += _handle_timestamp_start.elapsed().as_millis();
 
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
@@ -665,10 +680,15 @@ pub async fn ingest(
     let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
     if before_write_time > slow_time_threshold || write_time > slow_time_threshold {
         log::info!(
-            "total: {} ms, flatten: {} ms, convert_to_uds: {} ms, before_write: {} ms, write_to_channel: {} ms",
+            "total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
             total_time,
+            prepare_time,
             flatten_time,
             uds_time,
+            json_parse_time,
+            format_stream_name_time,
+            get_uds_and_original_time,
+            handle_timestamp_time,
             before_write_time,
             write_time
         );
