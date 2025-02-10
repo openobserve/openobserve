@@ -20,7 +20,11 @@ import useNotifications from "./useNotifications";
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
-import { buildSQLQueryFromInput } from "@/utils/dashboard/convertDataIntoUnitValue";
+import {
+  buildSQLQueryFromInput,
+  buildSQLJoinsFromInput,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
+import { buildSQLQueryWithParser } from "@/utils/query/sqlUtils";
 
 const colors = [
   "#5960b2",
@@ -2168,6 +2172,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const sqlchart = () => {
+    console.log(
+      "sqlchart",
+      dashboardPanelData,
+      buildSQLQueryWithParser(
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins,
+      ),
+    );
+
     // STEP 1: first check if there is at least 1 field selected
     if (
       dashboardPanelData.data.queries[
@@ -2274,7 +2291,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields?.stream
-    }" `;
+    }" ${buildSQLJoinsFromInput(
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins,
+    )}`;
 
     // Add the AND/OR condition logic
     const filterData =
@@ -2716,6 +2737,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].config.limit,
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].joins,
     ],
     () => {
       // only continue if current mode is auto query generation
@@ -3122,7 +3146,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
-      
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
