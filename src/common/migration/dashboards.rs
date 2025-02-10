@@ -50,7 +50,7 @@ async fn add_distinct_from_dashboard(
         let stream_settings = match settings_cache.get_mut(&cache_key) {
             Some(s) => s,
             None => {
-                let settings = get_settings(org_id, &stream, stype, None)
+                let settings = get_settings(org_id, &stream, stype)
                     .await
                     .unwrap_or_default();
                 settings_cache.insert(cache_key.clone(), settings);

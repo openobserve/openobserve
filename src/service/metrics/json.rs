@@ -367,7 +367,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                 &mut stream_schema_map,
                 vec![record],
                 timestamp,
-                None,
             )
             .await;
 

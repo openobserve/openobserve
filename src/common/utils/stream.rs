@@ -156,7 +156,7 @@ pub async fn get_max_query_range(
     futures::future::join_all(
         stream_names
             .iter()
-            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type, None)),
+            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type)),
     )
     .await
     .into_iter()

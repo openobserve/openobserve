@@ -183,7 +183,6 @@ pub async fn handle_otlp_request(
                     metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    None,
                 )
                 .await;
 
@@ -294,7 +293,6 @@ pub async fn handle_otlp_request(
                             local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
-                            None,
                         )
                         .await;
 
@@ -462,7 +460,6 @@ pub async fn handle_otlp_request(
                     &mut metric_schema_map,
                     vec![val_map],
                     timestamp,
-                    None,
                 )
                 .await
                 .is_ok()

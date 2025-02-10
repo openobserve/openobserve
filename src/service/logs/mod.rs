@@ -280,7 +280,6 @@ async fn write_logs(
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
-        trace_id,
     )
     .await;
 
@@ -322,7 +321,6 @@ async fn write_logs(
         &mut stream_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
-        trace_id,
     )
     .await?;
 
@@ -545,8 +543,8 @@ async fn write_logs(
     let process_time = start.elapsed().as_millis();
     let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
     if process_time > slow_time_threshold {
-        log::warn!("[write_logs] total: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
-         process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
+        log::warn!("[write_logs traceid: {}] total: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
+         trace_id.unwrap_or(""), process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
     }
     Ok(req_stats)
 }

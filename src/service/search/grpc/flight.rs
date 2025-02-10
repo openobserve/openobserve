@@ -196,7 +196,7 @@ pub async fn search(
     // search in object storage
     let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
-        let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type, None)
+        let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
         let (mut file_list, file_list_took) = get_file_list_by_ids(

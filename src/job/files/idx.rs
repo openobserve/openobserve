@@ -76,7 +76,7 @@ pub(crate) async fn write_parquet_index_to_disk(
         batches.iter().map(|b| b.num_rows()).sum::<usize>()
     );
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type, None)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
     let term_prefix_partition = stream_settings.partition_keys.iter().any(|partition| {

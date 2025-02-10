@@ -239,7 +239,7 @@ pub async fn generate_old_data_job_by_stream(
     }
 
     let cfg = get_config();
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type, None)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
     let mut stream_data_retention_days = cfg.compact.data_retention_days;
@@ -673,7 +673,7 @@ pub async fn merge_files(
 
     // get latest version of schema
     let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type, None).await;
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);

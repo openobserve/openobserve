@@ -288,6 +288,10 @@ impl Writer {
             return Ok(());
         }
         let cfg = get_config();
+        if !cfg.common.wal_write_queue_enabled {
+            return self.consume(entries, fsync).await;
+        }
+
         if cfg.common.wal_write_queue_full_reject {
             if let Err(e) = self
                 .write_queue
@@ -308,6 +312,7 @@ impl Writer {
                 .await
                 .context(TokioMpscSendEntriesSnafu)?;
         }
+
         Ok(())
     }
 

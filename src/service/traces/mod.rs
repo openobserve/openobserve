@@ -792,14 +792,12 @@ async fn write_traces(
         stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
-        None,
     )
     .await;
 
-    let stream_settings =
-        infra::schema::get_settings(org_id, stream_name, StreamType::Traces, None)
-            .await
-            .unwrap_or_default();
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
+        .await
+        .unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
@@ -850,7 +848,6 @@ async fn write_traces(
         &mut traces_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
-        None,
     )
     .await;
     let record_schema = traces_schema_map

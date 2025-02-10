@@ -207,7 +207,7 @@ pub async fn search_multi(
 
         // get stream settings
         if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type, None).await
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))

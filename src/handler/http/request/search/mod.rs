@@ -76,7 +76,7 @@ async fn can_use_distinct_stream(
         return false;
     }
 
-    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type, None)
+    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
         .await
         .unwrap_or_default();
 
@@ -237,7 +237,7 @@ pub async fn search(
     // get stream settings
     for stream_name in stream_names {
         if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type, None).await
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))

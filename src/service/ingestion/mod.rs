@@ -156,7 +156,7 @@ pub async fn get_stream_partition_keys(
     stream_type: &StreamType,
     stream_name: &str,
 ) -> PartitioningDetails {
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type, None)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
     PartitioningDetails {
@@ -503,14 +503,10 @@ pub async fn get_uds_and_original_data_streams(
         if user_defined_schema_map.contains_key(&stream.stream_name.to_string()) {
             continue;
         }
-        let stream_settings = infra::schema::get_settings(
-            &stream.org_id,
-            &stream.stream_name,
-            stream.stream_type,
-            None,
-        )
-        .await
-        .unwrap_or_default();
+        let stream_settings =
+            infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
+                .await
+                .unwrap_or_default();
         if stream_settings.store_original_data {
             streams_need_original.insert(stream.stream_name.to_string());
         }

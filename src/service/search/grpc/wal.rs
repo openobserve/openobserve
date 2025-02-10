@@ -62,7 +62,7 @@ pub async fn search_parquet(
 ) -> super::SearchTable {
     // get file list
     let stream_settings =
-        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type, None)
+        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
     let files = get_file_list(
@@ -309,7 +309,7 @@ pub async fn search_memtable(
 
     // format partition keys
     let stream_settings =
-        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type, None)
+        infra::schema::get_settings(&query.org_id, &query.stream_name, query.stream_type)
             .await
             .unwrap_or_default();
     let partition_keys = &stream_settings.partition_keys;

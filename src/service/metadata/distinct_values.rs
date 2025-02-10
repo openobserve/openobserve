@@ -211,13 +211,9 @@ impl Metadata for DistinctValues {
                 stream_name
             );
             // check for schema
-            let db_schema = infra::schema::get_cache(
-                &org_id,
-                &distinct_stream_name,
-                StreamType::Metadata,
-                None,
-            )
-            .await?;
+            let db_schema =
+                infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
+                    .await?;
             let mut is_new = false;
             if db_schema.fields_map().is_empty() {
                 is_new = true;

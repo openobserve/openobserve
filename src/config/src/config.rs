@@ -686,6 +686,12 @@ pub struct Common {
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
     #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_ENABLED",
+        default = false,
+        help = "Enable write queue for WAL"
+    )]
+    pub wal_write_queue_enabled: bool,
+    #[env_config(
         name = "ZO_WAL_WRITE_QUEUE_FULL_REJECT",
         default = false,
         help = "Reject write when write queue is full"

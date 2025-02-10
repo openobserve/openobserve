@@ -158,7 +158,7 @@ async fn update_distinct_variables(
 
     if !new_variables.is_empty() {
         for ((name, typ), fields) in new_variables.into_iter() {
-            let mut stream_settings = infra::schema::get_settings(org_id, &name, typ, None)
+            let mut stream_settings = infra::schema::get_settings(org_id, &name, typ)
                 .await
                 .unwrap_or_default();
             // we only store distinct values for logs and traces -
