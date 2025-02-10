@@ -7,12 +7,10 @@ import { IngestionPage } from '../pages/ingestionPage';
 function reportName() {
     const characters = 'abcdefghijklmnopqrstuvwxyz';
     let TEST_REPORT_NAME = '';
-
     for (let i = 0; i < 10; i++) {
         const randomIndex = Math.floor(Math.random() * characters.length);
         TEST_REPORT_NAME += characters[randomIndex];
     }
-
     return TEST_REPORT_NAME;
 }
 
@@ -27,7 +25,7 @@ test.describe("Report test cases Updated", () => {
         dashboardPage = new DashboardPage(page);
         reportsPage = new ReportsPage(page);
         await loginPage.gotoLoginPage();
-       // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
     });
@@ -51,19 +49,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
@@ -90,19 +84,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
@@ -129,19 +119,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
@@ -168,19 +154,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
@@ -207,19 +189,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
@@ -246,19 +224,15 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-
         await reportsPage.logedOut();
         await page.waitForTimeout(5000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(5000);
-
-        // await loginPage.loginAsInternalUserSC();
-
+        await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-
         await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);

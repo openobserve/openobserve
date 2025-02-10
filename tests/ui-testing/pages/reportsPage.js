@@ -273,8 +273,8 @@ async reportsURLValidation() {
 
   async logedOut() {
     await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
+    await this.page.waitForSelector('[data-test="menu-link-logout-item"]');
     await this.page.locator('[data-test="menu-link-logout-item"]').click();
-
     
   }
 
