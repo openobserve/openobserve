@@ -74,20 +74,20 @@ pub async fn get_cache(
         return Ok(schema);
     }
 
-    // get write lock and check again to prevent multiple calls to db
-    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
-    if let Some(schema) = write_guard.get(cache_key) {
-        return Ok(schema.clone());
-    }
-
-    // get from db
+    // Get from DB without holding any locks
     let schema = get_from_db(org_id, stream_name, stream_type).await?;
-    let schema = SchemaCache::new(schema);
-    // write to cache
-    write_guard.insert(cache_key.to_string(), schema.clone());
-    drop(write_guard);
+    let schema_cache = SchemaCache::new(schema);
 
-    Ok(schema)
+    // Only acquire write lock after DB read is complete
+    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
+
+    // Check again before inserting in case another thread updated while we were reading DB
+    if let Some(existing_schema) = write_guard.get(cache_key) {
+        Ok(existing_schema.clone())
+    } else {
+        write_guard.insert(cache_key.to_string(), schema_cache.clone());
+        Ok(schema_cache)
+    }
 }
 
 pub async fn get_from_db(

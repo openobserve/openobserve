@@ -279,19 +279,12 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
+    let stream_settings = stream_schema.settings;
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Logs,
-            stream_name,
-        )
-        .await;
+        let partition_det = stream_settings.partition_keys;
         partition_keys = partition_det.partition_keys;
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
@@ -551,7 +544,6 @@ async fn write_logs(
         log::warn!("[write_logs] total: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
          process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
     }
-
     Ok(req_stats)
 }
 

@@ -20,7 +20,10 @@ use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
-    meta::{promql::METADATA_LABEL, stream::StreamType},
+    meta::{
+        promql::METADATA_LABEL,
+        stream::{StreamSettings, StreamType},
+    },
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -486,6 +489,7 @@ pub async fn stream_schema_exists(
         has_fields: false,
         has_partition_keys: false,
         has_metadata: false,
+        settings: StreamSettings::default(),
     };
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
@@ -501,11 +505,13 @@ pub async fn stream_schema_exists(
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if let Some(value) = schema.metadata().get("settings") {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if settings.get("partition_keys").is_some() {
+
+    let settings = unwrap_stream_settings(&schema);
+    if let Some(stream_setting) = settings {
+        if !stream_setting.partition_keys.is_empty() {
             schema_chk.has_partition_keys = true;
         }
+        schema_chk.settings = stream_setting;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;
