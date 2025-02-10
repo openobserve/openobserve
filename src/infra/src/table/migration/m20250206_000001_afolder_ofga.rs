@@ -16,7 +16,7 @@
 use std::collections::HashSet;
 
 // TODO: use flag to import the below crate
-use o2_openfga::{authorizer::set_ownership, meta::mapping::OFGA_MODELS};
+use o2_openfga::{authorizer, config::get_config as get_o2_config, meta::mapping::OFGA_MODELS};
 use sea_orm::{
     ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
@@ -28,6 +28,9 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        if !get_o2_config().openfga.enabled {
+            return Ok(());
+        }
         let db = manager.get_connection();
         let txn = db.begin().await?;
         // Migrate pages of 100 records at a time to avoid loading too many
@@ -69,6 +72,7 @@ impl MigrationTrait for Migration {
         // Next migrate all the alerts of every organizations
         len = 0;
 
+        let mut orgs = HashSet::new();
         while let Some(alerts) = alert_pages.fetch_and_next().await? {
             let alerts_len = alerts.len();
             len += alerts_len;
@@ -76,6 +80,7 @@ impl MigrationTrait for Migration {
             let mut tuples = vec![];
             for alert in alerts {
                 let org_id = alert.org;
+                orgs.insert(org_id.clone());
                 // Use the alert id
                 let alert_id = alert.id;
                 let alert_folder_id = alert.folder_id;
@@ -105,7 +110,73 @@ impl MigrationTrait for Migration {
 
         log::info!("Processed {} alerts for ofga migrations", len);
 
-        // TODO: 3rd step: Read from tuple table to check all the roles the alerts are assigned to
+        // 1. Get all the roles for every org
+        for org in orgs.iter() {
+            let roles = match authorizer::roles::get_all_roles(org, None).await {
+                Ok(roles) => roles,
+                Err(e) => {
+                    log::error!("Error openfga getting roles for org: {}", e);
+                    continue;
+                }
+            };
+            // 2. Get all the alerts assigned to the roles
+            for role in roles.iter() {
+                let mut add_roles = vec![];
+                let alerts =
+                    match authorizer::roles::get_role_permissions(org, &role, &alerts_ofga_type)
+                        .await
+                    {
+                        Ok(alerts) => alerts,
+                        Err(e) => {
+                            log::error!("Error openfga getting alerts for role: {}", e);
+                            continue;
+                        }
+                    };
+                // 3. Add the role assignment tuples for the alerts
+                for mut alert in alerts.iter() {
+                    // Get the alert id from the alert name
+                    // TODO: Optimize this workflow
+
+                    let alert_name = alert.object.split(':').last() else {
+                        log::error!("Error openfga getting alert id from alert name");
+                        continue;
+                    };
+                    if alert_name.starts_with("_all_") {
+                        continue;
+                    }
+
+                    // Get the alert id from the alert name.
+                    // There could be multiple alerts with the same name.
+                    // Since we don't have a way to uniquely identify the alert,
+                    // we are using all the alerts with the same name.
+                    // TODO: Think of a better solution if possible.
+                    let db_alerts = alerts::Entity::find()
+                        .filter(alerts::Column::Name.eq(alert_name))
+                        .filter(alerts::Column::Org.eq(org))
+                        .all(&txn)
+                        .await?;
+
+                    for db_alert in db_alerts {
+                        alert.object = format!("{}:{}", alerts_ofga_type, db_alert.id);
+                        add_roles.push(alert);
+                    }
+                }
+                if !add_roles.is_empty() {
+                    match authorizer::roles::update_role(&org, &role, add_roles, vec![], None, None)
+                        .await
+                    {
+                        Ok(_) => {
+                            log::debug!("{} roles added to openfga", add_roles.len());
+                        }
+                        Err(e) => {
+                            log::error!("Error adding roles in openfga: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Add the role assignment tuples for the alerts
         txn.commit().await?;
         Ok(())
     }
