@@ -465,7 +465,7 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    let builder = builder
+    builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -476,16 +476,13 @@ async fn init_common_grpc_server(
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
         .add_service(streams_svc)
-        .add_service(flight_svc);
-
-    builder
+        .add_service(flight_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
         .await
         .expect("gRPC server init failed");
-
     stopped_tx.send(()).ok();
     Ok(())
 }
