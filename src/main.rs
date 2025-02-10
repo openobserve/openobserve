@@ -92,10 +92,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-#[cfg(feature = "enterprise")]
-use openobserve::handler::grpc::request::stream::StreamServiceImpl;
-use openobserve::service::tls::http_tls_config;
-#[cfg(feature = "enterprise")]
+use openobserve::{
+    handler::grpc::request::stream::StreamServiceImpl, service::tls::http_tls_config,
+};
 use proto::cluster_rpc::streams_server::StreamsServer;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -451,7 +450,6 @@ async fn init_common_grpc_server(
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    #[cfg(feature = "enterprise")]
     let streams_svc = StreamsServer::new(StreamServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -481,9 +479,8 @@ async fn init_common_grpc_server(
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
+        .add_service(streams_svc)
         .add_service(flight_svc);
-    #[cfg(feature = "enterprise")]
-    let builder = builder.add_service(streams_svc);
 
     builder
         .serve_with_shutdown(gaddr, async {

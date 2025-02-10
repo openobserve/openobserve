@@ -19,6 +19,5 @@ pub mod logs;
 pub mod metrics;
 pub mod query_cache;
 pub mod search;
-#[cfg(feature = "enterprise")]
 pub mod stream;
 pub mod traces;

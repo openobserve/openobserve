@@ -20,7 +20,7 @@ use once_cell::sync::Lazy;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::super_cluster::stream::stream::super_cluster_cache_stats,
+    o2_enterprise::enterprise::super_cluster::stream::client::super_cluster_cache_stats,
 };
 
 pub mod broadcast;
@@ -78,7 +78,6 @@ pub async fn progress(
 }
 
 pub async fn cache_stats() -> Result<(), anyhow::Error> {
-
     // super cluster
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
