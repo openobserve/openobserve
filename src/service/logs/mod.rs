@@ -284,10 +284,9 @@ async fn write_logs(
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = stream_settings.partition_keys;
-        partition_keys = partition_det.partition_keys;
+        partition_keys = stream_settings.partition_keys;
         partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
+            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
     let get_schema_time = _get_schema_start.elapsed().as_millis();
 
