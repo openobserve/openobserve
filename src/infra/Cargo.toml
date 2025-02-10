@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+enterprise = ["o2_openfga"]
+
 [dependencies]
 aes-siv.workspace = true
 ahash.workspace = true
@@ -23,6 +27,7 @@ itertools.workspace = true
 log.workspace = true
 async-nats.workspace = true
 object_store.workspace = true
+o2_openfga = { workspace = true, optional = true }
 once_cell.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
