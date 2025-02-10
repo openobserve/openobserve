@@ -9,7 +9,10 @@ export const useAnnotations = (
     if (!panelId) {
       return;
     }
-
+    if (!dashboardId) {
+      return;
+    }
+    
     try {
       const response = await annotationService.get_timed_annotations(
         organization,
@@ -22,7 +25,6 @@ export const useAnnotations = (
       );
 
       return response.data;
-
     } catch (err: any) {
       console.error("Error fetching annotations:", err);
       return null;
