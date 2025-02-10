@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -202,13 +202,11 @@ pub async fn save_enrichment_data(
     let writer = ingester::get_writer(
         0,
         org_id,
-        &StreamType::EnrichmentTables.to_string(),
+        StreamType::EnrichmentTables.as_str(),
         stream_name,
     )
     .await;
-    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled)
-        .await
-        .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
+    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await;
 
     // notify update
     if stream_schema.has_fields {
@@ -290,42 +288,44 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        let filename = content_disposition.get_filename();
+        let Some(content_disposition) = field.content_disposition() else {
+            continue;
+        };
+        if content_disposition.get_filename().is_none() {
+            continue;
+        };
+
         let mut data = bytes::Bytes::new();
+        while let Some(chunk) = field.next().await {
+            let chunked_data = chunk.unwrap();
+            // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+            data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        }
+        let mut rdr = csv::Reader::from_reader(data.as_ref());
+        let headers: csv::StringRecord = rdr
+            .headers()?
+            .iter()
+            .map(|x| {
+                let mut x = x.trim().to_string();
+                format_key(&mut x);
+                x
+            })
+            .collect::<Vec<_>>()
+            .into();
 
-        if filename.is_some() {
-            while let Some(chunk) = field.next().await {
-                let chunked_data = chunk.unwrap();
-                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        for result in rdr.records() {
+            // The iterator yields Result<StringRecord, Error>, so we check the
+            // error here.
+            let record = result?;
+            // Transform the record to a JSON value
+            let mut json_record = json::Map::new();
+
+            for (header, field) in headers.iter().zip(record.iter()) {
+                json_record.insert(header.into(), json::Value::String(field.into()));
             }
-            let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers: csv::StringRecord = rdr
-                .headers()?
-                .iter()
-                .map(|x| {
-                    let mut x = x.trim().to_string();
-                    format_key(&mut x);
-                    x
-                })
-                .collect::<Vec<_>>()
-                .into();
 
-            for result in rdr.records() {
-                // The iterator yields Result<StringRecord, Error>, so we check the
-                // error here.
-                let record = result?;
-                // Transform the record to a JSON value
-                let mut json_record = json::Map::new();
-
-                for (header, field) in headers.iter().zip(record.iter()) {
-                    json_record.insert(header.into(), json::Value::String(field.into()));
-                }
-
-                if !json_record.is_empty() {
-                    records.push(json_record);
-                }
+            if !json_record.is_empty() {
+                records.push(json_record);
             }
         }
     }
