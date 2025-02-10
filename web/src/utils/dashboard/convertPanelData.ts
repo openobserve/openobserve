@@ -122,14 +122,14 @@ export const convertPanelData = async (
       };
     }
     case "custom_chart": {
-      const result = await runJavaScriptCode(panelSchema, data);
-
-      // Ensure result is an object
-      const safeResult = result && typeof result === "object" ? result : {};
-      return {
-        chartType: panelSchema.type,
-        ...safeResult,
-      };
+      if(data.length > 0 && data[0].length > 0){
+        const result = await runJavaScriptCode(panelSchema, data);
+        const safeResult = result && typeof result === "object" ? result : {};
+        return {
+          chartType: panelSchema.type,
+          ...safeResult,
+        };
+      }
     }
     default: {
       return {};
