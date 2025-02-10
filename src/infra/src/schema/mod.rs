@@ -232,7 +232,6 @@ pub async fn get_settings(
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     // Try to get from read lock first
-    let _start = std::time::Instant::now();
     if let Some(settings) = STREAM_SETTINGS.read().await.get(&key).cloned() {
         return Some(settings);
     }

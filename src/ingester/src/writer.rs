@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -98,7 +98,7 @@ pub async fn get_writer(
     let r = WRITERS[idx].read().await;
     let data = r.get(&key);
     if start.elapsed().as_millis() > 500 {
-        log::info!(
+        log::warn!(
             "get_writer from read cache took: {} ms",
             start.elapsed().as_millis()
         );
@@ -115,7 +115,7 @@ pub async fn get_writer(
         .entry(key.clone())
         .or_insert_with(|| Writer::new(idx, key));
     if start.elapsed().as_millis() > 500 {
-        log::info!(
+        log::warn!(
             "get_writer from write cache took: {} ms",
             start.elapsed().as_millis()
         );

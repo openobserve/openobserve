@@ -222,7 +222,7 @@ async fn handle_diff_schema(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    log::info!("handle_diff_schema start");
+    log::debug!("handle_diff_schema start");
 
     // first update thread cache
     if is_new {
@@ -383,7 +383,7 @@ async fn handle_diff_schema(
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     let elapsed = start.elapsed();
-    log::info!("handle_diff_schema end, elapsed: {:?}", elapsed);
+    log::debug!("handle_diff_schema end, elapsed: {:?}", elapsed);
 
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
