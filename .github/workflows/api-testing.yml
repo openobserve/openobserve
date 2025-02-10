@@ -80,7 +80,10 @@ jobs:
         run: rye run pytest --force-sugar
         working-directory: tests/api-testing/
 
-      
+      - name: Setup websocket client
+        run: pip install websocat
+        working-directory: 'tests/api-testing/'
+           
       - name: Check WebSocket Server
         run: |
           echo "Checking WebSocket connection..."
