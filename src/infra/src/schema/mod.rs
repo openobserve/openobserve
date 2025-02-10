@@ -59,16 +59,8 @@ pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> Strin
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
-    let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
-
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.schema().as_ref().clone());
-    }
-    drop(r);
-    // if not found in cache, get from db
-    get_from_db(org_id, stream_name, stream_type).await
+    let schema = get_cache(org_id, stream_name, stream_type).await?;
+    Ok(schema.schema().as_ref().clone())
 }
 
 pub async fn get_cache(
@@ -82,12 +74,16 @@ pub async fn get_cache(
         return Ok(schema);
     }
 
-    // if not found in cache, get from db
+    // get write lock and check again to prevent multiple calls to db
+    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
+    if let Some(schema) = write_guard.get(cache_key) {
+        return Ok(schema.clone());
+    }
+
+    // get from db
     let schema = get_from_db(org_id, stream_name, stream_type).await?;
     let schema = SchemaCache::new(schema);
-
     // write to cache
-    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
     write_guard.insert(cache_key.to_string(), schema.clone());
     drop(write_guard);
 

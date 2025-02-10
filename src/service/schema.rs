@@ -483,15 +483,12 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get(org_id, stream_name, stream_type)
+            let schema = infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let schema = Arc::new(schema);
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new_from_arc(schema.clone()),
-            );
-            schema
+            let db_schema = schema.schema().clone();
+            stream_schema_map.insert(stream_name.to_string(), schema);
+            db_schema
         }
     };
     if !schema.fields().is_empty() {
