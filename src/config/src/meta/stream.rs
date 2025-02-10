@@ -350,6 +350,17 @@ impl StreamStats {
             self.doc_time_min = stats.doc_time_min;
         }
     }
+
+    pub fn merge(&mut self, other: &StreamStats) {
+        self.created_at = self.created_at.min(other.created_at);
+        self.doc_time_min = self.doc_time_min.min(other.doc_time_min);
+        self.doc_time_max = self.doc_time_max.max(other.doc_time_max);
+        self.doc_num += other.doc_num;
+        self.file_num += other.file_num;
+        self.storage_size += other.storage_size;
+        self.compressed_size += other.compressed_size;
+        self.index_size += other.index_size;
+    }
 }
 
 impl From<&str> for StreamStats {
