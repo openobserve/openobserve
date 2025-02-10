@@ -679,8 +679,8 @@ pub async fn ingest(
     let total_time = start.elapsed().as_millis();
     let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
     if before_write_time > slow_time_threshold || write_time > slow_time_threshold {
-        log::info!(
-            "total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
+        log::warn!(
+            "[bulk] total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
             total_time,
             prepare_time,
             flatten_time,

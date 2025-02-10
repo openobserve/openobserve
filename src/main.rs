@@ -618,6 +618,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -631,6 +635,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -718,6 +726,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -731,6 +743,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             app = app.service(
                 web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
