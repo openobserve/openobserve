@@ -302,10 +302,12 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     session = create_session
     url = base_url
     
-    # Prepare headers with cookies
-    cookie_header_histogram = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
-                    f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
-                    f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
+    cookie_header_histogram = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+
+    # # Prepare headers with cookies
+    # cookie_header_histogram = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
+    #                 f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
+    #                 f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
 
 
     # Generate a dynamic UUID
@@ -318,10 +320,12 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     print("WebSocket Histogram URL:", WS_URL_histogram)
 
     # Now we can use WS_URL in our WebSocket connection
+    try:
+        ws_histogram = websocket.create_connection(WS_URL_histogram, header={"Cookie": cookie_header_histogram})
+    except websocket.WebSocketBadStatusException as e:
+        print(f"Failed to connect: {e}")
 
-    ws_histogram = websocket.create_connection(WS_URL_histogram, header={"Cookie": cookie_header_histogram})
-
-    print("WebSocket histogram connection established", ws_histogram)
+        print("WebSocket histogram connection established", ws_histogram)
 
     # Generate a dynamic trace_id
     trace_id_histogram = str(uuid.uuid4())
