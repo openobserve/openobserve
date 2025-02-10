@@ -98,7 +98,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         .with_label_values(&[])
         .set(ids.len() as i64);
     // 1. first query from local cache
-    let (mut files, ids) = if !cfg.common.local_mode && cfg.common.meta_store_external {
+    let (mut files, ids) = if !cfg.common.local_mode {
         let ids_set: HashSet<_> = ids.iter().cloned().collect();
         let cached_files = match file_list::LOCAL_CACHE.query_by_ids(ids).await {
             Ok(files) => files,
@@ -158,7 +158,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         .collect::<Vec<_>>();
 
     // 3. set the local cache
-    if !cfg.common.local_mode && cfg.common.meta_store_external {
+    if !cfg.common.local_mode {
         let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);

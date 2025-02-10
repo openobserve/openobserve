@@ -15,7 +15,7 @@
 
 use actix_web::HttpResponse;
 use config::meta::stream::StreamType;
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+use o2_openfga::meta::mapping::OFGA_MODELS;
 
 use crate::common::{
     infra::config::USERS,

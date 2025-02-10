@@ -3,7 +3,7 @@
 mod tests {
     use actix_http::Method;
     use actix_web::{test, FromRequest};
-    use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+    use o2_openfga::meta::mapping::OFGA_MODELS;
 
     use super::super::auth::AuthExtractor;
 

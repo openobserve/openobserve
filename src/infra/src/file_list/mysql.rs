@@ -78,12 +78,14 @@ impl super::FileList for MysqlFileList {
         DB_QUERY_NUMS
             .with_label_values(&["delete", "file_list"])
             .inc();
-        sqlx::query(r#"DELETE FROM file_list WHERE stream = ? AND date = ? AND file = ?;"#)
-            .bind(stream_key)
-            .bind(date_key)
-            .bind(file_name)
-            .execute(&pool)
-            .await?;
+        sqlx::query(
+            r#"UPDATE file_list SET deleted = true WHERE stream = ? AND date = ? AND file = ?;"#,
+        )
+        .bind(stream_key)
+        .bind(date_key)
+        .bind(file_name)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 
@@ -99,11 +101,10 @@ impl super::FileList for MysqlFileList {
         self.inner_batch_add("file_list_history", files).await
     }
 
-    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>> {
+    async fn batch_remove(&self, files: &[String]) -> Result<()> {
         if files.is_empty() {
-            return Ok(Vec::new());
+            return Ok(());
         }
-        let mut error_files = Vec::new();
         let chunks = files.chunks(100);
         for files in chunks {
             // get ids of the files
@@ -130,10 +131,7 @@ impl super::FileList for MysqlFileList {
                     .observe(time);
                 let ret: Option<i64> = match query_res {
                     Ok(v) => v,
-                    Err(sqlx::Error::RowNotFound) => {
-                        error_files.push(file.to_string());
-                        continue;
-                    }
+                    Err(sqlx::Error::RowNotFound) => continue,
                     Err(e) => return Err(e.into()),
                 };
                 match ret {
@@ -147,7 +145,10 @@ impl super::FileList for MysqlFileList {
             }
             // delete files by ids
             if !ids.is_empty() {
-                let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+                let sql = format!(
+                    "UPDATE file_list SET deleted = true WHERE id IN({});",
+                    ids.join(",")
+                );
                 DB_QUERY_NUMS
                     .with_label_values(&["delete_id", "file_list"])
                     .inc();
@@ -159,7 +160,7 @@ impl super::FileList for MysqlFileList {
                     .observe(time);
             }
         }
-        Ok(error_files)
+        Ok(())
     }
 
     async fn batch_add_deleted(
@@ -387,12 +388,16 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .with_label_values(&["query", "file_list"])
             .observe(time);
         Ok(ret?
-            .into_iter()
-            .map(|r| {
-                (
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    FileMeta::from(&r),
-                )
+            .iter()
+            .filter_map(|r| {
+                if r.deleted {
+                    None
+                } else {
+                    Some((
+                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                        r.into(),
+                    ))
+                }
             })
             .collect())
     }
@@ -435,12 +440,16 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .with_label_values(&["query_by_date", "file_list"])
             .observe(time);
         Ok(ret?
-            .into_iter()
-            .map(|r| {
-                (
-                    "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
-                    FileMeta::from(&r),
-                )
+            .iter()
+            .filter_map(|r| {
+                if r.deleted {
+                    None
+                } else {
+                    Some((
+                        "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
+                        r.into(),
+                    ))
+                }
             })
             .collect())
     }
@@ -534,7 +543,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
                     let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
-                    let query = "SELECT id, records, original_size FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;";
+                    let query = "SELECT id, records, original_size, deleted FROM file_list WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ?;";
                     sqlx::query_as::<_, super::FileId>(query)
                     .bind(stream_key)
                     .bind(time_start)
@@ -548,7 +557,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let mut rets = Vec::new();
         for task in tasks {
             match task.await {
-                Ok(Ok(r)) => rets.extend(r),
+                Ok(Ok(r)) => rets.extend(r.into_iter().filter(|r| !r.deleted)),
                 Ok(Err(e)) => {
                     return Err(e.into());
                 }
@@ -699,6 +708,7 @@ SELECT date
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
         pk_value: Option<(i64, i64)>,
+        deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>> {
         let (field, value) = if stream_type.is_some() && stream_name.is_some() {
             (
@@ -713,7 +723,7 @@ SELECT date
         } else {
             ("org", org_id.to_string())
         };
-        let sql = format!(
+        let mut sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
     CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size, CAST(SUM(index_size) AS SIGNED) AS index_size
@@ -721,20 +731,33 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
     WHERE {field} = '{value}'
             "#,
         );
-        let sql = match pk_value {
+        if deleted {
+            sql = format!("{} AND deleted IS TRUE", sql);
+        }
+        match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some((0, 0)) => format!("{} GROUP BY stream", sql),
             Some((min, max)) => {
-                format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                if deleted {
+                    format!("{} AND id <= {} GROUP BY stream", sql, max)
+                } else {
+                    format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+                }
             }
         };
         let pool = CLIENT.clone();
+        let op_name = if deleted { "stats_deleted" } else { "stats" };
         DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
+            .with_label_values(&[op_name, "file_list"])
             .inc();
+        let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
             .fetch_all(&pool)
             .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&[op_name, "file_list"])
+            .observe(time);
         Ok(ret
             .iter()
             .map(|r| (r.stream.to_owned(), r.into()))
@@ -792,6 +815,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         &self,
         org_id: &str,
         streams: &[(String, StreamStats)],
+        pk_value: Option<(i64, i64)>,
     ) -> Result<()> {
         let pool = CLIENT.clone();
         let old_stats = self.get_stream_stats(org_id, None, None).await?;
@@ -840,6 +864,7 @@ INSERT INTO stream_stats
         }
 
         let mut tx = pool.begin().await?;
+        // update stats
         for (stream_key, stats) in update_streams {
             DB_QUERY_NUMS
                 .with_label_values(&["update", "stream_stats"])
@@ -868,6 +893,32 @@ UPDATE stream_stats
                 return Err(e.into());
             }
         }
+        // delete files which already marked deleted
+        if let Some((_min_id, max_id)) = pk_value {
+            DB_QUERY_NUMS
+                .with_label_values(&["clean_deleted", "file_list"])
+                .inc();
+            let start = std::time::Instant::now();
+            if let Err(e) = sqlx::query("DELETE FROM file_list WHERE deleted IS TRUE AND id <= ?;")
+                .bind(max_id)
+                .execute(&mut *tx)
+                .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!(
+                        "[MYSQL] rollback set stream stats error for delete file list: {}",
+                        e
+                    );
+                }
+                return Err(e.into());
+            }
+            let time = start.elapsed().as_secs_f64();
+            DB_QUERY_TIME
+                .with_label_values(&["clean_deleted", "file_list"])
+                .observe(time);
+        }
+
+        // commit
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit set stream stats error: {}", e);
             return Err(e.into());
@@ -1385,9 +1436,6 @@ INSERT IGNORE INTO {table} (org, stream, date, file, deleted, min_ts, max_ts, re
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list
@@ -1411,9 +1459,6 @@ CREATE TABLE IF NOT EXISTS file_list
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_history"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_history
@@ -1437,9 +1482,6 @@ CREATE TABLE IF NOT EXISTS file_list_history
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_deleted"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_deleted
@@ -1458,9 +1500,6 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "file_list_jobs"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS file_list_jobs
@@ -1479,9 +1518,6 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     .execute(&pool)
     .await?;
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "stream_stats"])
-        .inc();
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS stream_stats
@@ -1601,9 +1637,6 @@ pub async fn create_table_index() -> Result<()> {
 
         log::warn!("[MYSQL] starting delete duplicate records");
         // delete duplicate records
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
         let ret = sqlx::query(
                 r#"SELECT stream, date, file, min(id) as id FROM file_list GROUP BY stream, date, file HAVING COUNT(*) > 1;"#,
             ).fetch_all(&pool).await?;
@@ -1613,9 +1646,6 @@ pub async fn create_table_index() -> Result<()> {
             let date = r.get::<String, &str>("date");
             let file = r.get::<String, &str>("file");
             let id = r.get::<i64, &str>("id");
-            DB_QUERY_NUMS
-                .with_label_values(&["delete", "file_list"])
-                .inc();
             sqlx::query(
                 r#"DELETE FROM file_list WHERE id != ? AND stream = ? AND date = ? AND file = ?;"#,
             )
@@ -1650,9 +1680,6 @@ pub async fn create_table_index() -> Result<()> {
 
 async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
-    DB_QUERY_NUMS
-        .with_label_values(&["select", "information_schema.columns"])
-        .inc();
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );
@@ -1665,7 +1692,6 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 
     let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
-    DB_QUERY_NUMS.with_label_values(&["alter", table]).inc();
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
         if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column

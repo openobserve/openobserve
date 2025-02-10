@@ -28,8 +28,7 @@ use config::{
         promql::get_largest_downsampling_rule,
         search::StorageType,
         stream::{
-            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats,
-            StreamType,
+            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamType,
         },
     },
     metrics,
@@ -447,6 +446,14 @@ pub async fn merge_by_stream(
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    if schema == Schema::empty() {
+        // the stream was deleted, mark the job as done
+        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+            log::error!("[COMPACT] set_job_done failed: {e}");
+        }
+        return Ok(());
+    }
+
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
@@ -623,8 +630,8 @@ pub async fn merge_by_stream(
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
 
                 if check_guard.contains(&batch_id) {
-                    log::error!(
-                        "[COMPACT] merge files for stream: [{}/{}/{}] batch_id: {} duplicate",
+                    log::warn!(
+                        "[COMPACT] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
                         org_id,
                         stream_type,
                         stream_name,
@@ -647,10 +654,7 @@ pub async fn merge_by_stream(
                     });
                 }
 
-                // collect stream stats
-                let mut stream_stats: StreamStats = StreamStats::default();
                 for file in delete_file_list {
-                    stream_stats = stream_stats - &file.meta;
                     events.push(FileKey {
                         key: file.key.clone(),
                         meta: file.meta.clone(),
@@ -661,39 +665,10 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                match write_file_list(&org_id, &events).await {
-                    Ok(error_files) => {
-                        // recalculate stream stats
-                        if !error_files.is_empty() {
-                            log::debug!("[COMPACT] found error files: {:?}", error_files);
-                            for file in delete_file_list {
-                                if error_files.contains(&file.key) {
-                                    stream_stats = stream_stats + &file.meta;
-                                }
-                            }
-                        }
-                        // update stream stats
-                        if stream_stats.doc_num != 0 {
-                            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-                            if let Err(e) = infra_file_list::set_stream_stats(
-                                &org_id,
-                                &[(stream_key.clone(), stream_stats)],
-                            )
-                            .await
-                            {
-                                log::error!(
-                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
-                                    stream_key,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("[COMPACT] write file list failed: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
+                if let Err(e) = write_file_list(&org_id, &events).await {
+                    log::error!("[COMPACT] write file list failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
                 }
             }
             drop(permit);
@@ -1143,12 +1118,9 @@ async fn generate_inverted_index(
     Ok(())
 }
 
-async fn write_file_list(
-    org_id: &str,
-    events: &[FileKey],
-) -> Result<HashSet<String>, anyhow::Error> {
+async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow::Error> {
     if events.is_empty() {
-        return Ok(HashSet::new());
+        return Ok(());
     }
 
     let put_items = events
@@ -1170,7 +1142,6 @@ async fn write_file_list(
     // retry 5 times
     let mut success = false;
     let created_at = config::utils::time::now_micros();
-    let mut error_files = HashSet::new();
     for _ in 0..5 {
         if !del_items.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
@@ -1187,13 +1158,10 @@ async fn write_file_list(
         }
         if !del_items.is_empty() {
             let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-            match infra_file_list::batch_remove(&del_files).await {
-                Ok(v) => error_files.extend(v),
-                Err(e) => {
-                    log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                    continue;
-                }
+            if let Err(e) = infra_file_list::batch_remove(&del_files).await {
+                log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                continue;
             }
         };
         // send broadcast to other nodes
@@ -1209,7 +1177,7 @@ async fn write_file_list(
     if !success {
         Err(anyhow::anyhow!("batch_write to db failed"))
     } else {
-        Ok(error_files)
+        Ok(())
     }
 }
 

@@ -110,6 +110,7 @@ itertools.workspace = true
 jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
+memchr.workspace = true
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
@@ -259,7 +260,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
-getrandom = "0.2.11"
+getrandom = "0.2.15"
 hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
@@ -286,7 +287,7 @@ prometheus = "0.13"
 prost = "0.13.1"
 rand = "0.8"
 rayon = "1.10"
-regex = "1.7"
+regex = "1.11"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",

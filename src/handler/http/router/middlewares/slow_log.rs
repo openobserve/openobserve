@@ -100,7 +100,7 @@ where
 
             if duration > threshold {
                 log::warn!(
-                    "Slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
+                    "slow request detected - remote_addr: {}, method: {}, path: {}, took: {:.6}",
                     remote_addr,
                     method,
                     path,
