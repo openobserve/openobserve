@@ -6,7 +6,8 @@ import {
 export class DashboardPage {
   constructor(page) {
     this.page = page;
-    this.dashboardName = `dashboard${Date.now()}`;
+    this.dashboardName = `dash${Date.now()}`;
+    this.panelName = `p${Date.now()}`;
     this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
     this.addDashboardButton = page.locator('[data-test="dashboard-add"]');
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
@@ -58,7 +59,7 @@ export class DashboardPage {
       .click();
     await this.page.waitForSelector('[data-test="dashboard-panel-name"]');
     await this.page.locator('[data-test="dashboard-panel-name"]').click();
-    await this.page.locator('[data-test="dashboard-panel-name"]').fill('AutoP');
+    await this.page.locator('[data-test="dashboard-panel-name"]').fill(this.panelName);
     await this.page.locator('[data-test="dashboard-panel-name"]').press('Enter');
     await expect(this.page.locator('[data-test="dashboard-apply"]')).toBeVisible();
     await this.page.locator('[data-test="dashboard-apply"]').click();
