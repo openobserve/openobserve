@@ -15,13 +15,12 @@
 
 use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
 use dashmap::{DashMap, DashSet};
-use infra::{cache, file_list};
-use once_cell::sync::Lazy;
 #[cfg(feature = "enterprise")]
-use {
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::super_cluster::stream::client::super_cluster_cache_stats,
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    super_cluster::stream::client::super_cluster_cache_stats,
 };
+use once_cell::sync::Lazy;
 
 pub mod broadcast;
 pub mod local;
@@ -47,7 +46,7 @@ pub async fn progress(
     delete: bool,
 ) -> Result<(), anyhow::Error> {
     if delete {
-        if let Err(e) = file_list::remove(key).await {
+        if let Err(e) = infra::file_list::remove(key).await {
             log::error!(
                 "service:db:file_list: delete {}, set_file_to_cache error: {}",
                 key,
@@ -55,7 +54,7 @@ pub async fn progress(
             );
         }
     } else {
-        if let Err(e) = file_list::add(key, data.unwrap()).await {
+        if let Err(e) = infra::file_list::add(key, data.unwrap()).await {
             log::error!(
                 "service:db:file_list: add {}, set_file_to_cache error: {}",
                 key,
@@ -64,7 +63,7 @@ pub async fn progress(
         }
         // update stream stats realtime
         if config::get_config().common.local_mode {
-            if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
+            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data.unwrap()) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",
                     key,
