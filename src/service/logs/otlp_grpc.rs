@@ -369,6 +369,7 @@ pub async fn handle_grpc_request(
         UsageType::Logs,
         &mut status,
         json_data_by_stream,
+        None,
     )
     .await
     {

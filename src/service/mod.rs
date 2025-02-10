@@ -52,7 +52,8 @@ pub mod users;
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
     let stream_name = params.stream_name.to_string();
-    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
+    let schema =
+        infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type, None).await?;
     Ok(if schema.fields_map().is_empty() {
         format_stream_name(&stream_name)
     } else {

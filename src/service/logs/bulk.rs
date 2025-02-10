@@ -626,6 +626,7 @@ pub async fn ingest(
     drop(streams_need_original_set);
     drop(user_defined_schema_map);
 
+    let trace_id = config::ider::uuid();
     let _write_start = std::time::Instant::now();
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
@@ -637,6 +638,7 @@ pub async fn ingest(
             UsageType::Bulk,
             &mut status,
             json_data_by_stream,
+            Some(&trace_id),
         )
         .await;
         let IngestionStatus::Bulk(mut bulk_res) = status else {
@@ -680,7 +682,7 @@ pub async fn ingest(
     let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
     if before_write_time > slow_time_threshold || write_time > slow_time_threshold {
         log::warn!(
-            "[bulk] total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
+            "[bulk {trace_id}] total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
             total_time,
             prepare_time,
             flatten_time,
@@ -694,7 +696,7 @@ pub async fn ingest(
         );
     }
     if before_write_time > 5000 {
-        log::info!("original_line: {}", original_line);
+        log::info!("[bulk {trace_id}] original_line: {}", original_line);
     }
 
     Ok(response_body)

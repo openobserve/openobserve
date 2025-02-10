@@ -65,7 +65,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 }
 
                 let stream_settings =
-                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type, None)
                         .await
                         .unwrap_or_default();
                 let stream_data_retention_end = if stream_settings.data_retention > 0 {
@@ -256,7 +256,7 @@ pub async fn run_merge(
         let org_id = columns[0].to_string();
         let stream_type = StreamType::from(columns[1]);
         let stream_name = columns[2].to_string();
-        let stream_setting = get_settings(&org_id, &stream_name, stream_type)
+        let stream_setting = get_settings(&org_id, &stream_name, stream_type, None)
             .await
             .unwrap_or_default();
         let partition_time_level =

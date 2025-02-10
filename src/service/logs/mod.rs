@@ -195,6 +195,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
@@ -203,6 +204,7 @@ async fn write_logs_by_stream(
     usage_type: UsageType,
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    trace_id: Option<&str>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -213,7 +215,8 @@ async fn write_logs_by_stream(
         }
 
         // write json data by stream
-        let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
+        let mut req_stats =
+            write_logs(thread_id, org_id, &stream_name, status, json_data, trace_id).await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time_took;
@@ -263,6 +266,7 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    trace_id: Option<&str>,
 ) -> Result<RequestStats> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -276,11 +280,11 @@ async fn write_logs(
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
+        trace_id,
     )
     .await;
 
     let stream_settings = stream_schema.settings;
-
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
@@ -318,6 +322,7 @@ async fn write_logs(
         &mut stream_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
+        trace_id,
     )
     .await?;
 

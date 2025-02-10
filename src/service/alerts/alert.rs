@@ -358,7 +358,7 @@ async fn prepare_alert(
             for stream in stream_names.iter() {
                 if !stream.eq(stream_name) {
                     if let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, stream, stream_type, None).await
                     {
                         let max_query_range = settings.max_query_range;
                         if max_query_range > 0

@@ -66,9 +66,10 @@ pub async fn check_for_schema(
     stream_schema_map: &mut HashMap<String, SchemaCache>,
     record_vals: Vec<&Map<String, Value>>,
     record_ts: i64,
+    trace_id: Option<&str>,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
-        let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+        let schema = infra::schema::get_cache(org_id, stream_name, stream_type, trace_id).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
     let cfg = get_config();
@@ -111,7 +112,7 @@ pub async fn check_for_schema(
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
-            let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+            let stream_setting = get_settings(org_id, stream_name, stream_type, trace_id).await;
             let (defined_schema_fields, need_original) = match stream_setting {
                 Some(s) => (
                     s.defined_schema_fields.unwrap_or_default(),
@@ -483,6 +484,7 @@ pub async fn stream_schema_exists(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
+    trace_id: Option<&str>,
 ) -> StreamSchemaChk {
     let mut schema_chk = StreamSchemaChk {
         conforms: true,
@@ -494,7 +496,7 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get_cache(org_id, stream_name, stream_type)
+            let schema = infra::schema::get_cache(org_id, stream_name, stream_type, trace_id)
                 .await
                 .unwrap();
             let db_schema = schema.schema().clone();
@@ -550,6 +552,7 @@ mod tests {
             &mut map,
             vec![record.as_object().unwrap()],
             1234234234234,
+            None,
         )
         .await
         .unwrap();

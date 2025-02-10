@@ -59,7 +59,7 @@ pub async fn save(
                 let (org_id, stream_type) = (&derived_stream.org_id, derived_stream.stream_type);
                 for stream in stream_names.iter() {
                     if let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+                        infra::schema::get_settings(org_id, stream, stream_type, None).await
                     {
                         let max_query_range = settings.max_query_range;
                         if max_query_range > 0

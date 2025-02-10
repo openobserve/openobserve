@@ -99,7 +99,7 @@ pub const INGESTION_EP: [&str; 14] = [
     "_json_arrow",
 ];
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct BulkResponse {
     pub took: u128,
     pub errors: bool,

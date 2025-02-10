@@ -92,16 +92,34 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
+    let start = std::time::Instant::now();
     let key = WriterKey::new(org_id, stream_type);
     let idx = get_table_idx(thread_id, stream_name);
-    if let Some(w) = WRITERS[idx].read().await.get(&key) {
+    let r = WRITERS[idx].read().await;
+    let data = r.get(&key);
+    if start.elapsed().as_millis() > 500 {
+        log::info!(
+            "get_writer from read cache took: {} ms",
+            start.elapsed().as_millis()
+        );
+    }
+    if let Some(w) = data {
         return w.clone();
     }
+    drop(r);
+
     // slow path
+    let start = std::time::Instant::now();
     let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
         .or_insert_with(|| Writer::new(idx, key));
+    if start.elapsed().as_millis() > 500 {
+        log::info!(
+            "get_writer from write cache took: {} ms",
+            start.elapsed().as_millis()
+        );
+    }
     w.clone()
 }
 

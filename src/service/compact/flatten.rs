@@ -59,7 +59,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
             for stream_name in streams {
                 // check if this stream need flatten
                 let stream_setting =
-                    infra::schema::get_settings(&org_id, &stream_name, stream_type)
+                    infra::schema::get_settings(&org_id, &stream_name, stream_type, None)
                         .await
                         .unwrap_or_default();
                 let defined_schema_fields =
@@ -183,7 +183,7 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
     let org_id = columns[1];
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3];
-    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type)
+    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type, None)
         .await
         .unwrap_or_default();
     let bloom_filter_fields = stream_setting.bloom_filter_fields;

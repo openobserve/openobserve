@@ -59,7 +59,7 @@ pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> Strin
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
-    let schema = get_cache(org_id, stream_name, stream_type).await?;
+    let schema = get_cache(org_id, stream_name, stream_type, None).await?;
     Ok(schema.schema().as_ref().clone())
 }
 
@@ -67,20 +67,41 @@ pub async fn get_cache(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    trace_id: Option<&str>,
 ) -> Result<SchemaCache> {
+    let _start = std::time::Instant::now();
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
     if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
+        if let Some(trace_id) = trace_id {
+            log::info!(
+                "[schema {trace_id}] get_cache from read cache: {} ms",
+                _start.elapsed().as_millis()
+            );
+        }
         return Ok(schema);
     }
 
     // Get from DB without holding any locks
+    let _start = std::time::Instant::now();
     let schema = get_from_db(org_id, stream_name, stream_type).await?;
     let schema_cache = SchemaCache::new(schema);
+    if let Some(trace_id) = trace_id {
+        log::info!(
+            "[schema {trace_id}] get_cache from db: {} ms",
+            _start.elapsed().as_millis()
+        );
+    }
 
     // Only acquire write lock after DB read is complete
+    let _start = std::time::Instant::now();
     let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
-
+    if let Some(trace_id) = trace_id {
+        log::info!(
+            "[schema {trace_id}] get_cache from write cache, get lock took: {} ms",
+            _start.elapsed().as_millis()
+        );
+    }
     // Check again before inserting in case another thread updated while we were reading DB
     if let Some(existing_schema) = write_guard.get(cache_key) {
         Ok(existing_schema.clone())
@@ -229,15 +250,24 @@ pub async fn get_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    trace_id: Option<&str>,
 ) -> Option<StreamSettings> {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     // Try to get from read lock first
+    let _start = std::time::Instant::now();
     if let Some(settings) = STREAM_SETTINGS.read().await.get(&key).cloned() {
+        if let Some(trace_id) = trace_id {
+            log::info!(
+                "[schema {trace_id}] get_settings from read cache: {} ms",
+                _start.elapsed().as_millis()
+            );
+        }
         return Some(settings);
     }
 
     // Get from DB without holding any locks
+    let _start = std::time::Instant::now();
     let settings = match get(org_id, stream_name, stream_type).await {
         Ok(schema) => unwrap_stream_settings(&schema),
         Err(_) => None,
@@ -252,6 +282,12 @@ pub async fn get_settings(
             write_guard.insert(key, s.clone());
         }
         drop(write_guard);
+    }
+    if let Some(trace_id) = trace_id {
+        log::info!(
+            "[schema {trace_id}] get_settings from db: {} ms",
+            _start.elapsed().as_millis()
+        );
     }
 
     settings

@@ -671,7 +671,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -778,7 +778,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
