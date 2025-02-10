@@ -220,7 +220,7 @@ pub async fn merge_parquet_files_with_downsampling(
     // write result to parquet file
     let mut bufs = Vec::new();
     let mut file_metas = Vec::new();
-    let mut max_ts = 0;
+    let mut min_ts = 0;
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
@@ -229,14 +229,14 @@ pub async fn merge_parquet_files_with_downsampling(
     loop {
         match batch_stream.try_next().await {
             Ok(Some(batch)) => {
-                if file_meta.min_ts == 0 {
-                    file_meta.min_ts = get_first_timestamp(&batch);
+                if file_meta.max_ts == 0 {
+                    file_meta.max_ts = get_max_timestamp(&batch);
                 }
                 file_meta.original_size += batch.get_array_memory_size() as i64;
                 file_meta.records += batch.num_rows() as i64;
-                max_ts = get_last_timestamp(&batch);
+                min_ts = get_min_timestamp(&batch);
                 if file_meta.original_size > cfg.compact.max_file_size as i64 {
-                    file_meta.max_ts = max_ts;
+                    file_meta.min_ts = min_ts;
                     append_metadata(&mut writer, &file_meta)?;
                     writer.close().await?;
                     bufs.push(std::mem::take(&mut buf));
@@ -264,7 +264,7 @@ pub async fn merge_parquet_files_with_downsampling(
         }
     }
     if file_meta.original_size > 0 {
-        file_meta.max_ts = max_ts;
+        file_meta.min_ts = min_ts;
         append_metadata(&mut writer, &file_meta)?;
         writer.close().await?;
         bufs.push(std::mem::take(&mut buf));
@@ -707,7 +707,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
     )
 }
 
-fn get_first_timestamp(record_batch: &RecordBatch) -> i64 {
+fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
     let timestamp = record_batch
         .column_by_name(&cfg.common.column_timestamp)
@@ -718,7 +718,7 @@ fn get_first_timestamp(record_batch: &RecordBatch) -> i64 {
     timestamp.value(0)
 }
 
-fn get_last_timestamp(record_batch: &RecordBatch) -> i64 {
+fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
     let timestamp = record_batch
         .column_by_name(&cfg.common.column_timestamp)
