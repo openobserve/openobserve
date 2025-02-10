@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.openobserve.cluster";
+option java_outer_classname = "streamProto";
+
+package cluster;
+
+import "cluster/common.proto";
+
+service Streams {
+    rpc stream_stats (StreamStatsRequest) returns (StreamStatsResponse) {}
+}
+
+message StreamStatsRequest {
+    optional string  org_id = 1;
+    optional string  stream_type = 2;
+    optional string  stream_name = 3;
+}
+
+message StreamStatsResponse {
+    repeated StreamStatsEntry entries = 1;
+}
+
+message StreamStatsEntry {
+    string stream = 1;
+    StreamStats stats = 2;
+}
+
+message StreamStats {
+    int64 created_at = 1;
+    int64 doc_time_min = 2;
+    int64 doc_time_max = 3;
+    int64 doc_num = 4;
+    int64 file_num = 5;
+    double storage_size = 6;
+    double compressed_size = 7;
+    double index_size = 8;
+}

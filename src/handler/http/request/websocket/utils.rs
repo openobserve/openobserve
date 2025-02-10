@@ -32,7 +32,7 @@ pub mod enterprise_utils {
         user_id: &str,
         org_id: &str,
     ) -> Result<(), String> {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::{
             infra::config::USERS,
