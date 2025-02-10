@@ -71,18 +71,14 @@ impl ProfileProcessor {
     fn build_stack_trace(&self, sample: &Sample, profile: &Profile) -> Result<Vec<String>> {
         let mut stack = Vec::with_capacity(sample.location_id.len());
 
-        log::info!("Processing new stack trace");
-
         for &loc_id in &sample.location_id {
             if let Some(&func_id) = self.location_cache.get(&loc_id) {
                 if let Some(function) = profile.function.iter().find(|f| f.id == func_id) {
                     if let Some(name) = profile.string_table.get(function.name as usize) {
                         let clean_name = if name.starts_with("__ZN") {
                             let demangled = rustc_demangle::demangle(name).to_string();
-                            log::info!("Demangled: {} -> {}", name, demangled);
                             demangled
                         } else {
-                            log::info!("Original: {}", name);
                             name.to_string()
                         };
 
@@ -92,7 +88,6 @@ impl ProfileProcessor {
             }
         }
 
-        log::info!("Full stack: {}", stack.join(" -> "));
         Ok(stack)
     }
 
