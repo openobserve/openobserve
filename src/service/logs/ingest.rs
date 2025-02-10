@@ -368,6 +368,7 @@ pub async fn ingest(
             usage_type,
             &mut status,
             json_data_by_stream,
+            None,
         )
         .await;
         stream_status.status = match status {

@@ -40,8 +40,8 @@ use once_cell::sync::Lazy;
 mod etcd;
 mod nats;
 
-const HEALTH_CHECK_FAILED_TIMES: usize = 3;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
+const HEALTH_CHECK_FAILED_TIMES: usize = 5;
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
@@ -233,6 +233,24 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
         MetaStore::Nats => nats::update_local_node(node).await,
         _ => etcd::update_local_node(node).await,
     }
+}
+
+pub async fn set_unschedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = false;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+
+pub async fn set_schedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = true;
+        update_local_node(&node).await?;
+    };
+    Ok(())
 }
 
 pub async fn leave() -> Result<()> {

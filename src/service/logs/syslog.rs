@@ -329,6 +329,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             UsageType::Syslog,
             &mut status,
             json_data_by_stream,
+            None,
         )
         .await;
         stream_status.status = match status {

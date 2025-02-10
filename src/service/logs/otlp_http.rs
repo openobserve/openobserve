@@ -501,6 +501,7 @@ pub async fn logs_json_handler(
         UsageType::Logs,
         &mut status,
         json_data_by_stream,
+        None,
     )
     .await
     {

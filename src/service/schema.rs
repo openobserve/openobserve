@@ -20,7 +20,10 @@ use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
-    meta::{promql::METADATA_LABEL, stream::StreamType},
+    meta::{
+        promql::METADATA_LABEL,
+        stream::{StreamSettings, StreamType},
+    },
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -216,7 +219,11 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
+    log::debug!("handle_diff_schema start");
+
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -375,6 +382,9 @@ async fn handle_diff_schema(
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
+    let elapsed = start.elapsed();
+    log::debug!("handle_diff_schema end, elapsed: {:?}", elapsed);
+
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
         types_delta: Some(field_datatype_delta),
@@ -425,7 +435,7 @@ pub fn generate_schema_for_defined_schema_fields(
     ))
 }
 
-fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -479,29 +489,29 @@ pub async fn stream_schema_exists(
         has_fields: false,
         has_partition_keys: false,
         has_metadata: false,
+        settings: StreamSettings::default(),
     };
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get(org_id, stream_name, stream_type)
+            let schema = infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let schema = Arc::new(schema);
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new_from_arc(schema.clone()),
-            );
-            schema
+            let db_schema = schema.schema().clone();
+            stream_schema_map.insert(stream_name.to_string(), schema);
+            db_schema
         }
     };
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if let Some(value) = schema.metadata().get("settings") {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if settings.get("partition_keys").is_some() {
+
+    let settings = unwrap_stream_settings(&schema);
+    if let Some(stream_setting) = settings {
+        if !stream_setting.partition_keys.is_empty() {
             schema_chk.has_partition_keys = true;
         }
+        schema_chk.settings = stream_setting;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;

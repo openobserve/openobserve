@@ -57,6 +57,11 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Time went backwards");
+    let seconds = now.as_secs() % 60; // Get current second in the minute
+
     // check system resource
     check_ingestion_allowed(org_id, None)?;
 
@@ -81,6 +86,7 @@ pub async fn ingest(
     let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
         HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, ExecutablePipelineBulkInputs> = HashMap::new();
+    let prepare_time = start.elapsed().as_millis();
 
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut streams_need_original_set: HashSet<String> = HashSet::new();
@@ -88,13 +94,24 @@ pub async fn ingest(
     let mut json_data_by_stream = HashMap::new();
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
+    let mut print_flatten = true;
+    let mut json_parse_time = 0;
+    let mut flatten_time = 0;
+    let mut uds_time = 0;
+    let mut get_uds_and_original_time = 0;
+    let mut format_stream_name_time = 0;
+    let mut handle_timestamp_time = 0;
+    let mut original_line = String::new();
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
+        original_line = line.to_string();
 
+        let _json_parse_start = std::time::Instant::now();
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
+        json_parse_time += _json_parse_start.elapsed().as_millis();
 
         if !next_line_is_data {
             // check bulk operate
@@ -129,9 +146,11 @@ pub async fn ingest(
                 continue; // skip
             }
 
+            let _format_stream_name_start = std::time::Instant::now();
             if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(&stream_name);
             }
+            format_stream_name_time += _format_stream_name_start.elapsed().as_millis();
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
@@ -166,12 +185,14 @@ pub async fn ingest(
             }
             // End pipeline params construction
 
+            let _get_uds_and_original_start = std::time::Instant::now();
             crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
                 &mut user_defined_schema_map,
                 &mut streams_need_original_set,
             )
             .await;
+            get_uds_and_original_time += _get_uds_and_original_start.elapsed().as_millis();
 
             next_line_is_data = true;
         } else {
@@ -211,8 +232,13 @@ pub async fn ingest(
                     .or_default();
                 inputs.add_input(value, doc_id.to_owned(), original_data);
             } else {
+                let _flatten_start = std::time::Instant::now();
                 // JSON Flattening
                 value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
+                flatten_time += _flatten_start.elapsed().as_millis();
+                if print_flatten && seconds == 30 {
+                    print_flatten = false;
+                }
 
                 // get json object
                 let mut local_val = match value.take() {
@@ -225,10 +251,13 @@ pub async fn ingest(
                     local_val.insert("_id".to_string(), json::Value::String(doc_id.to_owned()));
                 }
 
+                let _uds_start = std::time::Instant::now();
                 if let Some(fields) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
+                uds_time += _uds_start.elapsed().as_millis();
 
+                let _get_uds_and_original_start = std::time::Instant::now();
                 // add `_original` and '_record_id` if required by StreamSettings
                 if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
                     local_val.insert(
@@ -245,7 +274,9 @@ pub async fn ingest(
                         json::Value::String(record_id.to_string()),
                     );
                 }
+                get_uds_and_original_time += _get_uds_and_original_start.elapsed().as_millis();
 
+                let _handle_timestamp_start = std::time::Instant::now();
                 // handle timestamp
                 let timestamp = match local_val.get(&cfg.common.column_timestamp) {
                     Some(v) => match parse_timestamp_micro_from_value(v) {
@@ -304,6 +335,7 @@ pub async fn ingest(
                     cfg.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
+                handle_timestamp_time += _handle_timestamp_start.elapsed().as_millis();
 
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
@@ -477,11 +509,15 @@ pub async fn ingest(
         }
     }
 
+    let before_write_time = start.elapsed().as_millis();
+
     // drop memory-intensive variables
     drop(stream_pipeline_inputs);
     drop(streams_need_original_set);
     drop(user_defined_schema_map);
 
+    let trace_id = config::ider::uuid();
+    let _write_start = std::time::Instant::now();
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Bulk(bulk_res);
         let write_result = super::write_logs_by_stream(
@@ -492,6 +528,7 @@ pub async fn ingest(
             UsageType::Bulk,
             &mut status,
             json_data_by_stream,
+            Some(&trace_id),
         )
         .await;
         let IngestionStatus::Bulk(mut bulk_res) = status else {
@@ -507,6 +544,8 @@ pub async fn ingest(
             }
         }
     };
+
+    let write_time = _write_start.elapsed().as_millis();
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
@@ -528,6 +567,27 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
+
+    let total_time = start.elapsed().as_millis();
+    let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
+    if before_write_time > slow_time_threshold || write_time > slow_time_threshold {
+        log::warn!(
+            "[bulk {trace_id}] total: {} ms, prepare: {} ms, flatten: {} ms, convert_to_uds: {} ms, json_parse: {} ms, format_stream_name: {} ms, get_uds_and_original: {} ms, handle_timestamp: {} ms, before_write: {} ms, write_to_channel: {} ms",
+            total_time,
+            prepare_time,
+            flatten_time,
+            uds_time,
+            json_parse_time,
+            format_stream_name_time,
+            get_uds_and_original_time,
+            handle_timestamp_time,
+            before_write_time,
+            write_time
+        );
+    }
+    if before_write_time > 5000 {
+        log::info!("[bulk {trace_id}] original_line: {}", original_line);
+    }
 
     Ok(response_body)
 }

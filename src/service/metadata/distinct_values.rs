@@ -25,7 +25,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     get_config,
     meta::stream::StreamType,
-    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    utils::{json, schema::infer_json_schema_from_map},
     FxIndexMap,
 };
 use infra::{
@@ -42,10 +42,10 @@ use tokio::{
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service,
     service::{
-        ingestion,
+        db, ingestion,
         metadata::{Metadata, MetadataItem},
+        schema::get_schema_changes,
     },
 };
 
@@ -212,12 +212,13 @@ impl Metadata for DistinctValues {
             );
             // check for schema
             let db_schema =
-                infra::schema::get(&org_id, &distinct_stream_name, StreamType::Metadata).await?;
-            let mut _is_new = false;
-            if db_schema.fields().is_empty() {
-                _is_new = true;
+                infra::schema::get_cache(&org_id, &distinct_stream_name, StreamType::Metadata)
+                    .await?;
+            let mut is_new = false;
+            if db_schema.fields_map().is_empty() {
+                is_new = true;
                 let schema = default_schema.as_ref().clone();
-                if let Err(e) = service::db::schema::merge(
+                if let Err(e) = db::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -227,20 +228,18 @@ impl Metadata for DistinctValues {
                 .await
                 {
                     log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                    return Err(Error::Message(e.to_string()));
                 }
             }
 
             let inferred_schema =
                 infer_json_schema_from_map(items.iter().map(|(v, _)| v), stream_type)?;
-
-            let mut schema_key = db_schema.hash_key();
-            let mut schema = inferred_schema;
-            if _is_new || db_schema.fields.ne(&schema.fields) {
-                match service::db::schema::merge(
+            let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
+                match db::schema::merge(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
-                    &schema,
+                    &inferred_schema,
                     Some(timestamp),
                 )
                 .await
@@ -249,17 +248,16 @@ impl Metadata for DistinctValues {
                         log::error!(
                             "[DISTINCT_VALUES] error while updating schema for {org_id}/{stream_name} : {e}"
                         );
-                        schema_key = schema.hash_key()
+                        return Err(Error::Message(e.to_string()));
                     }
-                    Ok(None) => schema_key = schema.hash_key(),
-                    Ok(Some((s, _))) => {
-                        schema_key = s.hash_key();
-                        schema = s;
-                    }
+                    Ok(None) => db_schema.schema().clone(),
+                    Ok(Some((s, _))) => Arc::new(s),
                 }
-            }
+            } else {
+                db_schema.schema().clone()
+            };
+            let schema_key = db_schema.hash_key();
 
-            let schema = Arc::new(schema);
             let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
@@ -274,13 +272,13 @@ impl Metadata for DistinctValues {
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
-                    Some(&schema_key),
+                    Some(schema_key),
                 );
                 let data = json::Value::Object(data.clone());
                 let data_size = json::to_vec(&data).unwrap_or_default().len();
 
                 let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                    schema_key: schema_key.clone(),
+                    schema_key: schema_key.to_string(),
                     schema: schema.clone(),
                     records: vec![],
                     records_size: 0,
@@ -312,7 +310,7 @@ impl Metadata for DistinctValues {
                 };
 
                 // set ownership only in the first time
-                if _is_new && get_o2_config().openfga.enabled {
+                if is_new && get_o2_config().openfga.enabled {
                     set_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, distinct_stream_name),

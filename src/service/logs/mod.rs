@@ -195,6 +195,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
     org_id: &str,
@@ -203,6 +204,7 @@ async fn write_logs_by_stream(
     usage_type: UsageType,
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    trace_id: Option<&str>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -213,7 +215,8 @@ async fn write_logs_by_stream(
         }
 
         // write json data by stream
-        let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
+        let mut req_stats =
+            write_logs(thread_id, org_id, &stream_name, status, json_data, trace_id).await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time_took;
@@ -263,11 +266,15 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    trace_id: Option<&str>,
 ) -> Result<RequestStats> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
     let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
+
+    let _get_schema_start = std::time::Instant::now();
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
@@ -276,23 +283,15 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
-
+    let stream_settings = stream_schema.settings;
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Logs,
-            stream_name,
-        )
-        .await;
-        partition_keys = partition_det.partition_keys;
+        partition_keys = stream_settings.partition_keys;
         partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
+            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
+    let get_schema_time = _get_schema_start.elapsed().as_millis();
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -313,6 +312,7 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
+    let _check_schema_start = std::time::Instant::now();
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
     let (schema_evolution, infer_schema) = check_for_schema(
         org_id,
@@ -340,17 +340,21 @@ async fn write_logs(
         Some(schema) => Arc::new(schema.cloned_from(&latest_schema)),
         None => Arc::new(latest_schema),
     };
+    let check_schema_time = _check_schema_start.elapsed().as_millis();
 
     let mut distinct_values = Vec::with_capacity(16);
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
+    let mut validate_time = 0;
+    let mut get_distinct_time = 0;
     for (timestamp, mut record_val) in json_data {
         let doc_id = record_val
             .get("_id")
             .map(|v| v.as_str().unwrap().to_string());
 
         // validate record
+        let _validate_start = std::time::Instant::now();
         if let Some(delta) = schema_evolution.types_delta.as_ref() {
             let ret_val = if !schema_evolution.is_schema_changed {
                 cast_to_type(&mut record_val, delta.to_owned())
@@ -412,6 +416,7 @@ async fn write_logs(
                 continue;
             }
         }
+        validate_time += _validate_start.elapsed().as_millis();
 
         // start check for alert trigger
         if let Some(alerts) = cur_stream_alerts {
@@ -442,6 +447,7 @@ async fn write_logs(
         // end check for alert triggers
 
         // get distinct_value items
+        let _get_distinct_start = std::time::Instant::now();
         let mut map = Map::new();
         for field in DISTINCT_FIELDS.iter().chain(
             stream_settings
@@ -453,7 +459,6 @@ async fn write_logs(
                 map.insert(field.clone(), val.clone());
             }
         }
-
         if !map.is_empty() {
             // add distinct values
             distinct_values.push(MetadataItem::DistinctValues(DvItem {
@@ -462,6 +467,7 @@ async fn write_logs(
                 value: map,
             }));
         }
+        get_distinct_time += _get_distinct_start.elapsed().as_millis();
 
         // get hour key
         let hour_key = get_write_partition_key(
@@ -503,6 +509,7 @@ async fn write_logs(
     }
 
     // write data to wal
+    let _get_writer_start = std::time::Instant::now();
     let writer = ingester::get_writer(
         thread_id,
         org_id,
@@ -510,24 +517,35 @@ async fn write_logs(
         stream_name,
     )
     .await;
+    let get_writer_time = _get_writer_start.elapsed().as_millis();
+    let _write_start = std::time::Instant::now();
     let req_stats = write_file(
         &writer,
         stream_name,
         write_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await?;
+    let write_time = _write_start.elapsed().as_millis();
 
     // send distinct_values
+    let _write_distinct_start = std::time::Instant::now();
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
+    let write_distinct_time = _write_distinct_start.elapsed().as_millis();
 
     // only one trigger per request
     evaluate_trigger(triggers).await;
 
+    let process_time = start.elapsed().as_millis();
+    let slow_time_threshold = std::cmp::max(1, cfg.limit.http_slow_log_threshold as u128) * 1000;
+    if process_time > slow_time_threshold {
+        log::warn!("[write_logs traceid: {}] total: {} ms, get_schema: {} ms, check_schema: {} ms, validate: {} ms, get_distinct: {} ms, write_distinct: {} ms, get_writer: {} ms, write_to_channel: {} ms",
+         trace_id.unwrap_or(""), process_time, get_schema_time, check_schema_time, validate_time, get_distinct_time, write_distinct_time, get_writer_time, write_time);
+    }
     Ok(req_stats)
 }
 

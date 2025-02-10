@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -202,11 +202,22 @@ pub async fn save_enrichment_data(
     let writer = ingester::get_writer(
         0,
         org_id,
-        &StreamType::EnrichmentTables.to_string(),
+        StreamType::EnrichmentTables.as_str(),
         stream_name,
     )
     .await;
-    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await;
+    let mut req_stats =
+        match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
+            Ok(stats) => stats,
+            Err(e) => {
+                return Ok(
+                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        format!("Error writing enrichment table: {}", e),
+                    )),
+                );
+            }
+        };
 
     // notify update
     if stream_schema.has_fields {

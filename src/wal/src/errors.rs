@@ -83,4 +83,7 @@ pub enum Error {
         expected: u32,
         actual: u32,
     },
+    WriteQueueFull {
+        idx: usize,
+    },
 }

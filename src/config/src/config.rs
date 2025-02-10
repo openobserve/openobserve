@@ -685,6 +685,18 @@ pub struct Common {
     pub bloom_filter_ndv_ratio: u64,
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
+    #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_ENABLED",
+        default = false,
+        help = "Enable write queue for WAL"
+    )]
+    pub wal_write_queue_enabled: bool,
+    #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_FULL_REJECT",
+        default = false,
+        help = "Reject write when write queue is full"
+    )]
+    pub wal_write_queue_full_reject: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -1016,6 +1028,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
+    #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
+    pub wal_write_queue_size: usize,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -1095,10 +1109,22 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
     pub keep_alive_disabled: bool,
-    #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
-    pub http_slow_log_threshold: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
+    #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
+    pub http_slow_log_threshold: u64,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
+    pub circuit_breaker_watching_window: i64,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
+    pub circuit_breaker_reset_window_num: i64,
+    #[env_config(
+        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
+        default = 100,
+        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
+    )] // slow requests
+    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -2046,6 +2072,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // wal
     if cfg.limit.wal_write_buffer_size < 4096 {
         cfg.limit.wal_write_buffer_size = 4096;
+    }
+    if cfg.limit.wal_write_queue_size == 0 {
+        cfg.limit.wal_write_queue_size = 10000;
     }
 
     // check query settings

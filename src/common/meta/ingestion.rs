@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::web;
-use config::utils::json;
+use config::{meta::stream::StreamSettings, utils::json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -79,6 +79,7 @@ pub struct StreamSchemaChk {
     pub has_fields: bool,
     pub has_partition_keys: bool,
     pub has_metadata: bool,
+    pub settings: StreamSettings,
 }
 
 pub const INGESTION_EP: [&str; 14] = [
@@ -98,7 +99,7 @@ pub const INGESTION_EP: [&str; 14] = [
     "_json_arrow",
 ];
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct BulkResponse {
     pub took: u128,
     pub errors: bool,

@@ -320,7 +320,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
         .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)

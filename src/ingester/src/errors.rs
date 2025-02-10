@@ -106,5 +106,12 @@ pub enum Error {
     TokioMpscSendError {
         source: tokio::sync::mpsc::error::SendError<PathBuf>,
     },
+    TokioMpscSendEntriesError {
+        source: tokio::sync::mpsc::error::SendError<(
+            crate::WriterSignal,
+            Vec<crate::entry::Entry>,
+            bool,
+        )>,
+    },
     MemoryTableOverflowError {},
 }
