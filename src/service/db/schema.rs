@@ -197,6 +197,7 @@ pub async fn list(
         drop(r);
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
     }
+    drop(r);
 
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
