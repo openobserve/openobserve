@@ -5,6 +5,7 @@ use std::{
 
 use bytes::Bytes;
 use config::ider;
+#[cfg(feature = "profiling")]
 use pprof::protos::{Message, Profile};
 use proto::profiling::{
     continuous_profiling_service_server::ContinuousProfilingService, ProfileData, ProfileResponse,
@@ -12,7 +13,13 @@ use proto::profiling::{
 use serde::{Deserialize, Serialize};
 use tonic::{Request, Response, Status};
 
-use crate::{common::meta::ingestion::IngestionRequest, service::logs};
+use crate::{
+    common::meta::ingestion::IngestionRequest,
+    service::{
+        logs,
+        profiling::{ProfileMetadata, ProfileProcessor},
+    },
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FlameGraphNode {
@@ -32,7 +39,7 @@ pub struct FlameGraphData {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfilingData {
     pub raw_pprof: Vec<u8>,
-    pub metadata: ProfileMetadata,
+    pub metadata: ProfileMetadataOld,
     pub flame_data: FlameGraphData,
 }
 
@@ -43,7 +50,7 @@ impl ProfilingData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProfileMetadata {
+pub struct ProfileMetadataOld {
     pub instance_name: String,
     // TODO: Add more fields as needed:
     // - timestamp
@@ -196,61 +203,72 @@ impl ContinuousProfilingService for ContinuousProfilingServer {
         } = request.into_inner();
 
         // Parse metadata
-        let _metadata: ProfileMetadata = serde_json::from_str(&metadata)
+        let metadata: ProfileMetadata = serde_json::from_str(&metadata)
             .map_err(|e| Status::invalid_argument(format!("Invalid metadata: {}", e)))?;
 
-        // Process profile in a blocking task
-        let process_result = tokio::time::timeout(
-            Duration::from_secs(30),
-            tokio::task::spawn_blocking(move || {
-                Profile::decode(&raw_pprof[..]).map(|profile| {
-                    let flame_data = FlameGraphData::from_profile(&profile)
-                        .map_err(|e| prost::DecodeError::new(e))?;
-                    Ok::<(Vec<u8>, FlameGraphData), prost::DecodeError>((raw_pprof, flame_data))
-                })
-            }),
-        )
-        .await;
+        let mut processor = ProfileProcessor::new();
+        processor
+            .process_profile(&raw_pprof, metadata)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
 
-        match process_result {
-            Ok(Ok(Ok(Ok((raw_pprof, flame_data))))) => {
-                let profile_id = ider::uuid();
-                let profiling_data = ProfilingData {
-                    raw_pprof,
-                    metadata: _metadata,
-                    flame_data,
-                };
-
-                match logs::ingest::ingest(
-                    0,
-                    "default",
-                    PROFILING_STREAM,
-                    IngestionRequest::JSON(&Bytes::from(profiling_data.to_json().unwrap())),
-                    "root@example.com",
-                    None,
-                )
-                .await
-                {
-                    Ok(_) => Ok(Response::new(ProfileResponse { profile_id })),
-                    Err(e) => {
-                        log::error!("Failed to ingest profile: {}", e);
-                        Err(Status::internal("Failed to ingest profile"))
-                    }
-                }
-            }
-            Ok(Ok(Ok(Err(e)))) => {
-                log::error!("Failed to process profile: {}", e);
-                Err(Status::internal("Failed to process profile"))
-            }
-            Ok(Ok(Err(e))) => {
-                log::error!("Failed to decode profile: {}", e);
-                Err(Status::internal("Failed to decode profile"))
-            }
-            Ok(Err(e)) => {
-                log::error!("Profile processing failed: {}", e);
-                Err(Status::internal("Profile processing failed"))
-            }
-            Err(_) => Err(Status::deadline_exceeded("Profile processing timed out")),
-        }
+        Ok(Response::new(ProfileResponse {
+            profile_id: ider::uuid(),
+        }))
     }
+
+    //     // Process profile in a blocking task
+    //     let process_result = tokio::time::timeout(
+    //         Duration::from_secs(30),
+    //         tokio::task::spawn_blocking(move || {
+    //             Profile::decode(&raw_pprof[..]).map(|profile| {
+    //                 let flame_data = FlameGraphData::from_profile(&profile)
+    //                     .map_err(|e| prost::DecodeError::new(e))?;
+    //                 Ok::<(Vec<u8>, FlameGraphData), prost::DecodeError>((raw_pprof, flame_data))
+    //             })
+    //         }),
+    //     )
+    //     .await;
+
+    //     match process_result {
+    //         Ok(Ok(Ok(Ok((raw_pprof, flame_data))))) => {
+    //             let profile_id = ider::uuid();
+    //             let profiling_data = ProfilingData {
+    //                 raw_pprof,
+    //                 metadata: _metadata,
+    //                 flame_data,
+    //             };
+
+    //             match logs::ingest::ingest(
+    //                 0,
+    //                 "default",
+    //                 PROFILING_STREAM,
+    //                 IngestionRequest::JSON(&Bytes::from(profiling_data.to_json().unwrap())),
+    //                 "root@example.com",
+    //                 None,
+    //             )
+    //             .await
+    //             {
+    //                 Ok(_) => Ok(Response::new(ProfileResponse { profile_id })),
+    //                 Err(e) => {
+    //                     log::error!("Failed to ingest profile: {}", e);
+    //                     Err(Status::internal("Failed to ingest profile"))
+    //                 }
+    //             }
+    //         }
+    //         Ok(Ok(Ok(Err(e)))) => {
+    //             log::error!("Failed to process profile: {}", e);
+    //             Err(Status::internal("Failed to process profile"))
+    //         }
+    //         Ok(Ok(Err(e))) => {
+    //             log::error!("Failed to decode profile: {}", e);
+    //             Err(Status::internal("Failed to decode profile"))
+    //         }
+    //         Ok(Err(e)) => {
+    //             log::error!("Profile processing failed: {}", e);
+    //             Err(Status::internal("Profile processing failed"))
+    //         }
+    //         Err(_) => Err(Status::deadline_exceeded("Profile processing timed out")),
+    //     }
+    // }
 }

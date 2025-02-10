@@ -124,17 +124,17 @@ async fn main() -> Result<(), anyhow::Error> {
         .init();
 
     // setup profiling
-    #[cfg(feature = "profiling")]
-    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
-        let guard = pprof::ProfilerGuardBuilder::default()
-            .frequency(1000)
-            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-            .build()
-            .unwrap();
-        Some(guard)
-    } else {
-        None
-    };
+    // #[cfg(feature = "profiling")]
+    // let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
+    //     let guard = pprof::ProfilerGuardBuilder::default()
+    //         .frequency(1000)
+    //         .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+    //         .build()
+    //         .unwrap();
+    //     Some(guard)
+    // } else {
+    //     None
+    // };
 
     // setup pyroscope
     #[cfg(feature = "pyroscope")]
@@ -365,12 +365,13 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     #[cfg(feature = "profiling")]
-    let profiling_task = if let Some(guard) = pprof_guard {
+    {
+        // let profiling_task = if let Some(guard) = pprof_guard {
         let interval_secs = cfg.profiling.pprof_interval;
         let pprof_endpoint = cfg.profiling.pprof_endpoint.clone();
         let auth_token = cfg.grpc.internal_grpc_token.clone();
 
-        Some(tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 let mut interval =
@@ -428,6 +429,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 loop {
                     interval.tick().await;
 
+                    // Create a new guard with basic settings
+                    let guard = pprof::ProfilerGuardBuilder::default()
+                        .frequency(100)  // Sample 100 times per second
+                        .build()
+                        .unwrap();
+
+                    // Sample for 10 seconds
+                    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
                     if let Ok(report) = guard.report().build() {
                         if let Ok(profile) = report.pprof() {
                             let mut content = Vec::new();
@@ -436,7 +446,8 @@ async fn main() -> Result<(), anyhow::Error> {
                                 let request = ProfileData {
                                     raw_pprof: content,
                                     metadata: serde_json::json!({
-                                        "instance_name": "default"
+                                        "instance_id": "default",
+                                        "_timestamp": chrono::Utc::now().timestamp_micros()
                                     })
                                     .to_string(),
                                 };
@@ -462,10 +473,11 @@ async fn main() -> Result<(), anyhow::Error> {
                     }
                 }
             })
-        }))
-    } else {
-        None
-    };
+        });
+        // } else {
+        //     None
+        // };
+    }
 
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
@@ -504,10 +516,10 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // stop profiling
-    #[cfg(feature = "profiling")]
-    if let Some(task) = profiling_task {
-        task.abort();
-    }
+    // #[cfg(feature = "profiling")]
+    // if let Some(task) = profiling_task {
+    //     task.abort();
+    // }
 
     // stop pyroscope
     #[cfg(feature = "pyroscope")]
@@ -569,7 +581,9 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip);
     let profiling_svc = ContinuousProfilingServiceServer::new(ContinuousProfilingServer::default())
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
     log::info!(
         "starting gRPC server {} at {}",
