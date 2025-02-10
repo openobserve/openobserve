@@ -48,7 +48,7 @@ codegen-units = 4
 [dependencies]
 actix-cors = "0.7"
 actix-http = "3.9"
-actix-multipart = { version = "0.6", features = ["derive"] }
+actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
