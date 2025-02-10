@@ -1,12 +1,8 @@
 use actix_web::{post, web, Error, HttpRequest, HttpResponse};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
-        infra::config::get_config as get_o2_config,
-    },
-    dex::service::auth::get_dex_jwks,
-};
+use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol};
 
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;
@@ -17,11 +13,9 @@ use crate::{common::utils::jwt::verify_decode_token, handler::http::auth::jwt::p
 #[post("/token")]
 pub async fn exchange_token(
     req: HttpRequest,
-    body: web::Json<o2_enterprise::enterprise::dex::meta::auth::TokenExchangeRequest>,
+    body: web::Json<o2_dex::meta::auth::TokenExchangeRequest>,
 ) -> Result<HttpResponse, Error> {
-    let result =
-        o2_enterprise::enterprise::dex::service::token_exchange::exchange_token(&body.into_inner())
-            .await;
+    let result = o2_dex::service::token_exchange::exchange_token(&body.into_inner()).await;
 
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
@@ -41,7 +35,7 @@ pub async fn exchange_token(
             let token_ver = verify_decode_token(
                 &response.access_token,
                 &keys,
-                &get_o2_config().dex.client_id,
+                &get_dex_config().client_id,
                 true,
                 false,
             )

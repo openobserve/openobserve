@@ -233,7 +233,7 @@ pub async fn search_multi(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+            use o2_openfga::meta::mapping::OFGA_MODELS;
 
             use crate::{
                 common::utils::auth::{is_root_user, AuthExtractor},

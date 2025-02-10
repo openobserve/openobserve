@@ -390,7 +390,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {

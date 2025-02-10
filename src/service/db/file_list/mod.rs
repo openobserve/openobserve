@@ -15,12 +15,15 @@
 
 use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
 use dashmap::{DashMap, DashSet};
-use infra::{cache, cache::stats, file_list, file_list as infra_file_list};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::infra::config::get_config as get_o2_config,
+    super_cluster::stream::client::super_cluster_cache_stats,
+};
 use once_cell::sync::Lazy;
 
 pub mod broadcast;
 pub mod local;
-use crate::service::db;
 
 pub static DEPULICATE_FILES: Lazy<RwHashSet<String>> =
     Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
@@ -43,7 +46,7 @@ pub async fn progress(
     delete: bool,
 ) -> Result<(), anyhow::Error> {
     if delete {
-        if let Err(e) = file_list::remove(key).await {
+        if let Err(e) = infra::file_list::remove(key).await {
             log::error!(
                 "service:db:file_list: delete {}, set_file_to_cache error: {}",
                 key,
@@ -51,7 +54,7 @@ pub async fn progress(
             );
         }
     } else {
-        if let Err(e) = file_list::add(key, data.unwrap()).await {
+        if let Err(e) = infra::file_list::add(key, data.unwrap()).await {
             log::error!(
                 "service:db:file_list: add {}, set_file_to_cache error: {}",
                 key,
@@ -60,7 +63,7 @@ pub async fn progress(
         }
         // update stream stats realtime
         if config::get_config().common.local_mode {
-            if let Err(e) = cache::stats::incr_stream_stats(key, data.unwrap()) {
+            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data.unwrap()) {
                 log::error!(
                     "service:db:file_list: add {}, incr_stream_stats error: {}",
                     key,
@@ -74,9 +77,29 @@ pub async fn progress(
 }
 
 pub async fn cache_stats() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        if let Err(err) = super_cluster_cache_stats().await {
+            log::error!("super_cluster_cache_stats error: {err}")
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    {
+        // single cluster
+        if let Err(err) = single_cache_stats().await {
+            log::error!("single_cache_stats error: {err}")
+        }
+    }
+
+    Ok(())
+}
+#[cfg(not(feature = "enterprise"))]
+async fn single_cache_stats() -> Result<(), anyhow::Error> {
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
+        let ret = infra::file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {
             log::error!("Load stream stats error: {}", ret.err().unwrap());
             continue;
@@ -86,7 +109,7 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
             let org_id = columns[0];
             let stream_type = columns[1];
             let stream_name = columns[2];
-            stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
+            infra::cache::stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }

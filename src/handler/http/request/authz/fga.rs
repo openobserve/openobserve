@@ -16,7 +16,7 @@ use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::dex::meta::auth::RoleRequest;
+use o2_dex::meta::auth::RoleRequest;
 
 use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
@@ -41,12 +41,7 @@ pub async fn create_role(
         ));
     }
 
-    match o2_enterprise::enterprise::openfga::authorizer::roles::create_role(
-        &user_req.role,
-        &org_id,
-    )
-    .await
-    {
+    match o2_openfga::authorizer::roles::create_role(&user_req.role, &org_id).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => {
             let err = err.to_string();
@@ -73,9 +68,7 @@ pub async fn create_role(
 pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::roles::delete_role(&org_id, &role_name)
-        .await
-    {
+    match o2_openfga::authorizer::roles::delete_role(&org_id, &role_name).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -126,9 +119,7 @@ pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<Ht
         permitted = Some(local_permitted);
     }
 
-    match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(&org_id, permitted)
-        .await
-    {
+    match o2_openfga::authorizer::roles::get_all_roles(&org_id, permitted).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -152,7 +143,7 @@ pub async fn update_role(
     let (org_id, role_id) = path.into_inner();
     let update_role = update_role.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::roles::update_role(
+    match o2_openfga::authorizer::roles::update_role(
         &org_id,
         &role_id,
         update_role.add,
@@ -182,11 +173,7 @@ pub async fn get_role_permissions(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id, resource) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::roles::get_role_permissions(
-        &org_id, &role_id, &resource,
-    )
-    .await
-    {
+    match o2_openfga::authorizer::roles::get_role_permissions(&org_id, &role_id, &resource).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -204,11 +191,7 @@ pub async fn get_role_permissions(
 #[get("/{org_id}/roles/{role_id}/users")]
 pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_id) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::roles::get_users_with_role(
-        &org_id, &role_id,
-    )
-    .await
-    {
+    match o2_openfga::authorizer::roles::get_users_with_role(&org_id, &role_id).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -272,7 +255,7 @@ pub async fn create_group(
     let mut user_grp = user_group.into_inner();
     user_grp.name = user_grp.name.trim().to_lowercase();
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::create_group(
+    match o2_openfga::authorizer::groups::create_group(
         &org_id,
         &user_grp.name,
         user_grp.users.unwrap_or_default(),
@@ -302,7 +285,7 @@ pub async fn update_group(
     let (org_id, group_name) = path.into_inner();
     let user_grp = user_group.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::update_group(
+    match o2_openfga::authorizer::groups::update_group(
         &org_id,
         &group_name,
         user_grp.add_users,
@@ -368,9 +351,7 @@ pub async fn get_groups(path: web::Path<String>, req: HttpRequest) -> Result<Htt
         permitted = Some(local_permitted);
     }
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::get_all_groups(&org_id, permitted)
-        .await
-    {
+    match o2_openfga::authorizer::groups::get_all_groups(&org_id, permitted).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -387,12 +368,7 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
 pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, group_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::get_group_details(
-        &org_id,
-        &group_name,
-    )
-    .await
-    {
+    match o2_openfga::authorizer::groups::get_group_details(&org_id, &group_name).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }
@@ -407,10 +383,10 @@ pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<Htt
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    use o2_enterprise::enterprise::openfga::meta::mapping::Resource;
+    use o2_openfga::meta::mapping::Resource;
     #[cfg(feature = "cloud")]
-    use o2_enterprise::enterprise::openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
-    let resources = o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+    use o2_openfga::meta::mapping::NON_CLOUD_RESOURCE_KEYS;
+    let resources = o2_openfga::meta::mapping::OFGA_MODELS
         .values()
         .collect::<Vec<&Resource>>();
     #[cfg(feature = "cloud")]
@@ -432,9 +408,7 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, group_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::groups::delete_group(&org_id, &group_name)
-        .await
-    {
+    match o2_openfga::authorizer::groups::delete_group(&org_id, &group_name).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(MetaHttpResponse::internal_error(err)),
     }

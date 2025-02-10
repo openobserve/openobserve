@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
-use config::{
-    meta::{
-        alerts::alert::{Alert, ListAlertsParams},
-        folder::Folder,
-        stream::StreamType,
-    },
-    utils::json,
+use config::meta::{
+    alerts::alert::{Alert, ListAlertsParams},
+    folder::Folder,
+    stream::StreamType,
 };
 use infra::{
     cluster_coordinator::alerts as cluster,
@@ -327,32 +323,27 @@ async fn put_into_cache(
     stream_type: StreamType,
     stream_name: String,
     alert_name: String,
-    value: Option<Bytes>,
 ) -> Result<(), anyhow::Error> {
-    let item_value: Alert = if config::get_config().common.meta_store_external {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        match table::get_by_name(
-            client,
-            &org,
-            "default",
-            stream_type,
-            &stream_name,
-            &alert_name,
-        )
-        .await
-        {
-            Ok(Some(val)) => val.1,
-            Ok(None) => {
-                log::error!("Tried to get alert that does not exist in DB");
-                return Ok(());
-            }
-            Err(e) => {
-                log::error!("Error getting value: {}", e);
-                return Ok(());
-            }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let item_value: Alert = match table::get_by_name(
+        client,
+        &org,
+        "default",
+        stream_type,
+        &stream_name,
+        &alert_name,
+    )
+    .await
+    {
+        Ok(Some(val)) => val.1,
+        Ok(None) => {
+            log::error!("Tried to get alert that does not exist in DB");
+            return Ok(());
         }
-    } else {
-        json::from_slice(&value.unwrap()).unwrap()
+        Err(e) => {
+            log::error!("Error getting value: {}", e);
+            return Ok(());
+        }
     };
     let mut cacher = STREAM_ALERTS.write().await;
     let stream_key = cache_stream_key(&org, stream_type, &stream_name);

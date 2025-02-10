@@ -23,9 +23,9 @@ use config::{
 };
 use futures::future::{ready, Ready};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -134,7 +134,7 @@ pub async fn delete_org_tuples(_org_id: &str) {}
 pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_enterprise::enterprise::openfga::authorizer::roles::get_role(format!(
+    let role = o2_openfga::authorizer::roles::get_role(format!(
         "{}",
         role.base_role
     ));
@@ -148,8 +148,8 @@ pub fn get_role(_role: &UserOrgRole) -> UserRole {
 
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_o2_config().openfga.enabled {
-        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    if get_openfga_config().enabled {
+        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
@@ -184,8 +184,8 @@ pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_o2_config().openfga.enabled {
-        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    if get_openfga_config().enabled {
+        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
         let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
         let parent_type = if obj.parent_type.is_empty() {
@@ -242,7 +242,7 @@ impl FromRequest for AuthExtractor {
 
         use actix_web::web;
         use config::meta::stream::StreamType;
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
@@ -414,6 +414,7 @@ impl FromRequest for AuthExtractor {
                 )
             } else if method.eq("GET")
                 && (path_columns[1].starts_with("dashboards")
+                    || path_columns[1].starts_with("folders")
                     || path_columns[1].starts_with("actions"))
             {
                 format!(
@@ -484,6 +485,19 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS
                         .get(path_columns[1])
                         .map_or(path_columns[1], |model| model.key),
+                    path_columns[3]
+                )
+            } else if method.eq("GET")
+                && (path_columns[2].eq("templates")
+                    || path_columns[2].eq("destinations")
+                    || path_columns[2].eq("alerts"))
+            {
+                // To access templates, you need GET permission on the template
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
                     path_columns[3]
                 )
             } else {

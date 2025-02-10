@@ -77,7 +77,8 @@
     "cancelMessage": "Are you sure you want to cancel the changes?",
     "back": "Back",
     "save": "Save",
-    "update": "Update"
+    "update": "Update",
+    "favourite": "Favorite"
   },
   "search": {
     "metrics": "Metrics",
