@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -231,6 +231,23 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
         MetaStore::Nats => nats::update_local_node(node).await,
         _ => etcd::update_local_node(node).await,
     }
+}
+
+pub async fn set_unschedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = false;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+pub async fn set_schedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = true;
+        update_local_node(&node).await?;
+    };
+    Ok(())
 }
 
 pub async fn leave() -> Result<()> {

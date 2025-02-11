@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,8 +28,8 @@ use config::{
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    get_settings, unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR,
-    STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST,
+    STREAM_SETTINGS,
 };
 use serde_json::{Map, Value};
 
@@ -108,7 +108,7 @@ pub async fn check_for_schema(
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
-            let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+            let stream_setting = unwrap_stream_settings(schema.schema());
             let (defined_schema_fields, need_original) = match stream_setting {
                 Some(s) => (
                     s.defined_schema_fields.unwrap_or_default(),
@@ -425,7 +425,7 @@ pub fn generate_schema_for_defined_schema_fields(
     ))
 }
 
-fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -483,23 +483,21 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get(org_id, stream_name, stream_type)
+            let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let schema = Arc::new(schema);
-            stream_schema_map.insert(
-                stream_name.to_string(),
-                SchemaCache::new_from_arc(schema.clone()),
-            );
-            schema
+            let db_schema = schema_cache.schema().clone();
+            stream_schema_map.insert(stream_name.to_string(), schema_cache);
+            db_schema
         }
     };
     if !schema.fields().is_empty() {
         schema_chk.has_fields = true;
     }
-    if let Some(value) = schema.metadata().get("settings") {
-        let settings: json::Value = json::from_slice(value.as_bytes()).unwrap();
-        if settings.get("partition_keys").is_some() {
+
+    let settings = unwrap_stream_settings(&schema);
+    if let Some(stream_setting) = settings {
+        if !stream_setting.partition_keys.is_empty() {
             schema_chk.has_partition_keys = true;
         }
     }
