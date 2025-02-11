@@ -26,6 +26,7 @@ use std::{
 };
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
@@ -622,6 +623,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                             cfg.limit.http_slow_log_threshold,
                             cfg.limit.circuit_breaker_enabled,
                         ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -639,6 +641,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         cfg.limit.http_slow_log_threshold,
                         cfg.limit.circuit_breaker_enabled,
                     ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -730,6 +733,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                             cfg.limit.http_slow_log_threshold,
                             cfg.limit.circuit_breaker_enabled,
                         ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -747,6 +751,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         cfg.limit.http_slow_log_threshold,
                         cfg.limit.circuit_breaker_enabled,
                     ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)

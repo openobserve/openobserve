@@ -51,7 +51,7 @@ actix-http = "3.9"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.20"
+actix-web-lab = "0.21"
 actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [

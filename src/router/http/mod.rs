@@ -280,7 +280,9 @@ async fn default_proxy(
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
 
@@ -309,7 +311,9 @@ async fn default_proxy(
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
     Ok(new_resp.body(body))
@@ -382,7 +386,9 @@ async fn proxy_querier_by_body(
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
 
@@ -411,7 +417,9 @@ async fn proxy_querier_by_body(
                 e,
                 start.elapsed().as_millis()
             );
-            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+            return Ok(HttpResponse::ServiceUnavailable()
+                .force_close()
+                .body(e.to_string()));
         }
     };
     Ok(new_resp.body(body))
