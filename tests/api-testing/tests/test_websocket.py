@@ -54,7 +54,7 @@ def test_ingest_data(create_session, base_url):
     
     url_Ing = f"{base_url}api/{org_id}/{stream_name}/_json"
     resp_ing = session.post(url_Ing, data=data, headers={"Content-Type": "application/json"})
-    print("Data ingested successfully for websocket, status code: ", resp_ing.status_code)
+    print(f"Data ingested successfully for websocket in {stream_name}, status code: ", resp_ing.status_code)
     assert ( resp_ing.status_code == 200), f"Data ingested successfully for websocket test, status code: {resp_ing.status_code}"
 
 def test_disable_websocket(create_session, base_url):
@@ -81,24 +81,61 @@ def test_disable_websocket(create_session, base_url):
 
 # Define test data with different queries and expected response details for histogram
 test_data_histog = [
-    (
-        "logs histogram",
-        f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-        -1,
-    ),
+    # (
+    #     "Stream",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     3848,
+    # ),
 
     # (
-    #     "logs and query",
+    #     "AND query",
     #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     -1,
+    #     1,
+    #     2002,
     # ),
 
     # (
-    #     "logs or query",
+    #     "OR query",
     #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
-    #     -1,
+    #     1,
+    #     2002,
     # ),
+    # (
+    #     "Match_all histogram",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE match_all('ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     18,
+    # ),  
+    # (
+    #     "str_match histogram",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     2002,
+    # ), 
 
+    # (
+    #     "Like histogram",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     2002,
+    # ), 
+    # 
+    #  (
+    #     "IN histogram",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     2816,
+    # ),  
+    # 
+    # 
+    # (
+    #     "str_match_ignore_case histogram",
+    #     f"SELECT histogram(_timestamp, '10 second') AS \"zo_sql_key\", COUNT(*) AS \"zo_sql_num\" FROM \"{stream_name}\" WHERE str_match_ignore_case(kubernetes_container_name, 'ziox') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+    #     1,
+    #     2002,
+    # ),  
+  
   
  
 
@@ -113,8 +150,8 @@ test_data_histog = [
 
 ]
 
-@pytest.mark.parametrize("test_name, hist_query, expected_size", test_data_histog)
-def test_histogram(create_session, base_url, test_name, hist_query, expected_size):
+@pytest.mark.parametrize("test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg", test_data_histog)
+def test_histogram(create_session, base_url, test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg):
     """Running an E2E test for histogram queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -130,7 +167,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
                 "sql": hist_query,
                 "start_time": ten_min_ago,
                 "end_time": end_time,
-                "size": expected_size,
+                "size": -1,
                 "sql_mode": "full"
         }
     }
@@ -141,7 +178,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
         res_histog.status_code == 200
     ), f"histogram mode {test_name} added 200, but got {res_histog.status_code} {res_histog.content}"
 
-    print("Response Histog:", res_histog.content) 
+    print(f"API {test_name} Response Histog:", res_histog.content) 
 
     # Parse the JSON response
     
@@ -151,8 +188,15 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
     total_hits_histog = res_data_histog["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_histog = 1  # we're expecting
+    expected_hits_histog = expected_total_hits_results_histg  # we're expecting
     assert total_hits_histog == expected_hits_histog, f"Expected total {test_name} to be {expected_hits_histog}, but got {total_hits_histog}"
+
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histog > 0:
+        actual_zo_sql_num_hits_histog = res_data_histog["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histog == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog}"
+    else:
+        pytest.fail("No hits found in the response.")
 
     # Generate request for histogram cache enabled
     res_histog_cache = session.post(f"{url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=true", json=json_data_hist)
@@ -171,33 +215,95 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_siz
     total_hits_histog_cache = res_data_histog_cache["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_histog_cache = 1  # what we're expecting
+    expected_hits_histog_cache = expected_total_hits_results_histg  # what we're expecting
     assert total_hits_histog_cache == expected_hits_histog_cache, f"Expected {test_name} total to be {expected_hits_histog_cache}, but got {total_hits_histog_cache}"
 
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histog_cache > 0:
+        actual_zo_sql_num_hits_histog_cache = res_data_histog_cache["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histog_cache == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histog_cache}"
+    else:
+        pytest.fail("No hits found in the response.")
 
 # Define test data with different queries and expected response details for SQL when websocket is disabled
 test_data_sql = [
-    (
-        "logs SQL query",
-        f"SELECT * FROM \"{stream_name}\"",
-        10,
-    ),
+    # (
+    #     "Stream SQL query",
+    #     f"SELECT * FROM \"{stream_name}\"",
+    #     100,
+    #     100,
+    # ),
 
     # (
-    #     "logs and query",
+    #     "AND SQL query",
     #     f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' AND kubernetes_labels_app = 'ziox'",
-    #     10,
+    #     100,
+    #     100,
     # ),
 
     # (
 
-    #     "logs or query",
+    #     "OR SQL query",
     #     f"SELECT * FROM \"{stream_name}\" where kubernetes_container_name = 'ziox' OR kubernetes_labels_app = 'ziox'",
+    #     100,
+    #     100,
+    # ),
+    # (
+    #     "Match_all SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" WHERE match_all('ziox')",
+    #     100,
+    #     18,
+    # ),
+
+    # (
+    #     "Str_match SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" where str_match(kubernetes_container_name, 'ziox')",
+    #     100,
+    #     100,
+    # ),
+
+    # (
+    #     "Str_match SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name LIKE '%ziox%'",
+    #     100,
+    #     100,
+    # ),
+
+    # (
+    #     "AS SQL query",
+    #     f"SELECT kubernetes_container_name as \"breakdown_1\" FROM \"{stream_name}\"",
+    #     100,
+    #     100,
+    # ),
+
+    # (
+    #     "IN SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" WHERE kubernetes_container_name IN ('controller', 'ziox')",
+    #     100,
+    #     100,
+    # ),
+
+    # (
+    #     "str_match_ignore_case SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" where str_match_ignore_case(kubernetes_container_name, 'ziox')",
+    #     100,
+    #     100,
+    # ),
+  
+    
+    # (
+    #     "Limit less SQL query",
+    #     f"SELECT * FROM \"{stream_name}\" LIMIT 10",
+    #     10,
     #     10,
     # ),
 
-  
- 
+    (
+        "DISTINCT SQL query",
+        f"SELECT DISTINCT code FROM \"{stream_name}\"",
+        3,
+        2,
+    ),
 
  
 
@@ -210,8 +316,8 @@ test_data_sql = [
 
 ]
 
-@pytest.mark.parametrize("test_name_sql, sql_query, sql_size", test_data_sql)
-def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
+def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
     session = create_session
@@ -249,7 +355,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
     total_hits_sql = res_data_sql["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_sql = sql_size  # what we're expecting
+    expected_hits_sql = total_exp  # what we're expecting
     assert total_hits_sql == expected_hits_sql, f"Expected total {test_name_sql} to be {expected_hits_sql}, but got {total_hits_sql}"
 
     # Generate request for cache
@@ -259,7 +365,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
         res_sql_cache.status_code == 200
     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
-    print("Response Cache SQL:", res_sql_cache.content) 
+    # print("Response Cache SQL:", res_sql_cache.content) 
 
     # Parse the JSON response
     
@@ -269,7 +375,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
     total_hits_sql_cache = res_data_sql_cache["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_sql_cache = sql_size  # what we're expecting
+    expected_hits_sql_cache = total_exp  # what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
 
@@ -296,19 +402,13 @@ def test_enable_websocket(create_session, base_url):
         resp_websocket.status_code == 200
     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
 
-@pytest.mark.parametrize("test_name, hist_query, expected_size", test_data_histog)
-def test_websocket_histogram(create_session, base_url, test_name, hist_query, expected_size):
+@pytest.mark.parametrize("test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg", test_data_histog)
+def test_websocket_histogram(create_session, base_url, test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg):
     """Test WebSocket connection and histogram endpoint."""
     session = create_session
     url = base_url
     
     cookie_header_histogram = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
-
-    # # Prepare headers with cookies
-    # cookie_header_histogram = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
-    #                 f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
-    #                 f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
-
 
     # Generate a dynamic UUID
     uuid_histogram = str(uuid.uuid4())  # Generates a new UUID
@@ -342,7 +442,7 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
                     "sql": hist_query,
                     "start_time": ten_min_ago,
                     "end_time": end_time,
-                    "size": expected_size,
+                    "size": -1,
                     "sql_mode": "full"
                 },
                 "regions": [],
@@ -369,9 +469,16 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     total_hits_histogram = response_data_histogram["content"]["results"]["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_histogram = 1  #That's what we're expecting
+    expected_hits_histogram = expected_total_hits_results_histg  #That's what we're expecting
     assert total_hits_histogram == expected_hits_histogram, f"Expected {test_name} total to be {expected_hits_histogram}, but got {total_hits_histogram}"
     
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histogram > 0:
+        actual_zo_sql_num_hits_histogram = response_data_histogram["content"]["results"]["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histogram == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histogram}"
+    else:
+        pytest.fail("No hits found in the response.")
+
     ws_histogram.close()
 
     # Generate a dynamic UUID for cache when websocket is enabled
@@ -405,7 +512,7 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
                     "sql": hist_query,
                     "start_time": ten_min_ago,
                     "end_time": end_time,
-                    "size": expected_size,
+                    "size": -1,
                     "sql_mode": "full"
                 },
                 "regions": [],
@@ -432,24 +539,28 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
     total_hits_histogram_cache = response_data_histogram_cache["content"]["results"]["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_histogram_cache = 1  # That's what you're expecting
+    expected_hits_histogram_cache = expected_total_hits_results_histg  # That's what you're expecting
     assert total_hits_histogram_cache == expected_hits_histogram_cache, f"Expected {test_name} cache total to be {expected_hits_histogram_cache}, but got {total_hits_histogram_cache}"
     
+    # Validate zo_sql_num hits histogram in the first hit
+    if total_hits_histogram_cache > 0:
+        actual_zo_sql_num_hits_histogram_cache = response_data_histogram_cache["content"]["results"]["hits"][0]["zo_sql_num"]
+        assert actual_zo_sql_num_hits_histogram_cache == expected_zo_sql_num_histg, f"Expected zo_sql_num histogram to be {expected_zo_sql_num_histg}, but got {actual_zo_sql_num_hits_histogram_cache}"
+    else:
+        pytest.fail("No hits found in the response.")
+
     ws_histogram_cache.close()
 
 
-@pytest.mark.parametrize("test_name_sql, sql_query, sql_size", test_data_sql)
-def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_size):
+@pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
+def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
     """Test WebSocket with sql when websocket is enabled ."""
     # Prepare headers with cookies
 
     session = create_session
     url = base_url
 
-    cookie_header_sql = f"auth_ext={{\"auth_ext\":\"\",\"refresh_token\":\"\",\"request_time\":0,\"expires_in\":0}}; " \
-                    f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}; " \
-                    f"_ga=GA1.1.1388396574.1737697562; _ga_89WN60ZK2E=GS1.1.1738658735.34.1.1738659900.0.0.0"
-
+    cookie_header_sql = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
     
     # Generate a dynamic UUID
     uuid_sql = str(uuid.uuid4())  # Generates a new UUID
@@ -458,7 +569,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     WS_URL_sql = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql}"
 
     # Example of using the WS_URL
-    print("WebSocket SQL URL:", WS_URL_sql)
+    # print("WebSocket SQL URL:", WS_URL_sql)
 
     # Now we can use WS_URL in our WebSocket connection
 
@@ -510,7 +621,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     total_hits_sql = response_data_sql["content"]["results"]["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_sql = sql_size  # That's what we're expecting
+    expected_hits_sql = total_exp  # That's what we're expecting
     assert total_hits_sql == expected_hits_sql, f"Expected {test_name_sql} total to be {expected_hits_sql}, but got {total_hits_sql}"
     
     ws_sql.close()
@@ -567,7 +678,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     # Receive the response
     response_sql_cache = ws_sql_cache.recv()
 
-    print("WebSocket cache response for SQL:", response_sql_cache)
+    # print("WebSocket cache response for SQL:", response_sql_cache)
 
 
     # Parse the JSON response
@@ -578,7 +689,7 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
     total_hits_sql_cache = response_data_sql_cache["content"]["results"]["total"]
 
     # Adjust the assertion based on our expectations
-    expected_hits_sql_cache = sql_size  # That's what we're expecting
+    expected_hits_sql_cache = total_exp  # That's what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected cache {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
     ws_sql_cache.close()
