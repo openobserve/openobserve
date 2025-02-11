@@ -300,47 +300,27 @@ pub async fn handle_search_request(
     Ok(())
 }
 
-async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
+async fn do_search(
+    req: &SearchEventReq,
+    org_id: &str,
+    user_id: &str,
+    use_cache: bool,
+) -> Result<Response, Error> {
     let span = tracing::info_span!(
         "src::handler::http::request::websocket::search::do_search",
         trace_id = %req.trace_id,
         org_id = %org_id,
     );
 
-    // while using search directly
-    // decode the vrl i.e. query_fn
     let mut req = req.clone();
-    if let Some(ref vrl) = req.payload.query.query_fn {
-        match base64::decode_url(vrl) {
-            Ok(vrl) => {
-                let vrl = vrl.trim().to_owned();
-                if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = format!("{vrl}\n.");
-                    req.payload.query.query_fn = Some(vrl);
-                } else if vrl.is_empty() || vrl.eq(".") {
-                    // In case the vrl contains only ".", no need to save it
-                    req.payload.query.query_fn = None;
-                } else {
-                    req.payload.query.query_fn = Some(vrl);
-                }
-            }
-            Err(e) => {
-                log::error!(
-                    "[WS_SEARCH] trace_id: {}, Error decoding vrl: {:?}",
-                    req.trace_id,
-                    e
-                );
-                return Err(Error::Message(e.to_string()));
-            }
-        }
-    }
-
-    let res = SearchService::search(
+    req.payload.use_cache = Some(use_cache);
+    let res = SearchService::cache::search(
         &req.trace_id,
         org_id,
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
+        "".to_string(),
     )
     .instrument(span)
     .await;
@@ -595,7 +575,8 @@ async fn process_delta(
             req.payload.query.size -= *curr_res_size;
         }
 
-        let mut search_res = do_search(&req, org_id, user_id).await?;
+        // use cache for delta search
+        let mut search_res = do_search(&req, org_id, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -891,7 +872,8 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        let mut search_res = do_search(&req, org_id, user_id).await?;
+        // do not use cache for partitioned search
+        let mut search_res = do_search(&req, org_id, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
