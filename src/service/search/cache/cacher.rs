@@ -686,7 +686,9 @@ fn calculate_deltas_multi(
         })
     {
         deltas.push(QueryDelta {
-            delta_start_time: current_end_time,
+            // Adding histogram interval to the current end time to ensure the next query
+            // fetches the data after the last cache result timestamp, thereby avoiding duplicates
+            delta_start_time: current_end_time + histogram_interval.abs(),
             delta_end_time: end_time,
             delta_removed_hits: false,
         });

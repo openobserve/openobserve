@@ -24,6 +24,8 @@ export interface Query {
 export interface SearchRequestPayload {
   query: QueryPayload;
   aggs?: HistogramQueryPayload;
+  regions?: string[];
+  clusters?: string[];
 }
 
 export interface QueryPayload {
