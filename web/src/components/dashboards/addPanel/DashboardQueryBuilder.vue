@@ -989,9 +989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </span>
     <q-separator />
-    <DashboardJoinsOption
-    :dashboardData="dashboardData"
-    ></DashboardJoinsOption>
+    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
     <q-separator />
     <!-- filters container -->
     <DashboardFiltersOption
@@ -1447,7 +1445,12 @@ export default defineComponent({
       ) {
         return field?.column;
       }
-      return buildSQLQueryFromInput(field);
+      return buildSQLQueryFromInput(
+        field,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream,
+      );
     };
 
     const xLabel = computed(() => {
