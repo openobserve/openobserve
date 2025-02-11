@@ -12,6 +12,7 @@ test.describe("Service Account for API access", () => {
         loginPage = new LoginPage(page);
         iamPage = new IamPage(page);
         await loginPage.gotoLoginPage();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
 
     });

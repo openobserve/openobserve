@@ -40,7 +40,7 @@ test.describe("Change Organisation", () => {
         managementPage = new ManagementPage(page);
         aboutPage = new AboutPage(page);
         await loginPage.gotoLoginPage();
-        // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
         await ingestionPage.ingestionMultiOrg();
