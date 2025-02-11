@@ -278,7 +278,7 @@ async reportsURLValidation() {
     
   // }
 
-  async logedOut() {
+  async loggedOut() {
     // Click on the profile icon
     await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
 

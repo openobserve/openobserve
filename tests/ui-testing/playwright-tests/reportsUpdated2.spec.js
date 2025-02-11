@@ -49,7 +49,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -64,7 +64,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
@@ -97,7 +97,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -112,7 +112,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
@@ -145,7 +145,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -160,7 +160,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
@@ -193,7 +193,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -208,7 +208,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
@@ -241,7 +241,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -256,7 +256,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
@@ -289,7 +289,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
+        await reportsPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
         await page.waitForTimeout(10000);
@@ -304,7 +304,7 @@ test.describe("Report test cases Updated", () => {
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
         await page.waitForTimeout(10000);
-        await dashboardPage.logedOut();
+        await dashboardPage.loggedout();
         await page.waitForTimeout(10000);
         await loginPage.gotoLoginPage();
         await page.waitForTimeout(10000);
