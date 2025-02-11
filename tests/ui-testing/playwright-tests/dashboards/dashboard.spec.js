@@ -9,7 +9,11 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"], { waitUntil: "networkidle" });
-  // await page.getByText('Login as internal user').click();
+
+  if (await page.getByText("Login as internal user").isVisible()) {
+    await page.getByText("Login as internal user").click();
+  }
+
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -32,10 +36,10 @@ async function login(page) {
     waitUntil: "networkidle",
   });
   await page
-  .locator('[data-test="navbar-organizations-select"]')
-  .getByText("arrow_drop_down")
-  .click();
-await page.getByRole("option", { name: "default", exact: true }).click();
+    .locator('[data-test="navbar-organizations-select"]')
+    .getByText("arrow_drop_down")
+    .click();
+  await page.getByRole("option", { name: "default", exact: true }).click();
 }
 
 async function ingestion(page) {
@@ -43,10 +47,10 @@ async function ingestion(page) {
   const streamName = "e2e_automate";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
+  ).toString("base64");
 
   const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
+    Authorization: `Basic ${basicAuthCredentials}`,
     "Content-Type": "application/json",
   };
   const fetchResponse = await fetch(
@@ -1060,21 +1064,35 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_host"] [data-test="dashboard-add-filter-data"]'
       )
       .click();
- 
-      await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
-      await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
 
+    await page
+      .locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]')
+      .click();
+    await page
+      .locator('[data-test="dashboard-add-condition-condition-0"]')
+      .click();
 
-      await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Operatorarrow_drop_down" })
+      .locator("i")
+      .click();
 
     await page.getByRole("option", { name: "Is Null" }).click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(200);
 
-    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
-    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
-    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
-
+    await page
+      .locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]')
+      .click();
+    await page
+      .locator('[data-test="dashboard-add-condition-condition-0"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Operatorarrow_drop_down" })
+      .locator("i")
+      .click();
 
     await page.getByRole("option", { name: "=", exact: true }).click();
     await page.getByLabel("Value").click();
@@ -1089,9 +1107,17 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
 
-    await page.locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]').click();
-    await page.locator('[data-test="dashboard-add-condition-condition-0"]').click();
-    await page.locator('label').filter({ hasText: 'Operatorarrow_drop_down' }).locator('i').click();
+    await page
+      .locator('[data-test="dashboard-add-condition-label-0-kubernetes_host"]')
+      .click();
+    await page
+      .locator('[data-test="dashboard-add-condition-condition-0"]')
+      .click();
+    await page
+      .locator("label")
+      .filter({ hasText: "Operatorarrow_drop_down" })
+      .locator("i")
+      .click();
 
     await page.getByText("Is Not Null").click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -1602,7 +1628,7 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => { });
+      dialog.dismiss().catch(() => {});
     });
     // await expect(page.locator('[data-test="chart-renderer"] canvas')).toBeVisible();
     //  await page.waitForTimeout(1000);
@@ -1723,10 +1749,9 @@ test.describe("dashboard UI testcases", () => {
 
     page.once("dialog", (dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
-      dialog.dismiss().catch(() => { });
+      dialog.dismiss().catch(() => {});
     });
     await page.locator('[data-test="dashboard-panel-discard"]').click();
-
   });
 
   test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({
@@ -1781,12 +1806,15 @@ test.describe("dashboard UI testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-sort-by-item-asc"]').click(); //Filter A to C
 
-    await page.locator('[data-test="chart-renderer"] canvas').last().click({
-      position: {
-        x: 829,
-        y: 31,
-      },
-    });
+    await page
+      .locator('[data-test="chart-renderer"] canvas')
+      .last()
+      .click({
+        position: {
+          x: 829,
+          y: 31,
+        },
+      });
     await page.locator('[data-test="dashboard-apply"]').click();
     await page
       .locator('[data-test="dashboard-b-item-kubernetes_container_name"]')
@@ -1868,6 +1896,4 @@ test.describe("dashboard UI testcases", () => {
     );
     await page.locator('[data-test="confirm-button"]').click();
   });
-})
-
-
+});
