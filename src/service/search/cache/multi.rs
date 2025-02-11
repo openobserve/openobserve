@@ -249,6 +249,20 @@ async fn recursive_process_multiple_metas(
     Ok(())
 }
 
+/// Cache selection strategies determine how to choose the best cached result when multiple caches
+/// exist:
+///
+/// 1. Overlap: Selects cache with maximum overlap with query time range Example: Query:
+///    10:00-10:30, Cache1: 10:00-10:15, Cache2: 10:10-10:25 Chooses Cache2 (15min overlap) over
+///    Cache1 (10min overlap)
+///
+/// 2. Duration: Selects cache with longest duration regardless of overlap Example: Query:
+///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
+///    (30min)
+///
+/// 3. Both: Balances overlap and duration using percentage calculation Example: Query: 10:00-11:00,
+///    Cache1: 10:00-10:30 (50% overlap), Cache2: 10:15-10:45 (75% overlap) Chooses Cache2 due to
+///    better overlap percentage
 fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,
