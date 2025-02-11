@@ -260,9 +260,10 @@ async fn recursive_process_multiple_metas(
 ///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
 ///    (30min)
 ///
-/// 3. Both: Balances overlap and duration using percentage calculation Example: Query: 10:00-11:00,
-///    Cache1: 10:00-10:30 (50% overlap), Cache2: 10:15-10:45 (75% overlap) Chooses Cache2 due to
-///    better overlap percentage
+/// 3. Both: Calculates what percentage of the cache duration overlaps with query Example: Query:
+///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
+///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
+///    because 100% of its duration is useful for the query
 fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,
