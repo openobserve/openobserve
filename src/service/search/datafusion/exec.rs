@@ -146,7 +146,7 @@ pub async fn merge_parquet_files(
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
-    let target_partitions = cfg.limit.cpu_num;
+    let target_partitions = 2; // force use 2 cpu cores for one merge task
     let ctx =
         prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
     // register union table
@@ -206,7 +206,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
-    let target_partitions = cfg.limit.cpu_num;
+    let target_partitions = 2; // force use 2 cpu cores for one merge task
     let ctx =
         prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
     // register union table
