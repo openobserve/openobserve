@@ -274,7 +274,7 @@ async fn default_proxy(
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy request error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
@@ -305,7 +305,7 @@ async fn default_proxy(
         Ok(b) => b,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
@@ -380,7 +380,7 @@ async fn proxy_querier_by_body(
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy request error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy request error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
@@ -411,7 +411,7 @@ async fn proxy_querier_by_body(
         Ok(b) => b,
         Err(e) => {
             log::error!(
-                "dispatch: {} to {}, proxy response error: {}, took: {} ms",
+                "dispatch: {} to {}, proxy response error: {:?}, took: {} ms",
                 new_url.path,
                 new_url.node_addr,
                 e,
