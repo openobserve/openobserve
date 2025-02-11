@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, web, HttpResponse, Responder};
-use config::meta::actions::action::DeployActionRequest;
+use std::collections::HashMap;
+
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use config::meta::actions::action::ActionType;
 use o2_enterprise::enterprise::actions::app_deployer::APP_DEPLOYER;
 
 #[post("/{org_id}/v1/job")]
@@ -64,6 +66,37 @@ pub async fn list_deployed_apps(path: web::Path<String>) -> impl Responder {
     if let Some(deployer) = APP_DEPLOYER.get() {
         return match deployer.list_apps(&org_id).await {
             Ok(resp) => HttpResponse::Ok().json(resp),
+            Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+        };
+    }
+
+    HttpResponse::InternalServerError().json("AppDeployer not initialized")
+}
+
+// Patch a resource
+#[put("/{org_id}/v1/job/{id}")]
+pub async fn patch_action(
+    path: web::Path<(String, String)>,
+    query: web::Query<HashMap<String, String>>,
+    body: web::Bytes,
+) -> impl Responder {
+    let (org_id, id) = path.into_inner();
+
+    // Extract the "action_type" from query parameters and handle missing cases properly
+    let action_type: ActionType = match query.get("action_type") {
+        Some(value) => match value.clone().as_str().try_into() {
+            Ok(action_type) => action_type,
+            Err(e) => return HttpResponse::BadRequest().json(e.to_string()),
+        },
+        None => return HttpResponse::BadRequest().body("Missing required 'action_type' parameter"),
+    };
+
+    if let Some(deployer) = APP_DEPLOYER.get() {
+        return match deployer
+            .update_action(&org_id, &id, action_type, body)
+            .await
+        {
+            Ok(modified_at) => HttpResponse::Ok().body(modified_at.to_rfc3339()),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
         };
     }

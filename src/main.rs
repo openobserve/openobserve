@@ -1020,7 +1020,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::create_job)
             .service(script_server::delete_job)
             .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps),
+            .service(script_server::list_deployed_apps)
+            .service(script_server::patch_action),
     );
 }
 

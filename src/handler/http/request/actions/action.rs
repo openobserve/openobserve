@@ -127,7 +127,7 @@ pub async fn update_action_details(
     req: web::Json<UpdateActionDetailsRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, ksuid) = path.into_inner();
-    let req = req.into_inner();
+    let mut req = req.into_inner();
     let sa = match req.service_account.clone() {
         None => {
             if let Ok(action) = action_scripts::get(&ksuid.to_string(), &org_id).await {
@@ -143,6 +143,8 @@ pub async fn update_action_details(
     } else {
         return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
     };
+
+    req.service_account = Some(sa);
     match update_app_on_target_cluster(&org_id, ksuid, req, &passcode).await {
         Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),

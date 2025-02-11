@@ -14,6 +14,7 @@ pub enum ExecutionDetailsType {
     #[default]
     Once,
     Repeat,
+    Serve,
 }
 
 impl std::fmt::Display for ExecutionDetailsType {
@@ -21,6 +22,7 @@ impl std::fmt::Display for ExecutionDetailsType {
         let s = match self {
             ExecutionDetailsType::Once => "Once",
             ExecutionDetailsType::Repeat => "Repeat",
+            ExecutionDetailsType::Serve => "Serve",
         };
         write!(f, "{}", s)
     }
@@ -33,6 +35,7 @@ impl TryFrom<&str> for ExecutionDetailsType {
         match value {
             "Once" => Ok(ExecutionDetailsType::Once),
             "Repeat" => Ok(ExecutionDetailsType::Repeat),
+            "Serve" => Ok(ExecutionDetailsType::Serve),
             _ => Err(anyhow::anyhow!("Invalid ExecutionDetailsType")),
         }
     }
@@ -167,6 +170,7 @@ pub enum ActionType {
     #[default]
     Job,
     CronJob,
+    Service,
 }
 
 impl Display for ActionType {
@@ -174,6 +178,7 @@ impl Display for ActionType {
         let str = match self {
             ActionType::Job => "job".to_string(),
             ActionType::CronJob => "cronjob".to_string(),
+            ActionType::Service => "service".to_string(),
         };
         write!(f, "{}", str)
     }
@@ -185,6 +190,7 @@ impl TryFrom<&str> for ActionType {
         match s {
             "job" => Ok(ActionType::Job),
             "cronjob" => Ok(ActionType::CronJob),
+            "service" => Ok(ActionType::Service),
             _ => Err(anyhow::anyhow!("Invalid action type: {}", s)),
         }
     }
@@ -195,6 +201,7 @@ impl From<ExecutionDetailsType> for ActionType {
         match e {
             ExecutionDetailsType::Once => ActionType::Job,
             ExecutionDetailsType::Repeat => ActionType::CronJob,
+            ExecutionDetailsType::Serve => ActionType::Service,
         }
     }
 }
