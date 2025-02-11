@@ -79,9 +79,16 @@ pub async fn progress(
 pub async fn cache_stats() -> Result<(), anyhow::Error> {
     // super cluster
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        if let Err(err) = super_cluster_cache_stats().await {
-            log::error!("super_cluster_cache_stats error: {err}")
+    {
+        if get_o2_config().super_cluster.enabled {
+            if let Err(err) = super_cluster_cache_stats().await {
+                log::error!("super_cluster_cache_stats error: {err}")
+            }
+        } else {
+            // single cluster
+            if let Err(err) = single_cache_stats().await {
+                log::error!("single_cache_stats error: {err}")
+            }
         }
     }
 
@@ -95,7 +102,6 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-#[cfg(not(feature = "enterprise"))]
 async fn single_cache_stats() -> Result<(), anyhow::Error> {
     let orgs = crate::service::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
