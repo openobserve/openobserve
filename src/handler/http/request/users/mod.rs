@@ -33,6 +33,7 @@ use {
     crate::service::self_reporting::audit,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
+    o2_openfga::config::get_config as get_openfga_config,
 };
 
 use crate::{
@@ -681,7 +682,7 @@ fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
         None
     } else {
         #[cfg(feature = "enterprise")]
-        if !get_o2_config().openfga.enabled && role.ne(&UserRole::Admin) {
+        if !get_openfga_config().enabled && role.ne(&UserRole::Admin) {
             return None;
         }
         Some(RolesResponse {

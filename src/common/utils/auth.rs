@@ -108,10 +108,10 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 
 #[cfg(feature = "enterprise")]
 pub async fn save_org_tuples(org_id: &str) {
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_o2_config().openfga.enabled {
-        o2_enterprise::enterprise::openfga::authorizer::authz::save_org_tuples(org_id).await
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
     }
 }
 
@@ -120,10 +120,10 @@ pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn delete_org_tuples(org_id: &str) {
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+    use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_o2_config().openfga.enabled {
-        o2_enterprise::enterprise::openfga::authorizer::authz::delete_org_tuples(org_id).await
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
     }
 }
 
@@ -134,10 +134,7 @@ pub async fn delete_org_tuples(_org_id: &str) {}
 pub fn get_role(role: &UserOrgRole) -> UserRole {
     use std::str::FromStr;
 
-    let role = o2_openfga::authorizer::roles::get_role(format!(
-        "{}",
-        role.base_role
-    ));
+    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
     UserRole::from_str(&role).unwrap()
 }
 

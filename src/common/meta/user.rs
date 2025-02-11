@@ -134,9 +134,8 @@ pub fn get_default_user_org() -> UserOrg {
 #[cfg(feature = "enterprise")]
 pub fn get_default_user_role() -> UserRole {
     let mut role = UserRole::Admin;
-    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-    if get_o2_config().openfga.enabled {
-        role = get_o2_config().dex.default_role.parse().unwrap();
+    if o2_openfga::config::get_config().enabled {
+        role = o2_dex::config::get_config().default_role.parse().unwrap();
     }
     role
 }

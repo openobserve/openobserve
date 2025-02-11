@@ -32,7 +32,7 @@ use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "cloud")]
 use o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
 
 use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
@@ -232,7 +232,7 @@ pub async fn create_org(
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // In this case, openfga takes care of permission checks
         // If the request reaches here, it means the user is allowed
         true
@@ -333,7 +333,7 @@ pub async fn rename_org(
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // In this case, openfga takes care of permission checks
         // If the request reaches here, it means the user is allowed
         true

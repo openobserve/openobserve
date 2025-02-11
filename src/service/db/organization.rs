@@ -158,7 +158,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         if let db::Event::Put(ev) = ev {
             let item_key = ev.key.strip_prefix(key).unwrap();
             let item_value = ev.value.unwrap();
-            let json_val: Organization = if config::get_config().common.meta_store_external {
+            let json_val: Organization = if !config::get_config().common.local_mode {
                 match get_org_from_db(item_key).await {
                     Ok(val) => val,
                     Err(e) => {

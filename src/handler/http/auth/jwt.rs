@@ -12,23 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use std::str::FromStr;
 
-#[cfg(feature = "enterprise")]
-use jsonwebtoken::TokenData;
-#[cfg(feature = "enterprise")]
-use o2_dex::config::get_config as get_dex_config;
-#[cfg(feature = "enterprise")]
-use o2_openfga::openfga::authorizer::authz::{get_user_org_tuple, update_tuples};
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use o2_enterprise::enterprise::openfga::authorizer::roles::{
-    check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
-};
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use once_cell::sync::Lazy;
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use regex::Regex;
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::{
@@ -36,20 +20,23 @@ use {
         service::{organization, users},
     },
     config::meta::user::{UserOrg, UserRole},
+    o2_openfga::authorizer::roles::{
+        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
+    },
+    once_cell::sync::Lazy,
+    regex::Regex,
+    std::str::FromStr,
 };
 #[cfg(feature = "enterprise")]
 use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-};
-#[cfg(feature = "enterprise")]
-use {serde_json::Value, std::collections::HashMap};
-
-#[cfg(feature = "enterprise")]
-use crate::{
-    common::meta::user::{DBUser, RoleOrg, TokenValidationResponse, UserOrg, UserRole},
-    service::{db, users},
+    jsonwebtoken::TokenData,
+    o2_dex::config::get_config as get_dex_config,
+    o2_openfga::authorizer::authz::{get_user_org_tuple, update_tuples},
+    o2_openfga::config::get_config as get_openfga_config,
+    serde_json::Value,
+    std::collections::HashMap,
 };
 
 #[cfg(feature = "cloud")]
@@ -87,7 +74,7 @@ pub async fn process_token(
     #[cfg(not(feature = "cloud"))]
     {
         use config::get_config;
-        use o2_openfga::openfga::authorizer::authz::{
+        use o2_openfga::authorizer::authz::{
             get_user_creation_tuples, get_user_role_creation_tuple, get_user_role_deletion_tuple,
         };
 
