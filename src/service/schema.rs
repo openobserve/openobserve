@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,8 +31,8 @@ use config::{
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    get_settings, unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR,
-    STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST,
+    STREAM_SETTINGS,
 };
 use serde_json::{Map, Value};
 
@@ -111,7 +111,7 @@ pub async fn check_for_schema(
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             // check defined_schema_fields
-            let stream_setting = get_settings(org_id, stream_name, stream_type).await;
+            let stream_setting = unwrap_stream_settings(schema.schema());
             let (defined_schema_fields, need_original) = match stream_setting {
                 Some(s) => (
                     s.defined_schema_fields.unwrap_or_default(),

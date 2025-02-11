@@ -381,9 +381,7 @@ async fn move_files(
     }
 
     // check data retention
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
-        .await
-        .unwrap_or_default();
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema).unwrap_or_default();
     let mut stream_data_retention_days = cfg.compact.data_retention_days;
     if stream_settings.data_retention > 0 {
         stream_data_retention_days = stream_settings.data_retention;
@@ -647,7 +645,7 @@ async fn merge_files(
     let file_name = columns[4].to_string();
 
     // get latest version of schema
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
