@@ -54,6 +54,11 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
     let first_stage = get_alerts_populate_migration_index().await?;
     Migrator::up(client, Some(first_stage)).await?; // hack for failing alerts migration
     Migrator::up(client, None).await?;
+
+    // do something with OpenFGA
+    #[cfg(feature = "enterprise")]
+    let _openfga_config = o2_openfga::config::get_config();
+
     dist_lock::unlock(&locker).await?;
     Ok(())
 }
