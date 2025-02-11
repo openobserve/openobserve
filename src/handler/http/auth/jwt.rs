@@ -20,6 +20,7 @@ use {
         service::{organization, users},
     },
     config::meta::user::{UserOrg, UserRole},
+    o2_dex::config::get_config as get_dex_config,
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
@@ -32,7 +33,6 @@ use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
-    o2_dex::config::get_config as get_dex_config,
     o2_openfga::authorizer::authz::{get_user_org_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
     serde_json::Value,
@@ -55,8 +55,6 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
-    let dex_cfg = get_dex_config();
-    let openfga_cfg = get_openfga_config();
     let dec_token = res.1.unwrap();
 
     let user_email = res.0.user_email.to_owned();
@@ -80,6 +78,8 @@ pub async fn process_token(
 
         use crate::common::meta::user::UserOrgRole;
 
+        let dex_cfg = get_dex_config();
+        let openfga_cfg = get_openfga_config();
         let groups = match dec_token.claims.get(&dex_cfg.group_claim) {
             None => vec![],
             Some(groups) => {
@@ -542,12 +542,11 @@ fn format_role_name(org: &str, role: String) -> String {
 #[cfg(feature = "cloud")]
 pub async fn check_and_add_to_org(user_email: &str, name: &str) {
     use config::ider;
-    use o2_enterprise::enterprise::{
-        cloud::org_invites::list_by_invitee, openfga::authorizer::authz::save_org_tuples,
-    };
+    use o2_enterprise::enterprise::cloud::org_invites::list_by_invitee;
+    use o2_openfga::authorizer::authz::save_org_tuples;
 
     use crate::service::users::{add_admin_to_org, create_new_user};
-    let o2cfg = get_o2_config();
+    let o2cfg = get_openfga_config();
 
     let mut tuples_to_add = HashMap::new();
     let (first_name, last_name) = name.split_once(' ').unwrap_or((name, ""));
@@ -637,7 +636,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) {
         }
     }
 
-    if o2cfg.openfga.enabled {
+    if o2cfg.enabled {
         for (_, tuples) in tuples_to_add {
             match update_tuples(tuples, vec![]).await {
                 Ok(_) => {
