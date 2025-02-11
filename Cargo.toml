@@ -26,7 +26,8 @@ default = []
 enterprise = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
-profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
+profiling = ["dep:pprof"]
+pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
 [profile.release]
@@ -50,7 +51,7 @@ actix-http = "3.9"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.20"
+actix-web-lab = "0.21"
 actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
@@ -168,6 +169,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+wal.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
@@ -175,8 +177,11 @@ tantivy.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
-wal.workspace = true
 tokio-util = "0.7.13"
+pprof = { version = "0.14", features = [
+    "flamegraph",
+    "prost-codec",
+], optional = true }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
