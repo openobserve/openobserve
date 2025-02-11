@@ -122,7 +122,7 @@ pub async fn search(
         .await
     } else {
         let query: SearchQuery = req.query.clone().into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+        match crate::service::search::Sql::new(&query, org_id, stream_type, false).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
                     cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
@@ -856,7 +856,7 @@ pub async fn check_cache_v2(
         resp
     } else {
         let query = req.query.into();
-        match crate::service::search::Sql::new(&query, org_id, stream_type).await {
+        match crate::service::search::Sql::new(&query, org_id, stream_type, true).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
                     cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)

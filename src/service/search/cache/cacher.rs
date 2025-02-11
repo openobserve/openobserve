@@ -97,7 +97,7 @@ pub async fn check_cache(
     let cfg = get_config();
 
     let query: SearchQuery = req.query.clone().into();
-    let sql = match Sql::new(&query, org_id, stream_type).await {
+    let sql = match Sql::new(&query, org_id, stream_type, true).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);

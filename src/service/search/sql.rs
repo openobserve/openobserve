@@ -95,14 +95,19 @@ pub struct Sql {
 }
 
 impl Sql {
-    pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<Sql, Error> {
-        Self::new(query, &req.org_id, req.stream_type).await
+    pub async fn new_from_req(
+        req: &Request,
+        query: &SearchQuery,
+        disable_remove_filter: bool,
+    ) -> Result<Sql, Error> {
+        Self::new(query, &req.org_id, req.stream_type, disable_remove_filter).await
     }
 
     pub async fn new(
         query: &SearchQuery,
         org_id: &str,
         stream_type: StreamType,
+        disable_remove_filter: bool,
     ) -> Result<Sql, Error> {
         let cfg = get_config();
         let sql = query.sql.clone();
@@ -246,6 +251,7 @@ impl Sql {
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
             && use_inverted_index
+            && !disable_remove_filter
         {
             let is_remove_filter = cfg.common.feature_query_remove_filter_with_index;
             let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);

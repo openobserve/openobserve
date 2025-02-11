@@ -561,7 +561,7 @@ pub async fn search_partition(
         sql: req.sql.to_string(),
         ..Default::default()
     };
-    let sql = Sql::new(&query, org_id, stream_type).await?;
+    let sql = Sql::new(&query, org_id, stream_type, false).await?;
 
     // check for vrl
     let apply_over_hits = match req.query_fn.as_ref() {

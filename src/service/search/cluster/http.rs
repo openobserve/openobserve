@@ -45,7 +45,7 @@ pub async fn search(
     let track_total_hits = query.track_total_hits;
 
     // handle request time range
-    let meta = Sql::new_from_req(&req, &query).await?;
+    let meta = Sql::new_from_req(&req, &query, false).await?;
     let sql = Arc::new(meta);
 
     // set this value to null & use it later on results ,
