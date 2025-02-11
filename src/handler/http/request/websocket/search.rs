@@ -153,7 +153,7 @@ pub async fn handle_search_request(
     let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
     if let Some(interval) = sql.histogram_interval {
         // modify the sql query statement to include the histogram interval
-        let updated_query = update_histogram_interval_in_query(&sql.sql, interval)?;
+        let updated_query = update_histogram_interval_in_query(&req.payload.query.sql, interval)?;
         req.payload.query.sql = updated_query;
         log::info!(
             "[WS_SEARCH] trace_id: {}; Updated query {}; with histogram interval: {}",
