@@ -271,12 +271,40 @@ async reportsURLValidation() {
       await expect(this.page.getByRole('alert').first()).toContainText('Report updated successfully.');
   }
 
-  async logedOut() {
-    await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
-    await this.page.waitForSelector('[data-test="menu-link-logout-item"]');
-    await this.page.locator('[data-test="menu-link-logout-item"]').click();
+  // async logedOut() {
+  //   await this.page.locator('[data-test="header-my-account-profile-icon"]').click({ force: true });
+  //   await this.page.waitForSelector('[data-test="menu-link-logout-item"]');
+  //   await this.page.locator('[data-test="menu-link-logout-item"]').click();
     
-  }
+  // }
+
+  async logedOut() {
+    // Click on the profile icon
+    await this.page.locator('[data-test="header-my-account-profile-icon"]').click();
+
+    // Wait for the logout menu item to be attached to the DOM
+    const logoutItem = this.page.locator('[data-test="menu-link-logout-item"]');
+    
+    // Wait for the logout item to be present in the DOM
+    await logoutItem.waitFor({ state: 'attached', timeout: 3000 });
+
+    // Optionally, wait a short time to ensure the element is visible
+    await this.page.waitForTimeout(100); // 100 ms delay
+
+    // Now check if it's visible before clicking
+    if (await logoutItem.isVisible()) {
+        await logoutItem.click({ force: true });
+    } else {
+        console.error("Logout item is not visible after clicking the profile icon.");
+    }
+}
+
+async notAvailableReport(reportName) {
+  await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
+  await this.page.waitForSelector('[data-test="report-list-table"]');
+  await expect(this.page.locator('[data-test="report-list-table"]')).toContainText('No data available');
+ 
+}
 
 }
 
