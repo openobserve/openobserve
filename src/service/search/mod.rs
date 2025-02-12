@@ -1163,7 +1163,7 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 pub fn generate_search_schema_diff(
     schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
+) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
@@ -1175,7 +1175,7 @@ pub fn generate_search_schema_diff(
         }
     }
 
-    Ok(diff_fields)
+    diff_fields
 }
 
 pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {

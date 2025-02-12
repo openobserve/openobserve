@@ -25,6 +25,7 @@ use config::{
     utils::{
         file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        schema_ext::SchemaExt,
     },
 };
 use datafusion::{
@@ -267,7 +268,7 @@ pub async fn search_parquet(
             target_partitions: cfg.limit.cpu_num,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map);
         match exec::create_parquet_table(
             &session,
             schema_latest.clone(),
@@ -392,20 +393,44 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
-
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map);
         for batch in record_batches.iter_mut() {
             *batch = adapt_batch(schema_latest.clone(), batch);
         }
 
-        let table = Arc::new(NewMemTable::try_new(
+        let cloned_schema = record_batches
+            .iter()
+            .map(|b| b.schema().clone())
+            .collect::<Vec<_>>();
+
+        let table = match NewMemTable::try_new(
             record_batches[0].schema().clone(),
             vec![record_batches],
             diff_fields,
             sorted_by_time,
             index_condition.clone(),
             fst_fields.clone(),
-        )?);
+        ) {
+            Ok(table) => table,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] wal->mem->search: create memtable error: {}",
+                    query.trace_id,
+                    e
+                );
+                for (i, schema) in cloned_schema.iter().enumerate() {
+                    log::error!(
+                        "[trace_id {}] wal->mem->search: batch_id: {}, schema_key: {}, schema: {:?}",
+                        query.trace_id,
+                        i,
+                        schema.hash_key(),
+                        schema
+                    );
+                }
+                return Err(e.into());
+            }
+        };
+        let table = Arc::new(table);
         tables.push(table as _);
     }
 
