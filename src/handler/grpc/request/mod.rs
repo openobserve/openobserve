@@ -19,4 +19,5 @@ pub mod logs;
 pub mod metrics;
 pub mod query_cache;
 pub mod search;
+pub mod stream;
 pub mod traces;

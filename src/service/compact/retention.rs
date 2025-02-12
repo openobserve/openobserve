@@ -19,12 +19,9 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
-    meta::stream::{
-        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType, TimeRange,
-    },
+    meta::stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamType, TimeRange},
     utils::time::{hour_micros, BASE_TIME},
 };
-use hashbrown::HashSet;
 use infra::{cache, dist_lock, file_list as infra_file_list};
 use itertools::Itertools;
 
@@ -302,15 +299,6 @@ pub async fn delete_all(
         stream_name
     );
 
-    // delete stream stats
-    infra_file_list::del_stream_stats(org_id, stream_type, stream_name).await?;
-    log::info!(
-        "deleted stream_stats for: {}/{}/{}/all",
-        org_id,
-        stream_type,
-        stream_name
-    );
-
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, None).await?;
     log::info!(
@@ -480,13 +468,9 @@ async fn delete_from_file_list(
         return Ok(());
     }
 
-    // collect stream stats
-    let mut stream_stats = StreamStats::default();
-
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
         let index_size = file.meta.index_size;
-        stream_stats = stream_stats - &file.meta;
         let file_name = file.key.clone();
         let columns: Vec<_> = file_name.split('/').collect();
         let hour_key = format!(
@@ -506,31 +490,7 @@ async fn delete_from_file_list(
     }
 
     // write file list to storage
-    let error_files = write_file_list(org_id, &hours_files).await?;
-
-    // recalculate stream stats
-    if !error_files.is_empty() {
-        log::debug!("[COMPACT] found error files: {:?}", error_files);
-        for files in hours_files.values() {
-            for file in files {
-                if error_files.contains(&file.key) {
-                    stream_stats = stream_stats + &file.meta;
-                }
-            }
-        }
-    }
-
-    // update stream stats
-    if stream_stats.doc_num != 0 {
-        infra_file_list::set_stream_stats(
-            org_id,
-            &[(
-                format!("{org_id}/{stream_type}/{stream_name}"),
-                stream_stats,
-            )],
-        )
-        .await?;
-    }
+    write_file_list(org_id, &hours_files).await?;
 
     Ok(())
 }
@@ -538,8 +498,7 @@ async fn delete_from_file_list(
 async fn write_file_list(
     org_id: &str,
     hours_files: &HashMap<String, Vec<FileKey>>,
-) -> Result<HashSet<String>, anyhow::Error> {
-    let mut error_files = HashSet::new();
+) -> Result<(), anyhow::Error> {
     for events in hours_files.values() {
         let put_items = events
             .iter()
@@ -573,13 +532,10 @@ async fn write_file_list(
             }
             if !del_items.is_empty() {
                 let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
-                match infra_file_list::batch_remove(&del_files).await {
-                    Ok(v) => error_files.extend(v),
-                    Err(e) => {
-                        log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
+                if let Err(e) = infra_file_list::batch_remove(&del_files).await {
+                    log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
                 }
             }
             success = true;
@@ -589,7 +545,7 @@ async fn write_file_list(
             return Err(anyhow::anyhow!("[COMPACT] batch_write to db failed"));
         }
     }
-    Ok(error_files)
+    Ok(())
 }
 
 fn generate_local_dirs(
