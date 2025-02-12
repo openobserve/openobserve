@@ -236,6 +236,11 @@ pub async fn search(
             idx_optimize_rule = None;
         }
 
+        // sort by max_ts, the latest file should be at the top
+        if empty_exec.sorted_by_time() {
+            file_list.par_sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
+        }
+
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             latest_schema.clone(),
