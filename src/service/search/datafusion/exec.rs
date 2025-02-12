@@ -53,7 +53,6 @@ use hashbrown::HashMap;
 use {
     arrow::array::{Int64Array, RecordBatch},
     config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
-    config::utils::parquet::new_parquet_writer_without_metadata,
     o2_enterprise::enterprise::{
         common::downsampling::get_largest_downsampling_rule,
         common::infra::config::get_config as get_o2_config, search::WorkGroup,
@@ -204,6 +203,11 @@ pub async fn merge_parquet_files_with_downsampling(
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
+    let mut metadata = metadata.clone();
+    // assume that the metrics data is sampled at a point every 15 seconds, and then estimate the
+    // records, used for bloom filter.
+    let step = if rule.step < 15 { 15 } else { rule.step };
+    metadata.records = (metadata.records * 15) / step;
 
     let sql = generate_downsampling_sql(&schema, rule);
 
@@ -229,13 +233,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer_without_metadata(
-        &mut buf,
-        &schema,
-        bloom_filter_fields,
-        metadata,
-        rule.step,
-    );
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata);
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -256,13 +254,7 @@ pub async fn merge_parquet_files_with_downsampling(
                     // reset for next file
                     buf.clear();
                     file_meta = FileMeta::default();
-                    writer = new_parquet_writer_without_metadata(
-                        &mut buf,
-                        &schema,
-                        bloom_filter_fields,
-                        metadata,
-                        rule.step,
-                    );
+                    writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata);
                 }
                 if let Err(e) = writer.write(&batch).await {
                     log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
