@@ -615,7 +615,7 @@ mod tests {
         // gxhash hash
         let data = [
             ["test", "node-q-5", "node-c-7"],
-            ["test1", "node-q-6", "node-c-9"], //
+            ["test1", "node-q-6", "node-c-9"],
             ["test2", "node-q-4", "node-c-6"],
             ["test3", "node-q-9", "node-c-1"],
             ["test4", "node-q-0", "node-c-4"],
