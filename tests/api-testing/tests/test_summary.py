@@ -7,13 +7,12 @@ import pytest  # For fixtures
 import random
 import uuid
 import string
-
+import requests  # or your HTTP client of choice
 
 # Constants for WebSocket URL and user credentials
 ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
-
 
 # Directory for test data
 root_dir = Path(__file__).parent.parent.parent
@@ -31,8 +30,6 @@ stream_name = "tdef" + random_string
 print("Random Org ID:", org_id)
 print("Random Stream:", stream_name)
 
-import requests  # or your HTTP client of choice
-
 @pytest.fixture
 def create_session():
     """Create a session for API requests."""
@@ -40,9 +37,6 @@ def create_session():
     # Optionally, set up any headers or authentication here
     yield session  # This will make the session available to tests
     session.close()  # Clean up after tests
-
-
-
 
 def test_data(create_session, base_url):
     """Ingest data into the OpenObserve running instance."""
@@ -121,7 +115,6 @@ def test_data(create_session, base_url):
     
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
-
     # create folder
     url=base_url
     payload_folder = {"description": "newfoldernvp", "name": folder_alert}
@@ -140,7 +133,6 @@ def test_data(create_session, base_url):
     template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
     destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
 
-
     payload_temp_alert = {
         "name":template_alert,
         "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
@@ -157,7 +149,6 @@ def test_data(create_session, base_url):
     assert (
         resp_create_templates_alert.status_code == 200
     ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
-
     
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
 
@@ -170,7 +161,6 @@ def test_data(create_session, base_url):
         "name":destination_alert
         }
     
-
     # Create destination
     resp_create_destinations_alert = session.post(
         f"{url}api/{org_id}/alerts/destinations",
@@ -280,22 +270,18 @@ def test_data(create_session, base_url):
     ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
     print(f"Alert {alert_name} created successfully")
 
-
     time.sleep(5)  # Increase this time if necessary
 
     # Make the request to create function 
-
     payload_function = {
         "function": ".a=190025552",
         "name": "pytestfunction",
         "params": "row",
         "transType": 0,
     }
-
     resp_create_function = session.post(
         f"{base_url}api/{org_id}/functions", json=payload_function
     )
-
     print(resp_create_function.content)
     assert (
         resp_create_function.status_code == 200
@@ -309,24 +295,14 @@ def test_data(create_session, base_url):
         "title": "pytestdashboard",
         "owner": ZO_ROOT_USER_EMAIL,
     }
-
     resp_create_dashboard = session.post(
         f"{base_url}api/{org_id}/dashboards", json=payload_dashboard
     )
-
     print(resp_create_dashboard.content)
-
     assert (
         resp_create_dashboard.status_code == 200
     ), f"Expected 200, but got {resp_create_dashboard.status_code} {resp_create_dashboard.content}"
-
-
-
-    
-
-
-
-
+    print("Dashboard created successfully")
 
 @pytest.fixture
 def base_url_sc():
@@ -337,42 +313,35 @@ def test_summary(create_session, base_url_sc):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
-
     url_sc = base_url_sc
-
     print("URL for super cluster:", url_sc) 
-
     time.sleep(5)  # Increase this time if necessary
-
     res_summary_sc = session.get(f"{url_sc}api/{org_id}/summary")
-
     print("Summary SC response:", res_summary_sc.content)  # Add this for debugging
     assert res_summary_sc.status_code == 200, f"Summary failed, status code: {res_summary_sc.status_code}"
-
     res_data_summary_sc = res_summary_sc.json()
+    print("Summary SC data:", res_data_summary_sc)  # Add this for debugging
 
     # Validate the number of streams
     actual_num_streams_sc= res_data_summary_sc["streams"]["num_streams"]
     expected_num_streams_sc = 1  # Adjust based on our expectations
     assert actual_num_streams_sc == expected_num_streams_sc, f"Expected to be {expected_num_streams_sc}, but got {actual_num_streams_sc}"
-
-  
+ 
     # Validate the number of pipelines
-    pipelines_data = res_data_summary_sc.get("pipelines", {})
-    actual_num_pipelines_sc = pipelines_data.get("num_realtime", 0)  # Default to 0 if not found
+    pipelines_data_sc = res_data_summary_sc.get("pipelines", {})
+    actual_num_pipelines_sc = pipelines_data_sc.get("num_realtime", 0)  # Default to 0 if not found
     expected_num_pipelines_sc = 1  # Adjust based on your expectations
     assert actual_num_pipelines_sc == expected_num_pipelines_sc, f"Expected to be {expected_num_pipelines_sc}, but got {actual_num_pipelines_sc}"
     
     # Validate the number of alerts
-    alerts_data = res_data_summary_sc.get("alerts", {})
+    alerts_data_sc = res_data_summary_sc.get("alerts", {})
     # Validate the number of scheduled alerts
-    actual_num_scheduled_alerts = alerts_data.get("num_scheduled", 0)  # Default to 0 if not found
-    expected_num_scheduled_alerts = 1  # Adjust based on your expectations
-    assert actual_num_scheduled_alerts == expected_num_scheduled_alerts, (
-        f"Expected {expected_num_scheduled_alerts} scheduled alerts, "
-        f"but got {actual_num_scheduled_alerts}"
+    actual_num_scheduled_alerts_sc = alerts_data_sc.get("num_scheduled", 0)  # Default to 0 if not found
+    expected_num_scheduled_alerts_sc = 1  # Adjust based on your expectations
+    assert actual_num_scheduled_alerts_sc == expected_num_scheduled_alerts_sc, (
+        f"Expected {expected_num_scheduled_alerts_sc} scheduled alerts, "
+        f"but got {actual_num_scheduled_alerts_sc}"
     )
-
 
     # Validate the total number of functions
     actual_num_functions_sc = res_data_summary_sc.get("total_functions", 0)  # Directly get the value
@@ -388,10 +357,6 @@ def test_summary(create_session, base_url_sc):
     assert actual_num_dashboards_sc == expected_num_dashboards_sc, (
         f"Expected to be {expected_num_dashboards_sc}, but got {actual_num_dashboards_sc}"
     )
-
-    
-
-   
 
     # Retrieve the pipeline list
     resp_list_pipelines = session.get(f"{url_sc}api/{org_id}/pipelines")
@@ -409,9 +374,7 @@ def test_summary(create_session, base_url_sc):
             break
 
     assert pipeline_id, "Pipeline ID not found for the created pipeline."
-    print(f"Pipeline ID: {pipeline_id}")
-
-     
+    print(f"Pipeline ID: {pipeline_id}")    
     resp_get_pipeline = session.get(f"{url_sc}api/{org_id}/pipelines")
     print(resp_get_pipeline.json())
     assert resp_get_pipeline.status_code == 200
@@ -422,42 +385,32 @@ def test_summary(create_session, base_url_sc):
     # Delete the pipeline
     resp_delete_pipeline = session.delete(f"{url_sc}api/{org_id}/pipelines/{pipeline_id}")
     assert resp_delete_pipeline.status_code == 200, f"Expected status code 200 but got {resp_delete_pipeline.status_code}"
-    
+    print(f"Deleted pipeline {pipeline_id}")
 
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{url_sc}api/v2/{org_id}/alerts")
-
     # Ensure the response is successful
     assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
     # Parse the response JSON
     response_json = resp_get_allalertsnew.json()
-
     # Check if "list" is in the response and proceed
     assert "list" in response_json, "Response does not contain 'list'"
-
     # Get the list of alerts from the response
     alerts = response_json["list"]
-
     # Now you can iterate over the alerts
     for alert in alerts:
         alert_id = alert.get("alert_id")
         assert alert_id, f"Alert ID is missing for alert: {alert}"
-
         print(f"Extracted alert_id: {alert_id}")
-
     # Validate the alert existence first
         resp_check_alert = session.get(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
         print(f"Alert {alert_id} exists and is retrievable.")
-
     # Proceed to delete the alert
         resp_delete_alertnew = session.delete(f"{url_sc}api/v2/{org_id}/alerts/{alert_id}")
         print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
         assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
         print(f"Successfully deleted alert {alert_id}")
-
-    
 
     # Proceed to delete the function
         resp_delete_function = session.delete(
@@ -471,78 +424,54 @@ def test_summary(create_session, base_url_sc):
     # Proceed to delete the dashboard
         resp_get_alldashboards = session.get(f"{url_sc}api/{org_id}/dashboards")
         assert resp_get_alldashboards.status_code == 200, f"Expected status code 200 but got {resp_get_alldashboards.status_code}"
-
     # Parse the response JSON
         dashboards_response = resp_get_alldashboards.json()
         print(f"Dashboard list response: {dashboards_response}")
-
     # Extract the dashboard ID
         dashboard_id = dashboards_response['dashboards'][0]['v1']['dashboardId']  # Corrected line
-
         print(f"Extracted Dashboard ID: {dashboard_id}")
-
     # Now you can delete the dashboard using the extracted ID
         resp_delete_dashboard = session.delete(
         f"{url_sc}api/{org_id}/dashboards/{dashboard_id}"
         )
-
     # Assert that the deletion was successful
         assert resp_delete_dashboard.status_code == 200, f"Failed to delete dashboard, status code: {resp_delete_dashboard.status_code}"
         print(f"Successfully deleted dashboard with ID: {dashboard_id}")
 
-
-   
-
-    
-
-    
     # Proceed to delete the stream
         resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
         print(f"Deleted Stream Response: {resp_delete_stream.text}")
         assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
         print(f"Successfully deleted stream {stream_name}")
 
-
-
 def test_summary_validate(create_session, base_url):
     """Run an E2E test for summary mode."""
     session = create_session
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
-
-
     print("Base URL:", base_url) 
-
     time.sleep(5)  # Increase this time if necessary
-
+    
     # Retrieve the pipeline list
     resp_list_pipelines = session.get(f"{base_url}api/{org_id}/pipelines")
-    assert resp_list_pipelines.status_code == 200, f"Expected status code 200 but got {resp_list_pipelines.status_code}"
-    
+    assert resp_list_pipelines.status_code == 200, f"Expected status code 200 but got {resp_list_pipelines.status_code}"   
     # Parse the pipeline list response
     pipelines_list = resp_list_pipelines.json().get("list", [])
-
     # Assert that the pipelines_list is either empty or contains elements
     if not pipelines_list:
         print("No pipelines found in the list response.")
     else:
         print(f"Found {len(pipelines_list)} pipelines.")
 
-    # Verify alert is deleted
     # Make the request to get the list of alerts
     resp_get_allalertsnew = session.get(f"{base_url}api/v2/{org_id}/alerts")
-
     # Ensure the response is successful
     assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
-
     # Parse the response JSON
     response_json = resp_get_allalertsnew.json()
-
     # Check if "list" is in the response and proceed
     assert "list" in response_json, "Response does not contain 'list'"
-
     # Get the list of alerts from the response
     alerts = response_json["list"]
-
     # Check if the alerts list is empty
     if not alerts:
         print("No alerts found.")
@@ -554,18 +483,13 @@ def test_summary_validate(create_session, base_url):
 
             print(f"Extracted alert_id: {alert_id}")
 
-   
-
     # Fetch the functions
     resp_ver_function = session.get(f"{base_url}api/{org_id}/functions")
     print(f"Function verification response: {resp_ver_function.status_code}, content: {resp_ver_function.content}")
-
     # Parse the response JSON
     response_json = resp_ver_function.json()
-
     # Assert that the status code indicates success
     assert resp_ver_function.status_code == 200, f"Expected status code 200 but got {resp_ver_function.status_code}"
-
     # Check if the "list" is present and assert that it's empty
     assert "list" in response_json, "Response does not contain 'list'"
     assert response_json["list"] == [], "Expected 'list' to be empty, but it contains elements."
@@ -574,25 +498,59 @@ def test_summary_validate(create_session, base_url):
     resp_ver_dashboard = session.get(f"{base_url}api/{org_id}/dashboards")
     print(f"Dashboard verification response: {resp_ver_dashboard.status_code}, content: {resp_ver_dashboard.content}")
     # Fetch the list of dashboards after deletion
-
     assert resp_ver_dashboard.status_code == 200, f"Expected status code 200 but got {resp_ver_dashboard.status_code}"
-
     # Parse the response JSON
     dashboards_response = resp_ver_dashboard.json()
     print(f"Dashboard list response: {dashboards_response}")
-
     # Assert that the dashboards list is empty
     assert 'dashboards' in dashboards_response, "Response does not contain 'dashboards'"
     assert dashboards_response['dashboards'] == [], "Expected the dashboards list to be empty after deletion."
-
     print("Successfully verified that the dashboard list is empty after deletion.")
+
+    res_summary = session.get(f"{base_url}api/{org_id}/summary")
+    print("Summary response:", res_summary.content)  # Add this for debugging
+    assert res_summary.status_code == 200, f"Summary failed, status code: {res_summary.status_code}"
+    res_data_summary = res_summary.json()
+    print("Summary data:", res_data_summary)  # Add this for debugging
+
+    # Validate the number of streams
+    actual_num_streams= res_data_summary["streams"]["num_streams"]
+    expected_num_streams = 0  # Adjust based on our expectations
+    assert actual_num_streams == expected_num_streams, f"Expected to be {expected_num_streams}, but got {actual_num_streams}"
+    print("Successfully verified that the number of streams is correct after deletion.")
+
+    # Validate the number of pipelines
+    pipelines_data = res_data_summary.get("pipelines", {})
+    actual_num_pipelines = pipelines_data.get("num_realtime", 0)  # Default to 0 if not found
+    expected_num_pipelines = 0  # Adjust based on your expectations
+    assert actual_num_pipelines == expected_num_pipelines, f"Expected to be {expected_num_pipelines}, but got {actual_num_pipelines}"
     
+    # Validate the number of alerts
+    alerts_data = res_data_summary.get("alerts", {})
+    # Validate the number of scheduled alerts
+    actual_num_scheduled_alerts = alerts_data.get("num_scheduled", 0)  # Default to 0 if not found
+    expected_num_scheduled_alerts = 0  # Adjust based on your expectations
+    assert actual_num_scheduled_alerts == expected_num_scheduled_alerts, (
+        f"Expected {expected_num_scheduled_alerts} scheduled alerts, "
+        f"but got {actual_num_scheduled_alerts}"
+    )
 
-    # Verify stream is deleted
-    resp_verify_stream = session.get(f"{base_url}api/{org_id}/streams/{stream_name}/schema?type=logs")
-    assert resp_verify_stream.status_code == 404, f"Expected 404 for deleted stream, got {resp_verify_stream.status_code}"
+    # Validate the total number of functions
+    actual_num_functions = res_data_summary.get("total_functions", 0)  # Directly get the value
+    expected_num_functions = 0 # Adjust based on your expectations
+    assert actual_num_functions == expected_num_functions, (
+    f"Expected total_functions to be {expected_num_functions}, "
+    f"but got {actual_num_functions}"
+    )
 
-    print(f"Base URL deleted stream {stream_name}")
+    # Validate the number of dashboards
+    actual_num_dashboards = res_data_summary.get("total_dashboards", 0)  # Directly get the value
+    expected_num_dashboards = 0  # Adjust based on your expectations
+    assert actual_num_dashboards == expected_num_dashboards, (
+        f"Expected to be {expected_num_dashboards}, but got {actual_num_dashboards}"
+    )
+
+
 
 
 
