@@ -26,7 +26,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
     let cfg = config::get_config();
     let metadata = req.metadata();
     if !metadata.contains_key(&cfg.grpc.org_header_key) && !metadata.contains_key("authorization") {
-        return Err(Status::unauthenticated("No valid auth token"));
+        return Err(Status::unauthenticated("No valid auth token[1]"));
     }
 
     let token = req
@@ -36,9 +36,18 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         .to_str()
         .unwrap()
         .to_string();
+    if token.is_empty() {
+        if get_internal_grpc_token().is_empty() {
+            log::error!("Internal grpc token is not set");
+        } else {
+            log::error!("Internal grpc token is set, but auth token is empty");
+        }
+        return Err(Status::unauthenticated("No valid auth token[2]"));
+    }
     if token.eq(get_internal_grpc_token().as_str()) {
         Ok(req)
     } else {
+        log::info!("Auth token is not internal grpc token");
         let org_id = metadata.get(&cfg.grpc.org_header_key);
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(
@@ -50,8 +59,8 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::info!("Err authenticating {}", err);
-                return Err(Status::unauthenticated("No valid auth token"));
+                log::error!("Err authenticating {}", err);
+                return Err(Status::unauthenticated("No valid auth token[3]"));
             }
         };
 
@@ -65,7 +74,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         )) {
             user
         } else {
-            return Err(Status::unauthenticated("No valid auth token"));
+            return Err(Status::unauthenticated("No valid auth token[4]"));
         };
 
         if user.token.eq(&credentials.password) {
@@ -81,7 +90,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
             Ok(req)
         } else {
-            Err(Status::unauthenticated("No valid auth token"))
+            Err(Status::unauthenticated("No valid auth token[5]"))
         }
     }
 }
