@@ -532,8 +532,6 @@ pub async fn merge_by_stream(
                     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
                 }
             }
-            // delete duplicated files
-            files_with_size.dedup_by(|a, b| a.key == b.key);
 
             #[cfg(feature = "enterprise")]
             let skip_group_files = stream_type == StreamType::Metrics
@@ -631,9 +629,6 @@ pub async fn merge_by_stream(
                     }
                 };
 
-                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
-                let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
-
                 if check_guard.contains(&batch_id) {
                     log::warn!(
                         "[COMPACT] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
@@ -647,6 +642,8 @@ pub async fn merge_by_stream(
                 check_guard.insert(batch_id);
 
                 // delete small files keys & write big files keys, use transaction
+                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
+                let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
                 for new_file in new_files {
                     if new_file.key.is_empty() {
                         continue;
