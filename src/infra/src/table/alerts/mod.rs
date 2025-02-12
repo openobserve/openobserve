@@ -27,9 +27,10 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ModelTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, RuntimeErr, Set, TransactionTrait, TryIntoModel,
 };
+use sqlx::Error as SqlxError;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::{
@@ -280,7 +281,7 @@ pub async fn create<C: TransactionTrait>(
         return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
     };
 
-    let id = if use_given_id {
+    let id: String = if use_given_id {
         alert
             .id
             .unwrap_or_else(|| svix_ksuid::Ksuid::new(None, None))
@@ -290,7 +291,7 @@ pub async fn create<C: TransactionTrait>(
     };
     let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
     let mut alert_am = alerts::ActiveModel {
-        id: Set(id),
+        id: Set(id.clone()),
         org: Set(org_id.to_owned()),
         folder_id: Set(folder_m.id),
         stream_type: Set(stream_type),
@@ -300,14 +301,30 @@ pub async fn create<C: TransactionTrait>(
         // they are set below.
         ..Default::default()
     };
-    update_mutable_fields(&mut alert_am, alert)?;
+    update_mutable_fields(&mut alert_am, alert.clone())?;
 
     // Triggered and satisfied timestamps should always be initialized
     // to None so overwrite any value that might have been set already.
     alert_am.last_triggered_at = Set(None);
     alert_am.last_satisfied_at = Set(None);
 
-    let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
+    let mut alert = alert;
+    let alert_m: alerts::Model = match alert_am.insert(&txn).await {
+        Ok(m) => m.try_into_model()?,
+        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+            // unique violation will occur when we try to re-insert the same combination
+            // which is ok, because what we want is already there.
+            if e.is_unique_violation() {
+                alert.id = Some(Ksuid::from_str(&id).unwrap());
+                return Ok(alert);
+            } else {
+                return Err(errors::DbError::SeaORMError(e.to_string()).into());
+            }
+        }
+        Err(e) => Err(errors::Error::DbError(errors::DbError::SeaORMError(
+            e.to_string(),
+        )))?,
+    };
     let alert = alert_m.try_into()?;
     txn.commit().await?;
     log::debug!("Alert created: {:?}", alert);
