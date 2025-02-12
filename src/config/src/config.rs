@@ -1547,6 +1547,9 @@ pub struct S3 {
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
     pub max_idle_per_host: usize,
+    // https://github.com/hyperium/hyper/issues/2136#issuecomment-589488526
+    #[env_config(name = "ZO_S3_CONNECTION_KEEPALIVE_TIMEOUT", default = 20)] // seconds
+    pub keepalive_timeout: u64, // aws s3 by has timeout of 20 sec
 }
 
 #[derive(Debug, EnvConfig)]
@@ -2363,6 +2366,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
+    }
+
+    if cfg.s3.keepalive_timeout <= 0 {
+        // reset to default
+        cfg.s3.keepalive_timeout = 20;
     }
 
     Ok(())
