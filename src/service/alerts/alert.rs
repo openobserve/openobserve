@@ -1231,7 +1231,7 @@ async fn process_dest_template(
             short_url
         }
         Err(e) => {
-            log::error!("[ALERT] Error shortening alert url: {e}");
+            log::error!("[ALERT] Error shortening alert url: {e}, url: {alert_url}");
             alert_url
         }
     };
