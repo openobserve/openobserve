@@ -273,7 +273,7 @@ const validateUserCode = (code: string): string | null => {
         }
       },
 
-      ForStatement(node: acorn.Node & { test: any }) {
+      ForStatement(node: acorn.Node & acorn.ForStatement) {
         // **Detect `for(;;)` which means infinite loop**
         if (!node.test) {
           errorMessage = "Infinite loop using 'for(;;)' is not allowed.";
