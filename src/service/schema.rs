@@ -216,7 +216,31 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
+    log::debug!(
+        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts
+    );
+
+    // acquire a local_lock to ensure only one thread can update schema
+    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let local_lock = infra::local_lock::lock(&cache_key).await?;
+    let _guard = local_lock.lock().await;
+
+    // check if the schema has been updated by another thread
+    let read_cache = STREAM_SCHEMAS_LATEST.read().await;
+    if let Some(updated_schema) = read_cache.get(&cache_key) {
+        if let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
+            return Ok(None);
+        }
+    }
+    drop(read_cache);
+
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -353,7 +377,6 @@ async fn handle_diff_schema(
 
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
-    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
@@ -374,6 +397,15 @@ async fn handle_diff_schema(
         need_original,
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
+
+    log::debug!(
+        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts,
+        start.elapsed().as_millis()
+    );
 
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
