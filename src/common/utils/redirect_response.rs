@@ -15,7 +15,10 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{http::header::ContentType, HttpResponse, ResponseError};
+use actix_web::{
+    http::header::{ContentType, LOCATION},
+    HttpResponse, ResponseError,
+};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -52,7 +55,7 @@ impl RedirectResponse {
         let redirect_uri = self.build_full_redirect_uri();
         if redirect_uri.len() < 1024 {
             HttpResponse::Found()
-                .append_header(("Location", redirect_uri))
+                .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
             let html = format!(
