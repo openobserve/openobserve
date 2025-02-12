@@ -2389,7 +2389,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
-    if cfg.s3.keepalive_timeout <= 0 {
+    if cfg.s3.keepalive_timeout == 0 {
         // reset to default
         cfg.s3.keepalive_timeout = 20;
     }
