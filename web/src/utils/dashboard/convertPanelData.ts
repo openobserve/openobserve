@@ -40,6 +40,7 @@ export const convertPanelData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  loading: any = false,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -131,7 +132,8 @@ export const convertPanelData = async (
         };
       }
       else{
-        throw new Error("No data to render Please check the query");
+        if(!loading)
+          throw new Error("No data to render Please check the query");
       }
     }
     default: {

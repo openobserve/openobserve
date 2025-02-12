@@ -588,6 +588,7 @@ export default defineComponent({
               metadata.value,
               chartPanelStyle.value,
               annotations,
+              loading.value
             );
 
             errorDetail.value = "";
