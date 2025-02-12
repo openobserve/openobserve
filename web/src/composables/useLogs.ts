@@ -4000,7 +4000,7 @@ const useLogs = () => {
       const query = searchObj.meta.sqlMode ? (queryStr || unionquery) : "";
 
       // Fetch all stream data in parallel
-      const streamDataPromises = streams.map(stream => 
+      const streamDataPromises = streams.map((stream: string) => 
         getStream(
           stream,
           searchObj.data.stream.streamType || "logs",
