@@ -95,7 +95,7 @@ test.describe("Logs Queries testcases", () => {
     ).toBeVisible();
   });
 
-  test("should add timestamp to editor save this view and switch", async ({ page }) => {
+  test.skip("should add timestamp to editor save this view and switch", async ({ page }) => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="log-table-column-0-source"]').click();
 

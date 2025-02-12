@@ -785,7 +785,7 @@ pub async fn merge_files(
 
     // get latest version of schema
     let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);

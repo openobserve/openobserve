@@ -49,10 +49,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -63,6 +63,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
     test("Create, use, and delete dashboard and months Schedule Later type report ", async ({ page }) => {
@@ -84,10 +97,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -98,6 +111,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
     test("Create, use, and delete dashboard and weeks Schedule Later type report ", async ({ page }) => {
@@ -119,10 +145,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -133,6 +159,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
     test("Create, use, and delete dashboard and days Schedule Later type report ", async ({ page }) => {
@@ -154,10 +193,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -168,6 +207,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
     test("Create, use, and delete dashboard and hours Schedule Later type report ", async ({ page }) => {
@@ -189,10 +241,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -203,6 +255,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
     test("Create, use, and delete dashboard and once Schedule Later type report ", async ({ page }) => {
@@ -224,10 +289,10 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.createReportContinueButtonStep2();
         await reportsPage.createReportFillDetail();
         await reportsPage.createReportSaveButton();
-        await reportsPage.logedOut();
-        await page.waitForTimeout(5000);
+        await reportsPage.loggedOut();
+        await page.waitForTimeout(10000);
         await loginPage.gotoLoginPageSC();
-        await page.waitForTimeout(5000);
+        await page.waitForTimeout(10000);
         await loginPage.loginAsInternalUserSC();
         await loginPage.loginSC();
         await reportsPage.navigateToReports();
@@ -238,6 +303,19 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
         await dashboardPage.deleteDashboard();
+        await page.waitForTimeout(10000);
+        await dashboardPage.loggedOut();
+        await page.waitForTimeout(10000);
+        await loginPage.gotoLoginPage();
+        await page.waitForTimeout(10000);
+        await loginPage.loginAsInternalUser();
+        await loginPage.login();
+        await reportsPage.navigateToReports();
+        await reportsPage.notAvailableReport(TEST_REPORT_NAME);
+        await page.goto(process.env["ZO_BASE_URL"] + "/web/dashboards?org_identifier=default");
+        await dashboardPage.navigateToDashboards();
+        await dashboardPage.notAvailableDashboard();
+
     });
 
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -348,7 +348,7 @@ pub async fn write_file(
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
-) -> RequestStats {
+) -> Result<RequestStats> {
     let mut req_stats = RequestStats::default();
     let entries = buf
         .into_iter()
@@ -380,11 +380,12 @@ pub async fn write_file(
             stream_name,
             e
         );
+        return Err(e.into());
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
     req_stats.records += entries_records as i64;
-    req_stats
+    Ok(req_stats)
 }
 
 pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
@@ -499,6 +500,9 @@ pub async fn get_uds_and_original_data_streams(
 ) {
     let cfg = get_config();
     for stream in streams {
+        if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
+            continue;
+        }
         let stream_settings =
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await

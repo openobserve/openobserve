@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -197,6 +197,7 @@ pub async fn list(
         drop(r);
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
     }
+    drop(r);
 
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
