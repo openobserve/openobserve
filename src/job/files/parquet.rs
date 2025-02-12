@@ -278,7 +278,7 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(&file_key, parquet_meta, false));
+        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);

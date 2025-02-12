@@ -67,12 +67,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             Ok((file, meta, _)) => {
                                 let mut new_file_keys = Vec::with_capacity(file.len());
                                 for (file, meta) in file.into_iter().zip(meta.into_iter()) {
-                                    new_file_keys.push(FileKey {
-                                        key: file,
-                                        meta,
-                                        deleted: false,
-                                        segment_ids: None,
-                                    });
+                                    new_file_keys.push(FileKey::new(file, meta, false));
                                 }
                                 if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await {
                                     log::error!(
