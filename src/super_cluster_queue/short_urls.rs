@@ -27,7 +27,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if original_url.is_empty() {
                 return Err(Error::Message("Invalid message value".to_string()));
             }
-            if infra::table::short_urls::get_by_id(&short_id).await?.is_some() {
+            if infra::table::short_urls::contains(&short_id).await? {
                 return Ok(());
             }
             infra::table::short_urls::add(&short_id, &original_url).await?;
