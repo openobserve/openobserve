@@ -1066,7 +1066,12 @@ export default defineComponent({
             await importSqlParser();
           }
 
-          const ast = await parseQuery(originalQuery, parser);
+          const ast = await parseQuery(
+            drilldownData.data.logsMode === "auto"
+              ? originalQuery
+              : drilldownData.data.logsQuery,
+            parser,
+          );
           if (!ast) return;
 
           const tableAliases = ast.from
@@ -1082,7 +1087,9 @@ export default defineComponent({
           const seriesIndex = drilldownParams[0]?.seriesIndex;
 
           const breakdownSeriesName =
-            seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
+            seriesIndex !== undefined
+              ? panelData.value.options.series[seriesIndex]
+              : undefined;
 
           const uniqueSeriesName = breakdownSeriesName
             ? breakdownSeriesName.originalSeriesName
