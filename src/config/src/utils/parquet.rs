@@ -90,6 +90,8 @@ pub fn new_parquet_writer_without_metadata<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
+    metadata: &'a FileMeta,
+    mut step: i64,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
     let mut writer_props = WriterProperties::builder()
@@ -106,7 +108,16 @@ pub fn new_parquet_writer_without_metadata<'a>(
             Encoding::DELTA_BINARY_PACKED,
         );
 
-    // TODO: set bf_ndv
+    // assume that the metrics data is sampled at a point every 15 seconds, and then estimate the
+    // bf_ndv.
+    if step < 15 {
+        step = 15;
+    }
+    let records = (metadata.records as u64 * 15) / (step as u64);
+    let mut bf_ndv = min(records, PARQUET_MAX_ROW_GROUP_SIZE as u64);
+    if bf_ndv > 1000 {
+        bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
+    }
     if cfg.common.bloom_filter_enabled {
         let mut fields = bloom_filter_fields.to_vec();
         fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
@@ -115,7 +126,8 @@ pub fn new_parquet_writer_without_metadata<'a>(
         for field in fields {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(field.as_str().into(), true)
-                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP);
+                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
+                .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
         }
     }
     let writer_props = writer_props.build();

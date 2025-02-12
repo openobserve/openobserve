@@ -108,6 +108,7 @@ pub async fn merge_parquet_files(
                 tables,
                 bloom_filter_fields,
                 rule,
+                metadata,
             )
             .await;
         }
@@ -199,6 +200,7 @@ pub async fn merge_parquet_files_with_downsampling(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     rule: &DownsamplingRule,
+    metadata: &FileMeta,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -227,7 +229,13 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer_without_metadata(&mut buf, &schema, bloom_filter_fields);
+    let mut writer = new_parquet_writer_without_metadata(
+        &mut buf,
+        &schema,
+        bloom_filter_fields,
+        metadata,
+        rule.step,
+    );
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -248,8 +256,13 @@ pub async fn merge_parquet_files_with_downsampling(
                     // reset for next file
                     buf.clear();
                     file_meta = FileMeta::default();
-                    writer =
-                        new_parquet_writer_without_metadata(&mut buf, &schema, bloom_filter_fields);
+                    writer = new_parquet_writer_without_metadata(
+                        &mut buf,
+                        &schema,
+                        bloom_filter_fields,
+                        metadata,
+                        rule.step,
+                    );
                 }
                 if let Err(e) = writer.write(&batch).await {
                     log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
