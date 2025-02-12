@@ -21,6 +21,8 @@ use config::{
     meta::{cluster::CompactionJobType, stream::FileKey},
     metrics,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::sync::{mpsc, Mutex};
 
 use crate::service::compact::{
@@ -103,11 +105,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { run_generate_job().await });
     tokio::task::spawn(async move { run_generate_old_data_job().await });
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { run_generate_downsampling_job().await });
     tokio::task::spawn(async move { run_merge(tx).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
     tokio::task::spawn(async move { run_sync_to_db().await });
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
     tokio::task::spawn(async move { run_check_running_jobs().await });
     tokio::task::spawn(async move { run_clean_done_jobs().await });
@@ -174,13 +178,18 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 }
 
 /// Generate downsampling job for compactor
+#[cfg(feature = "enterprise")]
 async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    if get_config().compact.metrics_downsampling_rules.is_empty() {
+    if get_o2_config()
+        .downsampling
+        .metrics_downsampling_rules
+        .is_empty()
+    {
         return Ok(());
     }
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.downsampling_interval,
+            get_o2_config().downsampling.downsampling_interval,
         ))
         .await;
         log::debug!("[COMPACTOR] Running generate downsampling job");
@@ -245,8 +254,13 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
-    if get_config().compact.metrics_downsampling_rules.is_empty() {
+    if get_o2_config()
+        .downsampling
+        .metrics_downsampling_rules
+        .is_empty()
+    {
         return Ok(());
     }
     loop {

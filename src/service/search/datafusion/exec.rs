@@ -15,21 +15,14 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use arrow::array::{Int64Array, RecordBatch};
 use arrow_schema::Field;
 use config::{
     get_config,
     meta::{
-        promql::{
-            get_largest_downsampling_rule, DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL,
-        },
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
-    utils::{
-        parquet::{new_parquet_writer, new_parquet_writer_without_metadata},
-        schema_ext::SchemaExt,
-    },
+    utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
     PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -57,10 +50,16 @@ use datafusion::{
 use futures::TryStreamExt;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config, search::WorkGroup,
+use {
+    arrow::array::{Int64Array, RecordBatch},
+    config::meta::promql::{DownsamplingRule, Function, HASH_LABEL, VALUE_LABEL},
+    config::utils::parquet::new_parquet_writer_without_metadata,
+    o2_enterprise::enterprise::{
+        common::downsampling::get_largest_downsampling_rule,
+        common::infra::config::get_config as get_o2_config, search::WorkGroup,
+    },
+    parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue},
 };
-use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
 
 use super::{
     file_type::{FileType, GetExt},
@@ -76,10 +75,12 @@ use crate::service::{
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
+#[cfg(feature = "enterprise")]
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
 
 pub enum MergeParquetResult {
     Single(Vec<u8>),
+    #[allow(unused)]
     Multiple {
         bufs: Vec<Vec<u8>>,
         file_metas: Vec<FileMeta>,
@@ -93,12 +94,13 @@ pub async fn merge_parquet_files(
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
-    is_ingester: bool,
+    _is_ingester: bool,
 ) -> Result<(Arc<Schema>, MergeParquetResult)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    if stream_type == StreamType::Metrics && !is_ingester {
+    #[cfg(feature = "enterprise")]
+    if stream_type == StreamType::Metrics && !_is_ingester {
         let rule = get_largest_downsampling_rule(stream_name, metadata.max_ts);
         if let Some(rule) = rule {
             return merge_parquet_files_with_downsampling(
@@ -191,6 +193,7 @@ pub async fn merge_parquet_files(
     Ok((schema, MergeParquetResult::Single(buf)))
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn merge_parquet_files_with_downsampling(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
@@ -282,6 +285,7 @@ pub async fn merge_parquet_files_with_downsampling(
     Ok((schema, MergeParquetResult::Multiple { bufs, file_metas }))
 }
 
+#[cfg(feature = "enterprise")]
 fn append_metadata(
     writer: &mut AsyncArrowWriter<&mut Vec<u8>>,
     file_meta: &FileMeta,
@@ -634,6 +638,7 @@ async fn get_cpu_and_mem_limit(
     Ok((target_partitions, memory_size))
 }
 
+#[cfg(feature = "enterprise")]
 fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
     let cfg = get_config();
     let step = rule.step;
@@ -707,6 +712,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
     )
 }
 
+#[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
     let timestamp = record_batch
@@ -718,6 +724,7 @@ fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
     timestamp.value(0)
 }
 
+#[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
     let cfg = get_config();
     let timestamp = record_batch

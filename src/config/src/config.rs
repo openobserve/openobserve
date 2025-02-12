@@ -22,7 +22,7 @@ use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
-use itertools::{chain, Itertools};
+use itertools::chain;
 use lettre::{
     transport::smtp::{
         authentication::Credentials,
@@ -31,15 +31,11 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use regex::Regex;
 use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
-    meta::{
-        cluster,
-        promql::{DownsamplingRule, Function},
-    },
-    utils::{cgroup, file::get_file_meta, time::parse_milliseconds},
+    meta::cluster,
+    utils::{cgroup, file::get_file_meta},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -190,37 +186,6 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields.sort();
     fields.dedup();
     fields
-});
-
-pub static METRICS_DOWNSAMPLING_RULES: Lazy<Vec<DownsamplingRule>> = Lazy::new(|| {
-    get_config()
-        .compact
-        .metrics_downsampling_rules
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                return None;
-            }
-            let (rule, function, offset, step) = s.split(':').collect_tuple().unwrap();
-            let rule = if rule.is_empty() {
-                None
-            } else {
-                Some(Regex::new(rule).unwrap())
-            };
-            let function = if function.is_empty() {
-                Function::Last
-            } else {
-                Function::from(function)
-            };
-            Some(DownsamplingRule {
-                rule,
-                function,
-                offset: get_seconds_from_string(offset),
-                step: get_seconds_from_string(step),
-            })
-        })
-        .collect::<Vec<_>>()
 });
 
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
@@ -1317,10 +1282,6 @@ pub struct Compact {
     pub job_clean_wait_time: i64,
     #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
     pub pending_jobs_metric_interval: u64,
-    #[env_config(name = "ZO_COMPACT_DOWNSAMPLING_INTERVAL", default = 3600)] // seconds
-    pub downsampling_interval: u64,
-    #[env_config(name = "ZO_METRICS_DOWNSAMPLING_RULES", default = "")]
-    pub metrics_downsampling_rules: String,
 }
 
 #[derive(EnvConfig)]
@@ -2282,58 +2243,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
 
-    // if cfg.metrics_downsampling_rules is not empty, then run downsampling job
-    // 1. split cfg.metrics_downsampling_rules by comma to get each rules
-    // 2. split each rule by : to get pattern:function:interval:offest
-    if !cfg.compact.metrics_downsampling_rules.is_empty() {
-        let rules = cfg
-            .compact
-            .metrics_downsampling_rules
-            .split(',')
-            .map(|s| s.trim())
-            .collect::<Vec<&str>>();
-        for rule in rules {
-            let (regex, function, offset, step) = rule.split(':').collect_tuple().expect(
-                "invalid downsampling rule, downsampling rule must be pattern:function:offest:step",
-            );
-            if !regex.is_empty() {
-                let _ = Regex::new(regex).expect("invalid regex for downsampling");
-            }
-            if !function.is_empty() {
-                let _ = Function::from(function);
-            }
-            if offset.len() <= 1 {
-                return Err(anyhow::anyhow!("offset is required for downsampling"));
-            }
-            if step.len() <= 1 {
-                return Err(anyhow::anyhow!("step is required for downsampling"));
-            }
-            // check the interval and offset is valid
-            let offset = get_seconds_from_string(offset);
-            let step = get_seconds_from_string(step);
-            if offset < 86400 {
-                return Err(anyhow::anyhow!(
-                    "downsampling offset must be greater than or equal to 1 day"
-                ));
-            }
-            if offset % 86400 != 0 {
-                return Err(anyhow::anyhow!(
-                    "downsampling offset must be a multiple of day"
-                ));
-            }
-            if step > 86400 || 86400 % step != 0 {
-                return Err(anyhow::anyhow!(
-                    "downsampling step must be divisible by 1 day and less than or equal to 1 day"
-                ));
-            }
-            if offset % step != 0 {
-                return Err(anyhow::anyhow!(
-                    "downsampling offset must be a multiple of step"
-                ));
-            }
-        }
-    }
-
     Ok(())
 }
 
@@ -2447,13 +2356,6 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
-}
-
-fn get_seconds_from_string(s: &str) -> i64 {
-    let milliseconds = parse_milliseconds(s).expect(
-        "invalid time format for downsampling: only support s(second), m(minute), h(hour), d(day)",
-    );
-    milliseconds as i64 / 1000
 }
 
 fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {

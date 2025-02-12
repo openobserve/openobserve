@@ -25,7 +25,6 @@ use config::{
     get_config, ider, is_local_disk_storage,
     meta::{
         inverted_index::InvertedIndexFormat,
-        promql::get_largest_downsampling_rule,
         search::StorageType,
         stream::{
             FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamType,
@@ -51,6 +50,8 @@ use infra::{
     },
     storage,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use tokio::{
     sync::{mpsc, Semaphore},
     task::JoinHandle,
@@ -534,12 +535,16 @@ pub async fn merge_by_stream(
             // delete duplicated files
             files_with_size.dedup_by(|a, b| a.key == b.key);
 
+            #[cfg(feature = "enterprise")]
             let skip_group_files = stream_type == StreamType::Metrics
                 && get_largest_downsampling_rule(
                     &stream_name,
                     files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
                 )
                 .is_some();
+
+            #[cfg(not(feature = "enterprise"))]
+            let skip_group_files = false;
 
             if files_with_size.len() <= 1 && !skip_group_files {
                 return Ok(());
@@ -707,11 +712,15 @@ pub async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(Vec<String>, Vec<FileMeta>, Vec<FileKey>), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
     let is_match_downsampling_rule = get_largest_downsampling_rule(
         stream_name,
         files_with_size.iter().map(|f| f.meta.max_ts).max().unwrap(),
     )
     .is_some();
+
+    #[cfg(not(feature = "enterprise"))]
+    let is_match_downsampling_rule = false;
 
     if files_with_size.len() <= 1 && !is_match_downsampling_rule {
         return Ok((Vec::new(), Vec::new(), Vec::new()));

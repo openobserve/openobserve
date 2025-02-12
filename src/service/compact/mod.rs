@@ -19,7 +19,6 @@ use config::{
     get_config,
     meta::{
         cluster::{CompactionJobType, Role},
-        promql::get_matching_downsampling_rules,
         stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
     },
 };
@@ -27,6 +26,8 @@ use infra::{
     file_list as infra_file_list,
     schema::{get_settings, unwrap_partition_time_level},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::{mpsc, Semaphore};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
@@ -238,6 +239,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 }
 
 /// Generate downsampling job for Metrics
+#[cfg(feature = "enterprise")]
 pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {

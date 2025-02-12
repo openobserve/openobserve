@@ -20,8 +20,6 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::METRICS_DOWNSAMPLING_RULES;
-
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
 pub const HASH_LABEL: &str = "__hash__";
@@ -282,35 +280,6 @@ impl DownsamplingRule {
             true
         }
     }
-}
-
-/// Return all downsampling rules that match the stream name, ordered by offset in descending order
-pub fn get_matching_downsampling_rules(stream_name: &str) -> Vec<&'static DownsamplingRule> {
-    let mut downsampling_rules = METRICS_DOWNSAMPLING_RULES
-        .iter()
-        .filter(|rule| rule.is_match(stream_name))
-        .collect::<Vec<_>>();
-
-    // if a timestamp is in multiple rules, order by offset in descending order
-    downsampling_rules.sort_by(|a, b| b.offset.cmp(&a.offset));
-    downsampling_rules.dedup_by(|a, b| a.offset == b.offset);
-    downsampling_rules
-}
-
-/// Return the largest downsampling rule that matches the stream name and the file's max timestamp
-pub fn get_largest_downsampling_rule(
-    stream_name: &str,
-    max_ts: i64,
-) -> Option<&'static DownsamplingRule> {
-    let downsampling_rules = get_matching_downsampling_rules(stream_name);
-    let mut rule = None;
-    for r in downsampling_rules {
-        if chrono::Utc::now().timestamp_micros() - r.offset * 1_000_000 > max_ts {
-            rule = Some(r);
-            break;
-        }
-    }
-    rule
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
