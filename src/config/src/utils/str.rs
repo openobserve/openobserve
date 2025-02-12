@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,13 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[inline(always)]
-#[cfg(target_arch = "x86_64")]
+#[cfg(not(target_arch = "x86_64"))]
 pub fn find(haystack: &str, needle: &str) -> bool {
     memchr::memmem::find(haystack.as_bytes(), needle.as_bytes()).is_some()
 }
 
 #[inline(always)]
-#[cfg(not(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub fn find(haystack: &str, needle: &str) -> bool {
     haystack.contains(needle)
 }

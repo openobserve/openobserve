@@ -2,6 +2,7 @@ import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
 const uniqueText = `${new Date().valueOf()}`
+import { LogsPage } from '../pages/logsPage.js';
 
 
 
@@ -20,7 +21,9 @@ const functionName = `automate${alphaUuid}`;
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -40,6 +43,7 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
         "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 test.describe("Alerts testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -67,6 +71,7 @@ test.describe("Alerts testcases", () => {
   // });
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(5000)
 
     // ("ingests logs via API", () => {

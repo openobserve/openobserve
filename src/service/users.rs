@@ -24,9 +24,8 @@ use config::{
 use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-    openfga::authorizer::authz::delete_service_account_from_org,
+use o2_openfga::{
+    authorizer::authz::delete_service_account_from_org, config::get_config as get_openfga_config,
 };
 
 use super::db::org_users::get_cached_user_org;
@@ -67,15 +66,13 @@ pub async fn post_user(
             "Custom roles not allowed".to_string(),
         )));
         #[cfg(feature = "enterprise")]
-        if !get_o2_config().openfga.enabled {
+        if !get_openfga_config().enabled {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
                 "Custom roles not allowed".to_string(),
             )));
         } else {
-            match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(org_id, None)
-                .await
-            {
+            match o2_openfga::authorizer::roles::get_all_roles(org_id, None).await {
                 Ok(res) => {
                     for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
                         if !res.contains(custom_role) {
@@ -117,7 +114,7 @@ pub async fn post_user(
     };
 
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // Permission already checked through RBAC
         true
     } else {
@@ -168,11 +165,11 @@ pub async fn post_user(
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                use o2_openfga::authorizer::authz::{
                     get_service_account_creation_tuple, get_user_crole_tuple, get_user_role_tuple,
                     update_tuples,
                 };
-                if get_o2_config().openfga.enabled {
+                if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     let org_id = org_id.replace(' ', "_");
                     get_user_role_tuple(
@@ -458,16 +455,14 @@ pub async fn update_user(
 
                     #[cfg(feature = "enterprise")]
                     {
-                        use o2_enterprise::enterprise::openfga::authorizer::{
+                        use o2_openfga::authorizer::{
                             authz::{get_user_crole_tuple, update_tuples, update_user_role},
                             roles::{
                                 get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples,
                             },
                         };
 
-                        if get_o2_config().openfga.enabled
-                            && old_role.is_some()
-                            && new_role.is_some()
+                        if get_openfga_config().enabled && old_role.is_some() && new_role.is_some()
                         {
                             let old = old_role.unwrap();
                             let new = new_role.unwrap();
@@ -556,11 +551,8 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         // Update OFGA
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::{
-                common::infra::config::get_config as get_o2_config,
-                openfga::authorizer::authz::{get_user_role_tuple, update_tuples},
-            };
-            if get_o2_config().openfga.enabled {
+            use o2_openfga::authorizer::authz::{get_user_role_tuple, update_tuples};
+            if get_openfga_config().enabled {
                 let mut tuples = vec![];
                 get_user_role_tuple(
                     &UserRole::Admin.to_string(),
@@ -619,7 +611,7 @@ pub async fn add_user_to_org(
         let is_allowed =
             initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
         #[cfg(feature = "enterprise")]
-        let is_allowed = if get_o2_config().openfga.enabled {
+        let is_allowed = if get_openfga_config().enabled {
             // Permission already checked through RBAC
             true
         } else {
@@ -652,10 +644,10 @@ pub async fn add_user_to_org(
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                use o2_openfga::authorizer::authz::{
                     get_user_crole_tuple, get_user_role_tuple, update_tuples,
                 };
-                if get_o2_config().openfga.enabled {
+                if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     get_user_role_tuple(&base_role.to_string(), &email, org_id, &mut tuples);
                     if role.custom_role.is_some() {
@@ -767,7 +759,7 @@ pub async fn list_users(
     log::debug!("Listing users for org: {}", org_id);
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().openfga.enabled && role.is_none() && permitted.is_some() {
+    if get_openfga_config().enabled && role.is_none() && permitted.is_some() {
         let permitted = permitted.as_ref().unwrap();
         // This user does not have list users permission
         // Hence only return this specific user
@@ -897,7 +889,7 @@ pub async fn remove_user_from_org(
     let is_allowed =
         initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // Permission already checked through RBAC
         true
     } else {
@@ -928,7 +920,7 @@ pub async fn remove_user_from_org(
                         let _ = db::user::delete(&email_id).await;
                         #[cfg(feature = "enterprise")]
                         {
-                            use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
+                            use o2_openfga::authorizer::authz::delete_user_from_org;
                             let user_role = &orgs[0].role;
                             let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
                                 || user_role.eq(&UserRole::User)
@@ -937,7 +929,7 @@ pub async fn remove_user_from_org(
                             } else {
                                 user_role.to_string()
                             };
-                            if get_o2_config().openfga.enabled {
+                            if get_openfga_config().enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
                                 delete_user_from_org(org_id, &email_id, &user_fga_role).await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
@@ -977,12 +969,12 @@ pub async fn remove_user_from_org(
                         if resp.is_ok() {
                             #[cfg(feature = "enterprise")]
                             {
-                                use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
+                                use o2_openfga::authorizer::authz::delete_user_from_org;
                                 log::debug!(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if get_o2_config().openfga.enabled && _user_fga_role.is_some() {
+                                if get_openfga_config().enabled && _user_fga_role.is_some() {
                                     delete_user_from_org(
                                         org_id,
                                         &email_id,

@@ -155,7 +155,7 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::{
             common::utils::auth::{is_root_user, AuthExtractor},

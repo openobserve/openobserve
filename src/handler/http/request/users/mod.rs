@@ -31,10 +31,9 @@ use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::self_reporting::audit,
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol},
-        infra::config::get_config as get_o2_config,
-    },
+    o2_dex::config::get_config as get_dex_config,
+    o2_enterprise::enterprise::common::auditor::{AuditMessage, HttpMeta, Protocol},
+    o2_openfga::config::get_config as get_openfga_config,
 };
 
 use crate::{
@@ -284,7 +283,7 @@ pub async fn authentication(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = get_o2_config().dex.native_login_enabled;
+    let native_login_enabled = get_dex_config().native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
@@ -322,9 +321,7 @@ pub async fn authentication(
                 if auth_header.is_some() {
                     let auth_header = auth_header.unwrap().to_str().unwrap();
                     if let Some((name, password)) =
-                        o2_enterprise::enterprise::dex::service::auth::get_user_from_token(
-                            auth_header,
-                        )
+                        o2_dex::service::auth::get_user_from_token(auth_header)
                     {
                         SignInUser { name, password }
                     } else {
@@ -350,8 +347,7 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        if get_o2_config().dex.root_only_login
-            && !crate::common::utils::auth::is_root_user(&auth.name)
+        if get_dex_config().root_only_login && !crate::common::utils::auth::is_root_user(&auth.name)
         {
             audit_unauthorized_error(audit_message).await;
             return unauthorized_error(resp);
@@ -546,7 +542,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 return unauthorized_error(resp);
             };
 
-            use o2_enterprise::enterprise::dex::service::auth::get_user_from_token;
+            use o2_dex::service::auth::get_user_from_token;
 
             use crate::handler::http::auth::validator::{
                 validate_user, validate_user_for_query_params,
@@ -686,7 +682,7 @@ fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
         None
     } else {
         #[cfg(feature = "enterprise")]
-        if !get_o2_config().openfga.enabled && role.ne(&UserRole::Admin) {
+        if !get_openfga_config().enabled && role.ne(&UserRole::Admin) {
             return None;
         }
         Some(RolesResponse {

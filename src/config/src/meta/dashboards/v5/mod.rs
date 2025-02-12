@@ -165,10 +165,9 @@ pub struct AxisArg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum AggregationFunc {
     Count,
-    #[serde(rename = "count-distinct")]
     CountDistinct,
     Histogram,
     Sum,
@@ -539,20 +538,17 @@ pub struct LabelOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum LineInterpolation {
     Smooth,
     Linear,
-    #[serde(rename = "step-start")]
     StepStart,
-    #[serde(rename = "step-end")]
     StepEnd,
-    #[serde(rename = "step-middle")]
     StepMiddle,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
     Top,
     Inside,

@@ -17,6 +17,7 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
+  ZO_BASE_URL_SC: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -27,6 +28,7 @@ env:
   ZO_USAGE_BATCH_SIZE: 200
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
+  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
 
 jobs:
   build_binary:
@@ -59,7 +61,7 @@ jobs:
           version: "21.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Build frontend code
         env:
@@ -84,7 +86,7 @@ jobs:
     runs-on:
       labels: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.42.1-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
     strategy:
       matrix:
@@ -110,10 +112,14 @@ jobs:
             "dashboards/dashboard-variables-setting.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
             "reportsUpdated.spec.js",
+            "reportsUpdated2.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
+            "sanity2.spec.js"
+            # "remotepipeline.spec.js",
+
           ]
 
     steps:
@@ -144,6 +150,7 @@ jobs:
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
           echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
           echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing

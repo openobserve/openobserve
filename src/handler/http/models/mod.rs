@@ -16,8 +16,10 @@
 //! This module contains models that can be serialized and deserialized as JSON
 //! for HTTP responses and requests.
 
+pub mod action;
 pub mod alerts;
 #[cfg(feature = "cloud")]
 pub mod billings;
 pub mod dashboards;
+pub mod destinations;
 pub mod folders;

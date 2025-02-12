@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,9 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
+use aes_siv::{siv::Aes256Siv, KeyInit};
 use arc_swap::ArcSwap;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
@@ -211,7 +213,7 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
     map
 });
 
-static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
+pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
@@ -375,6 +377,7 @@ pub struct Config {
     pub tokio_console: TokioConsole,
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
+    pub encryption: Encryption,
 }
 
 #[derive(EnvConfig)]
@@ -474,6 +477,8 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(name = "O2_SCRIPT_SERVER_TOKEN")]
+    pub script_server_token: String,
 }
 
 #[derive(EnvConfig)]
@@ -563,7 +568,6 @@ pub struct Common {
     pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
-    pub meta_store_external: bool, // external storage no need sync file_list to s3
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
@@ -1068,7 +1072,7 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
@@ -1234,6 +1238,12 @@ pub struct Limit {
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
     )]
     pub max_query_range_for_sa: i64,
+    #[env_config(
+        name = "ZO_TEXT_DATA_TYPE",
+        default = "longtext",
+        help = "Default data type for LongText compliant DB's"
+    )]
+    pub db_text_data_type: String,
 }
 
 #[derive(EnvConfig)]
@@ -1480,10 +1490,6 @@ pub struct S3 {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_S3_REQUEST_TIMEOUT", default = 3600)] // seconds
     pub request_timeout: u64,
-    // Deprecated, use ZO_S3_FEATURE_FORCE_HOSTED_STYLE instead
-    // #[deprecated(since = "0.6.5", note = "use `ZO_S3_FEATURE_FORCE_HOSTED_STYLE` instead")]
-    #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
-    pub feature_force_path_style: bool,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_HOSTED_STYLE", default = false)]
     pub feature_force_hosted_style: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP1_ONLY", default = false)]
@@ -1588,6 +1594,13 @@ pub struct Pipeline {
     pub max_connections: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct Encryption {
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
+    pub algorithm: String,
+    #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
+    pub master_key: String,
+}
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
@@ -1756,6 +1769,9 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
@@ -1833,6 +1849,11 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.tracing_enabled = false;
     }
 
+    if local_node_role.contains(&cluster::Role::ScriptServer) {
+        // script server does not have external dep, so can ignore their config check
+        return Ok(());
+    }
+
     // format local_mode_storage
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
@@ -1845,12 +1866,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if cfg.common.local_mode
-        || cfg.common.meta_store.starts_with("mysql")
-        || cfg.common.meta_store.starts_with("postgres")
-    {
-        cfg.common.meta_store_external = true;
-    }
     if !cfg.common.local_mode
         && !cfg.common.meta_store.starts_with("postgres")
         && !cfg.common.meta_store.starts_with("mysql")
@@ -2227,6 +2242,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_max_days < 1 {
         cfg.compact.old_data_max_days = 7;
     }
+    if cfg.compact.old_data_min_hours < 1 {
+        cfg.compact.old_data_min_hours = 2;
+    }
     if cfg.compact.old_data_min_records < 1 {
         cfg.compact.old_data_min_records = 100;
     }
@@ -2354,6 +2372,34 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
+}
+
+fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if !cfg.encryption.algorithm.is_empty() {
+        if cfg.encryption.algorithm != "aes-256-siv" {
+            return Err(anyhow::anyhow!(
+                "invalid algorithm specified, only [aes-256-siv] is supported"
+            ));
+        }
+        // this is basically a duplication of code from tables/cipher.rs
+        // but we only support one algorithm for now, so ok. Once we support more
+        // we have to extract this into proper functions and use the same in both places
+        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "master encryption key is not properly base64 encoded : {e}"
+                ));
+            }
+        };
+        match Aes256Siv::new_from_slice(&key) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(anyhow::anyhow!("invalid master encryption key : {e}"));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

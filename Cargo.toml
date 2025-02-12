@@ -111,6 +111,7 @@ itertools.workspace = true
 jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
+memchr.workspace = true
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
@@ -173,9 +174,12 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
 wal.workspace = true
+tokio-util = "0.7.13"
+
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
@@ -208,6 +212,7 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
@@ -257,7 +262,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
-getrandom = "0.2.11"
+getrandom = "0.2.15"
 hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
@@ -284,7 +289,7 @@ prometheus = "0.13"
 prost = "0.13.1"
 rand = "0.8"
 rayon = "1.10"
-regex = "1.7"
+regex = "1.11"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
@@ -367,3 +372,4 @@ utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "3d16e345232bb3cb9b104ee6461e9dd0b4c361da" }
 vrl = { version = "0.19.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"
+zip = "2.2.2"

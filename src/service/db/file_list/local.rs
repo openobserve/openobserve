@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,7 +38,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     let cfg = config::get_config();
 
     // notify other nodes
-    if !cfg.common.meta_store_external || cfg.memory_cache.cache_latest_files {
+    if cfg.memory_cache.cache_latest_files {
         let mut q = BROADCAST_QUEUE.write().await;
         q.push(file_data);
     }

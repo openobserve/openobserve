@@ -22,8 +22,11 @@ use crate::{
     dist_lock,
 };
 
+pub mod action_scripts;
 pub mod alerts;
+pub mod cipher;
 pub mod dashboards;
+pub mod destinations;
 pub mod distinct_values;
 #[allow(unused_imports)]
 pub mod entity;
@@ -34,6 +37,9 @@ pub mod organizations;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
+pub mod templates;
+pub mod timed_annotation_panels;
+pub mod timed_annotations;
 pub mod users;
 
 pub async fn init() -> Result<(), anyhow::Error> {

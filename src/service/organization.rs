@@ -24,7 +24,9 @@ use config::{
     utils::rand::generate_random_string,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
+
+use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::{
@@ -230,7 +232,7 @@ pub async fn create_org(
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // In this case, openfga takes care of permission checks
         // If the request reaches here, it means the user is allowed
         true
@@ -331,7 +333,7 @@ pub async fn rename_org(
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
-    let is_allowed = if get_o2_config().openfga.enabled {
+    let is_allowed = if get_openfga_config().enabled {
         // In this case, openfga takes care of permission checks
         // If the request reaches here, it means the user is allowed
         true
@@ -508,12 +510,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
 
     // Add to OFGA
-    o2_enterprise::enterprise::openfga::authorizer::authz::add_user_to_org(
-        &org_id,
-        user_email,
-        &invite.role,
-    )
-    .await;
+    o2_openfga::authorizer::authz::add_user_to_org(&org_id, user_email, &invite.role).await;
 
     if let Err(e) =
         org_invites::update_invite_status(invite_token, user_email, OrgInviteStatus::Accepted).await

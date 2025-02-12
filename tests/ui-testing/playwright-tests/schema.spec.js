@@ -1,13 +1,16 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: 'parallel' });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  //  await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -48,14 +51,8 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(
-    4000); await page.locator(
-      '[data-test="log-search-index-list-select-stream"]').click({ force: true }); await page.locator(
-        "div.q-item").getByText(`${stream}`).first().click({ force: true });
-};
-
 test.describe("Schema testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -76,6 +73,7 @@ test.describe("Schema testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -84,21 +82,11 @@ test.describe("Schema testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
   });
 
   test('stream schema settings updated to be displayed under logs', async ({ page }) => {
-    // page.on('console', msg => console.log(msg.text()));
-    // page.on('response', async (resp) => {
-    //   if (resp.url().includes('api/default/')) {
-    //     console.log('url      -> ', resp.url());
-    //     console.log('code     -> ', resp.status());
-    //     console.log('payload  -> ', resp.request().postData());
-    //     console.log('response -> ', await resp.text());
-    //   }
-    // });
-
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
@@ -138,6 +126,12 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
 
     await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
+    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.keyboard.type("str_match(_all, \'test\')");
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    const errorMessage = page.locator('[data-test="logs-search-error-message"]');
+    await expect(errorMessage).not.toBeVisible();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');

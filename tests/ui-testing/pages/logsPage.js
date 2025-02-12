@@ -379,8 +379,8 @@ export class LogsPage {
 
     // Select the current date
     const date = new Date().getDate();
-    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).click();
-    await this.page.locator(".q-date").getByText(date.toString(), { exact: true }).click();
+    await this.page.getByRole('button', { name: date.toString(), exact: true }).last().click();
+    await this.page.getByRole('button', { name: date.toString(), exact: true }).last().click();
 
     // Fill the start time
     const startTimeInput = this.page.locator(".startEndTime td:nth-child(1) input");
@@ -435,4 +435,10 @@ export class LogsPage {
     await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible();
   }
 
+  async selectStreamAndStreamTypeForLogs(stream) {
+    await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+    await this.page.locator('[data-test="log-search-index-list-select-stream"]').fill(stream);
+    await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
+    await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+}
 }

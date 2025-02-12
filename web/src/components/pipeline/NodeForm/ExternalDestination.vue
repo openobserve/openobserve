@@ -55,11 +55,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               tabindex="0"
-            />
+            >
+            <template v-slot:option="scope">
+              <q-item style="max-width: calc(40vw - 42px )" v-bind="scope.itemProps">
+                <q-item-section class="flex flex-col">
+                  <q-item-label > <span class="text-bold"> {{ scope.opt.label }}</span> - <span class="truncate-url" > {{  scope.opt.url }}</span> </q-item-label>
+                </q-item-section>
+              </q-item>
+        </template>
+          </q-select>
           </div>
-          <div class="col-12 q-pb-md"></div>
-          <div v-if="createNewDestination" class="col-12 q-py-xs">
+          <q-form
+            ref="destinationForm"
+            @submit="
+              createNewDestination ? createDestination() : saveDestination()
+            "
+            class="col-12"
+          >
+          <div class="col-12 q-py-xs">
             <q-input
+            v-if="createNewDestination"
               data-test="add-destination-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
@@ -80,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tabindex="0"
             />
           </div>
-
           <div v-if="createNewDestination" class="col-12 q-py-xs">
             <q-input
               data-test="add-destination-url-input"
@@ -197,9 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-        </div>
-      </div>
-      <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start q-mt-lg">
         <q-btn
           data-test="add-destination-cancel-btn"
           v-close-popup="true"
@@ -216,10 +228,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mb-md text-bold no-border q-ml-md"
           color="secondary"
           padding="sm xl"
-          @click="createNewDestination ? createDestination() : saveDestination()"
+          type="submit"
           no-caps
         />
       </div>
+        </q-form>
+        </div>
+      </div>
+
     </q-page>
   </div>
 </template>
@@ -264,14 +280,20 @@ const formData: Ref<DestinationData> = ref({
   template: "",
   headers: {},
   emails: "",
-  type: "remote_pipeline",
+  type: "http",
 });
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
+const destinationForm = ref(null);
 const { addNode, pipelineObj } = useDragAndDrop();
 const retries = ref(0);
-const selectedDestination = ref(
-  pipelineObj.currentSelectedNodeData.data.destination_name || "",
+const selectedDestination: any = ref(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name
+    ? {
+        label: pipelineObj.currentSelectedNodeData.data.destination_name,
+        value: pipelineObj.currentSelectedNodeData.data.destination_name,
+      }
+    : { label: "", value: "" },
 );
 const destinations = ref([]);
 
@@ -306,7 +328,7 @@ watch(
         template: "",
         headers: {},
         emails: "",
-        type: "remote_pipeline",
+        type: "http",
       };
       apiHeaders.value = [{ key: "", value: "", uuid: getUUID() }];
     }
@@ -316,6 +338,7 @@ const isValidDestination = computed(
   () => formData.value.name && formData.value.url && formData.value.method,
 );
 const createDestination = () => {
+  
   if (!isValidDestination.value) {
     q.notify({
       type: "negative",
@@ -341,7 +364,7 @@ const createDestination = () => {
     template: formData.value.template,
     headers: headers,
     name: formData.value.name,
-    type: "remote_pipeline",
+    type: "http",
   };
 
   destinationService
@@ -392,12 +415,19 @@ const deleteApiHeader = (header: any) => {
 
 const getFormattedDestinations = computed(() => {
   return destinations.value.map((destination: any) => {
+    const truncatedUrl = destination.url.length > 70 
+      ? destination.url.slice(0, 70) + '...' 
+      : destination.url;
+
     return {
       label: destination.name,
       value: destination.name,
+      url: truncatedUrl,
     };
   });
 });
+
+
 
 const createEmailTemplate = () => {
   router.push({
@@ -421,7 +451,7 @@ const getDestinations = () => {
       sort_by: "name",
       desc: false,
       org_identifier: store.state.selectedOrganization.identifier,
-      dst_type: "remote_pipeline",
+      module: "pipeline",
     })
     .then((res) => {
       destinations.value = res.data;
@@ -446,7 +476,10 @@ const saveDestination = () => {
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (!selectedDestination.value) {
+  if (
+    selectedDestination.value.hasOwnProperty("value") &&
+    selectedDestination.value.value === ""
+  ) {
     q.notify({
       message: "Please select External destination from the list",
       color: "negative",
@@ -476,4 +509,13 @@ const saveDestination = () => {
     }
   }
 }
+.truncate-url {
+  display: inline-block;
+  max-width: calc(40vw - 200px); /* Adjust the width as needed */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 </style>

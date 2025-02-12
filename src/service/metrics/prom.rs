@@ -323,8 +323,12 @@ pub async fn remote_write(
                 stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
             }
 
-            let value: json::Value = json::to_value(&metric).unwrap();
+            let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
+            value.as_object_mut().unwrap().insert(
+                cfg.common.column_timestamp.clone(),
+                json::Value::Number(timestamp.into()),
+            );
 
             // ready to be buffered for downstream processing
             if stream_executable_pipelines

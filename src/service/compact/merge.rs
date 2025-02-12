@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,8 +27,7 @@ use config::{
         inverted_index::InvertedIndexFormat,
         search::StorageType,
         stream::{
-            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats,
-            StreamType,
+            FileKey, FileListDeleted, FileMeta, MergeStrategy, PartitionTimeLevel, StreamType,
         },
     },
     metrics,
@@ -133,6 +132,9 @@ pub async fn generate_job_by_stream(
         return Ok(()); // no data
     }
 
+    // format to hour with zero minutes, seconds
+    let offset = offset - offset % hour_micros(1);
+
     let cfg = get_config();
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
@@ -181,8 +183,6 @@ pub async fn generate_job_by_stream(
 
     // write new offset
     let offset = offset + hour_micros(1);
-    // format to hour with zero minutes, seconds
-    let offset = offset - offset % hour_micros(1);
     db::compact::files::set_offset(
         org_id,
         stream_type,
@@ -264,7 +264,7 @@ pub async fn generate_old_data_job_by_stream(
         org_id,
         stream_type,
         stream_name,
-        Some((start_time, end_time)),
+        Some((start_time, end_time - 1)),
     )
     .await?;
 
@@ -320,10 +320,19 @@ pub async fn merge_by_stream(
     job_id: i64,
     offset: i64,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     let start = std::time::Instant::now();
 
     // get schema
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    if schema == Schema::empty() {
+        // the stream was deleted, mark the job as done
+        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+            log::error!("[COMPACT] set_job_done failed: {e}");
+        }
+        return Ok(());
+    }
+
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
@@ -336,76 +345,36 @@ pub async fn merge_by_stream(
         offset
     );
 
-    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
-    let offset_time_hour = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            offset_time.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    let offset_time_day = Utc
-        .with_ymd_and_hms(
-            offset_time.year(),
-            offset_time.month(),
-            offset_time.day(),
-            0,
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-
-    let cfg = get_config();
     // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
+    let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
+    let (date_start, date_end) = if partition_time_level == PartitionTimeLevel::Daily {
+        (
+            offset_time.format("%Y/%m/%d/00").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
         )
-        .unwrap()
-        .timestamp_micros();
-
-    // get current hour(day) all files
-    let (partition_offset_start, partition_offset_end) =
-        if partition_time_level == PartitionTimeLevel::Daily {
-            (offset_time_day, offset_time_day + hour_micros(24) - 1)
-        } else {
-            (offset_time_hour, offset_time_hour + hour_micros(1) - 1)
-        };
-    let files = file_list::query(
-        org_id,
-        stream_name,
-        stream_type,
-        partition_time_level,
-        partition_offset_start,
-        partition_offset_end,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+    } else {
+        (
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+        )
+    };
+    let files = file_list::query_by_date(org_id, stream_name, stream_type, &date_start, &date_end)
+        .await
+        .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] date range: [{},{}], files: {}",
         org_id,
         stream_type,
         stream_name,
-        partition_offset_start,
-        partition_offset_end,
+        date_start,
+        date_end,
         files.len(),
     );
 
     if files.is_empty() {
         // update job status
-        if let Err(e) = infra_file_list::set_job_done(job_id).await {
+        if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
             log::error!("[COMPACT] set_job_done failed: {e}");
         }
         return Ok(());
@@ -441,8 +410,6 @@ pub async fn merge_by_stream(
                     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
                 }
             }
-            // delete duplicated files
-            files_with_size.dedup_by(|a, b| a.key == b.key);
             // partition files by size
             if files_with_size.len() <= 1 {
                 return Ok(());
@@ -507,6 +474,7 @@ pub async fn merge_by_stream(
             }
 
             let mut last_error = None;
+            let mut check_guard = HashSet::with_capacity(batch_groups.len());
             for ret in worker_results {
                 let (batch_id, mut new_file) = match ret {
                     Ok(v) => v,
@@ -516,6 +484,17 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
+                if check_guard.contains(&batch_id) {
+                    log::warn!(
+                        "[COMPACT] merge files for stream: [{}/{}/{}] found error files, batch_id: {} duplicate",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        batch_id
+                    );
+                    continue;
+                }
+                check_guard.insert(batch_id);
                 let new_file_name = std::mem::take(&mut new_file.key);
                 let new_file_meta = std::mem::take(&mut new_file.meta);
                 let new_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
@@ -532,10 +511,7 @@ pub async fn merge_by_stream(
                     segment_ids: None,
                 });
 
-                // collect stream stats
-                let mut stream_stats: StreamStats = StreamStats::default();
-                for file in new_file_list.iter() {
-                    stream_stats = stream_stats - file.meta.clone();
+                for file in new_file_list {
                     events.push(FileKey {
                         key: file.key.clone(),
                         meta: file.meta.clone(),
@@ -546,30 +522,10 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                match write_file_list(&org_id, &events).await {
-                    Ok(_) => {
-                        // update stream stats
-                        if stream_stats.doc_num != 0 {
-                            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-                            if let Err(e) = infra_file_list::set_stream_stats(
-                                &org_id,
-                                &[(stream_key.clone(), stream_stats)],
-                            )
-                            .await
-                            {
-                                log::error!(
-                                    "[COMPACT] set_stream_stats failed: {}, err: {}",
-                                    stream_key,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("[COMPACT] write file list failed: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
+                if let Err(e) = write_file_list(&org_id, &events).await {
+                    log::error!("[COMPACT] write file list failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
                 }
             }
             drop(permit);
@@ -586,7 +542,7 @@ pub async fn merge_by_stream(
     }
 
     // update job status
-    if let Err(e) = infra_file_list::set_job_done(job_id).await {
+    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACT] set_job_done failed: {e}");
     }
 
@@ -595,9 +551,6 @@ pub async fn merge_by_stream(
     metrics::COMPACT_USED_TIME
         .with_label_values(&[org_id, stream_type.as_str()])
         .inc_by(time);
-    metrics::COMPACT_DELAY_HOURS
-        .with_label_values(&[org_id, stream_name, stream_type.as_str()])
-        .set((time_now_hour - offset_time_hour) / hour_micros(1));
 
     Ok(())
 }
@@ -672,7 +625,7 @@ pub async fn merge_files(
     }
 
     // get latest version of schema
-    let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let latest_schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
@@ -684,16 +637,16 @@ pub async fn merge_files(
         ),
         None => (Vec::new(), false),
     };
-    let schema_latest = if !defined_schema_fields.is_empty() {
-        let schema_latest = SchemaCache::new(schema_latest);
-        let schema_latest = generate_schema_for_defined_schema_fields(
-            &schema_latest,
+    let latest_schema = if !defined_schema_fields.is_empty() {
+        let latest_schema = SchemaCache::new(latest_schema);
+        let latest_schema = generate_schema_for_defined_schema_fields(
+            &latest_schema,
             &defined_schema_fields,
             need_original,
         );
-        schema_latest.schema().as_ref().clone()
+        latest_schema.schema().as_ref().clone()
     } else {
-        schema_latest
+        latest_schema
     };
 
     // read schema from parquet file and group files by schema
@@ -720,10 +673,10 @@ pub async fn merge_files(
         .values()
         .flat_map(|s| s.fields().iter().map(|f| f.name().to_string()))
         .collect::<HashSet<_>>();
-    let schema_latest = Arc::new(schema_latest.retain(all_fields));
-    let mut schema_latest_fields = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_fields.insert(field.name(), field);
+    let latest_schema = Arc::new(latest_schema.retain(all_fields));
+    let mut latest_schema_fields = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_fields.insert(field.name(), field);
     }
 
     // generate datafusion tables
@@ -741,10 +694,10 @@ pub async fn merge_files(
             target_partitions: 2,
         };
 
-        let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
+        let diff_fields = generate_schema_diff(&schema, &latest_schema_fields)?;
         let table = match exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             true,
@@ -771,14 +724,14 @@ pub async fn merge_files(
     let start = std::time::Instant::now();
     let merge_result = {
         let stream_name = stream_name.to_string();
-        let schema_latest = schema_latest.clone();
+        let latest_schema = latest_schema.clone();
         let new_file_meta = new_file_meta.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 exec::merge_parquet_files(
                     stream_type,
                     &stream_name,
-                    schema_latest,
+                    latest_schema,
                     tables,
                     &bloom_filter_fields,
                     &new_file_meta,
@@ -799,7 +752,7 @@ pub async fn merge_files(
                 "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
                 e,
                 files,
-                schema_latest
+                latest_schema
             );
             return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
         }
@@ -808,7 +761,7 @@ pub async fn merge_files(
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
-            "merge_parquet_files error: compressed_size is 0"
+            "merge_parquet_files err: compressed_size is 0"
         ));
     }
 
@@ -827,7 +780,28 @@ pub async fn merge_files(
     let buf = Bytes::from(buf);
     storage::put(&new_file_key, buf.clone()).await?;
 
+    // skip index generation if not enabled or not basic type
     if !cfg.common.inverted_index_enabled || !stream_type.is_basic_type() {
+        return Ok((new_file_key, new_file_meta, retain_file_list));
+    }
+
+    // skip index generation if no fields to index
+    let latest_schema_fields = latest_schema
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+    let need_index = full_text_search_fields
+        .iter()
+        .chain(index_fields.iter())
+        .any(|f| latest_schema_fields.contains(f));
+    if !need_index {
+        log::debug!(
+            "skip index generation for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name
+        );
         return Ok((new_file_key, new_file_meta, retain_file_list));
     }
 
@@ -852,7 +826,7 @@ pub async fn merge_files(
         .await
         .map_err(|e| {
             anyhow::anyhow!(
-                "generate_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                "generate_index_on_compactor for file: {}, err: {}, need delete files: {:?}",
                 new_file_key,
                 e,
                 retain_file_list
@@ -879,7 +853,7 @@ pub async fn merge_files(
             .await
             {
                 log::error!(
-                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                    "generate_index_on_compactor write to file list: {}, err: {}, need delete files: {:?}",
                     file_name,
                     e.to_string(),
                     retain_file_list
@@ -893,7 +867,7 @@ pub async fn merge_files(
         InvertedIndexFormat::Tantivy | InvertedIndexFormat::Both
     ) {
         let (schema, mut reader) = get_recordbatch_reader_from_bytes(&buf).await?;
-        let index_size =  create_tantivy_index(
+        let index_size = create_tantivy_index(
             "COMPACTOR",
             &new_file_key,
             &full_text_search_fields,
@@ -901,9 +875,10 @@ pub async fn merge_files(
             schema,
             &mut reader,
         )
-        .await.map_err(|e| {
+        .await
+        .map_err(|e| {
             anyhow::anyhow!(
-                "create_tantivy_index_on_compactor for file: {}, error: {}, need delete files: {:?}",
+                "create_tantivy_index_on_compactor for file: {}, err: {}, need delete files: {:?}",
                 new_file_key,
                 e,
                 retain_file_list
@@ -934,7 +909,8 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             flattened: v.meta.flattened,
         })
         .collect::<Vec<_>>();
-    // set to external db
+
+    // set to db
     // retry 5 times
     let mut success = false;
     let created_at = config::utils::time::now_micros();
@@ -942,30 +918,24 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         if !del_items.is_empty() {
             if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
-                log::error!(
-                    "[COMPACT] batch_add_deleted to external db failed, retrying: {}",
-                    e
-                );
+                log::error!("[COMPACT] batch_add_deleted to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
         }
         if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            log::error!("[COMPACT] batch_add to external db failed, retrying: {}", e);
+            log::error!("[COMPACT] batch_add to db failed, retrying: {}", e);
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
         if !del_items.is_empty() {
             let del_files = del_items.iter().map(|v| v.file.clone()).collect::<Vec<_>>();
             if let Err(e) = infra_file_list::batch_remove(&del_files).await {
-                log::error!(
-                    "[COMPACT] batch_delete to external db failed, retrying: {}",
-                    e
-                );
+                log::error!("[COMPACT] batch_delete to db failed, retrying: {}", e);
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-        }
+        };
         // send broadcast to other nodes
         if get_config().memory_cache.cache_latest_files {
             if let Err(e) = db::file_list::broadcast::send(events, None).await {
@@ -977,7 +947,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         break;
     }
     if !success {
-        Err(anyhow::anyhow!("batch_write to external db failed"))
+        Err(anyhow::anyhow!("batch_write to db failed"))
     } else {
         Ok(())
     }
@@ -1098,7 +1068,11 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     }
                     Some(file_name)
                 } else {
-                    log::error!("[COMPACT] download file to cache err: {}", e);
+                    log::warn!(
+                        "[COMPACT] download file to cache err: {}, file: {}",
+                        e,
+                        file_name
+                    );
                     // remove downloaded file
                     let _ = file_data::disk::remove("", &file_name).await;
                     None
@@ -1132,13 +1106,13 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
 // generate parquet file compact schema
 fn generate_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<HashMap<String, DataType>, anyhow::Error> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }

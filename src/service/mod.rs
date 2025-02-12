@@ -15,7 +15,6 @@
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
-
 pub mod alerts;
 pub mod compact;
 pub mod dashboards;
