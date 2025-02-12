@@ -83,7 +83,7 @@ export const convertMultiSQLData = async (
   const isAnnotationSeries = (series: any) => {
     // check if series name is available
     // if series name is not available then that is anotation series or we have markline or markarea
-    if (!series.name || series.mark_line || series.mark_area) return true;
+    if (!series.name && (series.markLine || series.markArea)) return true;
   };
 
   // loop on all options
