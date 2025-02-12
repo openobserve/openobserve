@@ -1222,6 +1222,7 @@ async fn process_dest_template(
         )
     };
 
+    log::debug!("[Alert URL shortening] Alert URL: {}", alert_url);
     // Shorten the alert url
     let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
         Ok(short_url) => short_url,
