@@ -295,7 +295,7 @@ pub async fn search(
             target_partitions,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let table = exec::create_parquet_table(
             &session,
             latest_schema.clone(),

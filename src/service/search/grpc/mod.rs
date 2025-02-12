@@ -66,7 +66,7 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
                 cfg.memory_cache.datafusion_max_size * cfg.common.memory_circuit_breaker_ratio
                     / 100
             );
-            log::warn!("[{trace_id}] {}", err);
+            log::warn!("[circuit_breaker {trace_id}] {}", err);
             return Err(Error::Message(err.to_string()));
         }
     }
