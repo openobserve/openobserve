@@ -115,7 +115,8 @@ pub async fn merge_parquet_files(
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
-    let target_partitions = cfg.limit.cpu_num;
+    // limit the number of partitions to 2 for each merge task
+    let target_partitions = 2;
     let ctx =
         prepare_datafusion_context(None, vec![], sort_by_timestamp_desc, target_partitions).await?;
     // register union table

@@ -1673,7 +1673,7 @@ pub fn init() -> Config {
     }
 
     // set real cpu num
-    cfg.limit.real_cpu_num = cgroup::get_cpu_limit();
+    cfg.limit.real_cpu_num = max(1, cgroup::get_cpu_limit());
     // set at least 2 threads
     let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
@@ -2125,7 +2125,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.memory_cache.bucket_num == 0 {
-        cfg.memory_cache.bucket_num = 1;
+        cfg.memory_cache.bucket_num = cfg.limit.real_cpu_num;
     }
     cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
     cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
@@ -2240,7 +2240,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.bucket_num == 0 {
-        cfg.disk_cache.bucket_num = 1;
+        cfg.disk_cache.bucket_num = cfg.limit.real_cpu_num;
     }
     cfg.disk_cache.bucket_num = max(
         cfg.disk_cache.bucket_num,
