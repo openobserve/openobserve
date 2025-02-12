@@ -314,6 +314,11 @@ pub async fn create<C: TransactionTrait>(
         Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
             // unique violation will occur when we try to re-insert the same combination
             // which is ok, because what we want is already there.
+            log::error!(
+                "Error creating alert (db-error): {}, is_unique_violation: {}",
+                e,
+                e.is_unique_violation()
+            );
             if e.is_unique_violation() {
                 alert.id = Some(Ksuid::from_str(&id).unwrap());
                 return Ok(alert);
@@ -321,9 +326,12 @@ pub async fn create<C: TransactionTrait>(
                 return Err(errors::DbError::SeaORMError(e.to_string()).into());
             }
         }
-        Err(e) => Err(errors::Error::DbError(errors::DbError::SeaORMError(
-            e.to_string(),
-        )))?,
+        Err(e) => {
+            log::error!("Error creating alert (non-db error): {}", e);
+            Err(errors::Error::DbError(errors::DbError::SeaORMError(
+                e.to_string(),
+            )))?
+        }
     };
     let alert = alert_m.try_into()?;
     txn.commit().await?;
