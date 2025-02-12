@@ -572,10 +572,14 @@ mod tests {
         assert!(get_cached_online_query_nodes(None).await.is_some());
         assert!(get_cached_online_ingester_nodes().await.is_some());
         assert!(get_cached_online_querier_nodes(None).await.is_some());
-    }
 
-    #[tokio::test]
-    async fn test_consistent_hashing() {
+        // Reset the global state.
+        QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await.clear();
+        QUERIER_BACKGROUND_CONSISTENT_HASH.write().await.clear();
+        COMPACTOR_CONSISTENT_HASH.write().await.clear();
+        FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await.clear();
+
+        // Test consistent hash logic.
         let node = load_local_node();
         for i in 0..10 {
             let node_q = Node {
