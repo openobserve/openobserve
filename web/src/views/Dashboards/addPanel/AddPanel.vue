@@ -1126,6 +1126,12 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
+      if(dashboardPanelData.data.type === 'custom_chart' && errorData.errors.length > 0){
+        showErrorNotification(
+          "There are some errors, please fix them and try again",
+        );
+        return;
+      }
       if (!isValid(false, true)) {
         return;
       }
