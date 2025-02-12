@@ -216,7 +216,17 @@ async fn handle_diff_schema(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Result<Option<SchemaEvolution>> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
+    log::debug!(
+        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts
+    );
+
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
@@ -374,6 +384,15 @@ async fn handle_diff_schema(
         need_original,
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
+
+    log::debug!(
+        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts,
+        start.elapsed().as_millis()
+    );
 
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
