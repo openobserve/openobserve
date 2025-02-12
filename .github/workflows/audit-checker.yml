@@ -6,7 +6,7 @@ on:
       - '**/Cargo.lock'
 jobs:
   security_audit:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/audit-check@v1
