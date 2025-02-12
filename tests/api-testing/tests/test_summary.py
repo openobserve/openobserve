@@ -56,11 +56,20 @@ def test_ingest_data(create_session, base_url):
         data = f.read()
 
     url_ing = f"{base_url}api/{org_id}/{stream_name}/_json"
+
+    print("Ingested URL", url_ing)  # Add this for debugging
+
     resp_ing = session.post(url_ing, data=data, headers={"Content-Type": "application/json"})
 
     print("Data ingested successfully for Summary, status code:", resp_ing.status_code)
     print("Response content:", resp_ing.text)  
     assert resp_ing.status_code == 200, f"Data ingestion failed, status code: {resp_ing.status_code}"
+
+    # Wait for a few seconds to allow the data to be ingested
+    time.sleep(5)  # Increase this time if necessary
+    
+
+
 
 
 @pytest.fixture
@@ -91,5 +100,33 @@ def test_summary(create_session, base_url_sc):
     expected_num_streams_sc = 1  # Adjust based on our expectations
 
     assert actual_num_streams_sc == expected_num_streams_sc, f"Expected to be {expected_num_streams_sc}, but got {actual_num_streams_sc}"
+
+    # Proceed to delete the stream
+    resp_delete_stream= session.delete(f"{url_sc}api/{org_id}/streams/{stream_name}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream.text}")
+    assert resp_delete_stream.status_code == 200, f"Failed to delete  {stream_name}"
+    print(f"Successfully deleted stream {stream_name}")
+
+
+
+def test_summary_validate(create_session, base_url):
+    """Run an E2E test for summary mode."""
+    session = create_session
+    session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)  # Add this line
+
+    url = base_url
+
+    print("Base URL:", url) 
+
+    time.sleep(5)  # Increase this time if necessary
+
+    # Verify stream is deleted
+    resp_verify_stream = session.get(f"{url}api/{org_id}/streams/{stream_name}/schema?type=logs")
+    assert resp_verify_stream.status_code == 404, f"Expected 404 for deleted stream, got {resp_verify_stream.status_code}"
+
+    print(f"Base URL deleted stream {stream_name}")
+
+
+
 
     
