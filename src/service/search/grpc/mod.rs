@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,6 +25,10 @@ use infra::errors::{Error, Result};
 pub mod flight;
 pub mod storage;
 pub mod wal;
+
+// if the cached files more than this threshold * cpu_num, use an async job to do it in the
+// background, and only waiting for first 2 * cpu_num files download
+pub const CACHE_FILES_THRESHOLD: usize = 2;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
 

@@ -228,7 +228,7 @@ pub async fn search(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, deleted_files) = cache_files(
+    let (cache_type, downloaded_num, deleted_files) = cache_files(
         &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &mut scan_stats,
@@ -245,7 +245,7 @@ pub async fn search(
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, downloaded {} files, into {:?}, others downloading in background, took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -253,6 +253,7 @@ pub async fn search(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
+        downloaded_num,
         cache_type,
         cache_start.elapsed().as_millis()
     );
@@ -317,7 +318,17 @@ async fn cache_files(
     trace_id: &str,
     files: &[&str],
     scan_stats: &mut ScanStats,
-) -> Result<(file_data::CacheType, Vec<String>), Error> {
+) -> Result<(file_data::CacheType, usize, Vec<String>), Error> {
+    // check how many files already cached
+    for file in files {
+        if file_data::memory::exist(file).await {
+            scan_stats.querier_memory_cached_files += 1;
+        } else if file_data::disk::exist(file).await {
+            scan_stats.querier_disk_cached_files += 1;
+        }
+    }
+
+    // check cache size
     let cfg = get_config();
     let cache_type = if cfg.memory_cache.enabled
         && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
@@ -331,79 +342,111 @@ async fn cache_files(
         // if scan_compressed_size < ZO_DISK_CACHE_SKIP_SIZE, use disk cache
         file_data::CacheType::Disk
     } else {
-        // no cache
-        return Ok((file_data::CacheType::None, vec![]));
+        // no cache, the files are too big than cache size
+        return Ok((file_data::CacheType::None, 0, vec![]));
     };
 
+    // fast path, only a few files, we download them directly
+    let cfg = get_config();
+    let limit = cfg.limit.cpu_num * super::CACHE_FILES_THRESHOLD;
+    if files.len() <= limit {
+        return cache_files_inner(trace_id, files, cache_type).await;
+    }
+
+    // slow path, use an async job to do it in the background
+    // group the files, one group is 2 * cpu_num files, and others in the next group
+    let mut files = files.to_vec();
+    let need_files = files.drain(..limit).collect_vec();
+    let rest_files = files.into_iter().map(|f| f.to_string()).collect_vec();
+    let trace_id_clone = trace_id.to_string();
+    tokio::spawn(async move {
+        let start = std::time::Instant::now();
+        let files = rest_files.iter().map(|f| f.as_str()).collect_vec();
+        match cache_files_inner(&trace_id_clone, &files, cache_type).await {
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] search->storage: cache files in background error: {:?}",
+                    trace_id_clone,
+                    e
+                );
+            }
+            Ok((cache_type, downloaded_num, _)) => {
+                log::info!(
+                "[trace_id {}] search->storage: cache files in background into {:?} cache done, download {} files, took: {} ms",
+                trace_id_clone,
+                cache_type,
+                downloaded_num,
+                start.elapsed().as_millis()
+            );
+            }
+        }
+    });
+    cache_files_inner(trace_id, &need_files, cache_type).await
+}
+
+#[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
+async fn cache_files_inner(
+    trace_id: &str,
+    files: &[&str],
+    cache_type: file_data::CacheType,
+) -> Result<(file_data::CacheType, usize, Vec<String>), Error> {
+    let cfg = get_config();
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     for file in files.iter() {
         let trace_id = trace_id.to_string();
         let file_name = file.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
-            async move {
-                let cfg = get_config();
-                let ret = match cache_type {
-                    file_data::CacheType::Memory => {
-                        let mut disk_exists = false;
-                        let mem_exists = file_data::memory::exist(&file_name).await;
-                        if !mem_exists && !cfg.memory_cache.skip_disk_check {
-                            // when skip_disk_check = false, need to check disk cache
-                            disk_exists = file_data::disk::exist(&file_name).await;
-                        }
-                        if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                            (
-                                file_data::memory::download(&trace_id, &file_name)
-                                    .await
-                                    .err(),
-                                false,
-                                false,
-                            )
-                        } else {
-                            (None, mem_exists, disk_exists)
-                        }
+        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
+            let cfg = get_config();
+            let ret = match cache_type {
+                file_data::CacheType::Memory => {
+                    let mut disk_exists = false;
+                    let mem_exists = file_data::memory::exist(&file_name).await;
+                    if !mem_exists && !cfg.memory_cache.skip_disk_check {
+                        // when skip_disk_check = false, need to check disk cache
+                        disk_exists = file_data::disk::exist(&file_name).await;
                     }
-                    file_data::CacheType::Disk => {
-                        if !file_data::disk::exist(&file_name).await {
-                            (
-                                file_data::disk::download(&trace_id, &file_name).await.err(),
-                                false,
-                                false,
-                            )
-                        } else {
-                            (None, false, true)
-                        }
+                    if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
+                        file_data::memory::download(&trace_id, &file_name)
+                            .await
+                            .err()
+                    } else {
+                        None
                     }
-                    _ => (None, false, false),
-                };
-                // return file_name if download failed
-                let file_name = if let Some(e) = ret.0 {
-                    log::warn!(
+                }
+                file_data::CacheType::Disk => {
+                    if !file_data::disk::exist(&file_name).await {
+                        file_data::disk::download(&trace_id, &file_name).await.err()
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            // return file_name if download failed
+            let file_name = if let Some(e) = ret {
+                log::warn!(
                         "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
                         e,
                         file_name
                     );
-                    Some(file_name)
-                } else {
-                    None
-                };
-                drop(permit);
-                (file_name, ret.1, ret.2)
-            },
-        );
+                Some(file_name)
+            } else {
+                None
+            };
+            drop(permit);
+            file_name
+        });
         tasks.push(task);
     }
 
+    let mut download_num = 0;
     let mut delete_files = Vec::new();
     for task in tasks {
         match task.await {
-            Ok((file, mem_exists, disk_exists)) => {
-                if mem_exists {
-                    scan_stats.querier_memory_cached_files += 1;
-                } else if disk_exists {
-                    scan_stats.querier_disk_cached_files += 1;
-                }
+            Ok(file) => {
+                download_num += 1;
                 if let Some(file) = file {
                     delete_files.push(file);
                 }
@@ -417,7 +460,7 @@ async fn cache_files(
         }
     }
 
-    Ok((cache_type, delete_files))
+    Ok((cache_type, download_num, delete_files))
 }
 
 /// Filter file list using inverted index
@@ -454,7 +497,7 @@ pub async fn filter_file_list_by_tantivy_index(
         })
         .collect_vec();
     scan_stats.querier_files = index_file_names.len() as i64;
-    let (cache_type, _) = cache_files(
+    let (cache_type, downloaded_num, _) = cache_files(
         &query.trace_id,
         &index_file_names
             .iter()
@@ -465,7 +508,7 @@ pub async fn filter_file_list_by_tantivy_index(
     .await?;
 
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, downloaded {} files, into {:?}, others downloading in background, took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -473,6 +516,7 @@ pub async fn filter_file_list_by_tantivy_index(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
+        downloaded_num,
         cache_type,
         start.elapsed().as_millis()
     );
