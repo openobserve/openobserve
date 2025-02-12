@@ -62,7 +62,7 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 
 /// Shortens the given original URL and stores it in the database
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
-    let mut short_id = generate_short_id(original_url, None);
+    let mut short_id = generate_short_id(original_url, Some(Utc::now().timestamp_micros()));
 
     if let Ok(existing_url) = db::short_url::get(&short_id).await {
         if existing_url == original_url {
@@ -77,7 +77,7 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
             if let Some(infra_error) = e.downcast_ref::<Error>() {
                 match infra_error {
                     Error::DbError(DbError::UniqueViolation) => {
-                        let timestamp = Utc::now().timestamp();
+                        let timestamp = Utc::now().timestamp_micros();
                         short_id = generate_short_id(original_url, Some(timestamp));
                         store_short_url(org_id, &short_id, original_url).await
                     }
