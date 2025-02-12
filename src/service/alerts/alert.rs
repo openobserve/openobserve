@@ -1232,11 +1232,16 @@ async fn process_dest_template(
         )
     };
 
+    log::debug!("[ALERT] alert_url: {}", alert_url);
+
     // Shorten the alert url
     let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
-        Ok(short_url) => short_url,
+        Ok(short_url) => {
+            log::debug!("[ALERT] short_url: {}", short_url);
+            short_url
+        }
         Err(e) => {
-            log::error!("Error shortening alert url: {e}");
+            log::error!("[ALERT] Error shortening alert url: {e}");
             alert_url
         }
     };
