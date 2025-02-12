@@ -610,13 +610,13 @@ mod tests {
 
         // gxhash hash
         let data = [
-            ["test", "node-q-4", "node-c-8"],
-            ["test1", "node-q-6", "node-c-2"],
-            ["test2", "node-q-2", "node-c-0"],
-            ["test3", "node-q-6", "node-c-3"],
-            ["test4", "node-q-1", "node-c-6"],
-            ["test5", "node-q-1", "node-c-0"],
-            ["test6", "node-q-2", "node-c-1"],
+            ["test", "node-q-5", "node-c-7"],
+            ["test1", "node-q-6", "node-c-9"],
+            ["test2", "node-q-4", "node-c-6"],
+            ["test3", "node-q-9", "node-c-1"],
+            ["test4", "node-q-0", "node-c-4"],
+            ["test5", "node-q-6", "node-c-7"],
+            ["test6", "node-q-6", "node-c-0"],
         ];
 
         remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
