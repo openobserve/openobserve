@@ -50,6 +50,8 @@ import {
 } from "echarts/components";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
+import DOMPurify from "dompurify";
+
 // Register necessary components
 echarts.use([
   TitleComponent,
@@ -109,6 +111,18 @@ export default defineComponent({
 
         return obj; // If it's not a function string or an object, return it as is
       };
+      function deepSanitize(obj) {
+        if (typeof obj === 'string') {
+          return DOMPurify.sanitize(obj);
+        } else if (Array.isArray(obj)) {
+          return obj.map(deepSanitize);
+        } else if (typeof obj === 'object' && obj !== null) {
+          return Object.fromEntries(
+            Object.entries(obj).map(([key, value]) => [key, deepSanitize(value)])
+          );
+        }
+        return obj;
+      }
 
 
     const initChart = async () => {
@@ -129,9 +143,9 @@ export default defineComponent({
 
 
       const convertedData = convertStringToFunction(props.data);
-
+      const safeChartOptions = deepSanitize(convertedData);
+        chart.setOption(safeChartOptions);
       // Now, set the option with the executed functions
-      chart.setOption(convertedData);
       chart.on("click", (params) => emit("click", params));
       chart.on("mousemove", (params) => emit("mousemove", params));
       chart.on("mouseout", () => emit("mouseout"));
