@@ -2243,7 +2243,28 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.bucket_num == 0 {
-        cfg.disk_cache.bucket_num = 1;
+        // because we validate thread_query_num before this
+        // we can be sure here that that value is sane.
+
+        // following numbers are imperically decided, users can set the value
+        // directly if they know better, otherwise this was the best numbers
+        // for bucket_num based on thread count.
+        let threads = cfg.limit.query_thread_num;
+        if threads <= 16 {
+            // for less than 16 threads, same buckets would be good enough
+            // with 16 files in parallel we should not run into that many
+            // files going into same bucket, so ok.
+            cfg.disk_cache.bucket_num = cfg.limit.query_thread_num;
+        } else if threads > 16 && threads <= 64 {
+            // for 32 -> 64 ish range, there can be a lot of collisions
+            // so we set it to double the threads to avoid any collisions
+            cfg.disk_cache.bucket_num = 2 * threads;
+        } else {
+            // for > 64 threads, it was observed that even with 1.5 times buckets
+            // it is ok, not that many collisions. This is imperical, no concrete
+            // reasoning for 1.5
+            cfg.disk_cache.bucket_num = (threads as f64 * 1.5) as usize;
+        }
     }
     cfg.disk_cache.bucket_num = max(
         cfg.disk_cache.bucket_num,
