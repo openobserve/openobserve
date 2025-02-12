@@ -17,10 +17,11 @@ use config::cluster::LOCAL_NODE;
 use sea_orm::{
     prelude::Expr,
     sea_query::{Keyword, LockType, SimpleExpr},
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait, UpdateMany, UpdateResult,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    RuntimeErr, Set, TransactionTrait, UpdateMany, UpdateResult,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::Error as SqlxError;
 
 use super::{
     super::{
@@ -169,12 +170,23 @@ pub async fn submit(job: ActiveModel) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _res = match Entity::insert(job).exec(client).await {
-        Ok(res) => res,
-        Err(e) => return orm_err!(format!("submit search job error: {e}")),
-    };
-
-    Ok(())
+    match Entity::insert(job).exec(client).await {
+        Ok(_res) => Ok(()),
+        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+            // unique violation will occur when we try to re-insert the same combination
+            // which is ok, because what we want is already there.
+            if e.is_unique_violation() {
+                Ok(())
+            } else {
+                Err(errors::Error::DbError(errors::DbError::SeaORMError(
+                    e.to_string(),
+                )))
+            }
+        }
+        Err(e) => Err(errors::Error::DbError(errors::DbError::SeaORMError(
+            e.to_string(),
+        ))),
+    }
 }
 
 // get the job and update status
@@ -408,11 +420,25 @@ pub async fn retry_search_job(
     };
 
     // insert into job result table
-    if let Err(e) = JobResultEntity::insert(record).exec(&tx).await {
-        if let Err(e) = tx.rollback().await {
-            return orm_err!(format!("retry job rollback error: {e}"));
+    match JobResultEntity::insert(record).exec(&tx).await {
+        Ok(_) => {}
+        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+            // unique violation will occur when we try to re-insert the same combination
+            // which is ok, because what we want is already there.
+            if !e.is_unique_violation() {
+                if let Err(e) = tx.rollback().await {
+                    return orm_err!(format!("retry job rollback error: {e}"));
+                }
+                return orm_err!(format!("retry job insert job result error: {e}"));
+            }
         }
-        return orm_err!(format!("retry job insert job result error: {e}"));
+        Err(e) => {
+            log::error!("retry job insert job result error: {e}");
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("retry job rollback error: {e}"));
+            }
+            return orm_err!(format!("retry job insert job result error: {e}"));
+        }
     };
 
     // reset all error job's status, result_path, error_message

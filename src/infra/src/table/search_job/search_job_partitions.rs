@@ -16,9 +16,11 @@
 use sea_orm::{
     prelude::Expr,
     sea_query::{LockType, SimpleExpr},
-    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
+    ColumnTrait, DbErr, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, RuntimeErr,
+    TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::Error as SqlxError;
 
 use super::{
     super::{entity::search_job_partitions::*, get_lock},
@@ -160,15 +162,27 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
     };
 
     let jobs: Vec<ActiveModel> = jobs.into_iter().map(|job| job.into()).collect::<Vec<_>>();
-    let res = Entity::insert_many(jobs).exec(&tx).await;
-
-    if let Err(e) = res {
-        log::error!("submit partition job insert error: {}", e);
-        if let Err(e) = tx.rollback().await {
-            return orm_err!(format!("submit partition job rollback error: {e}"));
+    match Entity::insert_many(jobs).exec(&tx).await {
+        Ok(_) => {}
+        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+            // unique violation will occur when we try to re-insert the same combination
+            // which is ok, because what we want is already there.
+            if !e.is_unique_violation() {
+                log::error!("submit partition job insert error: {}", e);
+                if let Err(e) = tx.rollback().await {
+                    return orm_err!(format!("submit partition job rollback error: {e}"));
+                }
+                return orm_err!(format!("submit partition job insert error: {e}"));
+            }
         }
-        return orm_err!(format!("submit partition job insert error: {e}"));
-    }
+        Err(e) => {
+            log::error!("submit partition job insert error: {}", e);
+            if let Err(e) = tx.rollback().await {
+                return orm_err!(format!("submit partition job rollback error: {e}"));
+            }
+            return orm_err!(format!("submit partition job insert error: {e}"));
+        }
+    };
 
     if let Err(e) = tx.commit().await {
         return orm_err!(format!("submit partition job commit error: {e}"));
