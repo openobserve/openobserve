@@ -1017,11 +1017,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
-      
+
       <div style="width: 100%; display: flex; gap: 16px">
         <q-input
-          v-model.number="dashboardPanelData.data.config.soft_min"
-          :label="t('common.softMin')"
+          v-model.number="dashboardPanelData.data.config.y_axis_min"
+          :label="t('common.yAxisMin')"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1035,15 +1035,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Auto"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.soft_min =
+              (dashboardPanelData.data.config.y_axis_min =
                 value !== '' ? value : null)
           "
-          data-test="dashboard-config-soft_min"
+          data-test="dashboard-config-y_axis_min"
         >
         </q-input>
         <q-input
-          v-model.number="dashboardPanelData.data.config.soft_max"
-          :label="t('common.softMax')"
+          v-model.number="dashboardPanelData.data.config.y_axis_max"
+          :label="t('common.yAxisMax')"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1057,10 +1057,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Auto"
           @update:model-value="
             (value: any) =>
-              (dashboardPanelData.data.config.soft_max =
+              (dashboardPanelData.data.config.y_axis_max =
                 value !== '' ? value : null)
           "
-          data-test="dashboard-config-soft_max"
+          data-test="dashboard-config-y_axis_max"
         >
         </q-input>
       </div>
