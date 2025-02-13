@@ -17,6 +17,7 @@ import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
 
+
 /**
  * Converts SQL data into a format suitable for rendering a chart.
  *
@@ -35,8 +36,11 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     document.body.appendChild(iframe);
 
     let staticEchartsRef = "/web/src/assets/dashboard/echarts.min.js";
+    let staticPurifierRef = "/web/src/assets/dashboard/purify.min.js";
+
     if (!window.location.pathname.includes("web")) {
       staticEchartsRef = "/src/assets/dashboard/echarts.min.js";
+      staticPurifierRef = "/src/assets/dashboard/purify.min.js";
     }
     let userCode = panelSchema.customChartContent;
 
@@ -61,6 +65,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   ">
 
   <script src="${staticEchartsRef}" nonce="${nonce}"></script>
+  <script src="${staticPurifierRef}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
     let securityPolicyError = false;
     let cspViolationDetected = false;
@@ -87,7 +92,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
           const userCode = event.data.code.trim();
 
           const convertFunctionsToString = (obj) => {
-            if (typeof obj === 'function') return obj.toString();
+            if (typeof obj === 'function') {
+              try {
+                const functionString = obj.toString();
+                return DOMPurify.sanitize(functionString); // Sanitize function string
+              } catch (e) {
+                return 'Error sanitizing function';
+              }
+            }
             if (Array.isArray(obj)) return obj.map(convertFunctionsToString);
             if (typeof obj === 'object' && obj !== null) {
               return Object.fromEntries(
@@ -96,6 +108,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             }
             return obj;
           };
+
 
           // Execution timeout to prevent infinite loops
           const timeout = setTimeout(() => {

@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="markdown-editor"
-    style="width: 100%; height: 100%; overflow: auto"
   >
-    <div style="width: 100%; height: 100%">
+    <div style="width: 100%; height: calc(100% - 1px)">
           <div class="col" style="height: 100%">
             <QueryEditor
               v-model:query="javascriptCodeContent"
@@ -72,7 +71,8 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. The 'data' variable is available for use \n// Example Usage: data[0].map((val)=>val.x_axis).\noption = {  \n \n};`
+      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  `
     },
   },
   setup(props, { emit }): any {
