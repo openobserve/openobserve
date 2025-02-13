@@ -371,7 +371,7 @@ impl Engine {
 
         // Evaluation timestamp.
         let eval_ts = self.time;
-        // let start = eval_ts - self.ctx.lookback_delta;
+        let start = eval_ts - self.ctx.lookback_delta;
 
         let mut offset_modifier: i64 = 0;
         if let Some(offset) = selector.offset {
@@ -390,16 +390,26 @@ impl Engine {
             let end_index = metric
                 .samples
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
-            if end_index > 0 && metric.samples[end_index - 1].timestamp + offset_modifier <= eval_ts
-            {
-                let last_value = metric.samples[end_index - 1].value;
-                values.push(
-                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                    InstantValue {
-                        labels: metric.labels.clone(),
-                        sample: Sample::new(eval_ts, last_value),
-                    },
-                );
+            let match_sample = if end_index > 0 {
+                metric.samples.get(end_index - 1)
+            } else if metric.samples.len() > 0 {
+                metric.samples.first()
+            } else {
+                None
+            };
+            if let Some(sample) = match_sample {
+                if sample.timestamp + offset_modifier <= eval_ts
+                    && sample.timestamp + offset_modifier > start
+                {
+                    let last_value = sample.value;
+                    values.push(
+                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                        InstantValue {
+                            labels: metric.labels.clone(),
+                            sample: Sample::new(eval_ts, last_value),
+                        },
+                    );
+                }
             }
         }
         Ok(values)
