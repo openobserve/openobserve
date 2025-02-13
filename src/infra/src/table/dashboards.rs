@@ -449,7 +449,6 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
         obj.remove("role");
         obj.remove("title");
         obj.remove("description");
-        obj.remove("updatedAt");
     }
 
     Ok(data)

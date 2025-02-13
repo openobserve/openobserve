@@ -40,7 +40,7 @@ pub struct Dashboard {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layouts: Option<Vec<Layout>>,
     pub variables: Option<Variables>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub updated_at: i64,
 }
 

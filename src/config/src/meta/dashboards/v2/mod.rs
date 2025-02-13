@@ -41,7 +41,7 @@ pub struct Dashboard {
     pub panels: Vec<Panel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub updated_at: i64,
 }
 

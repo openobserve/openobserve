@@ -43,7 +43,7 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub updated_at: i64,
 }
 
