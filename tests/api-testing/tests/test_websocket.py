@@ -553,12 +553,9 @@ def test_websocket_histogram(create_session, base_url, test_name, hist_query, ex
 
 
 @pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
-def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total_exp):
+def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
     """Test WebSocket with sql when websocket is enabled ."""
     # Prepare headers with cookies
-
-    session = create_session
-    url = base_url
 
     cookie_header_sql = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
     
@@ -567,9 +564,6 @@ def test_websocket_sql(create_session, base_url, test_name_sql, sql_query, sql_s
 
     # Construct the WebSocket URL
     WS_URL_sql = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql}"
-
-    # Example of using the WS_URL
-    # print("WebSocket SQL URL:", WS_URL_sql)
 
     # Now we can use WS_URL in our WebSocket connection
 
