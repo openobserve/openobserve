@@ -84,13 +84,8 @@ jobs:
         run: pip install websocat
         working-directory: 'tests/api-testing/'
            
-      - name: Check WebSocket Server
-        run: |
-          echo "Checking WebSocket connection..."
-          WS_URL="ws://localhost:5080/api/default/ws/test_uuid"
-          if ! (echo "exit" | websocat $WS_URL); then
-          echo "WebSocket server is not reachable."
-          exit 1
-          fi
-          echo "WebSocket server is reachable."
+      - name: Run websocket tests
+        run: websocat $WS_ZO_BASE_URL/ws/echo
+        working-directory: 'tests/api-testing/'
+        
 
