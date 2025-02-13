@@ -138,16 +138,24 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => Ok(()),
-        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
-            // unique violation will occur when we try to re-insert the same combination
-            // which is ok, because what we want is already there.
-            if e.is_unique_violation() {
-                Ok(())
-            } else {
-                Err(Error::DbError(DbError::SeaORMError(e.to_string())))
+        Err(e) => match e {
+            DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e))) => {
+                if e.is_unique_violation() {
+                    Ok(())
+                } else {
+                    Err(Error::DbError(DbError::SeaORMError(e.to_string())))
+                }
             }
-        }
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+            // Unique violation occurs as both exec and query error
+            DbErr::Query(RuntimeErr::SqlxError(SqlxError::Database(e))) => {
+                if e.is_unique_violation() {
+                    Ok(())
+                } else {
+                    Err(Error::DbError(DbError::SeaORMError(e.to_string())))
+                }
+            }
+            _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+        },
     }
 }
 
