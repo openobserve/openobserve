@@ -392,7 +392,7 @@ impl Engine {
                 .partition_point(|v| v.timestamp + offset_modifier <= eval_ts);
             let match_sample = if end_index > 0 {
                 metric.samples.get(end_index - 1)
-            } else if metric.samples.len() > 0 {
+            } else if !metric.samples.is_empty() {
                 metric.samples.first()
             } else {
                 None
