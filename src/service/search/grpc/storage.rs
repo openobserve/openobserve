@@ -232,14 +232,20 @@ pub async fn search(
         &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &mut scan_stats,
+        "parquet",
     )
     .instrument(enter_span.clone())
     .await?;
 
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!("downloading others into {:?} in background,", cache_type)
+    };
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, downloading others into {:?} in background, took: {} ms",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -247,7 +253,6 @@ pub async fn search(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        cache_type,
         cache_start.elapsed().as_millis()
     );
 
@@ -311,6 +316,7 @@ async fn cache_files(
     trace_id: &str,
     files: &[&str],
     scan_stats: &mut ScanStats,
+    file_type: &str,
 ) -> Result<file_data::CacheType, Error> {
     // check how many files already cached
     for file in files.iter() {
@@ -347,25 +353,28 @@ async fn cache_files(
 
     let trace_id = trace_id.to_string();
     let files = files.iter().map(|f| f.to_string()).collect_vec();
+    let file_type = file_type.to_string();
     tokio::spawn(async move {
         let start = std::time::Instant::now();
         let files = files.iter().map(|f| f.as_str()).collect_vec();
         match cache_files_inner(&trace_id, &files, cache_type).await {
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] search->storage: cache files in background error: {:?}",
+                    "[trace_id {}] search->storage: cache {} files in background error: {:?}",
                     trace_id,
+                    file_type,
                     e
                 );
             }
             Ok(cache_type) => {
                 log::info!(
-                "[trace_id {}] search->storage: cache files in background into {:?} cache done, download {} files, took: {} ms",
-                trace_id,
-                cache_type,
-                files.len(),
-                start.elapsed().as_millis()
-            );
+                    "[trace_id {}] search->storage: cache {} files in background into {:?} cache done, downloaded {} files, took: {} ms",
+                    trace_id,
+                    file_type,
+                    cache_type,
+                    files.len(),
+                    start.elapsed().as_millis()
+                );
             }
         }
     });
@@ -478,11 +487,17 @@ pub async fn filter_file_list_by_tantivy_index(
             .map(|(ttv_file, _)| ttv_file.as_str())
             .collect_vec(),
         &mut scan_stats,
+        "index",
     )
     .await?;
 
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!("downloading others into {:?} in background,", cache_type)
+    };
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, downloading others into {:?} in background, took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -490,7 +505,6 @@ pub async fn filter_file_list_by_tantivy_index(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        cache_type,
         start.elapsed().as_millis()
     );
 
