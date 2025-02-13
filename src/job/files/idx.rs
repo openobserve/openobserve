@@ -109,7 +109,7 @@ pub(crate) async fn write_parquet_index_to_disk(
         let mut buf_parquet = Vec::new();
         let bf_fields = vec!["term".to_string()];
         let mut writer =
-            new_parquet_writer(&mut buf_parquet, &schema, &bf_fields, &file_meta, false);
+            new_parquet_writer(&mut buf_parquet, &schema, &bf_fields, &file_meta, true);
         writer.write(&batch).await?;
         writer.close().await?;
         file_meta.compressed_size = buf_parquet.len() as i64;

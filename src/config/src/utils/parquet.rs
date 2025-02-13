@@ -39,7 +39,7 @@ pub fn new_parquet_writer<'a>(
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
-    is_downsampling: bool,
+    write_metadata: bool,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
     let mut writer_props = WriterProperties::builder()
@@ -55,7 +55,7 @@ pub fn new_parquet_writer<'a>(
             cfg.common.column_timestamp.as_str().into(),
             Encoding::DELTA_BINARY_PACKED,
         );
-    if !is_downsampling {
+    if write_metadata {
         writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
             KeyValue::new("max_ts".to_string(), metadata.max_ts.to_string()),
@@ -96,7 +96,7 @@ pub async fn write_recordbatch_to_parquet(
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, false);
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, true);
     for batch in record_batches {
         writer.write(batch).await?;
     }

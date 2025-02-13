@@ -186,7 +186,7 @@ impl Partition {
                 &schema,
                 &bloom_filter_fields,
                 &file_meta,
-                false,
+                true,
             );
 
             writer
