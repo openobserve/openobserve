@@ -19,8 +19,6 @@ env:
   ZO_BASE_URL: http://localhost:5080
   WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
-  WS_ZO_BASE_URL: ws://localhost:5080
-  ZO_BASE_URL_SC: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -225,4 +223,4 @@ jobs:
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
-          retention-days: 30
+          retention-days: 7
