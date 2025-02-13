@@ -4024,14 +4024,13 @@ const useLogs = () => {
       }
 
       // Update selected fields if needed
+      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
       if (searchObj.data.stream.selectedFields.length > 0) {
-        const validFieldNames = new Set(allStreamFields.map(item => item.name));
         searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields
-          .filter(fieldName => validFieldNames.has(fieldName));
+          .filter(fieldName => streamFieldNames.has(fieldName));
       }
 
       // Update interesting fields list
-      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
       searchObj.data.stream.interestingFieldList = searchObj.data.stream.interestingFieldList
         .filter(fieldName => streamFieldNames.has(fieldName));
 
