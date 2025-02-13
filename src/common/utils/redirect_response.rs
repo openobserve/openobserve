@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,10 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{http::header::ContentType, HttpResponse, ResponseError};
+use actix_web::{
+    http::header::{ContentType, LOCATION},
+    HttpResponse, ResponseError,
+};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -52,7 +55,7 @@ impl RedirectResponse {
         let redirect_uri = self.build_full_redirect_uri();
         if redirect_uri.len() < 1024 {
             HttpResponse::Found()
-                .append_header(("Location", redirect_uri))
+                .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
             let html = format!(
