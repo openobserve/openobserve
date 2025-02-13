@@ -39,6 +39,7 @@ pub fn new_parquet_writer<'a>(
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
+    is_downsampling: bool,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let cfg = get_config();
     let mut writer_props = WriterProperties::builder()
@@ -53,8 +54,9 @@ pub fn new_parquet_writer<'a>(
         .set_column_encoding(
             cfg.common.column_timestamp.as_str().into(),
             Encoding::DELTA_BINARY_PACKED,
-        )
-        .set_key_value_metadata(Some(vec![
+        );
+    if !is_downsampling {
+        writer_props = writer_props.set_key_value_metadata(Some(vec![
             KeyValue::new("min_ts".to_string(), metadata.min_ts.to_string()),
             KeyValue::new("max_ts".to_string(), metadata.max_ts.to_string()),
             KeyValue::new("records".to_string(), metadata.records.to_string()),
@@ -63,6 +65,7 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
+    }
     // Bloom filter stored by row_group, set NDV to reduce the memory usage.
     // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
@@ -93,7 +96,7 @@ pub async fn write_recordbatch_to_parquet(
     metadata: &FileMeta,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, false);
     for batch in record_batches {
         writer.write(batch).await?;
     }

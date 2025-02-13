@@ -161,7 +161,7 @@ pub async fn merge_parquet_files(
 
     // write result to parquet file
     let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata);
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, metadata, false);
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -233,7 +233,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let mut buf = Vec::with_capacity(cfg.compact.max_file_size as usize);
     let mut file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata);
+    let mut writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata, true);
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
     loop {
         match batch_stream.try_next().await {
@@ -254,7 +254,8 @@ pub async fn merge_parquet_files_with_downsampling(
                     // reset for next file
                     buf.clear();
                     file_meta = FileMeta::default();
-                    writer = new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata);
+                    writer =
+                        new_parquet_writer(&mut buf, &schema, bloom_filter_fields, &metadata, true);
                 }
                 if let Err(e) = writer.write(&batch).await {
                     log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
