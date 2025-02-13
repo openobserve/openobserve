@@ -22,7 +22,7 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
+    let file_data = FileKey::new(key.to_string(), meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
     // retry 5 times

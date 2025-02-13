@@ -175,9 +175,9 @@ pub struct FileKey {
 }
 
 impl FileKey {
-    pub fn new(key: &str, meta: FileMeta, deleted: bool) -> Self {
+    pub fn new(key: String, meta: FileMeta, deleted: bool) -> Self {
         Self {
-            key: key.to_string(),
+            key,
             meta,
             deleted,
             segment_ids: None,
