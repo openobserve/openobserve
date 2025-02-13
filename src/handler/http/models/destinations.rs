@@ -25,6 +25,9 @@ use utoipa::ToSchema;
 
 use crate::service::db::alerts::destinations::DestinationError;
 
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
+
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {
         match value.module {
@@ -91,6 +94,20 @@ impl Destination {
                         sns_topic_arn: self.sns_topic_arn.ok_or(DestinationError::InvalidSns)?,
                         aws_region: self.aws_region.ok_or(DestinationError::InvalidSns)?,
                     }),
+                    #[cfg(feature = "enterprise")]
+                    DestinationType::Action => {
+                        let action_endpoint = ActionEndpoint::new( &org_id, &self.action_id).map_err(DestinationError::InvalidActionId)?;
+                        meta_dest::DestinationType::Http(meta_dest::Endpoint {
+                            url: action_endpoint.url,
+                            method: if action_endpoint.method == reqwest::Method::POST {
+                                meta_dest::HTTPType::POST
+                            } else {
+                                meta_dest::HTTPType::GET
+                            },
+                            skip_tls_verify: action_endpoint.skip_tls,
+                            headers: None,
+                        })
+                    }
                 };
                 Ok(meta_dest::Destination {
                     id: None,
@@ -144,6 +161,8 @@ impl Template {
             DestinationType::Email => meta_dest::TemplateType::Email { title: self.title },
             DestinationType::Sns => meta_dest::TemplateType::Sns,
             DestinationType::Http => meta_dest::TemplateType::Http,
+            #[cfg(feature = "enterprise")]
+            DestinationType::Action => meta_dest::TemplateType::Http,
         };
         meta_dest::Template {
             id: None,
@@ -161,10 +180,10 @@ pub struct Destination {
     #[serde(default)]
     pub name: String,
     /// Required for `Http` destination_type
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "should_skip_if_action")]
     pub url: String,
     /// Required for `Http` destination_type
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "should_skip_if_action")]
     pub method: meta_dest::HTTPType,
     #[serde(default)]
     pub skip_tls_verify: bool,
@@ -173,9 +192,9 @@ pub struct Destination {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
     /// Required when `destination_type` is `Email`
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "should_skip_if_action")]
     pub emails: Vec<String>,
-    // New SNS-specific fields
+    // SNS-specific fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sns_topic_arn: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -183,6 +202,10 @@ pub struct Destination {
     #[serde(rename = "type")]
     #[serde(default)]
     pub destination_type: DestinationType,
+    /// Required when `destination_type` is `Action`
+    #[cfg(feature = "enterprise")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub action_id: String,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
@@ -192,6 +215,17 @@ pub enum DestinationType {
     Http,
     Email,
     Sns,
+    #[cfg(feature = "enterprise")]
+    Action,
+}
+
+// Helper functions for conditional serialization
+fn should_skip_if_action<T: Default + std::cmp::PartialEq>(value: &T) -> bool {
+    value == &T::default()
+}
+
+fn should_skip_if_not_action(value: &str) -> bool {
+    value.is_empty()
 }
 
 impl From<&str> for DestinationType {
@@ -199,6 +233,8 @@ impl From<&str> for DestinationType {
         match value.to_lowercase().as_str() {
             "email" => DestinationType::Email,
             "sns" => DestinationType::Sns,
+            #[cfg(feature = "enterprise")]
+            "action" => DestinationType::Action,
             _ => DestinationType::Http,
         }
     }
@@ -210,6 +246,8 @@ impl fmt::Display for DestinationType {
             DestinationType::Email => write!(f, "email"),
             DestinationType::Http => write!(f, "http"),
             DestinationType::Sns => write!(f, "sns"),
+            #[cfg(feature = "enterprise")]
+            DestinationType::Action => write!(f, "action"),
         }
     }
 }
