@@ -320,6 +320,12 @@ async fn cache_files(
             scan_stats.querier_disk_cached_files += 1;
         }
     }
+    if files.len() as i64
+        == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files
+    {
+        // all files are cached
+        return Ok(file_data::CacheType::None);
+    }
 
     // check cache size
     let cfg = get_config();
