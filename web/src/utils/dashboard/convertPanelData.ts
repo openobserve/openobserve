@@ -133,7 +133,7 @@ export const convertPanelData = async (
       }
       else{
         if(!loading)
-          throw new Error("No data to render Please check the query");
+          throw new Error("No data to render Please check the query.");
       }
     }
     default: {
