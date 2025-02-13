@@ -85,7 +85,7 @@ jobs:
         working-directory: 'tests/api-testing/'
            
       - name: Run websocket tests
-        # run: websocat $WS_ZO_BASE_URL/ws/echo
+        run: websocat $WS_ZO_BASE_URL/default/ws/1
         working-directory: 'tests/api-testing/'
         
 
