@@ -22,9 +22,9 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["cloud"]
-enterprise = ["dep:o2_enterprise"]
-cloud = ["enterprise", "o2_enterprise/cloud"]
+default = []
+enterprise = []
+cloud = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
@@ -114,7 +114,6 @@ maxminddb = "0.23.0"
 memchr.workspace = true
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
 once_cell.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true

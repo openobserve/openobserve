@@ -25,8 +25,6 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
-
-use super::{db::org_users, users::add_admin_to_org};
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::{
