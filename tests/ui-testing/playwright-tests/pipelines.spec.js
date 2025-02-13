@@ -3,9 +3,8 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
-// import { pipeline } from "stream";
-// import fs from "fs";
-import { v4 as uuidv4 } from "uuid";
+import { LogsPage } from '../pages/logsPage.js';
+
 
 test.describe.configure({ mode: "parallel" });
 
@@ -14,7 +13,9 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -55,17 +56,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
+
 async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Navigate to the streams menu
   await page.locator('[data-test="menu-link-\\/streams-item"]').click();
@@ -127,6 +118,7 @@ async function deletePipeline(page, randomPipelineName) {
   await page.locator('[data-test="confirm-button"]').click();
 }
 test.describe("Pipeline testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -148,6 +140,7 @@ test.describe("Pipeline testcases", () => {
  
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(5000);
     
 
@@ -168,7 +161,7 @@ test.describe("Pipeline testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
   });
 

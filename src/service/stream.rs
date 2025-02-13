@@ -600,9 +600,6 @@ pub async fn delete_stream(
         STREAM_RECORD_ID_GENERATOR.remove(&key);
     }
 
-    // delete stream stats cache
-    stats::remove_stream_stats(org_id, stream_name, stream_type);
-
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
         return Ok(

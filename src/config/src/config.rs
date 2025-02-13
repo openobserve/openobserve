@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -370,7 +370,7 @@ pub struct Config {
     pub sns: Sns,
     pub tcp: TCP,
     pub prom: Prometheus,
-    pub profiling: Pyroscope,
+    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -451,16 +451,43 @@ pub struct Smtp {
 }
 
 #[derive(EnvConfig)]
-pub struct Pyroscope {
-    #[env_config(name = "ZO_PROF_PYROSCOPE_ENABLED", default = false)]
-    pub enabled: bool,
+pub struct Profiling {
+    #[env_config(
+        name = "ZO_PROF_PPROF_ENABLED",
+        default = false,
+        help = "Enable pprof profiling with pprof-rs"
+    )]
+    pub pprof_enabled: bool,
+    #[env_config(
+        name = "ZO_PROF_PPROF_PROTOBUF_ENABLED",
+        default = false,
+        help = "Enable pprof profiling with pprof-rs encode to protobuf format"
+    )]
+    pub pprof_protobuf_enabled: bool,
+    #[env_config(
+        name = "ZO_PROF_PPROF_FLAMEGRAPH_PATH",
+        default = "",
+        help = "Path to save flamegraph"
+    )]
+    pub pprof_flamegraph_path: String,
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_ENABLED",
+        default = false,
+        help = "Enable pyroscope profiling with pyroscope-rs"
+    )]
+    pub pyroscope_enabled: bool,
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040"
+        default = "http://localhost:4040",
+        help = "Pyroscope server URL"
     )]
-    pub server_url: String,
-    #[env_config(name = "ZO_PROF_PYROSCOPE_PROJECT_NAME", default = "openobserve")]
-    pub project_name: String,
+    pub pyroscope_server_url: String,
+    #[env_config(
+        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
+        default = "openobserve",
+        help = "Pyroscope project name"
+    )]
+    pub pyroscope_project_name: String,
 }
 
 #[derive(EnvConfig)]
@@ -568,7 +595,6 @@ pub struct Common {
     pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
-    pub meta_store_external: bool, // external storage no need sync file_list to s3
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
@@ -639,6 +665,12 @@ pub struct Common {
         help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
     )]
     pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_SKIP_WAL",
+        default = false,
+        help = "Skip WAL for query"
+    )]
+    pub feature_query_skip_wal: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -659,6 +691,18 @@ pub struct Common {
     pub bloom_filter_ndv_ratio: u64,
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
+    #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_ENABLED",
+        default = false,
+        help = "Enable write queue for WAL"
+    )]
+    pub wal_write_queue_enabled: bool,
+    #[env_config(
+        name = "ZO_WAL_WRITE_QUEUE_FULL_REJECT",
+        default = false,
+        help = "Reject write when write queue is full"
+    )]
+    pub wal_write_queue_full_reject: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -929,7 +973,7 @@ pub struct Common {
     pub websocket_enabled: bool,
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
-        default = 300,
+        default = 5,
         help = "allow minimum auto refresh interval in seconds"
     )] // in seconds
     pub min_auto_refresh_interval: u32,
@@ -990,6 +1034,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
+    #[env_config(name = "ZO_WAL_WRITE_QUEUE_SIZE", default = 10000)] // 10k messages
+    pub wal_write_queue_size: usize,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -1057,7 +1103,7 @@ pub struct Limit {
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub job_runtime_shutdown_timeout: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
@@ -1067,10 +1113,22 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
     pub keep_alive_disabled: bool,
-    #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
-    pub http_slow_log_threshold: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
+    #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
+    pub http_slow_log_threshold: u64,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
+    pub circuit_breaker_watching_window: i64,
+    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
+    pub circuit_breaker_reset_window_num: i64,
+    #[env_config(
+        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
+        default = 100,
+        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
+    )] // slow requests
+    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1475,10 +1533,6 @@ pub struct S3 {
     pub connect_timeout: u64,
     #[env_config(name = "ZO_S3_REQUEST_TIMEOUT", default = 3600)] // seconds
     pub request_timeout: u64,
-    // Deprecated, use ZO_S3_FEATURE_FORCE_HOSTED_STYLE instead
-    // #[deprecated(since = "0.6.5", note = "use `ZO_S3_FEATURE_FORCE_HOSTED_STYLE` instead")]
-    #[env_config(name = "ZO_S3_FEATURE_FORCE_PATH_STYLE", default = false)]
-    pub feature_force_path_style: bool,
     #[env_config(name = "ZO_S3_FEATURE_FORCE_HOSTED_STYLE", default = false)]
     pub feature_force_hosted_style: bool,
     #[env_config(name = "ZO_S3_FEATURE_HTTP1_ONLY", default = false)]
@@ -1493,6 +1547,9 @@ pub struct S3 {
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
     pub max_idle_per_host: usize,
+    // https://github.com/hyperium/hyper/issues/2136#issuecomment-589488526
+    #[env_config(name = "ZO_S3_CONNECTION_KEEPALIVE_TIMEOUT", default = 20)] // seconds
+    pub keepalive_timeout: u64, // aws s3 by has timeout of 20 sec
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1855,12 +1912,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if cfg.common.local_mode
-        || cfg.common.meta_store.starts_with("mysql")
-        || cfg.common.meta_store.starts_with("postgres")
-    {
-        cfg.common.meta_store_external = true;
-    }
     if !cfg.common.local_mode
         && !cfg.common.meta_store.starts_with("postgres")
         && !cfg.common.meta_store.starts_with("mysql")
@@ -1994,6 +2045,11 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.mmdb_data_dir = format!("{}/", cfg.common.mmdb_data_dir);
     }
 
+    // check for pprof flamegraph
+    if cfg.profiling.pprof_flamegraph_path.is_empty() {
+        cfg.profiling.pprof_flamegraph_path = format!("{}flamegraph.svg", cfg.common.data_dir);
+    }
+
     Ok(())
 }
 
@@ -2096,6 +2152,9 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.wal_write_buffer_size < 4096 {
         cfg.limit.wal_write_buffer_size = 4096;
     }
+    if cfg.limit.wal_write_queue_size == 0 {
+        cfg.limit.wal_write_queue_size = 10000;
+    }
 
     // check query settings
     if cfg.limit.query_group_base_speed == 0 {
@@ -2184,7 +2243,28 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.bucket_num == 0 {
-        cfg.disk_cache.bucket_num = 1;
+        // because we validate thread_query_num before this
+        // we can be sure here that that value is sane.
+
+        // following numbers are imperically decided, users can set the value
+        // directly if they know better, otherwise this was the best numbers
+        // for bucket_num based on thread count.
+        let threads = cfg.limit.query_thread_num;
+        if threads <= 16 {
+            // for less than 16 threads, same buckets would be good enough
+            // with 16 files in parallel we should not run into that many
+            // files going into same bucket, so ok.
+            cfg.disk_cache.bucket_num = cfg.limit.query_thread_num;
+        } else if threads > 16 && threads <= 64 {
+            // for 32 -> 64 ish range, there can be a lot of collisions
+            // so we set it to double the threads to avoid any collisions
+            cfg.disk_cache.bucket_num = 2 * threads;
+        } else {
+            // for > 64 threads, it was observed that even with 1.5 times buckets
+            // it is ok, not that many collisions. This is imperical, no concrete
+            // reasoning for 1.5
+            cfg.disk_cache.bucket_num = (threads as f64 * 1.5) as usize;
+        }
     }
     cfg.disk_cache.bucket_num = max(
         cfg.disk_cache.bucket_num,
@@ -2307,6 +2387,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
+    }
+
+    if cfg.s3.keepalive_timeout == 0 {
+        // reset to default
+        cfg.s3.keepalive_timeout = 20;
     }
 
     Ok(())

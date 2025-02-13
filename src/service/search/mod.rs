@@ -661,6 +661,7 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }

@@ -58,7 +58,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[(i64, &FileKey)]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn batch_remove(&self, files: &[String]) -> Result<Vec<String>>;
+    async fn batch_remove(&self, files: &[String]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
         org_id: &str,
@@ -123,6 +123,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
         pk_value: Option<(i64, i64)>,
+        deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
@@ -136,8 +137,12 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<()>;
-    async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-        -> Result<()>;
+    async fn set_stream_stats(
+        &self,
+        org_id: &str,
+        streams: &[(String, StreamStats)],
+        pk_value: Option<(i64, i64)>,
+    ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,
@@ -199,7 +204,7 @@ pub async fn batch_add_history(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn batch_remove(files: &[String]) -> Result<Vec<String>> {
+pub async fn batch_remove(files: &[String]) -> Result<()> {
     CLIENT.batch_remove(files).await
 }
 
@@ -337,9 +342,10 @@ pub async fn stats(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     pk_value: Option<(i64, i64)>,
+    deleted: bool,
 ) -> Result<Vec<(String, StreamStats)>> {
     CLIENT
-        .stats(org_id, stream_type, stream_name, pk_value)
+        .stats(org_id, stream_type, stream_name, pk_value, deleted)
         .await
 }
 
@@ -366,8 +372,12 @@ pub async fn del_stream_stats(
 }
 
 #[inline]
-pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -> Result<()> {
-    CLIENT.set_stream_stats(org_id, streams).await
+pub async fn set_stream_stats(
+    org_id: &str,
+    streams: &[(String, StreamStats)],
+    pk_value: Option<(i64, i64)>,
+) -> Result<()> {
+    CLIENT.set_stream_stats(org_id, streams, pk_value).await
 }
 
 #[inline]
@@ -445,7 +455,7 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
-        if cfg.common.local_mode || !cfg.common.meta_store_external {
+        if cfg.common.local_mode {
             return;
         }
 
@@ -585,4 +595,6 @@ pub struct FileId {
     pub id: i64,
     pub records: i64,
     pub original_size: i64,
+    #[sqlx(default)]
+    pub deleted: bool,
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,6 +39,13 @@ pub static WAL_PARQUET_METADATA: Lazy<RwAHashMap<String, config::meta::stream::F
     Lazy::new(Default::default);
 
 pub static WAL_DIR_DEFAULT_PREFIX: &str = "logs";
+
+// writer signal
+pub enum WriterSignal {
+    Produce,
+    Rotate,
+    Close,
+}
 
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files

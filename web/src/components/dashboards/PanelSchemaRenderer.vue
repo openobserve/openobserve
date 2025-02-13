@@ -994,6 +994,75 @@ export default defineComponent({
       return whereClause;
     };
 
+    const replaceVariablesValue = (
+      query: any,
+      currentDependentVariablesData: any,
+      panelSchema: any,
+    ) => {
+      const queryType = panelSchema?.value?.queryType;
+      currentDependentVariablesData?.forEach((variable: any) => {
+        const variableName = `$${variable.name}`;
+
+        let variableValue = "";
+        if (Array.isArray(variable.value)) {
+          const value = variable.value
+            .map((value: any) => `'${value}'`)
+            .join(",");
+          const possibleVariablesPlaceHolderTypes = [
+            {
+              placeHolder: `\${${variable.name}:csv}`,
+              value: variable.value.join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:pipe}`,
+              value: variable.value.join("|"),
+            },
+            {
+              placeHolder: `\${${variable.name}:doublequote}`,
+              value: variable.value.map((value: any) => `"${value}"`).join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:singlequote}`,
+              value: value,
+            },
+            {
+              placeHolder: `\${${variable.name}}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+            {
+              placeHolder: `\$${variable.name}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+          ];
+
+          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
+            // if (query.includes(placeHolderObj.placeHolder)) {
+            //   metadata.push({
+            //     type: "variable",
+            //     name: variable.name,
+            //     value: placeHolderObj.value,
+            //   });
+            // }
+            query = query.replaceAll(
+              placeHolderObj.placeHolder,
+              placeHolderObj.value,
+            );
+          });
+        } else {
+          variableValue = variable.value === null ? "" : variable.value;
+          // if (query.includes(variableName)) {
+          //   metadata.push({
+          //     type: "variable",
+          //     name: variable.name,
+          //     value: variable.value,
+          //   });
+          // }
+          query = query.replaceAll(variableName, variableValue);
+        }
+      });
+
+      return query;
+    };
     const constructLogsUrl = (
       streamName: string,
       calculatedTimeRange: { startTime: number; endTime: number },
@@ -1049,6 +1118,7 @@ export default defineComponent({
 
           const { originalQuery, streamName } =
             getOriginalQueryAndStream(queryDetails, metadata) || {};
+
           if (!originalQuery || !streamName) return;
 
           const hoveredTime = drilldownParams[0]?.value?.[0];
@@ -1061,35 +1131,52 @@ export default defineComponent({
             hoveredTimestamp,
             intervalMicro.value,
           );
+          let modifiedQuery = originalQuery;
 
-          if (!parser) {
-            await importSqlParser();
+          if (drilldownData.data.logsMode === "auto") {
+            if (!parser) {
+              await importSqlParser();
+            }
+            const ast = await parseQuery(originalQuery, parser);
+
+            if (!ast) return;
+
+            const tableAliases = ast.from
+              ?.filter((fromEntry: any) => fromEntry.as)
+              .map((fromEntry: any) => fromEntry.as);
+
+            const aliasClause = tableAliases?.length
+              ? ` AS ${tableAliases.join(", ")}`
+              : "";
+
+            const breakdownColumn = breakdown[0]?.column;
+
+            const seriesIndex = drilldownParams[0]?.seriesIndex;
+
+            const breakdownSeriesName =
+              seriesIndex !== undefined
+                ? panelData.value.options.series[seriesIndex]
+                : undefined;
+
+            const uniqueSeriesName = breakdownSeriesName
+              ? breakdownSeriesName.originalSeriesName
+              : drilldownParams[0]?.seriesName;
+
+            const breakdownValue = uniqueSeriesName;
+            const whereClause = buildWhereClause(
+              ast,
+              breakdownColumn,
+              breakdownValue,
+            );
+
+            modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
+          } else {
+            modifiedQuery = replaceVariablesValue(
+              drilldownData?.data?.logsQuery,
+              variablesData?.value?.values,
+              panelSchema,
+            );
           }
-
-          const ast = await parseQuery(originalQuery, parser);
-          if (!ast) return;
-
-          const tableAliases = ast.from
-            ?.filter((fromEntry: any) => fromEntry.as)
-            .map((fromEntry: any) => fromEntry.as);
-
-          const aliasClause = tableAliases?.length
-            ? ` AS ${tableAliases.join(", ")}`
-            : "";
-
-          const breakdownColumn = breakdown[0]?.column;
-          const breakdownValue = drilldownParams[0]?.seriesName;
-          const whereClause = buildWhereClause(
-            ast,
-            breakdownColumn,
-            breakdownValue,
-          );
-
-          let modifiedQuery =
-            drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
-              : drilldownData.data.logsQuery;
-
           modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
           const encodedQuery: any = b64EncodeUnicode(modifiedQuery);

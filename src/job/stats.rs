@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,13 +28,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if (cfg.common.meta_store_external || !LOCAL_NODE.is_querier()) && !LOCAL_NODE.is_compactor() {
+    if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(
+    // should run it at least every 10 seconds
+    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
+        10,
         cfg.limit.calculate_stats_interval,
-    ));
+    )));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -60,10 +62,10 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // should run it every minute
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::min(
+    // should run it at least every 5 minutes
+    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
+        300,
         get_config().limit.calculate_stats_interval,
-        60,
     )));
     interval.tick().await; // trigger the first run
     loop {
