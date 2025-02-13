@@ -548,12 +548,4 @@ def test_summary_validate(create_session, base_url):
     expected_num_dashboards = 0  # Adjust based on your expectations
     assert actual_num_dashboards == expected_num_dashboards, (
         f"Expected to be {expected_num_dashboards}, but got {actual_num_dashboards}"
-    )
-
-
-
-
-
-
-
-    
+    )  
