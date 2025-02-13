@@ -2546,6 +2546,7 @@ mod tests {
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;
+        cfg.memory_cache.bucket_num = 1;
         check_memory_config(&mut cfg).unwrap();
         assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
         assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
