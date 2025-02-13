@@ -362,7 +362,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
         res_sql_cache.status_code == 200
     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
-    # print("Response Cache SQL:", res_sql_cache.content) 
+    print("Response Cache SQL:", res_sql_cache.content) 
 
     # Parse the JSON response
     
@@ -702,6 +702,8 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # Receive the response
     response_sql_cache = ws_sql_cache.recv()
+
+    print("WebSocket cache response for SQL:", response_sql_cache)
 
     # Parse the JSON response
 
