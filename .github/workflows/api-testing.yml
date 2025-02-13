@@ -63,9 +63,7 @@ jobs:
           version: '0.27.0'
 
       - name: Start OpenObserve
-        env:
-          ZO_WEBSOCKET_ENABLED: "true"
-        run: target/debug/openobserve &
+        run: ZO_WEBSOCKET_ENABLED=true target/debug/openobserve &
 
       - name: Wait for start
         run: sleep 15
