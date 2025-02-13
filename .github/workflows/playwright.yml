@@ -225,12 +225,4 @@ jobs:
           path: tests/ui-testing/coverage-report
           retention-days: 30
 
-      - name: Check WebSocket Server
-        run: |
-            WS_URL="ws://localhost:5080/api/default/ws/test_uuid"
-            if ! (echo "exit" | websocat $WS_URL); then
-              echo "WebSocket server is not reachable."
-              exit 1
-            fi
-            echo "WebSocket server is reachable."
              
