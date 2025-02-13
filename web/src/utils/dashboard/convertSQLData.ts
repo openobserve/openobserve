@@ -80,6 +80,12 @@ export const convertMultiSQLData = async (
     );
   }
 
+  const isAnnotationSeries = (series: any) => {
+    // check if series name is available
+    // if series name is not available then that is anotation series
+    if (!series.name) return true;
+  };
+
   // loop on all options
   if (options && options[0] && options[0].options) {
     for (let i = 1; i < options.length; i++) {
@@ -87,6 +93,7 @@ export const convertMultiSQLData = async (
         options[0].options.series = [
           ...options[0].options.series,
           ...options[i].options.series.map((it: any) => {
+            if (isAnnotationSeries(it)) return it;
             return {
               ...it,
               name: metadata?.queries[i]?.timeRangeGap.periodAsStr
