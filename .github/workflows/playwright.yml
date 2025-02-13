@@ -176,7 +176,7 @@ jobs:
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${SANITIZED_FILENAME}
+          name: playwright-coverage-${env.SANITIZED_FILENAME}
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
