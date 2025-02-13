@@ -569,12 +569,24 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
 
+    # try:
+    #     ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
+    #     # Proceed with your WebSocket logic here
+    # except websocket.WebSocketBadStatusException as e:
+    #     print(f"WebSocket connection failed: {e}")
+    #     assert False, f"WebSocket connection failed with status: {e.status} and message: {e.message}"
+    # except Exception as e:
+    #     print(f"An unexpected error occurred: {e}")
+    #     assert False, f"An unexpected error occurred: {e}"
+
     try:
         ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
         # Proceed with your WebSocket logic here
     except websocket.WebSocketBadStatusException as e:
         print(f"WebSocket connection failed: {e}")
-        assert False, f"WebSocket connection failed with status: {e.status} and message: {e.message}"
+        # Extract status code from the message
+        status_code = e.message.split()[2] if e.message else "Unknown"
+        assert False, f"WebSocket connection failed with status: {status_code} and message: {e.message}"
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         assert False, f"An unexpected error occurred: {e}"
