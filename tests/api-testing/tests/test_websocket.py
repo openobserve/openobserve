@@ -23,9 +23,6 @@ end_time = int(now.timestamp() * 1000000)
 ten_min_ago = int((now - timedelta(minutes=10)).timestamp() * 1000000)
 org_id = "default"
 
-
-
-
 root_dir = Path(__file__).parent.parent.parent
 
 
