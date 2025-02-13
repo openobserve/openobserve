@@ -1675,6 +1675,78 @@ pub fn init() -> Config {
         cfg.common.node_role_group = "".to_string();
     }
 
+    // check limit config
+    if let Err(e) = check_limit_config(&mut cfg) {
+        panic!("limit config error: {e}");
+    }
+
+    // check common config
+    if let Err(e) = check_common_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
+    // check grpc config
+    if let Err(e) = check_grpc_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
+    // check http config
+    if let Err(e) = check_http_config(&mut cfg) {
+        panic!("common config error: {e}")
+    }
+
+    // check data path config
+    if let Err(e) = check_path_config(&mut cfg) {
+        panic!("data path config error: {e}");
+    }
+
+    // check memory cache
+    if let Err(e) = check_memory_config(&mut cfg) {
+        panic!("memory cache config error: {e}");
+    }
+
+    // check disk cache
+    if let Err(e) = check_disk_cache_config(&mut cfg) {
+        panic!("disk cache config error: {e}");
+    }
+
+    // check compact config
+    if let Err(e) = check_compact_config(&mut cfg) {
+        panic!("compact config error: {e}");
+    }
+
+    // check etcd config
+    if let Err(e) = check_etcd_config(&mut cfg) {
+        panic!("etcd config error: {e}");
+    }
+
+    // check s3 config
+    if let Err(e) = check_s3_config(&mut cfg) {
+        panic!("s3 config error: {e}");
+    }
+
+    // check sns config
+    if let Err(e) = check_sns_config(&mut cfg) {
+        panic!("sns config error: {e}");
+    }
+
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
+    // check health check config
+    if let Err(e) = check_health_check_config(&mut cfg) {
+        panic!("health check config error: {e}");
+    }
+
+    // check pipeline config
+    if let Err(e) = check_pipeline_config(&mut cfg) {
+        panic!("pipeline config error: {e}");
+    }
+
+    cfg
+}
+
+fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
     cfg.limit.real_cpu_num = max(1, cgroup::get_cpu_limit());
     // set at least 2 threads
@@ -1765,70 +1837,7 @@ pub fn init() -> Config {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
     }
 
-    // check common config
-    if let Err(e) = check_common_config(&mut cfg) {
-        panic!("common config error: {e}");
-    }
-
-    // check grpc config
-    if let Err(e) = check_grpc_config(&mut cfg) {
-        panic!("common config error: {e}");
-    }
-
-    // check http config
-    if let Err(e) = check_http_config(&mut cfg) {
-        panic!("common config error: {e}")
-    }
-
-    // check data path config
-    if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {e}");
-    }
-
-    // check memory cache
-    if let Err(e) = check_memory_config(&mut cfg) {
-        panic!("memory cache config error: {e}");
-    }
-
-    // check disk cache
-    if let Err(e) = check_disk_cache_config(&mut cfg) {
-        panic!("disk cache config error: {e}");
-    }
-
-    // check compact config
-    if let Err(e) = check_compact_config(&mut cfg) {
-        panic!("compact config error: {e}");
-    }
-
-    // check etcd config
-    if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {e}");
-    }
-
-    // check s3 config
-    if let Err(e) = check_s3_config(&mut cfg) {
-        panic!("s3 config error: {e}");
-    }
-
-    // check sns config
-    if let Err(e) = check_sns_config(&mut cfg) {
-        panic!("sns config error: {e}");
-    }
-
-    if let Err(e) = check_encryption_config(&mut cfg) {
-        panic!("encryption config error: {e}");
-    }
-    // check health check config
-    if let Err(e) = check_health_check_config(&mut cfg) {
-        panic!("health check config error: {e}");
-    }
-
-    // check pipeline config
-    if let Err(e) = check_pipeline_config(&mut cfg) {
-        panic!("pipeline config error: {e}");
-    }
-
-    cfg
+    Ok(())
 }
 
 fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -2489,6 +2498,9 @@ mod tests {
     #[test]
     fn test_get_config() {
         let mut cfg = Config::init().unwrap();
+        let ret = check_limit_config(&mut cfg);
+        assert!(ret.is_ok());
+
         cfg.s3.server_url = "https://storage.googleapis.com".to_string();
         cfg.s3.provider = "".to_string();
         check_s3_config(&mut cfg).unwrap();
