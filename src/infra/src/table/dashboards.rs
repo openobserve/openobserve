@@ -56,6 +56,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
                 "description".to_owned(),
                 value.description.unwrap_or_default().into(),
             );
+            obj.insert("updatedAt".to_owned(), value.updated_at.into());
         }
 
         match value.version {
@@ -191,6 +192,7 @@ pub async fn put(
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
+    let updated_at = dashboard.updated_at;
 
     let data = inner_data_as_json(dashboard)?;
 
@@ -211,12 +213,14 @@ pub async fn put(
             dash_am.description = Set(description);
             dash_am.data = Set(data);
             dash_am.version = Set(version);
+            dash_am.updated_at = Set(updated_at);
             let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
             Ok(model)
         }
         Some((folder_m, None)) => {
             // Destination folder exists but dashboard does not exist, so create
             // a new dashboard.
+            // TODO: Use timestamp in microseconds like all other resources
             let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
                 created_at_tz.timestamp()
             } else {
@@ -234,6 +238,7 @@ pub async fn put(
                 data: Set(data),
                 version: Set(version),
                 created_at: Set(created_at_unix),
+                updated_at: Set(updated_at),
             };
             let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
             Ok(model)
@@ -444,6 +449,7 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
         obj.remove("role");
         obj.remove("title");
         obj.remove("description");
+        obj.remove("updatedAt");
     }
 
     Ok(data)

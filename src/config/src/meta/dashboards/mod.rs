@@ -38,6 +38,8 @@ pub struct Dashboard {
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
     pub hash: String,
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 impl Dashboard {
@@ -81,6 +83,10 @@ impl Dashboard {
             } => inner.dashboard_id = dashboard_id,
             _ => {}
         };
+    }
+
+    pub fn set_updated_at(&mut self) {
+        self.updated_at = Utc::now().timestamp_micros();
     }
 
     pub fn owner(&self) -> Option<&str> {
