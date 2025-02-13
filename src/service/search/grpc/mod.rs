@@ -26,10 +26,6 @@ pub mod flight;
 pub mod storage;
 pub mod wal;
 
-// if the cached files more than this threshold * cpu_num, use an async job to do it in the
-// background, and only waiting for first 2 * cpu_num files download
-pub const CACHE_FILES_THRESHOLD: usize = 2;
-
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
 
 #[derive(Debug)]
