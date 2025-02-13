@@ -68,6 +68,9 @@ export default defineComponent({
   name: "CustomChartRenderer",
   emits: [
     "error",
+    "mousemove",
+    "mouseout",
+    "click",
   ],
   props: {
     data: {
