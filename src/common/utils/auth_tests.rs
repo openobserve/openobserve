@@ -3120,7 +3120,7 @@ mod tests {
                 schema_max_fields_to_enable_uds: usize::default(),
                 user_defined_schema_max_fields: usize::default(),
                 mem_table_max_size: usize::default(),
-                mem_table_bucket_num: usize::default(),
+                mem_table_bucket_num: 1,
                 mem_persist_interval: u64::default(),
                 wal_write_buffer_size: usize::default(),
                 file_push_interval: u64::default(),
@@ -3231,7 +3231,7 @@ mod tests {
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
                 cache_strategy: String::default(),
-                bucket_num: usize::default(),
+                bucket_num: 1,
                 cache_latest_files: bool::default(),
                 max_size: usize::default(),
                 skip_size: usize::default(),
@@ -3245,7 +3245,7 @@ mod tests {
             disk_cache: config::DiskCache {
                 enabled: bool::default(),
                 cache_strategy: String::default(),
-                bucket_num: usize::default(),
+                bucket_num: 1,
                 max_size: usize::default(),
                 result_max_size: usize::default(),
                 skip_size: usize::default(),
