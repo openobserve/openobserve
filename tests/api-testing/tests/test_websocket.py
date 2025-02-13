@@ -567,7 +567,17 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # Now we can use WS_URL in our WebSocket connection
 
-    ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
+    # ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
+
+    try:
+        ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
+        # Proceed with your WebSocket logic here
+    except websocket.WebSocketBadStatusException as e:
+        print(f"WebSocket connection failed: {e}")
+        assert False, f"WebSocket connection failed with status: {e.status} and message: {e.message}"
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        assert False, f"An unexpected error occurred: {e}"
 
     print("WebSocket SQL connection established", ws_sql)
 
@@ -671,9 +681,6 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # Receive the response
     response_sql_cache = ws_sql_cache.recv()
-
-    # print("WebSocket cache response for SQL:", response_sql_cache)
-
 
     # Parse the JSON response
 
