@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,10 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             alert,
         } => {
             log::debug!("Creating alert: {:?}", alert);
-            if table::alerts::get_by_id(conn, &org_id, alert.id.clone().expect("alert id cannot be none")).await?.is_some() {
+            if table::alerts::get_by_id(conn, &org_id, alert.id.expect("alert id cannot be none"))
+                .await?
+                .is_some()
+            {
                 return Ok(());
             }
             table::alerts::create(conn, &org_id, &folder_id, alert.clone(), true).await?;
