@@ -140,20 +140,25 @@ pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let res = Entity::insert(record).exec(client).await;
-
-    match res {
+    match Entity::insert(record).exec(client).await {
         Ok(_) => Ok(()),
-        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+        Err(e) => match e {
             // unique violation will occur when we try to re-insert the same combination
             // which is ok, because what we want is already there.
-            if e.is_unique_violation() {
-                Ok(())
-            } else {
+            DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))
+            | DbErr::Query(RuntimeErr::SqlxError(SqlxError::Database(e))) => {
+                if e.is_unique_violation() {
+                    Ok(())
+                } else {
+                    log::error!("distinct values insert error: {}", e);
+                    Err(Error::DbError(DbError::SeaORMError(e.to_string())))
+                }
+            }
+            e => {
+                log::error!("distinct values insert error: {}", e);
                 Err(Error::DbError(DbError::SeaORMError(e.to_string())))
             }
-        }
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
+        },
     }
 }
 

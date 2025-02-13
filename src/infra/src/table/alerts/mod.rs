@@ -311,19 +311,33 @@ pub async fn create<C: TransactionTrait>(
     let mut alert = alert;
     let alert_m: alerts::Model = match alert_am.insert(&txn).await {
         Ok(m) => m.try_into_model()?,
-        Err(DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))) => {
+        Err(e) => match e {
             // unique violation will occur when we try to re-insert the same combination
             // which is ok, because what we want is already there.
-            if e.is_unique_violation() {
-                alert.id = Some(Ksuid::from_str(&id).unwrap());
-                return Ok(alert);
-            } else {
+            DbErr::Exec(RuntimeErr::SqlxError(SqlxError::Database(e)))
+            | DbErr::Query(RuntimeErr::SqlxError(SqlxError::Database(e))) => {
+                if e.is_unique_violation() {
+                    alert.id = Some(Ksuid::from_str(&id).unwrap());
+                    txn.commit().await.map_err(|e| {
+                        errors::DbError::SeaORMError(format!("alert commit error: {e}"))
+                    })?;
+                    return Ok(alert);
+                } else {
+                    log::error!("alert insert error: {}", e);
+                    txn.rollback().await.map_err(|e| {
+                        errors::DbError::SeaORMError(format!("alert rollback error: {e}"))
+                    })?;
+                    return Err(errors::DbError::SeaORMError(e.to_string()).into());
+                }
+            }
+            e => {
+                log::error!("alert insert error: {}", e);
+                txn.rollback().await.map_err(|e| {
+                    errors::DbError::SeaORMError(format!("alert rollback error: {e}"))
+                })?;
                 return Err(errors::DbError::SeaORMError(e.to_string()).into());
             }
-        }
-        Err(e) => Err(errors::Error::DbError(errors::DbError::SeaORMError(
-            e.to_string(),
-        )))?,
+        },
     };
     let alert = alert_m.try_into()?;
     txn.commit().await?;
