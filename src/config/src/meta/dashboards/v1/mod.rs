@@ -350,6 +350,7 @@ mod tests {
                     ],
                 ),
                 variables: None,
+                updated_at: 0,
             }
         "##]].assert_debug_eq(&dashboard);
     }
@@ -520,6 +521,7 @@ mod tests {
                     ],
                 ),
                 variables: None,
+                updated_at: 0,
             }
         "##]].assert_debug_eq(&dashboard);
     }
