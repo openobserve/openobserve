@@ -299,10 +299,10 @@ test_data_sql = [
     # ),
 
     (
-        "DISTINCT SQL query",
+        "DISTINCT",
         f"SELECT DISTINCT code FROM \"{stream_name}\"",
+        100,
         3,
-        2,
     ),
 
  
