@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="panelData"
             style="width: 100%; height: 100%"
             class="col"
+            @error="errorDetail = $event"
           />
         <ChartRenderer
           v-else
