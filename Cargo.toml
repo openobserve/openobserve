@@ -26,7 +26,8 @@ default = []
 enterprise = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
-profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
+profiling = ["dep:pprof"]
+pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
 
 [profile.release]
@@ -50,7 +51,7 @@ actix-http = "3.9"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.20"
+actix-web-lab = "0.21"
 actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
@@ -110,6 +111,7 @@ itertools.workspace = true
 jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
+memchr.workspace = true
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
@@ -167,6 +169,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+wal.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
@@ -174,8 +177,11 @@ tantivy.workspace = true
 zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
-wal.workspace = true
 tokio-util = "0.7.13"
+pprof = { version = "0.14", features = [
+    "flamegraph",
+    "prost-codec",
+], optional = true }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -259,7 +265,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
-getrandom = "0.2.11"
+getrandom = "0.2.15"
 hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
@@ -286,7 +292,7 @@ prometheus = "0.13"
 prost = "0.13.1"
 rand = "0.8"
 rayon = "1.10"
-regex = "1.7"
+regex = "1.11"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",

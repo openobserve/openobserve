@@ -3,6 +3,7 @@
 mod tests {
     use actix_http::Method;
     use actix_web::{test, FromRequest};
+    use o2_openfga::meta::mapping::OFGA_MODELS;
 
     use super::super::auth::AuthExtractor;
 
@@ -31,6 +32,8 @@ mod tests {
     const PIPELINE_ID: &str = "TEST_PIPELINE_ID";
     const SHORT_URL_ID: &str = "TEST_SHORT_URL_ID";
     const WS_REQUEST_ID: &str = "TEST_WS_REQUEST_ID";
+    const ACTION_KSUID: &str = "TEST_ACTION_KSUID";
+    const CIPHER_KEY_ID: &str = "TEST_CIPHER_KEY_ID";
 
     const POST_METHOD: &str = "POST";
     const GET_METHOD: &str = "GET";
@@ -1702,8 +1705,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                // Is this correct? Should it be dfolder:TEST_FOLDER_ID?
-                o2_type: format!("dfolder:{ORG_ID}"),
+                o2_type: format!("dfolder:{FOLDER_ID}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -1826,7 +1828,7 @@ mod tests {
                 method: format!("{GET_METHOD}"),
                 // Is this correct? Can two streams have the same name if they
                 // have different types?
-                o2_type: format!("{STREAM_NAME}:alerts"),
+                o2_type: format!("alert:{ALERT_NAME}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -1932,7 +1934,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                o2_type: format!("alert:templates"), // Is this correct?
+                o2_type: format!("template:{TEMPLATE_NAME}"),
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -2019,7 +2021,7 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 method: format!("{GET_METHOD}"),
-                o2_type: format!("alert:destinations"), // Is this correct?
+                o2_type: format!("destination:{DESTINATION_NAME}"), // Is this correct?
                 org_id: format!("{ORG_ID}"),
                 bypass_check: false,
                 parent_id: format!("default"),
@@ -2667,11 +2669,251 @@ mod tests {
             format!("api{ORG_ID}/ws/{WS_REQUEST_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                // Should these be empty strings?
                 method: format!(""),
                 o2_type: format!(""),
                 org_id: format!(""),
                 bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    // Tests for routes defined in handler::http::request::actions.
+
+    #[tokio::test]
+    async fn delete_action() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!(
+                    "{}:{ACTION_KSUID}",
+                    OFGA_MODELS
+                        .get("actions")
+                        .map_or("actions", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn serve_action_zip() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/actions/download/{ACTION_KSUID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!(
+                    "{}:{ACTION_KSUID}",
+                    OFGA_MODELS
+                        .get("actions")
+                        .map_or("actions", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_action() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!(
+                    "{}:{ACTION_KSUID}",
+                    OFGA_MODELS
+                        .get("actions")
+                        .map_or("actions", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn list_actions() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/actions"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!(
+                    "{}:{ORG_ID}",
+                    OFGA_MODELS
+                        .get("actions")
+                        .map_or("actions", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_single_action() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!(
+                    "{}:{ACTION_KSUID}",
+                    OFGA_MODELS
+                        .get("actions")
+                        .map_or("actions", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn upload_action() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/actions/upload"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: "".to_string(),
+                o2_type: "".to_string(),
+                org_id: "".to_string(),
+                bypass_check: true,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    // Tests for routes defined in handler::http::request::keys.
+
+    #[tokio::test]
+    async fn save_cipher_keys() {
+        test_auth(
+            Method::POST,
+            format!("api/{ORG_ID}/cipher_keys"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{POST_METHOD}"),
+                o2_type: format!(
+                    "{}:{ORG_ID}",
+                    OFGA_MODELS
+                        .get("cipher_keys")
+                        .map_or("cipher_keys", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn get_cipher_key() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{GET_METHOD}"),
+                o2_type: format!(
+                    "{}:{CIPHER_KEY_ID}",
+                    OFGA_MODELS
+                        .get("cipher_keys")
+                        .map_or("cipher_keys", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn list_cipher_keys() {
+        test_auth(
+            Method::GET,
+            format!("api/{ORG_ID}/cipher_keys"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{LIST_METHOD}"),
+                o2_type: format!(
+                    "{}:{ORG_ID}",
+                    OFGA_MODELS
+                        .get("cipher_keys")
+                        .map_or("cipher_keys", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn delete_cipher_key() {
+        test_auth(
+            Method::DELETE,
+            format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{DELETE_METHOD}"),
+                o2_type: format!(
+                    "{}:{CIPHER_KEY_ID}",
+                    OFGA_MODELS
+                        .get("cipher_keys")
+                        .map_or("cipher_keys", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
+                parent_id: format!("default"),
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn update_cipher_key() {
+        test_auth(
+            Method::PUT,
+            format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
+            AuthExtractor {
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: format!("{PUT_METHOD}"),
+                o2_type: format!(
+                    "{}:{CIPHER_KEY_ID}",
+                    OFGA_MODELS
+                        .get("cipher_keys")
+                        .map_or("cipher_keys", |model| model.key)
+                ),
+                org_id: format!("{ORG_ID}"),
+                bypass_check: false,
                 parent_id: format!("default"),
             },
         )
@@ -2753,7 +2995,6 @@ mod tests {
                 cluster_coordinator: String::default(),
                 queue_store: String::default(),
                 meta_store: String::default(),
-                meta_store_external: bool::default(),
                 meta_postgres_dsn: String::default(),
                 meta_mysql_dsn: String::default(),
                 node_role: String::default(),
@@ -2878,7 +3119,7 @@ mod tests {
                 schema_max_fields_to_enable_uds: usize::default(),
                 user_defined_schema_max_fields: usize::default(),
                 mem_table_max_size: usize::default(),
-                mem_table_bucket_num: usize::default(),
+                mem_table_bucket_num: 1,
                 mem_persist_interval: u64::default(),
                 wal_write_buffer_size: usize::default(),
                 file_push_interval: u64::default(),
@@ -2963,6 +3204,7 @@ mod tests {
                 inverted_index_cache_max_entries: usize::default(),
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
+                db_text_data_type: String::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -2988,7 +3230,7 @@ mod tests {
             memory_cache: config::MemoryCache {
                 enabled: bool::default(),
                 cache_strategy: String::default(),
-                bucket_num: usize::default(),
+                bucket_num: 1,
                 cache_latest_files: bool::default(),
                 max_size: usize::default(),
                 skip_size: usize::default(),
@@ -3002,7 +3244,7 @@ mod tests {
             disk_cache: config::DiskCache {
                 enabled: bool::default(),
                 cache_strategy: String::default(),
-                bucket_num: usize::default(),
+                bucket_num: 1,
                 max_size: usize::default(),
                 result_max_size: usize::default(),
                 skip_size: usize::default(),
@@ -3061,7 +3303,6 @@ mod tests {
                 bucket_prefix: String::default(),
                 connect_timeout: u64::default(),
                 request_timeout: u64::default(),
-                feature_force_path_style: bool::default(),
                 feature_force_hosted_style: bool::default(),
                 feature_http1_only: bool::default(),
                 feature_http2_only: bool::default(),

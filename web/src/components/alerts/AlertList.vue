@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               @click.stop="duplicateAlert(props.row)"
-              data-test="alert-clone"
+              :data-test="`alert-list-${props.row.name}-clone-alert`"
             ></q-btn>
             <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -564,7 +564,7 @@ export default defineComponent({
       destinationService
         .list({
           org_identifier: store.state.selectedOrganization.identifier,
-          dst_type: "http",
+          module: "alert",
         })
         .then((res) => {
           destinations.value = res.data;

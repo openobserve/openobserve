@@ -25,6 +25,7 @@ async-nats.workspace = true
 object_store.workspace = true
 once_cell.workspace = true
 parking_lot.workspace = true
+parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true

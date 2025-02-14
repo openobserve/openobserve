@@ -864,7 +864,7 @@ const useLogs = () => {
         req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3482,7 +3482,7 @@ const useLogs = () => {
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
         );
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3985,97 +3985,77 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-      searchObj.data.queryResults = {
-        hits: [],
-      };
-      searchObj.data.stream.selectedStreamFields = [];
-
-      let unionquery = "";
+      
+      // Reset query results
+      searchObj.data.queryResults = { hits: [] };
+      
+      // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
+      const unionquery = streams
+        .map((stream: string) => 
+          `SELECT [FIELD_LIST] FROM "${stream}"`
+        )
+        .join(" UNION ");
 
-      streams.forEach((stream: string, index: number) => {
-        // Add UNION for all but the first SELECT statement
-        if (index > 0) {
-          unionquery += " UNION ";
-        }
-        unionquery += `SELECT [FIELD_LIST] FROM "${stream}"`;
-      });
+      const query = searchObj.meta.sqlMode ? (queryStr || unionquery) : "";
 
-      let query = searchObj.meta.sqlMode
-        ? queryStr != ""
-          ? queryStr
-          : unionquery
-        : "";
-
-      searchObj.data.stream.selectedStreamFields = [];
-      for (const stream of searchObj.data.stream.selectedStream) {
-        const streamData: any = await getStream(
+      // Fetch all stream data in parallel
+      const streamDataPromises = streams.map((stream: string) => 
+        getStream(
           stream,
           searchObj.data.stream.streamType || "logs",
-          true,
-        );
+          true
+        )
+      );
 
-        if (streamData.schema != undefined) {
-          searchObj.data.stream.selectedStreamFields.push(...streamData.schema);
-        }
-      }
+      const streamDataResults = await Promise.all(streamDataPromises);
+      
+      // Collect all schema fields
+      const allStreamFields = streamDataResults
+        .filter(data => data?.schema)
+        .flatMap(data => data.schema);
 
-      if (
-        searchObj.data.stream.selectedStreamFields == undefined ||
-        searchObj.data.stream.selectedStreamFields.length == 0
-      ) {
-        searchObj.loadingStream = false;
+      // Update selectedStreamFields once
+      searchObj.data.stream.selectedStreamFields = allStreamFields;
+
+      if (allStreamFields.length === 0) {
         searchObj.data.errorMsg = t("search.noFieldFound");
         return;
       }
-      const streamFieldNames: any = [];
-      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        // subArray.forEach((item: any) => {
-        streamFieldNames.push(item.name);
-        // });
-      });
 
-      for (
-        let i = searchObj.data.stream.interestingFieldList.length - 1;
-        i >= 0;
-        i--
-      ) {
-        const fieldName = searchObj.data.stream.interestingFieldList[i];
-        if (!streamFieldNames.includes(fieldName)) {
-          searchObj.data.stream.interestingFieldList.splice(i, 1);
-        }
+      // Update selected fields if needed
+      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
+      if (searchObj.data.stream.selectedFields.length > 0) {
+        searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields
+          .filter(fieldName => streamFieldNames.has(fieldName));
       }
 
-      // if (queryStr == "") {
-      if (
-        searchObj.data.stream.interestingFieldList.length > 0 &&
-        searchObj.meta.quickMode
-      ) {
-        query = query.replace(
-          /\[FIELD_LIST\]/g,
-          searchObj.data.stream.interestingFieldList.join(","),
-        );
-      } else {
-        query = query.replace(/\[FIELD_LIST\]/g, "*");
-      }
-      // }
+      // Update interesting fields list
+      searchObj.data.stream.interestingFieldList = searchObj.data.stream.interestingFieldList
+        .filter(fieldName => streamFieldNames.has(fieldName));
 
-      searchObj.data.editorValue = query;
-      searchObj.data.query = query;
+      // Replace field list in query
+      const fieldList = searchObj.meta.quickMode && searchObj.data.stream.interestingFieldList.length > 0
+        ? searchObj.data.stream.interestingFieldList.join(",")
+        : "*";
+      
+      const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
+
+      // Update query related states
+      searchObj.data.editorValue = finalQuery;
+      searchObj.data.query = finalQuery;
       searchObj.data.tempFunctionContent = "";
       searchObj.meta.searchApplied = false;
 
-      if (searchObj.data.stream.selectedStream.length > 1) {
+      // Update histogram visibility
+      if (streams.length > 1) {
         searchObj.meta.showHistogram = false;
       }
 
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        handleQueryData();
+      if (!store.state.zoConfig.query_on_stream_selection) {
+        await handleQueryData();
       } else {
-        searchObj.data.stream.selectedStreamFields = [];
-        searchObj.data.queryResults = {
-          hits: [],
-        };
+        // Reset states when query on selection is disabled
         searchObj.data.sortedQueryResults = [];
         searchObj.data.histogram = {
           xData: [],
@@ -4090,11 +4070,11 @@ const useLogs = () => {
           errorDetail: "",
         };
         extractFields();
-        searchObj.loadingStream = false;
       }
     } catch (e: any) {
+      console.error("Error while getting stream data:", e);
+    } finally {
       searchObj.loadingStream = false;
-      console.log("Error while getting stream data", e);
     }
   };
 
@@ -4701,18 +4681,28 @@ const useLogs = () => {
         return;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, {
+      const payload = {
         type: "search",
         content: {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
-          },
+          } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
         },
-      });
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(requestId, payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(

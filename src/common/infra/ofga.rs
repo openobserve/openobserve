@@ -19,14 +19,14 @@ use hashbrown::HashSet;
 use infra::dist_lock;
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
-    openfga::{
-        authorizer::authz::{
-            add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
-            get_ownership_all_org_tuple, get_user_role_tuple, update_tuples,
-        },
-        meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
-    },
     super_cluster::kv::ofga::{get_model, set_model},
+};
+use o2_openfga::{
+    authorizer::authz::{
+        add_tuple_for_pipeline, get_index_creation_tuples, get_org_creation_tuples,
+        get_ownership_all_org_tuple, get_user_role_tuple, update_tuples,
+    },
+    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
 };
 
 use crate::{
@@ -38,9 +38,7 @@ use crate::{
 };
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    use o2_enterprise::enterprise::openfga::{
-        authorizer::authz::get_tuple_for_new_index, get_all_init_tuples,
-    };
+    use o2_openfga::{authorizer::authz::get_tuple_for_new_index, get_all_init_tuples};
 
     log::info!("[OFGA] Initializing OFGA model");
 
@@ -50,13 +48,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_pipeline_migration = false;
     let mut need_cipher_keys_migration = false;
     let mut need_action_scripts_migration = false;
-    let mut existing_meta = match db::ofga::get_ofga_model().await {
-        Ok(Some(model)) => Some(model),
-        Ok(None) | Err(_) => {
-            migrate_native_objects = true;
-            None
-        }
-    };
+    let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
+        match db::ofga::get_ofga_model().await {
+            Ok(Some(model)) => Some(model),
+            Ok(None) | Err(_) => {
+                migrate_native_objects = true;
+                None
+            }
+        };
 
     // sync with super cluster
     if get_o2_config().super_cluster.enabled {
@@ -110,7 +109,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    let meta = o2_enterprise::enterprise::openfga::model::read_ofga_model().await;
+    let meta = o2_openfga::model::read_ofga_model().await;
     get_all_init_tuples(&mut init_tuples).await;
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
@@ -164,8 +163,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if store_id.is_empty() {
                 log::error!("OFGA store id is empty");
             }
-            o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
-                .insert("store_id".to_owned(), store_id);
+            o2_openfga::config::OFGA_STORE_ID.insert("store_id".to_owned(), store_id);
 
             let mut tuples = vec![];
             let r = infra::schema::STREAM_SCHEMAS.read().await;

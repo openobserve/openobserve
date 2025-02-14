@@ -10,7 +10,6 @@ pub struct Model {
     pub org: String,
     pub folder_id: String,
     pub name: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub r#type: i16,
 }

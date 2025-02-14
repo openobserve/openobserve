@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -78,7 +78,10 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{datafusion::exec, tantivy::puffin_directory::writer::PuffinDirWriter},
+        search::{
+            datafusion::exec::{self, MergeParquetResult},
+            tantivy::puffin_directory::writer::PuffinDirWriter,
+        },
     },
 };
 
@@ -275,7 +278,7 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(&file_key, parquet_meta, false));
+        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
@@ -381,9 +384,7 @@ async fn move_files(
     }
 
     // check data retention
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
-        .await
-        .unwrap_or_default();
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema).unwrap_or_default();
     let mut stream_data_retention_days = cfg.compact.data_retention_days;
     if stream_settings.data_retention > 0 {
         stream_data_retention_days = stream_settings.data_retention;
@@ -647,7 +648,7 @@ async fn merge_files(
     let file_name = columns[4].to_string();
 
     // get latest version of schema
-    let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type).await;
+    let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -709,6 +710,7 @@ async fn merge_files(
         tables,
         &bloom_filter_fields,
         &new_file_meta,
+        true,
     )
     .await;
 
@@ -730,6 +732,15 @@ async fn merge_files(
                 retain_file_list
             );
             return Err(e.into());
+        }
+    };
+
+    // ingester should not support multiple files
+    // multiple files is for downsampling that will be handled in compactor
+    let buf = match buf {
+        MergeParquetResult::Single(v) => v,
+        MergeParquetResult::Multiple { .. } => {
+            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
         }
     };
 

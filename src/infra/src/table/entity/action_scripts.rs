@@ -12,7 +12,6 @@ pub struct Model {
     pub file_name: String,
     pub org_id: String,
     pub created_by: String,
-    #[sea_orm(column_type = "Text")]
     pub origin_cluster_url: String,
     pub env: Json,
     pub execution_details: String,
@@ -21,7 +20,6 @@ pub struct Model {
     pub last_modified_at: i64,
     pub last_executed_at: Option<i64>,
     pub last_successful_at: Option<i64>,
-    #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub status: String,
     pub service_account: String,

@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item style="padding: 0px 0px 0px 0px">
                 <q-item-section
                   class="column"
+                  no-hover
                   style="width: 60%; border-right: 1px solid lightgray"
                 >
                   <q-table
@@ -114,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-header
                     :wrap-cells="searchObj.meta.resultGrid.wrapCells"
                     class="saved-view-table full-height"
+                    no-hover
                     id="savedViewList"
                     :rows-per-page-options="[]"
                     :hide-bottom="
@@ -162,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-tr>
                     </template>
                     <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list">
+                      <q-td :props="props" class="field_list" no-hover>
                         <q-item
                           class="q-pa-sm saved-view-item"
                           clickable
@@ -189,29 +191,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
+                            <q-btn
+                              :icon="favoriteViews.includes(props.row.view_id)
                                   ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
+                                  : 'favorite_border'"
+                              :title="t('common.favourite')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
                               size="xs"
-                            />
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleUpdateSavedView(props.row)"
                           >
-                            <q-icon name="edit" color="grey" size="xs" />
+                            <q-btn
+                              icon="edit"
+                              :title="t('common.edit')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete" color="grey" size="xs" />
+                            <q-btn
+                              icon="delete"
+                              :title="t('common.delete')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -321,7 +344,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             data-test="logs-search-bar-function-dropdown"
             v-model="functionModel"
-            auto-close
             size="12px"
             icon="save"
             :icon-right="iconRight"
@@ -331,16 +353,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="fnSavedFunctionDialog"
           >
             <q-list data-test="logs-search-saved-function-list">
-              <q-item-label header class="q-pa-sm">{{
-                t("search.functionPlaceholder")
-              }}</q-item-label>
-              <q-separator inset></q-separator>
+              <!-- Search Input -->
+              <div>
+                <q-input
+                  v-model="searchTerm"
+                  dense
+                  filled
+                  borderless
+                  clearable
+                  debounce="300"
+                  :placeholder="t('search.searchSavedFunction')"
+                  data-test="function-search-input"
+                >
+                  <template #prepend>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+              </div>
 
-              <div v-if="functionOptions.length">
+              <div v-if="filteredFunctionOptions.length">
                 <q-item
-                  class="q-pa-sm saved-view-item"
+                  class="tw-border-b saved-view-item"
                   clickable
-                  v-for="(item, i) in functionOptions"
+                  v-for="(item, i) in filteredFunctionOptions"
                   :key="'saved-view-' + i"
                   v-close-popup
                 >
@@ -1218,6 +1253,13 @@ export default defineComponent({
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
     const savedViewDropdownModel = ref(false);
+    const searchTerm = ref(""); 
+    const filteredFunctionOptions = computed(() => {
+      if (!searchTerm.value) return functionOptions.value;
+      return functionOptions.value.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.value.toLowerCase())
+      );
+    });
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
 
@@ -1726,7 +1768,6 @@ export default defineComponent({
           timeout: 3000,
         });
       }
-      searchObj.meta.toggleFunction = true;
       searchObj.config.fnSplitterModel = 60;
       fnEditorRef.value.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
@@ -1924,6 +1965,7 @@ export default defineComponent({
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
+                searchObj.meta.toggleFunction = true;
               } else {
                 populateFunctionImplementation(
                   {
@@ -2861,6 +2903,8 @@ export default defineComponent({
       fnParsedSQL,
       iconRight,
       functionToggleIcon,
+      searchTerm,
+      filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
       updateSavedViews,
@@ -3046,6 +3090,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.logs-saved-view-icon:hover {
+  color: black !important;
+  background-color: lightgray !important;
+}
 .logs-search-bar-component {
   padding-bottom: 1px;
   height: 100%;
@@ -3293,7 +3341,7 @@ export default defineComponent({
   }
 
   .saved-view-item {
-    padding: 4px 5px !important;
+    padding: 2px 4px !important;
   }
 
   .body--dark {

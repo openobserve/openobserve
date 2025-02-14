@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -60,13 +60,45 @@ pub async fn query(
     Ok(file_keys)
 }
 
+#[tracing::instrument(
+    name = "service::file_list::query_by_date",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_by_date(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    date_start: &str,
+    date_end: &str,
+) -> Result<Vec<FileKey>> {
+    let files = file_list::query_by_date(
+        org_id,
+        stream_type,
+        stream_name,
+        Some((date_start.to_string(), date_end.to_string())),
+    )
+    .await?;
+    let mut file_keys = Vec::with_capacity(files.len());
+    for file in files {
+        file_keys.push(FileKey {
+            key: file.0,
+            meta: file.1,
+            deleted: false,
+            segment_ids: None,
+        });
+    }
+    Ok(file_keys)
+}
+
+#[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
 pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
     let cfg = get_config();
     FILE_LIST_ID_SELECT_COUNT
         .with_label_values(&[])
         .set(ids.len() as i64);
     // 1. first query from local cache
-    let (mut files, ids) = if !cfg.common.local_mode && cfg.common.meta_store_external {
+    let (mut files, ids) = if !cfg.common.local_mode {
         let ids_set: HashSet<_> = ids.iter().cloned().collect();
         let cached_files = match file_list::LOCAL_CACHE.query_by_ids(ids).await {
             Ok(files) => files,
@@ -126,7 +158,7 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         .collect::<Vec<_>>();
 
     // 3. set the local cache
-    if !cfg.common.local_mode && cfg.common.meta_store_external {
+    if !cfg.common.local_mode {
         let db_files: Vec<_> = db_files.iter().map(|(id, f)| (*id, f)).collect();
         if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
             log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);

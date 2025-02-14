@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use config::utils::str;
 use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanArray},
@@ -25,6 +24,7 @@ use datafusion::{
     error::DataFusionError,
     logical_expr::{ColumnarValue, ScalarFunctionImplementation, ScalarUDF, Volatility},
     prelude::create_udf,
+    scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
@@ -64,27 +64,63 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
                 None,
             ));
         }
-        let args = ColumnarValue::values_to_arrays(args)?;
 
         // 1. cast both arguments to be aligned with the signature
-        let haystack = as_string_array(&args[0])?;
-        let needle = as_string_array(&args[1])?;
+        let ColumnarValue::Array(haystack) = &args[0] else {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[haystack] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        };
+        let haystack = as_string_array(&haystack)?;
+        let ColumnarValue::Scalar(needle) = &args[1] else {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[needle] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        };
+        let needle = match needle {
+            ScalarValue::Utf8(v) => v,
+            ScalarValue::Utf8View(v) => v,
+            ScalarValue::LargeUtf8(v) => v,
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "Invalid argument types[needle] to str_match function".to_string(),
+                    ),
+                    None,
+                ))
+            }
+        };
+        if needle.is_none() || needle.as_ref().unwrap().is_empty() {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[needle] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        }
+        // pre-compute the needle
+        let mem_finder = memchr::memmem::Finder::new(needle.as_ref().unwrap().as_bytes());
 
         // 2. perform the computation
         let array = haystack
             .iter()
-            .zip(needle.iter())
-            .map(|(haystack, needle)| {
-                match (haystack, needle) {
+            .map(|haystack| {
+                match haystack {
                     // in arrow, any value can be null.
-                    // Here we decide to make our UDF to return null when either haystack or needle
-                    // is null.
-                    (Some(haystack), Some(needle)) => match case_insensitive {
-                        true => Some(str::find(
-                            haystack.to_lowercase().as_str(),
-                            needle.to_lowercase().as_str(),
-                        )),
-                        false => Some(str::find(haystack, needle)),
+                    // Here we decide to make our UDF to return null when haystack is null.
+                    Some(haystack) => match case_insensitive {
+                        true => Some(
+                            mem_finder
+                                .find(haystack.to_lowercase().as_bytes())
+                                .is_some(),
+                        ),
+                        false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
                     },
                     _ => None,
                 }
@@ -114,7 +150,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_str_match_udf() {
-        let sql = "select * from t where str_match(log, 'a') and str_match_ignore_case(city, 'ny')";
+        let sql =
+            "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'be')";
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -127,9 +164,14 @@ mod tests {
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(StringArray::from(vec!["this", "is", "a", "test"])),
                 Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
-                Arc::new(StringArray::from(vec!["NY", "Pune", "SF", "Beijing"])),
+                Arc::new(StringArray::from(vec![
+                    "New York",
+                    "Pune",
+                    "San Francisco",
+                    "Beijing",
+                ])),
             ],
         )
         .unwrap();

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -450,7 +450,13 @@ pub async fn get_online_querier_nodes(
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let cfg = get_config();
+    let nodes = if cfg.common.feature_query_skip_wal {
+        infra_cluster::get_cached_online_querier_nodes(node_group).await
+    } else {
+        infra_cluster::get_cached_online_query_nodes(node_group).await
+    };
+    let mut nodes = match nodes {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] flight->search: no querier node online");
@@ -958,7 +964,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![]).await?;
+    let resp = super::http::search(req, query, vec![], vec![], false).await?;
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();

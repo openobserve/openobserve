@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -176,7 +176,7 @@ pub async fn search(
     log::info!("[{trace_id}] request sql : {}", query.sql.clone());
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
     let res = match handle.await {
@@ -661,6 +661,7 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }
@@ -1163,7 +1164,7 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 pub fn generate_search_schema_diff(
     schema: &Schema,
     latest_schema_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
+) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
@@ -1175,7 +1176,7 @@ pub fn generate_search_schema_diff(
         }
     }
 
-    Ok(diff_fields)
+    diff_fields
 }
 
 pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {

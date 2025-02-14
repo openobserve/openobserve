@@ -16,7 +16,7 @@ jobs:
         id-token: write
         contents: read
       if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
-      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2004-8-cores' || 'ubicloud-standard-4' }}
+      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-4' }}
       steps:
         - name: Remove unused tools
           run: |
@@ -47,7 +47,7 @@ jobs:
             version: "21.12"
         - uses: actions/setup-node@v4
           with:
-            node-version: 18
+            node-version: 22
         
         - name: Build frontend code
           run: cd web && npm install && npm run build
@@ -134,7 +134,7 @@ jobs:
             version: "21.12"
         - uses: actions/setup-node@v4
           with:
-            node-version: 18
+            node-version: 22
         
         - name: Build frontend code
           run: cd web && npm install && npm run build

@@ -19,8 +19,6 @@ use utoipa::ToSchema;
 use crate::{meta::search::SearchEventType, utils::json::Value};
 
 pub mod alert;
-pub mod destinations;
-pub mod templates;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {

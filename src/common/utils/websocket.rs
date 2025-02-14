@@ -195,4 +195,24 @@ mod tests {
             "Updated remaining query range should be correct"
         );
     }
+
+    #[test]
+    fn test_histogram_with_normal_where() {
+        let sql = "SELECT histogram(_timestamp, '30 seconds') AS time_bucket, COUNT(*) AS count FROM logs WHERE status = 500 AND level = 'error' GROUP BY time_bucket ORDER BY time_bucket ASC";
+        let histogram_interval = 30;
+
+        let result = update_histogram_interval_in_query(sql, histogram_interval).unwrap();
+
+        assert_eq!(result, sql);
+    }
+
+    #[test]
+    fn test_histogram_with_match_all_udf() {
+        let sql = "SELECT histogram(_timestamp, '10 second') AS zo_sql_key, COUNT(*) AS zo_sql_num FROM default WHERE match_all('.parquet') GROUP BY zo_sql_key ORDER BY zo_sql_key ASC";
+        let histogram_interval = 10;
+
+        let result = update_histogram_interval_in_query(sql, histogram_interval).unwrap();
+
+        assert_eq!(result, sql);
+    }
 }

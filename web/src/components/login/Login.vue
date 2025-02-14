@@ -187,6 +187,7 @@ import {
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 export default defineComponent({
   name: "PageLogin",
@@ -279,6 +280,13 @@ export default defineComponent({
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
+
+                if(store.state.zoConfig?.rum?.enabled) {
+                  openobserveRum.setUser({
+                    name: userInfo.given_name + " " + userInfo.family_name,
+                    email: userInfo.email,
+                  });
+                }
 
                 //check for redirect URI and redirect user to that page
                 const redirectURI =

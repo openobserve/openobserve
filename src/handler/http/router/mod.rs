@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -320,8 +320,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-        .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
@@ -415,6 +413,11 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::reports::delete_report)
         .service(dashboards::reports::enable_report)
         .service(dashboards::reports::trigger_report)
+        .service(dashboards::timed_annotations::create_annotations)
+        .service(dashboards::timed_annotations::get_annotations)
+        .service(dashboards::timed_annotations::delete_annotations)
+        .service(dashboards::timed_annotations::update_annotations)
+        .service(dashboards::timed_annotations::delete_annotation_panels)
         .service(folders::create_folder)
         .service(folders::list_folders)
         .service(folders::update_folder)

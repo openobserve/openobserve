@@ -153,7 +153,7 @@ pub async fn handle_search_request(
     let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
     if let Some(interval) = sql.histogram_interval {
         // modify the sql query statement to include the histogram interval
-        let updated_query = update_histogram_interval_in_query(&sql.sql, interval)?;
+        let updated_query = update_histogram_interval_in_query(&req.payload.query.sql, interval)?;
         req.payload.query.sql = updated_query;
         log::info!(
             "[WS_SEARCH] trace_id: {}; Updated query {}; with histogram interval: {}",
@@ -315,7 +315,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = format!("{vrl}\n.");
                     req.payload.query.query_fn = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it
