@@ -75,6 +75,14 @@ impl WsSession {
             Err(actix_ws::Closed)
         }
     }
+
+    pub async fn ping(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
+        if let Some(ref mut session) = self.inner {
+            session.ping(payload).await
+        } else {
+            Err(actix_ws::Closed)
+        }
+    }
 }
 
 pub async fn run(
@@ -107,6 +115,14 @@ pub async fn run(
                             log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
                             break;
                         }
+                    }
+                    // handle pong as well
+                    Ok(actix_ws::Message::Pong(bytes)) => {
+                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received pong {:?}",
+                            req_id,
+                            cfg.common.node_role,
+                            bytes
+                        );
                     }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
@@ -186,13 +202,13 @@ pub async fn handle_text_message(
                                 // Experiment: sleep for 1 seconds to avoid race condition
                                 // where the close frame (control frame) is treated as a data frame
                                 // and mal forms the data frame
-                                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                // tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
                                 // close the session
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Normal,
                                     description: Some(format!(
-                                        "[trace_id {}] Search completed",
+                                        "trace_id {} Search completed",
                                         search_req.trace_id.clone()
                                     )),
                                 });
@@ -240,7 +256,7 @@ pub async fn handle_text_message(
                                 }
 
                                 let err_msg =
-                                    format!("[trace_id: {}, error: {}]", search_req.trace_id, &e);
+                                    format!("trace_id: {}, error: {}", search_req.trace_id, &e);
                                 #[allow(unused_variables)]
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
@@ -279,7 +295,7 @@ pub async fn handle_text_message(
                                     // Need to keep description short
                                     // `actix_ws` does not support long descriptions
                                     description: Some(format!(
-                                        "[trace_id {}] Search Error",
+                                        "trace_id {} Search Error",
                                         search_req.trace_id.clone()
                                     )),
                                 });
@@ -306,7 +322,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("[trace_id {}] Search canceled", trace_id)),
+                        description: Some(format!("trace_id {} Search canceled", trace_id)),
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
@@ -329,7 +345,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, response.to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("[id {}] benchmark completed", id)),
+                        description: Some(format!("id {} benchmark completed", id)),
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
@@ -346,7 +362,7 @@ pub async fn handle_text_message(
             let _ = send_message(req_id, err_res.to_json().to_string()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
-                description: Some(format!("[req_id {}] Request Error", req_id)),
+                description: Some(format!("req_id {} Request Error", req_id)),
             });
             let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
                 session
