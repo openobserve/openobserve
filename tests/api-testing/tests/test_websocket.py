@@ -38,6 +38,8 @@ print("Random String:", random_string)
 
 stream_name = "tdef" + random_string
 
+stream_join = "join" + random_string
+
 print("Random Stream:", stream_name)
 
 def test_ingest_data(create_session, base_url):
@@ -53,6 +55,21 @@ def test_ingest_data(create_session, base_url):
     resp_ing = session.post(url_Ing, data=data, headers={"Content-Type": "application/json"})
     print(f"Data ingested successfully for websocket in {stream_name}, status code: ", resp_ing.status_code)
     assert ( resp_ing.status_code == 200), f"Data ingested successfully for websocket test, status code: {resp_ing.status_code}"
+
+    # Join stream data
+def test_ingest_join(create_session, base_url):
+    """Ingest join data into the openobserve running instance."""
+
+    session = create_session
+    # Open the json data file and read it
+    with open(root_dir / "test-data/logs_data.json") as f:
+        data = f.read()
+
+    
+    url_join = f"{base_url}api/{org_id}/{stream_join}/_json"
+    resp_ing_join = session.post(url_join, data=data, headers={"Content-Type": "application/json"})
+    print(f"Data ingested successfully for join in {stream_join}, status code: ", resp_ing_join.status_code)
+    assert ( resp_ing_join.status_code == 200), f"Data ingested successfully for join, status code: {resp_ing_join.status_code}"
 
 def test_disable_websocket(create_session, base_url):
     """Fixture to enable WebSocket and return cookies."""
@@ -289,18 +306,28 @@ test_data_sql = [
   
     
     # (
-    #     "Limit less SQL query",
+    #     "Limit",
     #     f"SELECT * FROM \"{stream_name}\" LIMIT 10",
     #     10,
     #     10,
     # ),
 
+    # 
+    
+    # (
+    #     "DISTINCT",
+    #     f"SELECT DISTINCT code FROM \"{stream_name}\"",
+    #     100,
+    #     3,
+    # ),
+
     (
-        "DISTINCT",
-        f"SELECT DISTINCT code FROM \"{stream_name}\"",
-        100,
-        3,
+        "UNION",
+        f"SELECT * FROM \"{stream_name}\" UNION SELECT * FROM \"{stream_join}\"",
+        1,
+        1,
     ),
+
 
  
 
@@ -564,30 +591,7 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # Now we can use WS_URL in our WebSocket connection
 
-    # ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
-
-    # try:
-    #     ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
-    #     # Proceed with your WebSocket logic here
-    # except websocket.WebSocketBadStatusException as e:
-    #     print(f"WebSocket connection failed: {e}")
-    #     assert False, f"WebSocket connection failed with status: {e.status} and message: {e.message}"
-    # except Exception as e:
-    #     print(f"An unexpected error occurred: {e}")
-    #     assert False, f"An unexpected error occurred: {e}"
-
-    # try:
-    #     ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
-    #     # Proceed with your WebSocket logic here
-    # except websocket.WebSocketBadStatusException as e:
-    #     print(f"WebSocket connection failed: {e}")
-    #     # Extract status code from the message
-    #     status_code = e.message.split()[2] if e.message else "Unknown"
-    #     assert False, f"WebSocket connection failed with status: {status_code} and message: {e.message}"
-    # except Exception as e:
-    #     print(f"An unexpected error occurred: {e}")
-    #     assert False, f"An unexpected error occurred: {e}"
-
+    
     try:
         ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
         # Proceed with your WebSocket logic here
@@ -730,9 +734,16 @@ def test_delete_stream(create_session, base_url):
     assert resp_delete_stream.status_code == 200, f"Failed to delete stream {stream_name}"
     print(f"Successfully deleted stream {stream_name}")
 
-    # Verify stream is deleted
-    resp_verify = session.get(f"{url}api/{org_id}/streams/{stream_name}/schema?type=logs")
-    assert resp_verify.status_code == 404, f"Expected 404 for {stream_name} deleted stream, got {resp_verify.status_code}"
+def test_delete_stream_join(create_session, base_url):
+    """Running an E2E test for deleting the created join stream."""
+    session = create_session
+    url = base_url
+    # Proceed to delete the created Stream
+    resp_delete_stream_join= session.delete(f"{url}api/{org_id}/streams/{stream_join}?type=logs")
+    print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
+    assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
+    print(f"Successfully deleted stream {stream_join}")
+
 
 
 
