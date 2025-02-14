@@ -43,7 +43,7 @@ use crate::{
     },
     handler::http::request::websocket::{
         session::send_message,
-        utils::{TimeOffset, WsServerEvents},
+        utils::{determine_sort_column, TimeOffset, WsServerEvents},
     },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
@@ -895,6 +895,8 @@ async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
+            search_res = order_search_results(search_res);
+
             // check range error
             if !range_error.is_empty() {
                 search_res.is_partial = true;
@@ -1077,4 +1079,55 @@ async fn write_results_to_cache(
     }
 
     Ok(())
+}
+
+/// Order the search results by the sort column
+fn order_search_results(mut search_res: Response) -> Response {
+    if search_res.hits.is_empty() {
+        return search_res;
+    }
+
+    // First check if user specified ORDER BY exists
+    if let Some(order_by) = search_res.order_by {
+        log::info!(
+            "[trace_id: {}] Using user-specified ORDER BY: {:?}",
+            &search_res.trace_id,
+            order_by
+        );
+        return search_res; // Return without modifying order - respect user's ORDER BY
+    }
+
+    // Auto-determine sort order only if user didn't specify ORDER BY
+    if let Some((sort_column, is_string)) = determine_sort_column(&search_res.hits[0]) {
+        log::info!(
+            "[trace_id: {}] Auto-sorting by column: {}, type: {}",
+            &search_res.trace_id,
+            sort_column,
+            if is_string {
+                "string (ASC)"
+            } else {
+                "numeric (DESC)"
+            }
+        );
+
+        search_res.hits.sort_by(|a, b| {
+            match is_string {
+                true => {
+                    // String comparison (ascending)
+                    let a_val = a.get(&sort_column).and_then(|v| v.as_str());
+                    let b_val = b.get(&sort_column).and_then(|v| v.as_str());
+                    a_val.cmp(&b_val)
+                }
+                false => {
+                    // Numeric comparison (descending)
+                    let b_val = b.get(&sort_column).and_then(|v| v.as_f64());
+                    let a_val = a.get(&sort_column).and_then(|v| v.as_f64());
+                    a_val
+                        .partial_cmp(&b_val)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                }
+            }
+        });
+    }
+    search_res
 }
