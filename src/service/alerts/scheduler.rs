@@ -248,6 +248,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         ScheduledTriggerData {
             period_end_time: None,
             tolerance: 0,
+            last_satisfied_at: None,
         }
     };
 
@@ -433,6 +434,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     } else {
         None
     };
+    trigger_data.last_satisfied_at = last_satisfied_at;
+
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
@@ -560,27 +563,29 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
-    // Check if the alert has been disabled in the mean time
-    let mut old_alert =
-        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
-            Some(alert) => alert,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "alert not found: {}/{}/{}/{}",
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    alert_name
-                ));
-            }
-        };
-    old_alert.last_triggered_at = Some(triggered_at);
-    if let Some(last_satisfied_at) = last_satisfied_at {
-        old_alert.last_satisfied_at = Some(last_satisfied_at);
-    }
-    if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
-        log::error!("Failed to update alert: {alert_name} after trigger: {e}");
-    }
+    // TODO: Update the trigger_data of scheduled_job with the last satisfied time if required
+
+    // // Check if the alert has been disabled in the mean time
+    // let mut old_alert =
+    //     match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
+    //         Some(alert) => alert,
+    //         None => {
+    //             return Err(anyhow::anyhow!(
+    //                 "alert not found: {}/{}/{}/{}",
+    //                 org_id,
+    //                 stream_name,
+    //                 stream_type,
+    //                 alert_name
+    //             ));
+    //         }
+    //     };
+    // old_alert.last_triggered_at = Some(triggered_at);
+    // if let Some(last_satisfied_at) = last_satisfied_at {
+    //     old_alert.last_satisfied_at = Some(last_satisfied_at);
+    // }
+    // if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
+    //     log::error!("Failed to update alert: {alert_name} after trigger: {e}");
+    // }
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
 
@@ -1071,6 +1076,7 @@ async fn handle_derived_stream_triggers(
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
                     period_end_time: Some(start_time), // updated start_time as end_time
                     tolerance: 0,
+                    last_satisfied_at: None,
                 })
                 .unwrap();
             }

@@ -32,6 +32,8 @@ pub struct ScheduledTriggerData {
     pub period_end_time: Option<i64>,
     #[serde(default)]
     pub tolerance: i64,
+    #[serde(default)]
+    pub last_satisfied_at: Option<i64>,
 }
 
 #[inline]
