@@ -211,11 +211,10 @@ mod super_cluster {
         entry: short_urls::ShortUrlRecord,
     ) -> Result<(), infra::errors::Error> {
         let key = short_url_key(short_id);
-        let value = json::to_vec(&entry.original_url)?.into();
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::short_url_put(
                 &key,
-                value,
+                entry.original_url.into(),
                 infra::db::NEED_WATCH,
                 None,
             )
