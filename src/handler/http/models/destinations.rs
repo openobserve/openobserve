@@ -20,13 +20,12 @@ use std::fmt;
 
 use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::service::db::alerts::destinations::DestinationError;
-
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
 
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {
@@ -96,7 +95,8 @@ impl Destination {
                     }),
                     #[cfg(feature = "enterprise")]
                     DestinationType::Action => {
-                        let action_endpoint = ActionEndpoint::new( &org_id, &self.action_id).map_err(DestinationError::InvalidActionId)?;
+                        let action_endpoint = ActionEndpoint::new(&org_id, &self.action_id)
+                            .map_err(DestinationError::InvalidActionId)?;
                         meta_dest::DestinationType::Http(meta_dest::Endpoint {
                             url: action_endpoint.url,
                             method: if action_endpoint.method == reqwest::Method::POST {
@@ -222,10 +222,6 @@ pub enum DestinationType {
 // Helper functions for conditional serialization
 fn should_skip_if_action<T: Default + std::cmp::PartialEq>(value: &T) -> bool {
     value == &T::default()
-}
-
-fn should_skip_if_not_action(value: &str) -> bool {
-    value.is_empty()
 }
 
 impl From<&str> for DestinationType {
