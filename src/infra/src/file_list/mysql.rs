@@ -734,7 +734,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         if deleted {
             sql = format!("{} AND deleted IS TRUE", sql);
         }
-        match pk_value {
+        let sql = match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some((0, 0)) => format!("{} GROUP BY stream", sql),
             Some((min, max)) => {

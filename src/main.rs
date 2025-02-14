@@ -26,6 +26,7 @@ use std::{
 };
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
@@ -86,6 +87,12 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+#[cfg(feature = "pyroscope")]
+use {
+    pyroscope::PyroscopeAgent,
+    pyroscope_pprofrs::{pprof_backend, PprofConfig},
+};
+
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -117,24 +124,39 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let agent = if !cfg.profiling.enabled {
-        None
-    } else {
-        let agent = PyroscopeAgent::builder(&cfg.profiling.server_url, &cfg.profiling.project_name)
-            .tags(
-                [
-                    ("role", cfg.common.node_role.as_str()),
-                    ("instance", cfg.common.instance_name.as_str()),
-                    ("version", VERSION),
-                ]
-                .to_vec(),
-            )
-            .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
             .build()
-            .expect("Failed to setup pyroscope agent");
-        #[cfg(feature = "profiling")]
+            .unwrap();
+        Some(guard)
+    } else {
+        None
+    };
+
+    // setup pyroscope
+    #[cfg(feature = "pyroscope")]
+    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
+        let agent = PyroscopeAgent::builder(
+            &cfg.profiling.pyroscope_server_url,
+            &cfg.profiling.pyroscope_project_name,
+        )
+        .tags(
+            [
+                ("role", cfg.common.node_role.as_str()),
+                ("instance", cfg.common.instance_name.as_str()),
+                ("version", VERSION),
+            ]
+            .to_vec(),
+        )
+        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+        .build()
+        .expect("Failed to setup pyroscope agent");
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
+    } else {
+        None
     };
 
     // cli mode
@@ -399,13 +421,55 @@ async fn main() -> Result<(), anyhow::Error> {
             .await;
     }
 
+    // stop profiling
     #[cfg(feature = "profiling")]
-    if let Some(agent) = agent {
-        let agent_ready = agent.stop().unwrap();
-        agent_ready.shutdown();
+    if let Some(guard) = pprof_guard {
+        if let Ok(report) = guard.report().build() {
+            if cfg.profiling.pprof_protobuf_enabled {
+                let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
+                match std::fs::File::create(&pb_file) {
+                    Ok(mut file) => {
+                        use std::io::Write;
+
+                        use pprof::protos::Message;
+
+                        if let Ok(profile) = report.pprof() {
+                            let mut content = Vec::new();
+                            profile.encode(&mut content).unwrap();
+                            if let Err(e) = file.write_all(&content) {
+                                log::error!("Failed to write flamegraph: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
+                    }
+                }
+            } else {
+                match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
+                    Ok(file) => {
+                        if let Err(e) = report.flamegraph(file) {
+                            log::error!("Failed to write flamegraph: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
+                    }
+                }
+            }
+        };
+    }
+
+    // stop pyroscope
+    #[cfg(feature = "pyroscope")]
+    if let Some(agent) = pyroscope_agent {
+        if let Ok(agent_ready) = agent.stop() {
+            agent_ready.shutdown();
+        }
     }
 
     log::info!("server stopped");
+
     Ok(())
 }
 
@@ -589,6 +653,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -602,6 +671,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -609,7 +683,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes);
                 #[cfg(feature = "enterprise")]
                 let scope = scope.configure(get_script_server_routes);
-
                 scope
             })
         }
@@ -638,7 +711,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -693,6 +766,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -706,6 +784,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -713,7 +796,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes);
                 #[cfg(feature = "enterprise")]
                 let scope = scope.configure(get_script_server_routes);
-
                 scope
             })
         }
@@ -741,7 +823,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();

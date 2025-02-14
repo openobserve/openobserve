@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -324,8 +324,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-        .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)

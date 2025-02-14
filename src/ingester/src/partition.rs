@@ -181,8 +181,13 @@ impl Partition {
                     .context(MergeRecordBatchSnafu)?;
 
             let mut buf_parquet = Vec::new();
-            let mut writer =
-                new_parquet_writer(&mut buf_parquet, &schema, &bloom_filter_fields, &file_meta);
+            let mut writer = new_parquet_writer(
+                &mut buf_parquet,
+                &schema,
+                &bloom_filter_fields,
+                &file_meta,
+                true,
+            );
 
             writer
                 .write(&batches)

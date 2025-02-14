@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -268,7 +268,7 @@ async fn prepare_alert(
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = base64::encode_url(&format!("{vrl}\n."));
                     alert.query_condition.vrl_function = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it

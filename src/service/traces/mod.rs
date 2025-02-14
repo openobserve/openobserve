@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -961,7 +961,11 @@ async fn write_traces(
         data_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await
+    .map_err(|e| {
+        log::error!("Error while writing traces: {}", e);
+        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    })?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
