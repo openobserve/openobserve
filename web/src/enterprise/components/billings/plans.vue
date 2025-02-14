@@ -356,6 +356,7 @@ export default defineComponent({
     return {
       t,
       store,
+      config,
       frmPayment,
       planType,
       isActiveSubscription,
