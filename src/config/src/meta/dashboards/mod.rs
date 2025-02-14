@@ -30,6 +30,7 @@ fn default_version() -> i32 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub v1: Option<v1::Dashboard>,
     pub v2: Option<v2::Dashboard>,

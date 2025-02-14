@@ -85,6 +85,8 @@ pub struct ListDashboardsResponseBodyItem {
     pub owner: String,
     #[schema(value_type = String, format = DateTime)]
     pub created: DateTime<FixedOffset>,
+    // TODO: All client APIs should return camelCase
+    #[serde(rename = "updatedAt")]
     pub updated_at: i64,
 }
 
