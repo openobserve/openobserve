@@ -182,6 +182,12 @@ pub async fn handle_text_message(
                         .await
                         {
                             Ok(_) => {
+                                // TODO: temporary fix for the race condition
+                                // Experiment: sleep for 1 seconds to avoid race condition
+                                // where the close frame (control frame) is treated as a data frame
+                                // and mal forms the data frame
+                                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
                                 // close the session
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Normal,
