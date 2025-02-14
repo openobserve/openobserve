@@ -21,9 +21,9 @@ use infra::{
     errors::{self, Error},
     table::organizations,
 };
-#[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
 
+// #[cfg(feature = "cloud")]
+// use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
 use crate::{
     common::{
         infra::config::{ORGANIZATIONS, ORGANIZATION_SETTING},
@@ -192,14 +192,6 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     {
         log::error!("Error saving org: {}", e);
         return Err(anyhow::anyhow!("Error saving org: {}", e));
-    }
-
-    #[cfg(feature = "cloud")]
-    {
-        let org_usage_record = OrgUsageRecord::new(&entry.identifier);
-        if let Err(e) = org_usage::put(&entry.identifier, org_usage_record).await {
-            log::error!("Error saving org usage record: {}", e);
-        }
     }
 
     let key = format!("{}{}", ORG_KEY_PREFIX, entry.identifier);

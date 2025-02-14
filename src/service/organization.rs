@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "cloud")]
-use chrono::{Duration, Utc};
-#[cfg(feature = "cloud")]
-use config::{get_config, SMTP_CLIENT};
 use config::{
     ider,
     meta::{
@@ -27,18 +23,20 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
-#[cfg(feature = "cloud")]
-use lettre::{message::SinglePart, AsyncTransport, Message};
-#[cfg(feature = "cloud")]
-use o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+#[cfg(feature = "cloud")]
+use {
+    crate::common::meta::organization::{
+        OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
+    },
+    chrono::{Duration, Utc},
+    config::{get_config, SMTP_CLIENT},
+    lettre::{message::SinglePart, AsyncTransport, Message},
+    o2_enterprise::enterprise::cloud::{org_invites, OrgInviteStatus},
+};
 
 use super::{db::org_users, users::add_admin_to_org};
-#[cfg(feature = "cloud")]
-use crate::common::meta::organization::{
-    OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
-};
 use crate::{
     common::{
         meta::organization::{
@@ -522,40 +520,28 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
 #[cfg(feature = "cloud")]
 pub async fn is_add_user_allowed_for_org(org_id: &str, user_email: &str) -> bool {
-    use o2_enterprise::enterprise::cloud::org_usage;
+    use o2_enterprise::enterprise::cloud::billings as cloud_billings;
 
-    let org = org_usage::get(org_id).await;
+    let subscription_type = cloud_billings::get_org_subscription_type(org_id, user_email)
+        .await
+        .unwrap_or_default();
     let mut is_already_part_of_free_org = false;
     let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
     if member_orgs.is_empty() {
         return true;
     }
     for member_org in member_orgs {
-        if let Ok(subscription) = org_usage::get(&member_org.identifier).await {
-            if subscription.is_some() {
-                let subscription = subscription.unwrap();
-                if subscription.is_free_sub() {
-                    is_already_part_of_free_org = true;
-                    break;
-                }
+        if let Ok(Some(subscription_type)) =
+            cloud_billings::get_org_subscription_type(&member_org.identifier, user_email).await
+        {
+            if subscription_type.is_free_sub() {
+                is_already_part_of_free_org = true;
+                break;
             }
         }
     }
 
-    if org.is_ok() {
-        let org = org.unwrap();
-        if org.is_some() {
-            let org = org.unwrap();
-            if org.is_free_sub() && is_already_part_of_free_org {
-                return false;
-            }
-        } else if is_already_part_of_free_org {
-            return false;
-        }
-    } else if is_already_part_of_free_org {
-        return false;
-    }
-    true
+    !subscription_type.is_some_and(|sub| sub.is_free_sub() && is_already_part_of_free_org)
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {

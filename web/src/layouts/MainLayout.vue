@@ -1043,6 +1043,9 @@ export default defineComponent({
         if (router.currentRoute.value.query.action == "subscribe") {
           router.push({
             name: "plans",
+            query: {
+              org_identifier: selectedOrg.value.identifier,
+            },
           });
         }
 

@@ -200,6 +200,10 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
+
+    #[cfg(feature = "cloud")]
+    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+
     svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -539,7 +543,14 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let service = service
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
-        .service(organization::org::accept_org_invite);
+        .service(organization::org::accept_org_invite)
+        .service(billings::create_checkout_session)
+        .service(billings::process_session_detail)
+        .service(billings::list_subscription)
+        .service(billings::list_invoices)
+        .service(billings::unsubscribe)
+        .service(billings::org_usage::get_org_quota_threshold)
+        .service(billings::org_usage::get_org_usage);
 
     svc.service(service);
 }

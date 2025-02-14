@@ -244,11 +244,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    // Migrate ofga for cloud
+    // additional for cloud
     #[cfg(feature = "cloud")]
-    o2_enterprise::enterprise::cloud::ofga_migrate()
-        .await
-        .expect("cloud ofga migrations failed");
+    {
+        // OpenFGA migration
+        o2_enterprise::enterprise::cloud::ofga_migrate()
+            .await
+            .expect("cloud ofga migrations failed");
+
+        // OrgUsage pipeline init
+        o2_enterprise::enterprise::cloud::billings::org_usage::check_and_create_usage_pipeline()
+            .await
+            .expect("Cloud OrgUsage pipeline init failed");
+    }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
