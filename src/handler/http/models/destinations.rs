@@ -20,12 +20,13 @@ use std::fmt;
 
 use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::service::db::alerts::destinations::DestinationError;
+
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
 
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {
@@ -95,8 +96,7 @@ impl Destination {
                     }),
                     #[cfg(feature = "enterprise")]
                     DestinationType::Action => {
-                        let action_endpoint = ActionEndpoint::new(&org_id, &self.action_id)
-                            .map_err(DestinationError::InvalidActionId)?;
+                        let action_endpoint = ActionEndpoint::new( &org_id, &self.action_id).map_err(DestinationError::InvalidActionId)?;
                         meta_dest::DestinationType::Http(meta_dest::Endpoint {
                             url: action_endpoint.url,
                             method: if action_endpoint.method == reqwest::Method::POST {
@@ -180,10 +180,10 @@ pub struct Destination {
     #[serde(default)]
     pub name: String,
     /// Required for `Http` destination_type
-    #[serde(default, skip_serializing_if = "should_skip_if_action")]
+    #[serde(default)]
     pub url: String,
     /// Required for `Http` destination_type
-    #[serde(default, skip_serializing_if = "should_skip_if_action")]
+    #[serde(default)]
     pub method: meta_dest::HTTPType,
     #[serde(default)]
     pub skip_tls_verify: bool,
@@ -192,7 +192,7 @@ pub struct Destination {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<String>,
     /// Required when `destination_type` is `Email`
-    #[serde(default, skip_serializing_if = "should_skip_if_action")]
+    #[serde(default)]
     pub emails: Vec<String>,
     // SNS-specific fields
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -204,7 +204,7 @@ pub struct Destination {
     pub destination_type: DestinationType,
     /// Required when `destination_type` is `Action`
     #[cfg(feature = "enterprise")]
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
     pub action_id: String,
 }
 
@@ -217,11 +217,6 @@ pub enum DestinationType {
     Sns,
     #[cfg(feature = "enterprise")]
     Action,
-}
-
-// Helper functions for conditional serialization
-fn should_skip_if_action<T: Default + std::cmp::PartialEq>(value: &T) -> bool {
-    value == &T::default()
 }
 
 impl From<&str> for DestinationType {
