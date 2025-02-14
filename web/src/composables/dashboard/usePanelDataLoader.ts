@@ -455,20 +455,21 @@ export const usePanelDataLoader = (
           // remove past error detail
           state.errorDetail = "";
 
+          // Removing below part to allow rendering chart if the error is a function error
           // if there is an function error and which not related to stream range, throw error
-          if (
-            searchRes.data.function_error &&
-            searchRes.data.is_partial != true
-          ) {
-            // abort on unmount
-            if (abortControllerRef) {
-              // this will stop partition api call
-              abortControllerRef?.abort();
-            }
+          // if (
+          //   searchRes.data.function_error &&
+          //   searchRes.data.is_partial != true
+          // ) {
+          //   // abort on unmount
+          //   if (abortControllerRef) {
+          //     // this will stop partition api call
+          //     abortControllerRef?.abort();
+          //   }
 
-            // throw error
-            throw new Error(`Function error: ${searchRes.data.function_error}`);
-          }
+          //   // throw error
+          //   throw new Error(`Function error: ${searchRes.data.function_error}`);
+          // }
 
           // if the query is aborted or the response is partial, break the loop
           if (abortControllerRef?.signal?.aborted) {
