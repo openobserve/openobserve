@@ -192,7 +192,6 @@ export default defineComponent({
       }
     },
     onLoadSubscription(planType: string) {
-      alert(planType)
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
         BillingService.resume_subscription(
