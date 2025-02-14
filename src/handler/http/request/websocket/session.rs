@@ -369,6 +369,8 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
             req_id
         )));
     };
+
+    log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
     session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
