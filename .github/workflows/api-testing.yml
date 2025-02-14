@@ -13,6 +13,7 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080/
+  ZO_BASE_URL_SC: http://localhost:5080/
 
 jobs:
   api_integration_tests:

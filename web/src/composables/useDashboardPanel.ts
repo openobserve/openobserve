@@ -104,6 +104,9 @@ const getDefaultDashboardPanelData: any = () => ({
     },
     htmlContent: "",
     markdownContent: "",
+    customChartContent: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  `,
+    customChartResult: {},
     queryType: "sql",
     queries: [
       {
@@ -151,6 +154,7 @@ const getDefaultDashboardPanelData: any = () => ({
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
+    showFieldList: true,
   },
   meta: {
     parsedQuery: "",
@@ -187,6 +191,11 @@ const getDefaultDashboardPanelData: any = () => ({
 const dashboardPanelDataObj: any = {
   dashboard: reactive({ ...getDefaultDashboardPanelData() }),
 };
+
+const getDefaultCustomChartText = () => {
+  return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  `
+}
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
@@ -821,6 +830,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -863,6 +873,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
       case "table":
       case "pie":
@@ -901,6 +912,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -924,6 +937,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.source = null;
           query.fields.target = null;
@@ -939,6 +954,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -947,6 +963,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
+        dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "custom_chart":
+        dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -996,6 +1023,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;

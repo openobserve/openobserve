@@ -1530,7 +1530,6 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
-
       log("Variables Watcher: starting...");
 
       const newDependentVariablesData = getDependentVariablesData();
@@ -1908,6 +1907,7 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
+
     loadData(); // Loading the data
   });
 
