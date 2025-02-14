@@ -200,7 +200,6 @@ mod cluster {
 /// Helper fuunctions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::utils::json;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
     use super::{short_urls, SHORT_URL_KEY};
