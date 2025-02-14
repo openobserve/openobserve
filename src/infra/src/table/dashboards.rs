@@ -159,10 +159,15 @@ pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
 
 /// Creates a new dashboard or updates an existing dashboard in the database.
 /// Returns the new or updated dashboard.
+///
+/// `clone` is a boolean that determines whether the dashboard should be cloned.
+/// if `clone` is true, the given dashboard will be used as it is when saving to db.
+/// `clone` should be always true for super cluster.
 pub async fn put(
     org_id: &str,
     folder_id: &str,
-    dashboard: Dashboard,
+    mut dashboard: Dashboard,
+    clone: bool,
 ) -> Result<Dashboard, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
@@ -192,6 +197,9 @@ pub async fn put(
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
+    if clone {
+        dashboard.set_updated_at();
+    }
     let updated_at = dashboard.updated_at;
 
     let data = inner_data_as_json(dashboard)?;
