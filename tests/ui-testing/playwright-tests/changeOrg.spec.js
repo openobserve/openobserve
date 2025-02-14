@@ -42,7 +42,7 @@ test.describe("Change Organisation", () => {
         aboutPage = new AboutPage(page);
         createOrgPage = new CreateOrgPage(page);
         await loginPage.gotoLoginPage();
-        // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
         let orgId = await createOrgPage.createOrg();

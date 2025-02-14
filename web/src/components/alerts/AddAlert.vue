@@ -1202,7 +1202,7 @@ export default defineComponent({
           .search({
             org_identifier: store.state.selectedOrganization.identifier,
             query,
-            page_type: "logs",
+            page_type: formData.value.stream_type,
           })
           .then((res: any) => {
             sqlQueryErrorMsg.value = "";

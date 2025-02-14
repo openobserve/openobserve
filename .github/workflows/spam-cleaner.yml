@@ -6,7 +6,7 @@ on:
 
 jobs:
   delete_mediafire_comments:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - name: Check for Mediafire in comments
         uses: actions/github-script@v7
