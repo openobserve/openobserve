@@ -134,7 +134,7 @@ const defaultObject = {
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
-      rowsPerPage: 100,
+      rowsPerPage: 50,
       wrapCells: false,
       manualRemoveFields: false,
       chartInterval: "1 second",
