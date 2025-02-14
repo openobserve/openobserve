@@ -192,6 +192,7 @@ export default defineComponent({
       }
     },
     onLoadSubscription(planType: string) {
+      alert(planType)
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
         BillingService.resume_subscription(
@@ -211,7 +212,7 @@ export default defineComponent({
       } else {
         BillingService.get_hosted_url(
           this.store.state.selectedOrganization.identifier,
-          convertToTitleCase(planType),
+          planType,
         )
           .then((res) => {
             window.location.href = res.data.url;
