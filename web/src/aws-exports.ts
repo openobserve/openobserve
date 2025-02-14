@@ -26,8 +26,9 @@ const config = {
   isEnterprise: import.meta.env.VITE_OPENOBSERVE_ENTERPRISE
     ? import.meta.env.VITE_OPENOBSERVE_ENTERPRISE
     : "false",
-  freePlan: "Developer",
-  paidPlan: "Pro",
+  freePlan: "free",
+  paidPlan: "pay-as-you-go",
+  enterprisePlan: "enterprise",
   ooApplicationID: import.meta.env.VITE_OO_APP_ID,
   ooClientToken: import.meta.env.VITE_OO_CLIENT_TOKEN,
   ooSite: import.meta.env.VITE_OO_SITE,

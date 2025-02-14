@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :freeLoading="freeLoading"
         :proLoading="proLoading"
         @update:freeSubscription="subscribeFreePlan"
-        @update:proSubscription="onLoadSubscription('Pro')"
-        @update:businessSubscription="onLoadSubscription('business')"
+        @update:proSubscription="onLoadSubscription(config.paidPlan)"
+        @update:businessSubscription="onLoadSubscription(config.enterprisePlan)"
       ></plan-card>
     </div>
 
@@ -186,7 +186,7 @@ export default defineComponent({
   methods: {
     subscribeFreePlan() {
       if (this.currentPlanDetail.subscription_type == config.freePlan) {
-        this.onLoadSubscription("Developer");
+        this.onLoadSubscription(config.freePlan);
       } else {
         this.confirm_downgrade_subscription = true;
       }
@@ -269,23 +269,23 @@ export default defineComponent({
           this.currentPlanDetail = res.data;
 
           if (res.data.subscription_type !== "") {
-            if (res.data.subscription_type == "Pro") {
-              this.planType = "pro";
+            if (res.data.subscription_type == config.paidPlan) {
+              this.planType = config.paidPlan;
               const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = "Pro";
+              localOrg.value.subscription_type = config.paidPlan;
               useLocalOrganization(localOrg.value);
               this.store.dispatch("setSelectedOrganization", localOrg.value);
               this.store.dispatch("setQuotaThresholdMsg", "");
             } else if (res.data.subscription_type == config.freePlan) {
-              this.planType = "basic";
+              this.planType = config.freePlan;
               const localOrg: any = useLocalOrganization();
               localOrg.value.subscription_type = config.freePlan;
               useLocalOrganization(localOrg.value);
               this.store.dispatch("setSelectedOrganization", localOrg.value);
-            } else if (res.data.subscription_type == "Business") {
-              this.planType = "business";
+            } else if (res.data.subscription_type == config.enterprisePlan) {
+              this.planType = config.enterprisePlan;
               const localOrg: any = useLocalOrganization();
-              localOrg.value.subscription_type = "Business";
+              localOrg.value.subscription_type = config.enterprisePlan;
               useLocalOrganization(localOrg.value);
               this.store.dispatch("setSelectedOrganization", localOrg.value);
               this.store.dispatch("setQuotaThresholdMsg", "");
