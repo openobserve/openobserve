@@ -202,7 +202,7 @@ pub async fn handle_text_message(
                                 // Experiment: sleep for 1 seconds to avoid race condition
                                 // where the close frame (control frame) is treated as a data frame
                                 // and mal forms the data frame
-                                // tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
                                 // close the session
                                 let close_reason = Some(CloseReason {
