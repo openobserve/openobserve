@@ -895,7 +895,7 @@ async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
-            search_res = order_search_results(search_res);
+            search_res = order_search_results(search_res, req.fallback_order_by_col);
 
             // check range error
             if !range_error.is_empty() {
@@ -1081,53 +1081,144 @@ async fn write_results_to_cache(
     Ok(())
 }
 
-/// Order the search results by the sort column
-fn order_search_results(mut search_res: Response) -> Response {
+/// Determines and applies sorting to search results
+fn order_search_results(
+    mut search_res: Response,
+    fallback_order_by_col: Option<String>,
+) -> Response {
     if search_res.hits.is_empty() {
         return search_res;
     }
 
-    // First check if user specified ORDER BY exists
+    // First determine the strategy
+    let strategy = determine_sort_strategy(&search_res, fallback_order_by_col);
+
+    // Then apply it
+    apply_sort_strategy(&mut search_res, strategy);
+
+    search_res
+}
+
+/// Represents different sorting strategies
+enum SortStrategy {
+    SqlOrderBy,
+    FallbackColumn(String, OrderBy),
+    AutoDetermine(String, bool), // (column, is_string)
+    NoSort,
+}
+
+/// Determines which sorting strategy to use
+fn determine_sort_strategy(
+    search_res: &Response,
+    fallback_order_by_col: Option<String>,
+) -> SortStrategy {
+    // Check SQL ORDER BY first
     if let Some(order_by) = search_res.order_by {
         log::info!(
             "[trace_id: {}] Using user-specified ORDER BY: {:?}",
             &search_res.trace_id,
             order_by
         );
-        return search_res; // Return without modifying order - respect user's ORDER BY
+        return SortStrategy::SqlOrderBy;
     }
 
-    // Auto-determine sort order only if user didn't specify ORDER BY
-    if let Some((sort_column, is_string)) = determine_sort_column(&search_res.hits[0]) {
+    // Check fallback column
+    if let Some(col) = find_fallback_column(search_res, fallback_order_by_col) {
+        return SortStrategy::FallbackColumn(col, OrderBy::Desc);
+    }
+
+    // Auto-determine as last resort
+    if let Some((col, is_string)) = determine_sort_column(&search_res.hits[0]) {
         log::info!(
             "[trace_id: {}] Auto-sorting by column: {}, type: {}",
             &search_res.trace_id,
-            sort_column,
-            if is_string {
-                "string (ASC)"
-            } else {
-                "numeric (DESC)"
-            }
+            col,
+            if is_string { "string" } else { "numeric" }
         );
-
-        search_res.hits.sort_by(|a, b| {
-            match is_string {
-                true => {
-                    // String comparison (ascending)
-                    let a_val = a.get(&sort_column).and_then(|v| v.as_str());
-                    let b_val = b.get(&sort_column).and_then(|v| v.as_str());
-                    a_val.cmp(&b_val)
-                }
-                false => {
-                    // Numeric comparison (descending)
-                    let b_val = b.get(&sort_column).and_then(|v| v.as_f64());
-                    let a_val = a.get(&sort_column).and_then(|v| v.as_f64());
-                    a_val
-                        .partial_cmp(&b_val)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                }
-            }
-        });
+        return SortStrategy::AutoDetermine(col, is_string);
     }
-    search_res
+
+    SortStrategy::NoSort
+}
+
+/// Finds and validates fallback column in results
+fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> Option<String> {
+    let fallback_col = fallback_col?;
+    let first_hit = search_res.hits.first()?.as_object()?;
+
+    // Find case-insensitive match
+    first_hit
+        .keys()
+        .find(|k| k.eq_ignore_ascii_case(&fallback_col))
+        .map(|k| {
+            log::info!(
+                "[trace_id: {}] Using fallback ORDER BY: {}",
+                &search_res.trace_id,
+                k
+            );
+            k.to_string()
+        })
+}
+
+/// Applies the chosen sort strategy to results
+fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
+    match strategy {
+        SortStrategy::SqlOrderBy => (), // Already sorted
+        SortStrategy::FallbackColumn(col, order) => {
+            sort_by_column(search_res, &col, true, order == OrderBy::Desc);
+            search_res.order_by = Some(order);
+        }
+        SortStrategy::AutoDetermine(col, is_string) => {
+            sort_by_column(search_res, &col, is_string, !is_string);
+        }
+        SortStrategy::NoSort => (),
+    }
+}
+
+/// Sorts results by a specific column
+fn sort_by_column(search_res: &mut Response, column: &str, is_string: bool, descending: bool) {
+    search_res.hits.sort_by(|a, b| {
+        let ordering = if is_string {
+            compare_string_values(a, b, column)
+        } else {
+            compare_numeric_values(a, b, column)
+        };
+        if descending {
+            ordering.reverse()
+        } else {
+            ordering
+        }
+    });
+}
+
+/// Compares string values with null handling
+fn compare_string_values(
+    a: &serde_json::Value,
+    b: &serde_json::Value,
+    column: &str,
+) -> std::cmp::Ordering {
+    let a_val = a.get(column).and_then(|v| v.as_str());
+    let b_val = b.get(column).and_then(|v| v.as_str());
+    match (a_val, b_val) {
+        (Some(a), Some(b)) => a.cmp(b),
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+/// Compares numeric values with null handling
+fn compare_numeric_values(
+    a: &serde_json::Value,
+    b: &serde_json::Value,
+    column: &str,
+) -> std::cmp::Ordering {
+    let a_val = a.get(column).and_then(|v| v.as_f64());
+    let b_val = b.get(column).and_then(|v| v.as_f64());
+    match (a_val, b_val) {
+        (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
 }
