@@ -663,6 +663,7 @@ export const usePanelDataLoader = (
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
+        fallback_order_by_col: getFallbackOrderByCol(),
       },
     });
   };
@@ -775,7 +776,6 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
-        fallback_order_by_col?: string;
       } = {
         queryReq: {
           query,
@@ -790,7 +790,6 @@ export const usePanelDataLoader = (
         traceId,
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
-        fallback_order_by_col: getFallbackOrderByCol(),
       };
 
       const requestId = fetchQueryDataWithWebSocket(payload, {
