@@ -282,27 +282,3 @@ impl WsServerEvents {
         }
     }
 }
-
-pub(crate) fn determine_sort_column(
-    first_hit: &config::utils::json::Value,
-) -> Option<(String, bool)> {
-    if let Some(obj) = first_hit.as_object() {
-        // First try to find non-numeric columns
-        for (key, value) in obj {
-            if !value.is_number() {
-                log::debug!("Using string column for sorting: {}", key);
-                return Some((key.clone(), true)); // (column, is_string)
-            }
-        }
-
-        // If no non-numeric column found, take first numeric column
-        for (key, value) in obj {
-            if value.is_number() {
-                log::debug!("Using numeric column for sorting: {}", key);
-                return Some((key.clone(), false)); // (column, is_string)
-            }
-        }
-    }
-    log::warn!("No suitable sort column found in results");
-    None
-}
