@@ -1166,12 +1166,15 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
         SortStrategy::SqlOrderBy => (), // Already sorted
         SortStrategy::FallbackColumn(col, order) => {
             sort_by_column(search_res, &col, true, order == OrderBy::Desc);
-            search_res.order_by = Some(order);
+            if search_res.order_by.is_none() {
+                search_res.order_by = Some(order);
+            }
         }
-        SortStrategy::AutoDetermine(col, is_string) => {
-            sort_by_column(search_res, &col, is_string, !is_string);
-        }
+        // SortStrategy::AutoDetermine(col, is_string) => {
+        //     sort_by_column(search_res, &col, is_string, !is_string);
+        // }
         SortStrategy::NoSort => (),
+        _ => (),
     }
 }
 
