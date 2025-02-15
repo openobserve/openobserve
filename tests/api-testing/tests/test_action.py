@@ -38,9 +38,9 @@ def test_create_serviceaccount(create_session, base_url):
     # Create a service account
     payload_serviceaccounts = {
         "email": email_id,
-        "organization": "default",
-        "first_name": "",
-        "last_name": ""
+        "organization": org_id,
+        "first_name": "Action",
+        "last_name": "Services",
     }
 
     resp_create_serviceaccount = session.post(
@@ -53,12 +53,16 @@ def test_create_serviceaccount(create_session, base_url):
         resp_create_serviceaccount.status_code == 200
     ), f"Expected 200, but got {resp_create_serviceaccount.status_code} {resp_create_serviceaccount.content}"
 
-    resp_get_service_accounts = session.get(f"{base_url}api/{org_id}/service_accounts")
+    # Delete the service account
+    resp_delete_serviceaccount = session.delete(
+        f"{base_url}api/{org_id}/service_accounts/{email_id}"
+    )
 
-    print("Service Account", resp_get_service_accounts.content)
+    print("Service Account Deleted", resp_delete_serviceaccount.content)
+
     assert (
-        resp_get_service_accounts.status_code == 200
-    ), f"Expected 200, but got {resp_get_service_accounts.status_code} {resp_get_service_accounts.content}"
+        resp_delete_serviceaccount.status_code == 200
+    ), f"Expected 200, but got {resp_delete_serviceaccount.status_code} {resp_delete_serviceaccount.content}"
 
 # Define the headers for the request
 HEADERS = {
