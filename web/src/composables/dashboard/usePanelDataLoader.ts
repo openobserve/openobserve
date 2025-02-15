@@ -793,8 +793,6 @@ export const usePanelDataLoader = (
         fallback_order_by_col: getFallbackOrderByCol(),
       };
 
-      console.log(payload);
-
       const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
