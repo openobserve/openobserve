@@ -456,24 +456,10 @@ export default defineComponent({
     watch(
       () => hoveredSeriesState?.value?.hoveredSeriesName,
       () => {
-        const highlightObj: any = {
+        chart?.dispatchAction({
           type: "highlight",
-        };
-
-        // if chart type is pie or donut
-        if (
-          ["pie", "donut"].includes(
-            (props?.data?.options || {})?.series?.[0]?.type,
-          )
-        ) {
-          highlightObj["name"] =
-            hoveredSeriesState?.value?.hoveredSeriesName ?? "";
-        } else {
-          highlightObj["seriesName"] =
-            hoveredSeriesState?.value?.hoveredSeriesName ?? "";
-        }
-
-        chart?.dispatchAction(highlightObj);
+          seriesName: hoveredSeriesState?.value?.hoveredSeriesName,
+        });
       },
     );
 
