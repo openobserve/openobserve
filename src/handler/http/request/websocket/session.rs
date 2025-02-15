@@ -202,7 +202,18 @@ pub async fn handle_text_message(
                                 // Experiment: sleep for 1 seconds to avoid race condition
                                 // where the close frame (control frame) is treated as a data frame
                                 // and mal forms the data frame
-                                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                                let cfg = get_config();
+                                let interval = cfg.common.websocket_close_frame_delay;
+                                if interval > 0 {
+                                    tokio::time::sleep(std::time::Duration::from_millis(interval))
+                                        .await;
+                                }
+
+                                // Experiment: Send a ping frame before closing the session
+                                // ensure that all the messages are sent before closing the session
+                                if cfg.common.websocket_enable_ping_before_close {
+                                    ensure_all_messages_sent(&req_id).await;
+                                }
 
                                 // close the session
                                 let close_reason = Some(CloseReason {
@@ -434,4 +445,23 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         req_id,
         sessions_cache_utils::len_sessions()
     );
+}
+
+// Ensure all messages are sent before closing
+async fn ensure_all_messages_sent(req_id: &str) {
+    let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
+        session
+    } else {
+        log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+        return;
+    };
+
+    // Send a ping frame and wait for pong
+    if let Err(e) = session.ping(b"").await {
+        log::error!(
+            "[WS_HANDLER]: req_id: {} failed to send ping frame: {:?}",
+            req_id,
+            e
+        );
+    }
 }
