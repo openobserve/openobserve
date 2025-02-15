@@ -100,6 +100,14 @@ export const usePanelDataLoader = (
     panelSchema.value.id,
   );
 
+  const getFallbackOrderByCol = () => {
+    // from panelSchema, get first x axis field alias
+    if (panelSchema?.value?.queries?.[0]?.fields?.x) {
+      return panelSchema.value?.queries[0]?.fields?.x?.[0]?.alias ?? null;
+    }
+    return null;
+  };
+
   /**
    * Calculate cache key for panel
    * @returns cache key
@@ -767,6 +775,7 @@ export const usePanelDataLoader = (
         traceId: string;
         org_id: string;
         pageType: string;
+        fallback_order_by_col?: string;
       } = {
         queryReq: {
           query,
@@ -781,7 +790,10 @@ export const usePanelDataLoader = (
         traceId,
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
+        fallback_order_by_col: getFallbackOrderByCol(),
       };
+
+      console.log(payload);
 
       const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,

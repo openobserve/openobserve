@@ -12,6 +12,7 @@ const useSearchWebSocket = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      fallback_order_by_col?: string;
     },
     handlers: {
       open: (requestId: string, data: any, response: any) => void;
