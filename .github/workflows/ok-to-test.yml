@@ -7,7 +7,7 @@ on:
 
 jobs:
   ok-to-test:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     permissions:
       pull-requests: write
     # Only run for PRs, not issue comments

@@ -169,7 +169,7 @@ jobs:
   release:
     name: Release artifacts
     needs: [build]
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
