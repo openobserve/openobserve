@@ -66,6 +66,12 @@ echarts.use([
 
 export default defineComponent({
   name: "CustomChartRenderer",
+  emits: [
+    "error",
+    "mousemove",
+    "mouseout",
+    "click",
+  ],
   props: {
     data: {
       required: true,
@@ -91,7 +97,7 @@ export default defineComponent({
           try {
             return new Function(`return ${obj}`)(); // Convert string to function
           } catch (error) {
-            console.error("Error converting string to function:", error);
+           emit("error",`Error while executing the code: ${error.message}`);
           }
         }
 
@@ -141,12 +147,12 @@ export default defineComponent({
         renderer: "canvas",
       });
 
-
+      try{
       const convertedData = convertStringToFunction(props.data);
       const safeChartOptions = deepSanitize(convertedData);
-        chart.setOption(safeChartOptions);
-      // Now, set the option with the executed functions
-      chart.on("click", (params) => emit("click", params));
+      chart.setOption(safeChartOptions);
+            // Now, set the option with the executed functions
+            chart.on("click", (params) => emit("click", params));
       chart.on("mousemove", (params) => emit("mousemove", params));
       chart.on("mouseout", () => emit("mouseout"));
       chart.on("legendselectchanged", (params) =>
@@ -161,6 +167,14 @@ export default defineComponent({
           chart.on(event, (params) => convertedData.o2_events[event](params,chart));
         }
       }
+
+      }
+      catch(e){
+        emit("error","Error while executing the code");
+      }
+
+
+
 
     };
 
