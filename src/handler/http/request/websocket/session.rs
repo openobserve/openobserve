@@ -224,6 +224,12 @@ pub async fn handle_text_message(
                                     search_req.trace_id.clone(),
                                     e
                                 );
+                                let err_res = WsServerEvents::error_response(
+                                    e,
+                                    Some(search_req.trace_id.clone()),
+                                    Some(req_id_clone.clone()),
+                                );
+                                let _ = send_message(&req_id_clone, err_res.to_json().to_string()).await;
                                 Some(CloseReason {
                                     code: CloseCode::Error,
                                     description: Some(format!(
