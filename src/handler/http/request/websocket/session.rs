@@ -46,7 +46,10 @@ pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::
 // Core state management
 #[derive(Debug)]
 enum SearchState {
-    Running { cancel_tx: mpsc::Sender<()> },
+    Running {
+        #[allow(unused)]
+        cancel_tx: mpsc::Sender<()>,
+    },
     Cancelled,
     Completed,
 }
@@ -598,6 +601,7 @@ async fn handle_search_event(
 }
 
 // Cancel handler
+#[cfg(feature = "enterprise")]
 async fn handle_cancel_event(trace_id: &str) {
     // Use entry API for atomic operations
     if let Some(mut entry) = SEARCH_REGISTRY.get_mut(trace_id) {
