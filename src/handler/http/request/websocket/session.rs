@@ -18,7 +18,7 @@ use actix_ws::{MessageStream, Session};
 use config::{get_config, meta::websocket::SearchResultType};
 use dashmap::DashMap;
 use futures::StreamExt;
-use infra::errors::Error;
+use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
@@ -205,6 +205,19 @@ pub async fn handle_text_message(
                                 )),
                             }),
                             Err(e) => {
+                                // if the error is due to search cancellation, return.
+                                // the cancel handler will close the session
+                                if let errors::Error::ErrorCode(
+                                    errors::ErrorCodes::SearchCancelQuery(_),
+                                ) = e
+                                {
+                                    log::info!(
+                                        "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
+                                        search_req.trace_id
+                                    );
+                                    return None;
+                                }
+
                                 // Error handling...
                                 log::error!(
                                     "[WS_HANDLER]: trace_id: {} Search error: {}",
@@ -230,25 +243,27 @@ pub async fn handle_text_message(
                         })
                     });
 
-                    // Audit before closing
-                    #[cfg(feature = "enterprise")]
-                    if is_audit_enabled {
-                        audit(AuditMessage {
-                            user_email: user_id.to_string(),
-                            org_id: org_id.to_string(),
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Ws(WsMeta {
-                                path,
-                                message_type: client_msg.get_type(),
-                                content: client_msg.to_json(),
-                                close_reason: format!("{:#?}", close_reason.clone().unwrap()),
-                            }),
-                        })
-                        .await;
-                    }
+                    if let Some(close_reason) = close_reason {
+                        // Audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                            audit(AuditMessage {
+                                user_email: user_id.to_string(),
+                                org_id: org_id.to_string(),
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Ws(WsMeta {
+                                    path,
+                                    message_type: client_msg.get_type(),
+                                    content: client_msg.to_json(),
+                                    close_reason: format!("{:#?}", close_reason.clone()),
+                                }),
+                            })
+                            .await;
+                        }
 
-                    // Safe close the session after the task is complete
-                    cleanup_and_close_session(&req_id, close_reason).await;
+                        // Safe close the session after the task is complete
+                        cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                    }
 
                     // Clean up after everything is done
                     cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
@@ -268,8 +283,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        // description: Some(format!("trace_id {} Search canceled", trace_id)),
-                        description: None,
+                        description: Some(format!("trace_id {} Search canceled", trace_id)),
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
@@ -351,9 +365,9 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
 
             // Hack for the malformed message with close description
-            if get_config().common.websocket_enable_ping_before_close {
-                reason.description = None;
-            }
+            // if get_config().common.websocket_enable_ping_before_close {
+            //     reason.description = None;
+            // }
         } else {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with no specific reason",
