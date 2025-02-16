@@ -365,17 +365,17 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         // Experiment: sleep for 1 seconds to avoid race condition
         // where the close frame (control frame) is treated as a data frame
         // and mal forms the data frame
-        let cfg = get_config();
-        let interval = cfg.common.websocket_close_frame_delay;
-        if interval > 0 {
-            tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
-        }
+        // let cfg = get_config();
+        // let interval = cfg.common.websocket_close_frame_delay;
+        // if interval > 0 {
+        //     tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+        // }
 
         // Experiment: Send a ping frame before closing the session
         // ensure that all the messages are sent before closing the session
-        if cfg.common.websocket_enable_ping_before_close {
-            ensure_all_messages_sent(&req_id).await;
-        }
+        // if cfg.common.websocket_enable_ping_before_close {
+        //     ensure_all_messages_sent(&req_id).await;
+        // }
 
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
