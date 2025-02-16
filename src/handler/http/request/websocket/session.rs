@@ -184,9 +184,6 @@ pub async fn handle_text_message(
     msg: String,
     path: String,
 ) {
-    #[cfg(feature = "enterprise")]
-    let is_audit_enabled = get_o2_config().common.audit_enabled;
-
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             match client_msg {
@@ -288,15 +285,7 @@ pub async fn handle_text_message(
 
                     // // Clean up after everything is done
                     // cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
-                    handle_search_event(
-                        search_req,
-                        org_id,
-                        user_id,
-                        req_id,
-                        path.clone(),
-                        is_audit_enabled,
-                    )
-                    .await;
+                    handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel { trace_id } => {
@@ -323,6 +312,9 @@ pub async fn handle_text_message(
                     let client_msg = WsClientEvents::Cancel { trace_id };
 
                     // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    let is_audit_enabled = get_o2_config().common.audit_enabled;
+
                     #[cfg(feature = "enterprise")]
                     if is_audit_enabled {
                         audit(AuditMessage {
@@ -499,8 +491,7 @@ async fn handle_search_event(
     org_id: &str,
     user_id: &str,
     req_id: &str,
-    path: String,
-    is_audit_enabled: bool,
+    #[allow(unused_variables)] path: String,
 ) {
     let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
@@ -511,6 +502,9 @@ async fn handle_search_event(
     let trace_id = search_req.trace_id.clone();
     let trace_id_for_task = trace_id.clone();
     let search_req = search_req.clone();
+
+    #[cfg(feature = "enterprise")]
+    let is_audit_enabled = get_o2_config().common.audit_enabled;
 
     #[cfg(feature = "enterprise")]
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
