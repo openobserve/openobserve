@@ -218,10 +218,11 @@ pub async fn handle_text_message(
                                 // close the session
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Normal,
-                                    description: Some(format!(
-                                        "trace_id {} Search completed",
-                                        search_req.trace_id.clone()
-                                    )),
+                                    // description: Some(format!(
+                                    //     "trace_id {} Search completed",
+                                    //     search_req.trace_id.clone()
+                                    // )),
+                                    description: None,
                                 });
 
                                 // audit
@@ -333,7 +334,8 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("trace_id {} Search canceled", trace_id)),
+                        // description: Some(format!("trace_id {} Search canceled", trace_id)),
+                        description: None,
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
