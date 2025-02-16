@@ -545,9 +545,11 @@ async fn handle_search_event(
                         }
 
                         cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
                         handle_search_error(e, &req_id, &trace_id_for_task).await;
+                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                 }
             }
@@ -560,6 +562,7 @@ async fn handle_search_event(
                         timestamp: Utc::now().timestamp(),
                     };
                 }
+                cleanup_search_resources(&trace_id_for_task).await;
             }
         }
     });
@@ -577,17 +580,16 @@ async fn handle_search_event(
 
 // Cancel handler
 async fn handle_cancel_event(trace_id: &str) {
-    if let Some(state) = SEARCH_REGISTRY.get(trace_id) {
-        match state.value() {
+    // Use entry API for atomic operations
+    if let Some(mut entry) = SEARCH_REGISTRY.get_mut(trace_id) {
+        match entry.value_mut() {
             SearchState::Running { cancel_tx, .. } => {
-                let _ = cancel_tx.send(()).await;
-                log::info!("[WS_HANDLER]: trace_id: {}, Cancel signal sent", trace_id);
+                if let Err(e) = cancel_tx.send(()).await {
+                    log::error!("[WS_HANDLER]: Failed to send cancel signal: {}", e);
+                }
             }
-            _ => {
-                log::info!(
-                    "[WS_HANDLER]: trace_id: {}, Search already completed/cancelled",
-                    trace_id
-                );
+            state => {
+                log::info!("[WS_HANDLER]: Cannot cancel search in state: {:?}", state);
             }
         }
     }
@@ -627,4 +629,14 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
             timestamp: Utc::now().timestamp(),
         };
     }
+    cleanup_search_resources(trace_id).await;
+}
+
+// Add cleanup function
+async fn cleanup_search_resources(trace_id: &str) {
+    // Clean up registry
+    SEARCH_REGISTRY.remove(trace_id);
+    // Clean up cancellation flag
+    cancellation_registry_cache_utils::remove_cancellation_flag(trace_id);
+    log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }
