@@ -1039,9 +1039,9 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             .wrap(RequestTracing::new())
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(
-        cfg.limit.keep_alive,
+        cfg.limit.http_keep_alive,
     )))
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;
