@@ -18,7 +18,7 @@ use actix_ws::{MessageStream, Session};
 use config::{get_config, meta::websocket::SearchResultType};
 use dashmap::DashMap;
 use futures::StreamExt;
-use infra::errors::{self, Error};
+use infra::errors::Error;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
@@ -177,145 +177,80 @@ pub async fn handle_text_message(
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
                     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-                    let org_id = org_id.to_string();
-                    let user_id = user_id.to_string();
-                    let req_id = req_id.to_string();
+                    let org_id_clone = org_id.to_string();
+                    let user_id_clone = user_id.to_string();
+                    let req_id_clone = req_id.to_string();
                     let search_req = search_req.clone();
+                    let trace_id = search_req.trace_id.clone();
                     #[cfg(feature = "enterprise")]
                     let client_msg = client_msg.clone();
                     #[allow(unused_variables)]
                     let path = path.to_string();
-                    let trace_id = search_req.trace_id.clone();
 
-                    let task = tokio::spawn(async move {
+                    let close_reason = tokio::spawn(async move {
                         match search::handle_search_request(
-                            &req_id,
+                            &req_id_clone,
                             &mut accumulated_results,
-                            &org_id,
-                            &user_id,
+                            &org_id_clone,
+                            &user_id_clone,
                             *search_req.clone(),
                         )
                         .await
                         {
-                            Ok(_) => {
-                                // TODO: temporary fix for the race condition
-                                // Experiment: sleep for 1 seconds to avoid race condition
-                                // where the close frame (control frame) is treated as a data frame
-                                // and mal forms the data frame
-                                let cfg = get_config();
-                                let interval = cfg.common.websocket_close_frame_delay;
-                                if interval > 0 {
-                                    tokio::time::sleep(std::time::Duration::from_millis(interval))
-                                        .await;
-                                }
-
-                                // Experiment: Send a ping frame before closing the session
-                                // ensure that all the messages are sent before closing the session
-                                if cfg.common.websocket_enable_ping_before_close {
-                                    ensure_all_messages_sent(&req_id).await;
-                                }
-
-                                // close the session
-                                let close_reason = Some(CloseReason {
-                                    code: CloseCode::Normal,
-                                    description: Some(format!(
-                                        "trace_id {} Search completed",
-                                        search_req.trace_id.clone()
-                                    )),
-                                });
-
-                                // audit
-                                #[cfg(feature = "enterprise")]
-                                if is_audit_enabled {
-                                    audit(AuditMessage {
-                                        user_email: user_id,
-                                        org_id,
-                                        _timestamp: chrono::Utc::now().timestamp(),
-                                        protocol: Protocol::Ws(WsMeta {
-                                            path,
-                                            message_type: client_msg.get_type(),
-                                            content: client_msg.to_json(),
-                                            close_reason: format!(
-                                                "{:#?}",
-                                                close_reason.clone().unwrap()
-                                            ),
-                                        }),
-                                    })
-                                    .await;
-                                }
-
-                                cleanup_and_close_session(&req_id, close_reason).await;
-                            }
+                            Ok(_) => Some(CloseReason {
+                                code: CloseCode::Normal,
+                                description: Some(format!(
+                                    "trace_id {} Search completed",
+                                    search_req.trace_id.clone()
+                                )),
+                            }),
                             Err(e) => {
+                                // Error handling...
                                 log::error!(
-                                    "[WS_HANDLER]: Failed to get search result for trace_id: {}, error: {:?}",
-                                    search_req.trace_id,
+                                    "[WS_HANDLER]: trace_id: {} Search error: {}",
+                                    search_req.trace_id.clone(),
                                     e
                                 );
-
-                                // if the error is due to search cancellation, return
-                                // the cancel handler will close the session
-                                if let errors::Error::ErrorCode(
-                                    errors::ErrorCodes::SearchCancelQuery(_),
-                                ) = e
-                                {
-                                    log::info!(
-                                        "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
-                                        search_req.trace_id
-                                    );
-                                    return;
-                                }
-
-                                let err_msg =
-                                    format!("trace_id: {}, error: {}", search_req.trace_id, &e);
-                                #[allow(unused_variables)]
-                                let close_reason = Some(CloseReason {
+                                Some(CloseReason {
                                     code: CloseCode::Error,
-                                    // sending the original error for audit
-                                    description: Some(err_msg),
-                                });
-
-                                // audit
-                                #[cfg(feature = "enterprise")]
-                                if is_audit_enabled {
-                                    audit(AuditMessage {
-                                        user_email: user_id,
-                                        org_id,
-                                        _timestamp: chrono::Utc::now().timestamp(),
-                                        protocol: Protocol::Ws(WsMeta {
-                                            path,
-                                            message_type: client_msg.get_type(),
-                                            content: client_msg.to_json(),
-                                            close_reason: format!(
-                                                "{:#?}",
-                                                close_reason.clone().unwrap()
-                                            ),
-                                        }),
-                                    })
-                                    .await;
-                                }
-
-                                let err_res = WsServerEvents::error_response(
-                                    e,
-                                    Some(search_req.trace_id.clone()),
-                                    Some(req_id.to_string()),
-                                );
-                                let _ = send_message(&req_id, err_res.to_json().to_string()).await;
-                                let close_reason = Some(CloseReason {
-                                    code: CloseCode::Error,
-                                    // Need to keep description short
-                                    // `actix_ws` does not support long descriptions
                                     description: Some(format!(
                                         "trace_id {} Search Error",
                                         search_req.trace_id.clone()
                                     )),
-                                });
-                                cleanup_and_close_session(&req_id, close_reason).await;
+                                })
                             }
                         }
+                    })
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::error!("[WS_HANDLER] trace_id: {} Task join error: {}", trace_id, e);
+                        Some(CloseReason {
+                            code: CloseCode::Error,
+                            description: Some(format!("trace_id: {} Task join error", trace_id)),
+                        })
                     });
-                    drop(task);
-                    // Remove the cancellation flag
+
+                    // Audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id.to_string(),
+                            org_id: org_id.to_string(),
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws(WsMeta {
+                                path,
+                                message_type: client_msg.get_type(),
+                                content: client_msg.to_json(),
+                                close_reason: format!("{:#?}", close_reason.clone().unwrap()),
+                            }),
+                        })
+                        .await;
+                    }
+
+                    // Safe close the session after the task is complete
+                    cleanup_and_close_session(&req_id, close_reason).await;
+
+                    // Clean up after everything is done
                     cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
                 }
                 #[cfg(feature = "enterprise")]
@@ -416,7 +351,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
 
             // Hack for the malformed message with close description
-            if !get_config().common.websocket_enable_ping_before_close {
+            if get_config().common.websocket_enable_ping_before_close {
                 reason.description = None;
             }
         } else {
@@ -425,6 +360,23 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
                 req_id
             );
         }
+
+        // TODO: temporary fix for the race condition
+        // Experiment: sleep for 1 seconds to avoid race condition
+        // where the close frame (control frame) is treated as a data frame
+        // and mal forms the data frame
+        let cfg = get_config();
+        let interval = cfg.common.websocket_close_frame_delay;
+        if interval > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+        }
+
+        // Experiment: Send a ping frame before closing the session
+        // ensure that all the messages are sent before closing the session
+        if cfg.common.websocket_enable_ping_before_close {
+            ensure_all_messages_sent(&req_id).await;
+        }
+
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
