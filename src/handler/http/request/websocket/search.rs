@@ -28,7 +28,7 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
 
-use super::{sort::order_search_results, utils::cancellation_registry_cache_utils};
+use super::sort::order_search_results;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -43,7 +43,7 @@ use crate::{
     },
     handler::http::request::websocket::{
         session::send_message,
-        utils::{TimeOffset, WsServerEvents},
+        utils::{search_registry_utils, TimeOffset, WsServerEvents},
     },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
@@ -163,9 +163,6 @@ pub async fn handle_search_request(
         );
     }
     let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-
-    // Set cancel flag to stop search when cancel event is received
-    cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
     // Search start
     log::info!(
@@ -578,7 +575,7 @@ async fn process_delta(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(&trace_id) {
+        if search_registry_utils::is_cancelled(&trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
                 trace_id
@@ -750,7 +747,7 @@ async fn send_cached_responses(
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
 ) -> Result<(), Error> {
-    if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+    if search_registry_utils::is_cancelled(trace_id) {
         log::info!(
             "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
             trace_id
@@ -878,7 +875,7 @@ async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+        if search_registry_utils::is_cancelled(trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
                 trace_id

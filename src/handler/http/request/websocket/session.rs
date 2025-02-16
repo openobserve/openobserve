@@ -31,31 +31,16 @@ use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
-#[allow(unused_imports)]
-use crate::handler::http::request::websocket::utils::cancellation_registry_cache_utils;
+use super::utils::search_registry_utils::SearchState;
 use crate::handler::http::request::websocket::{
     search,
-    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
+    utils::{search_registry_utils, sessions_cache_utils, WsClientEvents, WsServerEvents},
 };
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;
 
-// Global cancellation registry for search requests by `trace_id`
-pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::new);
-
-// Core state management
-#[derive(Debug)]
-enum SearchState {
-    Running {
-        #[allow(unused)]
-        cancel_tx: mpsc::Sender<()>,
-    },
-    Cancelled,
-    Completed,
-}
-
 // Global registry for search requests by `trace_id`
-static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
+pub static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
 
 // Do not clone the session, instead use a reference to the session
 pub struct WsSession {
@@ -296,12 +281,10 @@ pub async fn handle_text_message(
                     // send a cancel flag to the search task
                     handle_cancel_event(&trace_id).await;
 
-                    // Then do the rest of cancel handling
-                    cancellation_registry_cache_utils::set_cancellation_flag(&trace_id);
                     log::info!(
                         "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {}",
                         trace_id,
-                        cancellation_registry_cache_utils::is_cancelled(&trace_id)
+                        search_registry_utils::is_cancelled(&trace_id)
                     );
 
                     let res = search::handle_cancel(&trace_id, org_id).await;
@@ -583,8 +566,9 @@ async fn handle_search_event(
 
 
                             cleanup_and_close_session(&req_id, Some(close_reason)).await;
-                            cleanup_search_resources(&trace_id_for_task).await;
                         }
+                        // Even if the search is cancelled, we need to cleanup the resources
+                        cleanup_search_resources(&trace_id_for_task).await;
                     }
                 }
             }
@@ -656,6 +640,5 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
     SEARCH_REGISTRY.remove(trace_id);
-    cancellation_registry_cache_utils::remove_cancellation_flag(trace_id);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }
