@@ -30,7 +30,7 @@ use o2_enterprise::enterprise::common::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::sync::mpsc;
 
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::cancellation_registry_cache_utils;
@@ -47,21 +47,12 @@ pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::
 // Core state management
 #[derive(Debug)]
 enum SearchState {
-    Running {
-        trace_id: String,
-        task_handle: JoinHandle<()>,
-        cancel_tx: mpsc::Sender<()>,
-    },
-    Cancelled {
-        trace_id: String,
-        timestamp: i64,
-    },
-    Completed {
-        trace_id: String,
-        timestamp: i64,
-    },
+    Running { cancel_tx: mpsc::Sender<()> },
+    Cancelled,
+    Completed,
 }
 
+// Global registry for search requests by `trace_id`
 static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
 
 // Do not clone the session, instead use a reference to the session
@@ -504,7 +495,7 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Register running search BEFORE spawning task
-    let search_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         tokio::select! {
             search_result = search::handle_search_request(
                 &req_id,
@@ -516,10 +507,7 @@ async fn handle_search_event(
                 match search_result {
                     Ok(_) => {
                         if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
-                            *state = SearchState::Completed {
-                                trace_id: trace_id_for_task.clone(),
-                                timestamp: Utc::now().timestamp(),
-                            };
+                            *state = SearchState::Completed;
                         }
 
                         let close_reason = CloseReason {
@@ -557,10 +545,7 @@ async fn handle_search_event(
                 // if search is cancelled, update the state
                 // the cancel handler will close the session
                 if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
-                    *state = SearchState::Cancelled {
-                        trace_id: trace_id_for_task.clone(),
-                        timestamp: Utc::now().timestamp(),
-                    };
+                    *state = SearchState::Cancelled;
                 }
                 cleanup_search_resources(&trace_id_for_task).await;
             }
@@ -568,14 +553,7 @@ async fn handle_search_event(
     });
 
     // Register the search state
-    SEARCH_REGISTRY.insert(
-        trace_id.clone(),
-        SearchState::Running {
-            trace_id: trace_id.clone(),
-            task_handle: search_task,
-            cancel_tx,
-        },
-    );
+    SEARCH_REGISTRY.insert(trace_id.clone(), SearchState::Running { cancel_tx });
 }
 
 // Cancel handler
@@ -605,8 +583,6 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
         );
         return;
     }
-
-    // Error handling...
     log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
 
     // Send error response
@@ -624,19 +600,14 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
 
     // Update registry state
     if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
-        *state = SearchState::Completed {
-            trace_id: trace_id.to_string(),
-            timestamp: Utc::now().timestamp(),
-        };
+        *state = SearchState::Completed;
     }
     cleanup_search_resources(trace_id).await;
 }
 
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
-    // Clean up registry
     SEARCH_REGISTRY.remove(trace_id);
-    // Clean up cancellation flag
     cancellation_registry_cache_utils::remove_cancellation_flag(trace_id);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }
