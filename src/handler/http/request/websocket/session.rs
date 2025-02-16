@@ -449,9 +449,8 @@ async fn handle_search_event(
             _ = cancel_rx.recv() => {
                 // if search is cancelled, update the state
                 // the cancel handler will close the session
-                if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
-                    *state = SearchState::Cancelled;
-                }
+
+                // Just cleanup resources when cancelled
                 cleanup_search_resources(&trace_id_for_task).await;
             }
         }
@@ -461,18 +460,23 @@ async fn handle_search_event(
 // Cancel handler
 #[cfg(feature = "enterprise")]
 async fn handle_cancel_event(trace_id: &str) {
-    // Use entry API for atomic operations
     if let Some(mut entry) = SEARCH_REGISTRY.get_mut(trace_id) {
-        match entry.value_mut() {
-            SearchState::Running { cancel_tx, .. } => {
-                if let Err(e) = cancel_tx.send(()).await {
-                    log::error!("[WS_HANDLER]: Failed to send cancel signal: {}", e);
-                }
-            }
+        let state = entry.value_mut();
+        let cancel_tx = match state {
+            SearchState::Running { cancel_tx } => cancel_tx.clone(),
             state => {
                 log::info!("[WS_HANDLER]: Cannot cancel search in state: {:?}", state);
+                return;
             }
+        };
+
+        *entry.value_mut() = SearchState::Cancelled;
+
+        if let Err(e) = cancel_tx.send(()).await {
+            log::error!("[WS_HANDLER]: Failed to send cancel signal: {}", e);
         }
+
+        log::info!("[WS_HANDLER]: Search cancelled for trace_id: {}", trace_id);
     }
 }
 
