@@ -15,7 +15,6 @@
 
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
-use chrono::Utc;
 use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
@@ -302,6 +301,7 @@ pub async fn handle_text_message(
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel { trace_id } => {
                     // First handle the cancel event
+                    // send a cancel flag to the search task
                     handle_cancel_event(&trace_id).await;
 
                     // Then do the rest of cancel handling
@@ -318,6 +318,27 @@ pub async fn handle_text_message(
                         code: CloseCode::Normal,
                         description: Some(format!("trace_id {} Search canceled", trace_id)),
                     });
+
+                    #[cfg(feature = "enterprise")]
+                    let client_msg = WsClientEvents::Cancel { trace_id };
+
+                    // Add audit before closing
+                    #[cfg(feature = "enterprise")]
+                    if is_audit_enabled {
+                        audit(AuditMessage {
+                            user_email: user_id.to_string(),
+                            org_id: org_id.to_string(),
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Ws(WsMeta {
+                                path: path.clone(),
+                                message_type: client_msg.get_type(),
+                                content: client_msg.to_json(),
+                                close_reason: format!("{:#?}", close_reason),
+                            }),
+                        })
+                        .await;
+                    }
+
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
@@ -495,7 +516,16 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Register running search BEFORE spawning task
+    SEARCH_REGISTRY.insert(trace_id.clone(), SearchState::Running { cancel_tx });
+
+    // Spawn the search task
     tokio::spawn(async move {
+        // Handle the search request
+        // If search is cancelled, the task will exit
+        // Otherwise, the task will complete and the results will be sent to the client
+        // The task will also update the search state to completed
+        // The task will also close the session
+        // The task will also cleanup the search resources
         tokio::select! {
             search_result = search::handle_search_request(
                 &req_id,
@@ -536,8 +566,28 @@ async fn handle_search_event(
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        handle_search_error(e, &req_id, &trace_id_for_task).await;
-                        cleanup_search_resources(&trace_id_for_task).await;
+                        if let Some(close_reason) = handle_search_error(e, &req_id, &trace_id_for_task).await {
+                            // Add audit before closing
+                            #[cfg(feature = "enterprise")]
+                            if is_audit_enabled {
+                                audit(AuditMessage {
+                                    user_email: user_id,
+                                    org_id,
+                                    _timestamp: chrono::Utc::now().timestamp(),
+                                    protocol: Protocol::Ws(WsMeta {
+                                        path: path.clone(),
+                                        message_type: client_msg.get_type(),
+                                        content: client_msg.to_json(),
+                                        close_reason: format!("{:#?}", close_reason),
+                                    }),
+                                })
+                                .await;
+                            }
+
+
+                            cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                            cleanup_search_resources(&trace_id_for_task).await;
+                        }
                     }
                 }
             }
@@ -551,9 +601,6 @@ async fn handle_search_event(
             }
         }
     });
-
-    // Register the search state
-    SEARCH_REGISTRY.insert(trace_id.clone(), SearchState::Running { cancel_tx });
 }
 
 // Cancel handler
@@ -573,7 +620,7 @@ async fn handle_cancel_event(trace_id: &str) {
     }
 }
 
-async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
+async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
     if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
@@ -581,10 +628,14 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
             "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
             trace_id
         );
-        return;
+        // Update state to cancelled before returning
+        if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
+            *state = SearchState::Cancelled;
+        }
+        return None;
     }
-    log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
 
+    log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
     // Send error response
     let err_res =
         WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
@@ -596,13 +647,12 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
         description: Some(format!("trace_id {} Search Error", trace_id)),
     };
 
-    cleanup_and_close_session(req_id, Some(close_reason)).await;
-
     // Update registry state
     if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
         *state = SearchState::Completed;
     }
-    cleanup_search_resources(trace_id).await;
+
+    Some(close_reason)
 }
 
 // Add cleanup function
