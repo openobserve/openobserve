@@ -15,7 +15,11 @@
 
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
-use config::{get_config, meta::websocket::SearchResultType};
+use chrono::Utc;
+use config::{
+    get_config,
+    meta::websocket::{SearchEventReq, SearchResultType},
+};
 use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::{self, Error};
@@ -26,6 +30,7 @@ use o2_enterprise::enterprise::common::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::cancellation_registry_cache_utils;
@@ -38,6 +43,26 @@ use crate::service::self_reporting::audit;
 
 // Global cancellation registry for search requests by `trace_id`
 pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::new);
+
+// Core state management
+#[derive(Debug)]
+enum SearchState {
+    Running {
+        trace_id: String,
+        task_handle: JoinHandle<()>,
+        cancel_tx: mpsc::Sender<()>,
+    },
+    Cancelled {
+        trace_id: String,
+        timestamp: i64,
+    },
+    Completed {
+        trace_id: String,
+        timestamp: i64,
+    },
+}
+
+static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
 
 // Do not clone the session, instead use a reference to the session
 pub struct WsSession {
@@ -176,107 +201,119 @@ pub async fn handle_text_message(
         Ok(client_msg) => {
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
-                    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
-                    let org_id_clone = org_id.to_string();
-                    let user_id_clone = user_id.to_string();
-                    let req_id_clone = req_id.to_string();
-                    let search_req = search_req.clone();
-                    let trace_id = search_req.trace_id.clone();
-                    #[cfg(feature = "enterprise")]
-                    let client_msg = client_msg.clone();
-                    #[allow(unused_variables)]
-                    let path = path.to_string();
+                    // let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+                    // let org_id_clone = org_id.to_string();
+                    // let user_id_clone = user_id.to_string();
+                    // let req_id_clone = req_id.to_string();
+                    // let search_req = search_req.clone();
+                    // let trace_id = search_req.trace_id.clone();
+                    // #[cfg(feature = "enterprise")]
+                    // let client_msg = client_msg.clone();
+                    // #[allow(unused_variables)]
+                    // let path = path.to_string();
 
-                    let close_reason = tokio::spawn(async move {
-                        match search::handle_search_request(
-                            &req_id_clone,
-                            &mut accumulated_results,
-                            &org_id_clone,
-                            &user_id_clone,
-                            *search_req.clone(),
-                        )
-                        .await
-                        {
-                            Ok(_) => Some(CloseReason {
-                                code: CloseCode::Normal,
-                                description: Some(format!(
-                                    "trace_id {} Search completed",
-                                    search_req.trace_id.clone()
-                                )),
-                            }),
-                            Err(e) => {
-                                // if the error is due to search cancellation, return.
-                                // the cancel handler will close the session
-                                if let errors::Error::ErrorCode(
-                                    errors::ErrorCodes::SearchCancelQuery(_),
-                                ) = e
-                                {
-                                    log::info!(
-                                        "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
-                                        search_req.trace_id
-                                    );
-                                    return None;
-                                }
+                    // let close_reason = tokio::spawn(async move {
+                    //     match search::handle_search_request(
+                    //         &req_id_clone,
+                    //         &mut accumulated_results,
+                    //         &org_id_clone,
+                    //         &user_id_clone,
+                    //         *search_req.clone(),
+                    //     )
+                    //     .await
+                    //     {
+                    //         Ok(_) => Some(CloseReason {
+                    //             code: CloseCode::Normal,
+                    //             description: Some(format!(
+                    //                 "trace_id {} Search completed",
+                    //                 search_req.trace_id.clone()
+                    //             )),
+                    //         }),
+                    //         Err(e) => {
+                    //             // if the error is due to search cancellation, return.
+                    //             // the cancel handler will close the session
+                    //             if let errors::Error::ErrorCode(
+                    //                 errors::ErrorCodes::SearchCancelQuery(_),
+                    //             ) = e
+                    //             {
+                    //                 log::info!(
+                    //                     "[WS_HANDLER]: trace_id: {}, Return from search handler,
+                    // search canceled",                     search_req.trace_id
+                    //                 );
+                    //                 return None;
+                    //             }
 
-                                // Error handling...
-                                log::error!(
-                                    "[WS_HANDLER]: trace_id: {} Search error: {}",
-                                    search_req.trace_id.clone(),
-                                    e
-                                );
-                                let err_res = WsServerEvents::error_response(
-                                    e,
-                                    Some(search_req.trace_id.clone()),
-                                    Some(req_id_clone.clone()),
-                                );
-                                let _ = send_message(&req_id_clone, err_res.to_json().to_string()).await;
-                                Some(CloseReason {
-                                    code: CloseCode::Error,
-                                    description: Some(format!(
-                                        "trace_id {} Search Error",
-                                        search_req.trace_id.clone()
-                                    )),
-                                })
-                            }
-                        }
-                    })
-                    .await
-                    .unwrap_or_else(|e| {
-                        log::error!("[WS_HANDLER] trace_id: {} Task join error: {}", trace_id, e);
-                        Some(CloseReason {
-                            code: CloseCode::Error,
-                            description: Some(format!("trace_id: {} Task join error", trace_id)),
-                        })
-                    });
+                    //             // Error handling...
+                    //             log::error!(
+                    //                 "[WS_HANDLER]: trace_id: {} Search error: {}",
+                    //                 search_req.trace_id.clone(),
+                    //                 e
+                    //             );
+                    //             let err_res = WsServerEvents::error_response(
+                    //                 e,
+                    //                 Some(search_req.trace_id.clone()),
+                    //                 Some(req_id_clone.clone()),
+                    //             );
+                    //             let _ = send_message(&req_id_clone,
+                    // err_res.to_json().to_string()).await;
+                    // Some(CloseReason {                 code:
+                    // CloseCode::Error,                 description:
+                    // Some(format!(                     "trace_id {} Search
+                    // Error",                     search_req.trace_id.clone()
+                    //                 )),
+                    //             })
+                    //         }
+                    //     }
+                    // })
+                    // .await
+                    // .unwrap_or_else(|e| {
+                    //     log::error!("[WS_HANDLER] trace_id: {} Task join error: {}", trace_id,
+                    // e);     Some(CloseReason {
+                    //         code: CloseCode::Error,
+                    //         description: Some(format!("trace_id: {} Task join error", trace_id)),
+                    //     })
+                    // });
 
-                    if let Some(close_reason) = close_reason {
-                        // Audit before closing
-                        #[cfg(feature = "enterprise")]
-                        if is_audit_enabled {
-                            audit(AuditMessage {
-                                user_email: user_id.to_string(),
-                                org_id: org_id.to_string(),
-                                _timestamp: chrono::Utc::now().timestamp(),
-                                protocol: Protocol::Ws(WsMeta {
-                                    path,
-                                    message_type: client_msg.get_type(),
-                                    content: client_msg.to_json(),
-                                    close_reason: format!("{:#?}", close_reason.clone()),
-                                }),
-                            })
-                            .await;
-                        }
+                    // if let Some(close_reason) = close_reason {
+                    //     // Audit before closing
+                    //     #[cfg(feature = "enterprise")]
+                    //     if is_audit_enabled {
+                    //         audit(AuditMessage {
+                    //             user_email: user_id.to_string(),
+                    //             org_id: org_id.to_string(),
+                    //             _timestamp: chrono::Utc::now().timestamp(),
+                    //             protocol: Protocol::Ws(WsMeta {
+                    //                 path,
+                    //                 message_type: client_msg.get_type(),
+                    //                 content: client_msg.to_json(),
+                    //                 close_reason: format!("{:#?}", close_reason.clone()),
+                    //             }),
+                    //         })
+                    //         .await;
+                    //     }
 
-                        // Safe close the session after the task is complete
-                        cleanup_and_close_session(&req_id, Some(close_reason)).await;
-                    }
+                    //     // Safe close the session after the task is complete
+                    //     cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                    // }
 
-                    // Clean up after everything is done
-                    cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
+                    // // Clean up after everything is done
+                    // cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
+                    handle_search_event(
+                        search_req,
+                        org_id,
+                        user_id,
+                        req_id,
+                        path.clone(),
+                        is_audit_enabled,
+                    )
+                    .await;
                 }
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel { trace_id } => {
-                    // Set to cancellation flag for the given trace_id
+                    // First handle the cancel event
+                    handle_cancel_event(&trace_id).await;
+
+                    // Then do the rest of cancel handling
                     cancellation_registry_cache_utils::set_cancellation_flag(&trace_id);
                     log::info!(
                         "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {}",
@@ -285,7 +322,6 @@ pub async fn handle_text_message(
                     );
 
                     let res = search::handle_cancel(&trace_id, org_id).await;
-                    // close the session if send_message failed
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
@@ -427,7 +463,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
 }
 
 // Ensure all messages are sent before closing
-async fn ensure_all_messages_sent(req_id: &str) {
+async fn _ensure_all_messages_sent(req_id: &str) {
     let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
         session
     } else {
@@ -442,5 +478,153 @@ async fn ensure_all_messages_sent(req_id: &str) {
             req_id,
             e
         );
+    }
+}
+
+// Main search handler
+async fn handle_search_event(
+    search_req: &SearchEventReq,
+    org_id: &str,
+    user_id: &str,
+    req_id: &str,
+    path: String,
+    is_audit_enabled: bool,
+) {
+    let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
+    let mut accumulated_results: Vec<SearchResultType> = Vec::new();
+
+    let org_id = org_id.to_string();
+    let user_id = user_id.to_string();
+    let req_id = req_id.to_string();
+    let trace_id = search_req.trace_id.clone();
+    let trace_id_for_task = trace_id.clone();
+    let search_req = search_req.clone();
+
+    #[cfg(feature = "enterprise")]
+    let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
+
+    // Register running search BEFORE spawning task
+    let search_task = tokio::spawn(async move {
+        tokio::select! {
+            search_result = search::handle_search_request(
+                &req_id,
+                &mut accumulated_results,
+                &org_id,
+                &user_id,
+                search_req.clone(),
+            ) => {
+                match search_result {
+                    Ok(_) => {
+                        if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                            *state = SearchState::Completed {
+                                trace_id: trace_id_for_task.clone(),
+                                timestamp: Utc::now().timestamp(),
+                            };
+                        }
+
+                        let close_reason = CloseReason {
+                            code: CloseCode::Normal,
+                            description: Some(format!("trace_id {} Search completed", trace_id_for_task)),
+                        };
+
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                            audit(AuditMessage {
+                                user_email: user_id,
+                                org_id,
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Ws(WsMeta {
+                                    path: path.clone(),
+                                    message_type: client_msg.get_type(),
+                                    content: client_msg.to_json(),
+                                    close_reason: format!("{:#?}", close_reason),
+                                }),
+                            })
+                            .await;
+                        }
+
+                        cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                    }
+                    Err(e) => {
+                        handle_search_error(e, &req_id, &trace_id_for_task).await;
+                    }
+                }
+            }
+            _ = cancel_rx.recv() => {
+                // if search is cancelled, update the state
+                // the cancel handler will close the session
+                if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                    *state = SearchState::Cancelled {
+                        trace_id: trace_id_for_task.clone(),
+                        timestamp: Utc::now().timestamp(),
+                    };
+                }
+            }
+        }
+    });
+
+    // Register the search state
+    SEARCH_REGISTRY.insert(
+        trace_id.clone(),
+        SearchState::Running {
+            trace_id: trace_id.clone(),
+            task_handle: search_task,
+            cancel_tx,
+        },
+    );
+}
+
+// Cancel handler
+async fn handle_cancel_event(trace_id: &str) {
+    if let Some(state) = SEARCH_REGISTRY.get(trace_id) {
+        match state.value() {
+            SearchState::Running { cancel_tx, .. } => {
+                let _ = cancel_tx.send(()).await;
+                log::info!("[WS_HANDLER]: trace_id: {}, Cancel signal sent", trace_id);
+            }
+            _ => {
+                log::info!(
+                    "[WS_HANDLER]: trace_id: {}, Search already completed/cancelled",
+                    trace_id
+                );
+            }
+        }
+    }
+}
+
+async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) {
+    // if the error is due to search cancellation, return.
+    // the cancel handler will close the session
+    if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
+        log::info!(
+            "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
+            trace_id
+        );
+        return;
+    }
+
+    // Error handling...
+    log::error!("[WS_HANDLER]: trace_id: {} Search error: {}", trace_id, e);
+
+    // Send error response
+    let err_res =
+        WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
+    let _ = send_message(req_id, err_res.to_json().to_string()).await;
+
+    // Close with error
+    let close_reason = CloseReason {
+        code: CloseCode::Error,
+        description: Some(format!("trace_id {} Search Error", trace_id)),
+    };
+
+    cleanup_and_close_session(req_id, Some(close_reason)).await;
+
+    // Update registry state
+    if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
+        *state = SearchState::Completed {
+            trace_id: trace_id.to_string(),
+            timestamp: Utc::now().timestamp(),
+        };
     }
 }
