@@ -218,11 +218,10 @@ pub async fn handle_text_message(
                                 // close the session
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Normal,
-                                    // description: Some(format!(
-                                    //     "trace_id {} Search completed",
-                                    //     search_req.trace_id.clone()
-                                    // )),
-                                    description: None,
+                                    description: Some(format!(
+                                        "trace_id {} Search completed",
+                                        search_req.trace_id.clone()
+                                    )),
                                 });
 
                                 // audit
@@ -408,12 +407,18 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
     if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
-        if let Some(reason) = &close_reason {
+        let mut close_reason = close_reason;
+        if let Some(reason) = close_reason.as_mut() {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
                 req_id,
                 reason
             );
+
+            // Hack for the malformed message with close description
+            if !get_config().common.websocket_enable_ping_before_close {
+                reason.description = None;
+            }
         } else {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with no specific reason",
