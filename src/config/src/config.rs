@@ -971,9 +971,9 @@ pub struct Common {
     pub fake_es_version: String,
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub websocket_enabled: bool,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 10)]
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
     pub websocket_close_frame_delay: u64, // in milliseconds
-    #[env_config(name = "ZO_WEBSOCKET_ENABLE_PING_BEFORE_CLOSE", default = true)]
+    #[env_config(name = "ZO_WEBSOCKET_ENABLE_PING_BEFORE_CLOSE", default = false)]
     pub websocket_enable_ping_before_close: bool,
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",

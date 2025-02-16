@@ -32,9 +32,11 @@ use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
 use super::utils::search_registry_utils::SearchState;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::websocket::utils::search_registry_utils;
 use crate::handler::http::request::websocket::{
     search,
-    utils::{search_registry_utils, sessions_cache_utils, WsClientEvents, WsServerEvents},
+    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
 };
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;
