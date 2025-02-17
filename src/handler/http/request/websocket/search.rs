@@ -72,7 +72,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
             );
             WsServerEvents::CancelResponse {
                 trace_id: trace_id.to_string(),
-                is_success: false,
+                is_success: true,
             }
         }
     }
