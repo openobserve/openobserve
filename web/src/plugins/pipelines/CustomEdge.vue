@@ -24,8 +24,8 @@
       <q-icon name="close"
       flat
       dense
-      size="8px"
-      style="padding: 0px !important;"
+      size="12px"
+      style="padding: 0px !important; bottom: 1px;"
        />
       </button>
     </div>
