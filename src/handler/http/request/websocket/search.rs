@@ -23,7 +23,6 @@ use config::{
         sql::{resolve_stream_names, OrderBy},
         websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
     },
-    utils::base64,
 };
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
