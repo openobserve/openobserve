@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ async fn default() -> Box<dyn Queue> {
         _ => Box::<nop::NopQueue>::default(),
     }
 }
-
+ 
 async fn init_super_cluster() -> Box<dyn Queue> {
     if config::get_config().common.local_mode {
         panic!("super cluster is not supported in local mode");
