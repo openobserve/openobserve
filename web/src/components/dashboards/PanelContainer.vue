@@ -534,7 +534,7 @@ export default defineComponent({
 
     const isPanelLoading = ref(false);
 
-    const handleLoadingStateChange = (isLoading) => {
+    const handleLoadingStateChange = (isLoading: any) => {
       isPanelLoading.value = isLoading;
     };
 
