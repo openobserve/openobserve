@@ -30,6 +30,7 @@ pub async fn init() -> Result<()> {
 
 pub struct NatsQueue {
     prefix: String,
+    consumer_name: String,
 }
 
 impl NatsQueue {
@@ -37,11 +38,19 @@ impl NatsQueue {
         let prefix = prefix.trim_end_matches('/');
         Self {
             prefix: prefix.to_string(),
+            consumer_name: get_cluster_name(),
         }
     }
 
     pub fn super_cluster() -> Self {
         Self::new("super_cluster_queue_")
+    }
+
+    pub fn set_consumer_name(&self, name: &str) -> Self {
+        Self {
+            prefix: self.prefix.clone(),
+            consumer_name: name.to_string(),
+        }
     }
 }
 
@@ -84,11 +93,11 @@ impl super::Queue for NatsQueue {
     async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         let (tx, rx) = mpsc::channel(1024);
         let stream_name = format!("{}{}", self.prefix, topic);
+        let consumer_name = self.consumer_name.clone();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
             let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await?;
-            let consumer_name = get_cluster_name();
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
                 durable_name: Some(consumer_name.to_string()),
