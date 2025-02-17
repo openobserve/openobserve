@@ -27,8 +27,9 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
     physical_plan::{
-        expressions::Column, DisplayAs, DisplayFormatType, Distribution, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
+        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
     },
 };
 use futures::{Stream, StreamExt};
@@ -65,7 +66,8 @@ impl DeduplicationExec {
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }

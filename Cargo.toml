@@ -91,7 +91,7 @@ dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-aggregate-common.workspace = true
-datafusion-functions-json = "0.43.0"
+datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
 arrow-schema.workspace = true
@@ -245,17 +245,18 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "43.0.0"
-datafusion-proto = "43.0.0"
-datafusion-functions-aggregate-common = "43.0.0"
+datafusion = "44.0.0"
+datafusion-proto = "44.0.0"
+datafusion-functions-aggregate-common = "44.0.0"
+datafusion-functions-json = "0.44.0"
 expect-test = "1.4"
-arrow = { version = "53.2.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "53.2.0"
-arrow-json = "53.2.0"
-arrow-schema = { version = "53.2.0", features = ["serde"] }
-parquet = { version = "53.2.0", features = ["arrow", "async", "object_store"] }
+arrow = { version = "53.3.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "53.3.0"
+arrow-json = "53.3.0"
+arrow-schema = { version = "53.3.0", features = ["serde"] }
+parquet = { version = "53.3.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.11.0", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.51.0", features = ["serde", "visitor"] }
+sqlparser = { version = "0.53.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.1"
 dotenvy = "0.15.7"
 env_logger = "0.10"

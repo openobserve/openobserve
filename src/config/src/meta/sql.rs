@@ -566,6 +566,7 @@ fn parse_expr_for_field(
             expr,
             pattern,
             escape_char,
+            any: _,
         } => {
             parse_expr_like(negated, expr, pattern, escape_char, expr_op, field, fields).unwrap();
         }
@@ -793,6 +794,7 @@ fn parse_expr_function(
                 }
                 _ => return Err(anyhow::anyhow!("We only support String at the moment")),
             },
+            _ => {}
         }
     }
 
@@ -850,6 +852,7 @@ fn parse_expr_fun_time_range(
                     }
                     _ => return Err(anyhow::anyhow!("We only support String at the moment")),
                 },
+                _ => unreachable!(),
             };
             vals.push(val);
         }
