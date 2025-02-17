@@ -25,7 +25,7 @@
       flat
       dense
       size="12px"
-      style="padding: 0px !important; bottom: 1px;"
+      class="red-btn"
        />
       </button>
     </div>
@@ -116,6 +116,10 @@ export default {
   border-radius: 100%;
   cursor: pointer;
   padding: 0px 6px !important;
+}
+.red-btn{
+  padding: 0px !important;
+  bottom: 1px;
 }
 </style>
 
