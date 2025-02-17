@@ -253,6 +253,7 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
+        #[allow(deprecated)]
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
