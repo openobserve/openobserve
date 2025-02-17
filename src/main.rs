@@ -928,7 +928,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // following command will setup the namespace
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::actions::app_deployer::init().await?;
+    o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
     let server = HttpServer::new(move || {
         let cfg = get_config();

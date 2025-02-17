@@ -24,27 +24,16 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 infra::table::action_scripts::get(&action.id.unwrap().to_string(), &action.org_id)
                     .await
             {
-                // first we check if the origin cluster url has changed
-                // if it has, we check if the previous action zip file was uploaded in the s3 bucket
-                // of the current cluster if it was, we remove the zip file from s3
-                // bucket
+                // Delete zip file if origin cluster changed and we're the original cluster
                 if current_cluster_action.origin_cluster_url != action.origin_cluster_url
-                    && current_cluster_action.origin_cluster_url
-                        == config::get_config().common.web_url
-                    && infra::storage::del(&[current_cluster_action
-                        .zip_file_path
-                        .as_ref()
-                        .expect("zip file path is required")])
-                    .await
-                    .is_err()
+                    && current_cluster_action.origin_cluster_url == config::get_config().common.web_url
                 {
-                    log::error!(
-                        "failed to delete the zip file from s3 bucket {}",
-                        current_cluster_action
-                            .zip_file_path
-                            .expect("zip file path is required")
-                    );
-                };
+                    if let Some(zip_path) = &current_cluster_action.zip_file_path {
+                        if let Err(e) = infra::storage::del(&[zip_path]).await {
+                            log::error!("failed to delete the zip file from s3 bucket {}: {}", zip_path, e);
+                        }
+                    }
+                }
                 infra::table::action_scripts::update(&action).await?;
             } else {
                 infra::table::action_scripts::add(&action).await?;
@@ -54,21 +43,13 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if let Ok(current_cluster_action) =
                 infra::table::action_scripts::get(&action_id, &org_id).await
             {
-                // check if the current cluster is the custodian of the action zip file
-                if current_cluster_action.origin_cluster_url == config::get_config().common.web_url
-                    && infra::storage::del(&[current_cluster_action
-                        .zip_file_path
-                        .as_ref()
-                        .expect("zip file path is required")])
-                    .await
-                    .is_err()
-                {
-                    log::error!(
-                        "failed to delete the zip file from s3 bucket {}",
-                        current_cluster_action
-                            .zip_file_path
-                            .expect("zip file path is required")
-                    );
+                // Delete zip file if we're the original cluster
+                if current_cluster_action.origin_cluster_url == config::get_config().common.web_url {
+                    if let Some(zip_path) = &current_cluster_action.zip_file_path {
+                        if let Err(e) = infra::storage::del(&[zip_path]).await {
+                            log::error!("failed to delete the zip file from s3 bucket {}: {}", zip_path, e);
+                        }
+                    }
                 }
             }
             infra::table::action_scripts::remove(&org_id, &action_id).await?;

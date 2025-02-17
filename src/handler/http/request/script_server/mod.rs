@@ -17,13 +17,13 @@ use std::collections::HashMap;
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use config::meta::actions::action::ActionType;
-use o2_enterprise::enterprise::actions::app_deployer::APP_DEPLOYER;
+use o2_enterprise::enterprise::actions::action_deployer::ACTION_DEPLOYER;
 
 #[post("/{org_id}/v1/job")]
 pub async fn create_job(path: web::Path<String>, body: web::Bytes) -> impl Responder {
     let org_id = path.into_inner();
 
-    if let Some(deployer) = APP_DEPLOYER.get() {
+    if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.create_app(&org_id, body).await {
             Ok(created_at) => HttpResponse::Ok().body(created_at.to_rfc3339()),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
@@ -37,7 +37,7 @@ pub async fn create_job(path: web::Path<String>, body: web::Bytes) -> impl Respo
 pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, name) = path.into_inner();
 
-    if let Some(deployer) = APP_DEPLOYER.get() {
+    if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.delete_app(&org_id, &name).await {
             Ok(_) => HttpResponse::Ok().finish(),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
@@ -50,7 +50,7 @@ pub async fn delete_job(path: web::Path<(String, String)>) -> impl Responder {
 pub async fn get_app_details(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, name) = path.into_inner();
 
-    if let Some(deployer) = APP_DEPLOYER.get() {
+    if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.get_app_status(&org_id, &name).await {
             Ok(resp) => HttpResponse::Ok().json(resp),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
@@ -63,7 +63,7 @@ pub async fn get_app_details(path: web::Path<(String, String)>) -> impl Responde
 pub async fn list_deployed_apps(path: web::Path<String>) -> impl Responder {
     let org_id = path.into_inner();
 
-    if let Some(deployer) = APP_DEPLOYER.get() {
+    if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer.list_apps(&org_id).await {
             Ok(resp) => HttpResponse::Ok().json(resp),
             Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
@@ -91,7 +91,7 @@ pub async fn patch_action(
         None => return HttpResponse::BadRequest().body("Missing required 'action_type' parameter"),
     };
 
-    if let Some(deployer) = APP_DEPLOYER.get() {
+    if let Some(deployer) = ACTION_DEPLOYER.get() {
         return match deployer
             .update_action(&org_id, &id, action_type, body)
             .await
