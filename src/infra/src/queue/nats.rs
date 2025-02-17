@@ -46,7 +46,7 @@ impl NatsQueue {
         Self::new("super_cluster_queue_")
     }
 
-    pub fn set_consumer_name(&self, name: &str) -> Self {
+    pub fn with_consumer_name(&self, name: &str) -> Self {
         Self {
             prefix: self.prefix.clone(),
             consumer_name: name.to_string(),
