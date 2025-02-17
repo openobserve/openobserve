@@ -10,7 +10,7 @@ on:
 
 jobs:
   js-license-check:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     timeout-minutes: 10
     steps:
       - name: Checkout latest code

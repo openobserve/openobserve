@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,7 @@ use crate::{
             distributed_plan::{
                 remote_scan::RemoteScanExec,
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                EmptyExecVisitor,
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
@@ -394,7 +395,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
-        sql.index_optimize_mode,
+        sql.index_optimize_mode.clone(),
         false, // for super cluster
         context,
     );
@@ -413,6 +414,17 @@ pub async fn run_datafusion(
     if streaming_output {
         let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap(), start_time, end_time);
         physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    }
+
+    let mut visitor = EmptyExecVisitor::default();
+    if physical_plan.visit(&mut visitor).is_err() {
+        log::error!("[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable");
+        return Err(Error::Message(
+            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+        ));
+    }
+    if visitor.get_data().is_some() {
+        return Ok((vec![], ScanStats::default(), "".to_string()));
     }
 
     if cfg.common.print_key_sql {
@@ -438,7 +450,13 @@ pub async fn get_online_querier_nodes(
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let cfg = get_config();
+    let nodes = if cfg.common.feature_query_skip_wal {
+        infra_cluster::get_cached_online_querier_nodes(node_group).await
+    } else {
+        infra_cluster::get_cached_online_query_nodes(node_group).await
+    };
+    let mut nodes = match nodes {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] flight->search: no querier node online");
@@ -946,7 +964,7 @@ pub async fn get_inverted_index_file_list(
     query.track_total_hits = false;
     query.uses_zo_fn = false;
     query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![]).await?;
+    let resp = super::http::search(req, query, vec![], vec![], false).await?;
 
     // Merge bitmap segment_ids of the same file
     let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();

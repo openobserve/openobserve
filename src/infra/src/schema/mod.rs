@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -59,16 +59,8 @@ pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> Strin
 }
 
 pub async fn get(org_id: &str, stream_name: &str, stream_type: StreamType) -> Result<Schema> {
-    let key = mk_key(org_id, stream_type, stream_name);
-    let cache_key = key.strip_prefix("/schema/").unwrap();
-
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.schema().as_ref().clone());
-    }
-    drop(r);
-    // if not found in cache, get from db
-    get_from_db(org_id, stream_name, stream_type).await
+    let schema = get_cache(org_id, stream_name, stream_type).await?;
+    Ok(schema.schema().as_ref().clone())
 }
 
 pub async fn get_cache(
@@ -78,15 +70,23 @@ pub async fn get_cache(
 ) -> Result<SchemaCache> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
-
-    let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(cache_key) {
-        return Ok(schema.clone());
+    if let Some(schema) = STREAM_SCHEMAS_LATEST.read().await.get(cache_key).cloned() {
+        return Ok(schema);
     }
-    drop(r);
-    // if not found in cache, get from db
+
+    // Get from DB without holding any locks
     let schema = get_from_db(org_id, stream_name, stream_type).await?;
-    Ok(SchemaCache::new(schema))
+    let schema = SchemaCache::new(schema);
+
+    // Only acquire write lock after DB read is complete
+    let mut write_guard = STREAM_SCHEMAS_LATEST.write().await;
+    // Check again before inserting in case another thread updated while we were reading DB
+    if let Some(schema) = write_guard.get(cache_key) {
+        Ok(schema.clone())
+    } else {
+        write_guard.insert(cache_key.to_string(), schema.clone());
+        Ok(schema)
+    }
 }
 
 pub async fn get_from_db(
@@ -230,15 +230,30 @@ pub async fn get_settings(
     stream_type: StreamType,
 ) -> Option<StreamSettings> {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SETTINGS.read().await;
-    if let Some(v) = r.get(&key) {
-        return Some(v.clone());
+
+    // Try to get from read lock first
+    if let Some(settings) = STREAM_SETTINGS.read().await.get(&key).cloned() {
+        return Some(settings);
     }
-    // if not found in cache, get from db
-    get(org_id, stream_name, stream_type)
-        .await
-        .ok()
-        .and_then(|schema| unwrap_stream_settings(&schema))
+
+    // Get from DB without holding any locks
+    let settings = match get(org_id, stream_name, stream_type).await {
+        Ok(schema) => unwrap_stream_settings(&schema),
+        Err(_) => None,
+    };
+
+    // Only acquire write lock if we have settings to update
+    if let Some(ref s) = settings {
+        // Check cache again before updating as another thread might have updated while we were
+        // reading DB
+        let mut write_guard = STREAM_SETTINGS.write().await;
+        if !write_guard.contains_key(&key) {
+            write_guard.insert(key, s.clone());
+        }
+        drop(write_guard);
+    }
+
+    settings
 }
 
 pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
@@ -278,6 +293,13 @@ pub fn unwrap_partition_time_level(
             _ => PartitionTimeLevel::default(),
         }
     }
+}
+
+pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    settings
+        .as_ref()
+        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .unwrap_or_default()
 }
 
 pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<String> {

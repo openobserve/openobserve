@@ -66,7 +66,6 @@ fn connect_rw() -> Pool<Sqlite> {
         .synchronous(SqliteSynchronous::Normal)
         .locking_mode(SqliteLockingMode::Normal)
         .busy_timeout(Duration::from_secs(acquire_timeout))
-        // .disable_statement_logging()
         .create_if_missing(true);
 
     SqlitePoolOptions::new()

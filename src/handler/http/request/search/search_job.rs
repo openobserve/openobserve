@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,9 @@ use crate::{
             get_stream_type_from_request, get_use_cache_from_request,
         },
     },
-    handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
+    handler::http::request::search::{
+        query_manager::cancel_query_inner, utils::check_stream_permissions,
+    },
     service::{
         db::search_job::{search_job_partitions::*, search_jobs::*},
         search_jobs::{get_result, merge_response},
@@ -128,7 +130,7 @@ pub async fn submit_job(
         &trace_id,
         &org_id,
         &user_id,
-        &stream_type.to_string(),
+        stream_type.as_str(),
         &stream_names,
         &json::to_string(&req).unwrap(),
         req.query.start_time,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -276,22 +276,23 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
-        .await
-        .unwrap_or_default();
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.schema().clone(),
+        None => {
+            return Err(anyhow::anyhow!(
+                "Schema not found for stream: {}",
+                stream_name
+            ));
+        }
+    };
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
-        let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            org_id,
-            &StreamType::Logs,
-            stream_name,
-        )
-        .await;
-        partition_keys = partition_det.partition_keys;
+        partition_keys = stream_settings.partition_keys;
         partition_time_level =
-            unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Logs);
+            unwrap_partition_time_level(stream_settings.partition_time_level, StreamType::Logs);
     }
 
     // Start get stream alerts
@@ -380,7 +381,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -392,7 +393,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -503,20 +504,15 @@ async fn write_logs(
     }
 
     // write data to wal
-    let writer = ingester::get_writer(
-        thread_id,
-        org_id,
-        &StreamType::Logs.to_string(),
-        stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
         write_buf,
         !cfg.common.wal_fsync_disabled,
     )
-    .await;
+    .await?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
 
-use super::utils::cancellation_registry_cache_utils;
+use super::sort::order_search_results;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -41,7 +41,10 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
+    handler::http::request::websocket::{
+        session::send_message,
+        utils::{search_registry_utils, TimeOffset, WsServerEvents},
+    },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
     },
@@ -69,7 +72,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
             );
             WsServerEvents::CancelResponse {
                 trace_id: trace_id.to_string(),
-                is_success: false,
+                is_success: true,
             }
         }
     }
@@ -132,7 +135,8 @@ pub async fn handle_search_request(
 
     // handle search result size
     let req_size = if req.payload.query.size == 0 {
-        cfg.limit.query_default_limit
+        req.payload.query.size = cfg.limit.query_default_limit;
+        req.payload.query.size
     } else {
         req.payload.query.size
     };
@@ -149,7 +153,7 @@ pub async fn handle_search_request(
     let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
     if let Some(interval) = sql.histogram_interval {
         // modify the sql query statement to include the histogram interval
-        let updated_query = update_histogram_interval_in_query(&sql.sql, interval)?;
+        let updated_query = update_histogram_interval_in_query(&req.payload.query.sql, interval)?;
         req.payload.query.sql = updated_query;
         log::info!(
             "[WS_SEARCH] trace_id: {}; Updated query {}; with histogram interval: {}",
@@ -159,9 +163,6 @@ pub async fn handle_search_request(
         );
     }
     let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-
-    // Set cancel flag to stop search when cancel event is received
-    cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
     // Search start
     log::info!(
@@ -311,7 +312,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
                 if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    let vrl = format!("{vrl}\n.");
                     req.payload.query.query_fn = Some(vrl);
                 } else if vrl.is_empty() || vrl.eq(".") {
                     // In case the vrl contains only ".", no need to save it
@@ -466,6 +467,7 @@ async fn handle_cache_responses_and_deltas(
                     cached,
                     accumulated_results,
                     &mut curr_res_size,
+                    req.fallback_order_by_col.clone(),
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -500,6 +502,7 @@ async fn handle_cache_responses_and_deltas(
                 cached,
                 accumulated_results,
                 &mut curr_res_size,
+                req.fallback_order_by_col.clone(),
             )
             .await?;
         }
@@ -572,7 +575,7 @@ async fn process_delta(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(&trace_id) {
+        if search_registry_utils::is_cancelled(&trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
                 trace_id
@@ -602,6 +605,7 @@ async fn process_delta(
         );
 
         if !search_res.hits.is_empty() {
+            search_res = order_search_results(search_res, req.fallback_order_by_col);
             // for every partition, compute the queried range omitting the result cache ratio
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
@@ -636,7 +640,10 @@ async fn process_delta(
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
-                time_offset: end_time,
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
                 streaming_aggs: is_streaming_aggs,
             };
             log::info!(
@@ -712,8 +719,7 @@ async fn get_partitions(
         clusters: search_payload.clusters.clone(),
         // vrl is not required for _search_partition
         query_fn: Default::default(),
-        // TODO: push a fix for this as an update
-        streaming_output: false,
+        streaming_output: true,
     };
 
     let res = SearchService::search_partition(
@@ -739,8 +745,9 @@ async fn send_cached_responses(
     cached: &CachedQueryResponse,
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
+    fallback_order_by_col: Option<String>,
 ) -> Result<(), Error> {
-    if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+    if search_registry_utils::is_cancelled(trace_id) {
         log::info!(
             "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
             trace_id
@@ -772,6 +779,8 @@ async fn send_cached_responses(
         }
     }
 
+    cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
+
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
@@ -784,7 +793,10 @@ async fn send_cached_responses(
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
         results: Box::new(cached.cached_response.clone()),
-        time_offset: cached.response_end_time,
+        time_offset: TimeOffset {
+            start_time: cached.response_start_time,
+            end_time: cached.response_end_time,
+        },
         streaming_aggs: false, // streaming aggs is not supported for cached responses
     };
     log::info!(
@@ -863,7 +875,7 @@ async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+        if search_registry_utils::is_cancelled(trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
                 trace_id
@@ -886,6 +898,8 @@ async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
+            search_res = order_search_results(search_res, req.fallback_order_by_col);
+
             // check range error
             if !range_error.is_empty() {
                 search_res.is_partial = true;
@@ -912,7 +926,10 @@ async fn do_partitioned_search(
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
-                time_offset: end_time,
+                time_offset: TimeOffset {
+                    start_time,
+                    end_time,
+                },
                 streaming_aggs: is_streaming_aggs,
             };
             send_message(req_id, ws_search_res.to_json().to_string()).await?;
@@ -938,7 +955,10 @@ async fn do_partitioned_search(
         let ws_search_res = WsServerEvents::SearchResponse {
             trace_id: trace_id.to_string(),
             results: Box::new(Response::default()),
-            time_offset: req.payload.query.end_time,
+            time_offset: TimeOffset {
+                start_time: req.payload.query.start_time,
+                end_time: req.payload.query.end_time,
+            },
             streaming_aggs: is_streaming_aggs,
         };
         send_message(req_id, ws_search_res.to_json().to_string()).await?;
@@ -978,7 +998,10 @@ async fn send_partial_search_resp(
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
         results: Box::new(s_resp),
-        time_offset: 0,
+        time_offset: TimeOffset {
+            start_time: new_start_time,
+            end_time: new_end_time,
+        },
         streaming_aggs: is_streaming_aggs,
     };
     log::info!(

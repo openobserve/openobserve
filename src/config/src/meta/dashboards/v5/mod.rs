@@ -43,6 +43,8 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+    #[serde(default, skip_serializing)]
+    pub updated_at: i64,
 }
 
 impl From<Dashboard> for super::Dashboard {
@@ -53,6 +55,7 @@ impl From<Dashboard> for super::Dashboard {
         hasher.write_i32(version);
         value.hash(&mut hasher);
         let hash = hasher.finish().to_string();
+        let updated_at = value.updated_at;
 
         Self {
             v1: None,
@@ -62,6 +65,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: Some(value),
             version,
             hash,
+            updated_at,
         }
     }
 }
@@ -102,6 +106,8 @@ pub struct Panel {
     pub html_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub markdown_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_chart_content: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -165,10 +171,9 @@ pub struct AxisArg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum AggregationFunc {
     Count,
-    #[serde(rename = "count-distinct")]
     CountDistinct,
     Histogram,
     Sum,
@@ -539,20 +544,17 @@ pub struct LabelOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum LineInterpolation {
     Smooth,
     Linear,
-    #[serde(rename = "step-start")]
     StepStart,
-    #[serde(rename = "step-end")]
     StepEnd,
-    #[serde(rename = "step-middle")]
     StepMiddle,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 pub enum LabelPosition {
     Top,
     Inside,

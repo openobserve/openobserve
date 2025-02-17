@@ -864,7 +864,7 @@ const useLogs = () => {
         req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -1238,6 +1238,10 @@ const useLogs = () => {
             })
             .catch((err: any) => {
               searchObj.loading = false;
+
+              // Reset cancel query on search error
+              searchObj.data.isOperationCancelled = false;
+
               let trace_id = "";
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
@@ -1480,6 +1484,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+
+      // Reset cancel query on new search request initation
+      searchObj.data.isOperationCancelled = false;
+
       // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
@@ -2002,6 +2010,10 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
+
+          // Reset cancel query on search error
+          searchObj.data.isOperationCancelled = false;
+
           let trace_id = "";
           searchObj.data.countErrorMsg =
             "Error while retrieving total events: ";
@@ -2301,6 +2313,10 @@ const useLogs = () => {
           // TODO OK : create handleError function, which will handle error and return error message and detail
 
           searchObj.loading = false;
+
+          // Reset cancel query on search error
+          searchObj.data.isOperationCancelled = false;
+
           let trace_id = "";
           searchObj.data.errorMsg =
             typeof err == "string" && err
@@ -2550,6 +2566,11 @@ const useLogs = () => {
           })
           .catch((err) => {
             searchObj.loadingHistogram = false;
+
+
+            // Reset cancel query on search error
+            searchObj.data.isOperationCancelled = false;
+
             let trace_id = "";
 
             if (err?.request?.status != 429) {
@@ -3355,6 +3376,15 @@ const useLogs = () => {
       ) {
         plusSign = "+";
       }
+
+      if (
+        searchObj.communicationMethod === "ws" &&
+        endCount < totalCount &&
+        !searchObj.meta.showHistogram
+      ) {
+        plusSign = "+";
+      }
+
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
@@ -3473,7 +3503,7 @@ const useLogs = () => {
           b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
         );
       } else {
-        const parseQuery = query.split("|");
+        const parseQuery = [query];
         let queryFunctions = "";
         let whereClause = "";
         if (parseQuery.length > 1) {
@@ -3662,7 +3692,8 @@ const useLogs = () => {
     try {
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs"
+        router.currentRoute.value.name == "logs" &&
+        enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
@@ -3688,6 +3719,16 @@ const useLogs = () => {
         }
       } else {
         clearInterval(store.state.refreshIntervalID);
+      }
+
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs" &&
+        !enableRefreshInterval(searchObj.meta.refreshInterval)
+      ) {
+        searchObj.meta.refreshInterval = 0;
+        clearInterval(store.state.refreshIntervalID);
+        store.dispatch("setRefreshIntervalID", 0);
       }
     } catch (e: any) {
       console.log("Error while refreshing data", e);
@@ -3820,9 +3861,21 @@ const useLogs = () => {
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
-    if (queryParams.refresh) {
+
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
       searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
     }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
     useLocalTimezone(queryParams.timezone);
 
     if (queryParams.functionContent) {
@@ -3869,6 +3922,12 @@ const useLogs = () => {
         defined_schemas: searchObj.meta.useUserDefinedSchemas,
       },
     });
+  };
+
+  const enableRefreshInterval = (value: number) => {
+    return (
+      value >= (Number(store.state?.zoConfig?.min_auto_refresh_interval) || 0)
+    );
   };
 
   const showNotification = () => {
@@ -3947,97 +4006,77 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-      searchObj.data.queryResults = {
-        hits: [],
-      };
-      searchObj.data.stream.selectedStreamFields = [];
-
-      let unionquery = "";
+      
+      // Reset query results
+      searchObj.data.queryResults = { hits: [] };
+      
+      // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
+      const unionquery = streams
+        .map((stream: string) => 
+          `SELECT [FIELD_LIST] FROM "${stream}"`
+        )
+        .join(" UNION ");
 
-      streams.forEach((stream: string, index: number) => {
-        // Add UNION for all but the first SELECT statement
-        if (index > 0) {
-          unionquery += " UNION ";
-        }
-        unionquery += `SELECT [FIELD_LIST] FROM "${stream}"`;
-      });
+      const query = searchObj.meta.sqlMode ? (queryStr || unionquery) : "";
 
-      let query = searchObj.meta.sqlMode
-        ? queryStr != ""
-          ? queryStr
-          : unionquery
-        : "";
-
-      searchObj.data.stream.selectedStreamFields = [];
-      for (const stream of searchObj.data.stream.selectedStream) {
-        const streamData: any = await getStream(
+      // Fetch all stream data in parallel
+      const streamDataPromises = streams.map((stream: string) => 
+        getStream(
           stream,
           searchObj.data.stream.streamType || "logs",
-          true,
-        );
+          true
+        )
+      );
 
-        if (streamData.schema != undefined) {
-          searchObj.data.stream.selectedStreamFields.push(...streamData.schema);
-        }
-      }
+      const streamDataResults = await Promise.all(streamDataPromises);
+      
+      // Collect all schema fields
+      const allStreamFields = streamDataResults
+        .filter(data => data?.schema)
+        .flatMap(data => data.schema);
 
-      if (
-        searchObj.data.stream.selectedStreamFields == undefined ||
-        searchObj.data.stream.selectedStreamFields.length == 0
-      ) {
-        searchObj.loadingStream = false;
+      // Update selectedStreamFields once
+      searchObj.data.stream.selectedStreamFields = allStreamFields;
+
+      if (allStreamFields.length === 0) {
         searchObj.data.errorMsg = t("search.noFieldFound");
         return;
       }
-      const streamFieldNames: any = [];
-      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        // subArray.forEach((item: any) => {
-        streamFieldNames.push(item.name);
-        // });
-      });
 
-      for (
-        let i = searchObj.data.stream.interestingFieldList.length - 1;
-        i >= 0;
-        i--
-      ) {
-        const fieldName = searchObj.data.stream.interestingFieldList[i];
-        if (!streamFieldNames.includes(fieldName)) {
-          searchObj.data.stream.interestingFieldList.splice(i, 1);
-        }
+      // Update selected fields if needed
+      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
+      if (searchObj.data.stream.selectedFields.length > 0) {
+        searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields
+          .filter(fieldName => streamFieldNames.has(fieldName));
       }
 
-      // if (queryStr == "") {
-      if (
-        searchObj.data.stream.interestingFieldList.length > 0 &&
-        searchObj.meta.quickMode
-      ) {
-        query = query.replace(
-          /\[FIELD_LIST\]/g,
-          searchObj.data.stream.interestingFieldList.join(","),
-        );
-      } else {
-        query = query.replace(/\[FIELD_LIST\]/g, "*");
-      }
-      // }
+      // Update interesting fields list
+      searchObj.data.stream.interestingFieldList = searchObj.data.stream.interestingFieldList
+        .filter(fieldName => streamFieldNames.has(fieldName));
 
-      searchObj.data.editorValue = query;
-      searchObj.data.query = query;
+      // Replace field list in query
+      const fieldList = searchObj.meta.quickMode && searchObj.data.stream.interestingFieldList.length > 0
+        ? searchObj.data.stream.interestingFieldList.join(",")
+        : "*";
+      
+      const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
+
+      // Update query related states
+      searchObj.data.editorValue = finalQuery;
+      searchObj.data.query = finalQuery;
       searchObj.data.tempFunctionContent = "";
       searchObj.meta.searchApplied = false;
 
-      if (searchObj.data.stream.selectedStream.length > 1) {
+      // Update histogram visibility
+      if (streams.length > 1) {
         searchObj.meta.showHistogram = false;
       }
 
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        handleQueryData();
+      if (!store.state.zoConfig.query_on_stream_selection) {
+        await handleQueryData();
       } else {
-        searchObj.data.stream.selectedStreamFields = [];
-        searchObj.data.queryResults = {
-          hits: [],
-        };
+        // Reset states when query on selection is disabled
         searchObj.data.sortedQueryResults = [];
         searchObj.data.histogram = {
           xData: [],
@@ -4052,11 +4091,11 @@ const useLogs = () => {
           errorDetail: "",
         };
         extractFields();
-        searchObj.loadingStream = false;
       }
     } catch (e: any) {
+      console.error("Error while getting stream data:", e);
+    } finally {
       searchObj.loadingStream = false;
-      console.log("Error while getting stream data", e);
     }
   };
 
@@ -4660,23 +4699,31 @@ const useLogs = () => {
     try {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
-        showCancelSearchNotification();
         return;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, {
+      const payload = {
         type: "search",
         content: {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
-          },
+          } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
         },
-      });
-      // cancelQuery();
+      };
+
+      if (
+        Object.hasOwn(queryReq.queryReq, "regions") &&
+        Object.hasOwn(queryReq.queryReq, "clusters")
+      ) {
+        payload.content.payload["regions"] = queryReq.queryReq.regions;
+        payload.content.payload["clusters"] = queryReq.queryReq.clusters;
+      }
+
+      sendSearchMessageBasedOnRequestId(requestId, payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4710,7 +4757,8 @@ const useLogs = () => {
           payload.isPagination,
           payload.traceId,
           response,
-          searchPartitionMap[payload.traceId] > 1,
+          !response.content?.streaming_aggs &&
+            searchPartitionMap[payload.traceId] > 1, // In aggregation query, we need to replace the results instead of appending
         );
       }
 
@@ -4730,7 +4778,10 @@ const useLogs = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
+      searchObj.data.isOperationCancelled = false;
+
       showCancelSearchNotification();
+      setCancelSearchError();
     }
   };
 
@@ -4779,10 +4830,15 @@ const useLogs = () => {
 
       if (searchObj.meta.sqlMode) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.total =
-            searchAggData.total + response.content?.results?.total;
           searchAggData.hasAggregation = true;
           searchObj.meta.resultGrid.showPagination = false;
+
+          if (response.content?.streaming_aggs) {
+            searchAggData.total = response.content?.results?.total;
+          } else {
+            searchAggData.total =
+              searchAggData.total + response.content?.results?.total;
+          }
         }
       }
 
@@ -4819,16 +4875,34 @@ const useLogs = () => {
           searchObj.data.queryResults.scan_size +=
             response.content.results.scan_size;
         } else {
-          if (isPagination) {
+          if (response.content?.streaming_aggs) {
+            if (!Object.keys(searchObj.data.queryResults)?.length) {
+              searchObj.data.queryResults = response.content.results;
+            } else {
+              searchObj.data.queryResults.hits = response.content.results.hits;
+              searchObj.data.queryResults.total =
+                response.content.results.total;
+
+              searchObj.data.queryResults.took += response.content.results.took;
+              searchObj.data.queryResults.scan_size +=
+                response.content.results.scan_size;
+            }
+          } else if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
             searchObj.data.queryResults.from = response.content.results.from;
             searchObj.data.queryResults.scan_size =
               response.content.results.scan_size;
             searchObj.data.queryResults.took = response.content.results.took;
+            searchObj.data.queryResults.total = response.content.results.total;
           } else {
             searchObj.data.queryResults = response.content.results;
           }
         }
+      }
+
+      // We are storing time_offset for the context of pagecount, to get the partial pagecount
+      if (searchObj.data.queryResults) {
+        searchObj.data.queryResults.time_offset = response.content?.time_offset;
       }
 
       // If its a pagination request, then append
@@ -4839,8 +4913,6 @@ const useLogs = () => {
       if (isPagination) refreshPagination(true);
 
       processPostPaginationData();
-
-      searchObj.loading = false;
 
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
@@ -5115,6 +5187,9 @@ const useLogs = () => {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
+
+      showCancelSearchNotification();
+      setCancelSearchError();
       return;
     }
 
@@ -5168,7 +5243,8 @@ const useLogs = () => {
     }
 
     if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram") searchObj.loadingHistogram = false;
+    if (payload.type === "histogram" || payload.type === "pageCount")
+      searchObj.loadingHistogram = false;
     searchObj.data.isOperationCancelled = false;
   };
 
@@ -5185,6 +5261,7 @@ const useLogs = () => {
     // 20009 is the code for query cancelled
     if (code === 20009) {
       showCancelSearchNotification();
+      setCancelSearchError();
     }
 
     if (trace_id) removeTraceId(trace_id);
@@ -5268,6 +5345,13 @@ const useLogs = () => {
   };
 
   const getPageCountThroughSocket = async (queryReq: any) => {
+    if (
+      searchObj.data.queryResults.total >
+      queryReq.query.from + queryReq.query.size
+    ) {
+      return;
+    }
+
     searchObj.data.countErrorMsg = "";
     queryReq.query.size = 0;
     delete queryReq.query.from;
@@ -5276,7 +5360,19 @@ const useLogs = () => {
 
     queryReq.query.track_total_hits = true;
 
+    if (
+      searchObj.data?.queryResults?.time_offset?.start_time &&
+      searchObj.data?.queryResults?.time_offset?.end_time
+    ) {
+      queryReq.query.start_time =
+        searchObj.data.queryResults.time_offset.start_time;
+      queryReq.query.end_time =
+        searchObj.data.queryResults.time_offset.end_time;
+    }
+
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+
+    searchObj.loadingHistogram = true;
 
     const requestId = initializeWebSocketConnection(payload);
 
@@ -5306,6 +5402,26 @@ const useLogs = () => {
       position: "bottom",
       timeout: 4000,
     });
+  };
+
+  const setCancelSearchError = () => {
+    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
+      searchObj.data.queryResults.hits = [];
+    }
+
+    if (!searchObj.data?.queryResults?.hits?.length) {
+      searchObj.data.errorMsg = "";
+      searchObj.data.errorCode = 0;
+    }
+
+    if (
+      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
+      searchObj.data.queryResults?.hits?.length &&
+      !searchObj.data.queryResults?.aggs?.length
+    ) {
+      searchObj.data.histogram.errorMsg =
+        "Histogram search query was cancelled";
+    }
   };
 
   const handlePageCountError = (err: any) => {
@@ -5385,6 +5501,7 @@ const useLogs = () => {
     extractValueQuery,
     initialQueryPayload,
     refreshPagination,
+    enableRefreshInterval,
   };
 };
 

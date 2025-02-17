@@ -15,7 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding-bottom: 30px">
+  <div
+    v-if="dashboardPanelData.data.type == 'custom_chart'"
+    style="padding-bottom: 30px">
+    <div class="" style="max-width: 300px">
+      <div class="q-mb-sm" style="font-weight: 600">
+        {{ t("dashboard.description") }}
+      </div>
+      <q-input
+        outlined
+        v-model="dashboardPanelData.data.description"
+        filled
+        autogrow
+        class="showLabelOnTop"
+        data-test="dashboard-config-description"
+      />
+    </div>
+  </div>
+  <div v-else style="padding-bottom: 30px">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -46,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="`${
           dashboardPanelData.data.config.trellis?.layout ?? 'None'
         }`"
-        :disable="isBreakdownFieldEmpty"
+        :disable="isBreakdownFieldEmpty || hasTimeShifts"
       >
         <template v-slot:label>
           <div class="row items-center all-pointer-events">
@@ -64,7 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="bottom middle"
                 max-width="250px"
               >
-                <b> {{ t("dashboard.trellisTooltip") }}</b>
+                <b>
+                  {{
+                    hasTimeShifts
+                      ? t("dashboard.trellisTimeShiftTooltip")
+                      : t("dashboard.trellisTooltip")
+                  }}</b
+                >
               </q-tooltip>
             </div>
           </div>
@@ -87,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :type="'number'"
           placeholder="Auto"
           data-test="trellis-chart-num-of-columns"
-          :disable="isBreakdownFieldEmpty"
+          :disable="isBreakdownFieldEmpty || hasTimeShifts"
           :min="1"
           :max="16"
           @update:model-value="
@@ -113,7 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   self="bottom middle"
                   max-width="250px"
                 >
-                  <b> {{ t("dashboard.trellisTooltip") }}</b>
+                  <b>
+                    {{
+                      hasTimeShifts
+                        ? t("dashboard.trellisTimeShiftTooltip")
+                        : t("dashboard.trellisTooltip")
+                    }}</b
+                  >
                 </q-tooltip>
               </div>
             </div>
@@ -1742,6 +1771,9 @@ export default defineComponent({
     const timeShifts = [];
 
     const addTimeShift = () => {
+      if (dashboardPanelData.data.config.trellis.layout)
+        dashboardPanelData.data.config.trellis.layout = null;
+
       const newTimeShift = {
         offSet: "15m",
         data: {
@@ -1795,16 +1827,7 @@ export default defineComponent({
     });
 
     const showTrellisConfig = computed(() => {
-      const supportedTypes = [
-        "area",
-        "area-stacked",
-        "bar",
-        "h-bar",
-        "line",
-        "scatter",
-        "stacked",
-        "h-stacked",
-      ];
+      const supportedTypes = ["area", "bar", "h-bar", "line", "scatter"];
       return supportedTypes.includes(dashboardPanelData.data.type);
     });
 
@@ -1813,6 +1836,14 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ]?.fields?.breakdown?.length == 0
+      );
+    });
+
+    const hasTimeShifts = computed(() => {
+      return (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift?.length > 0
       );
     });
 
@@ -1841,6 +1872,7 @@ export default defineComponent({
       trellisOptions,
       showTrellisConfig,
       isBreakdownFieldEmpty,
+      hasTimeShifts,
     };
   },
 });

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -83,7 +83,7 @@ pub async fn search(
     let mut ctx =
         prepare_datafusion_context(work_group.clone(), vec![], false, cfg.limit.cpu_num).await?;
 
-    // register UDF
+    // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
@@ -138,21 +138,21 @@ pub async fn search(
     );
 
     // construct latest schema map
-    let schema_latest = empty_exec.full_schema();
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let latest_schema = empty_exec.full_schema();
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     // construct index condition
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
 
-    let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
-    let stream_created_at = unwrap_stream_created_at(schema_latest.as_ref());
+    let stream_settings = unwrap_stream_settings(latest_schema.as_ref());
+    let stream_created_at = unwrap_stream_created_at(latest_schema.as_ref());
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
         .filter_map(|v| {
-            if schema_latest_map.contains_key(&v) {
+            if latest_schema_map.contains_key(&v) {
                 Some(v)
             } else {
                 None
@@ -167,7 +167,7 @@ pub async fn search(
         .equal_keys
         .iter()
         .filter_map(|v| {
-            if schema_latest_map.contains_key(&v.key) {
+            if latest_schema_map.contains_key(&v.key) {
                 Some((v.key.to_string(), v.value.to_string()))
             } else {
                 None
@@ -236,9 +236,14 @@ pub async fn search(
             idx_optimize_rule = None;
         }
 
+        // sort by max_ts, the latest file should be at the top
+        if empty_exec.sorted_by_time() {
+            file_list.par_sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
+        }
+
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
-            schema_latest.clone(),
+            latest_schema.clone(),
             &file_list,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
@@ -268,7 +273,7 @@ pub async fn search(
     if LOCAL_NODE.is_ingester() {
         let (tbls, stats) = match super::wal::search_parquet(
             query_params.clone(),
-            schema_latest.clone(),
+            latest_schema.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
@@ -297,7 +302,7 @@ pub async fn search(
     if LOCAL_NODE.is_ingester() {
         let (tbls, stats) = match super::wal::search_memtable(
             query_params.clone(),
-            schema_latest.clone(),
+            latest_schema.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
             index_condition.clone(),
@@ -308,7 +313,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] flight->search: search wal memtable error: {}",
+                    "[trace_id {}] flight->search: search wal memtable error: {:?}",
                     trace_id,
                     e
                 );

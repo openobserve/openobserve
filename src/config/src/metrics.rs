@@ -402,18 +402,6 @@ pub static COMPACT_MERGED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-pub static COMPACT_DELAY_HOURS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "compact_delay_hours",
-            "Compactor delay hours. ".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
-    )
-    .expect("Metric created")
-});
 pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -837,9 +825,6 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(COMPACT_MERGED_BYTES.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(COMPACT_DELAY_HOURS.clone()))
-        .expect("Metric registered");
-    registry
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))
         .expect("Metric registered");
 
@@ -933,9 +918,12 @@ fn create_const_labels() -> HashMap<String, String> {
 }
 
 pub fn create_prometheus_handler() -> PrometheusMetrics {
-    PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
-        .const_labels(create_const_labels())
+    let cfg = crate::config::get_config();
+    let mut srv = PrometheusMetricsBuilder::new(NAMESPACE);
+    if cfg.common.prometheus_enabled {
+        srv = srv.endpoint(format!("{}/metrics", cfg.common.base_uri).as_str());
+    };
+    srv.const_labels(create_const_labels())
         .registry(get_registry())
         .build()
         .expect("Prometheus build failed")

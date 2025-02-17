@@ -32,7 +32,7 @@ pub mod enterprise_utils {
         user_id: &str,
         org_id: &str,
     ) -> Result<(), String> {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::{
             infra::config::USERS,
@@ -51,37 +51,35 @@ pub mod enterprise_utils {
             .clone();
 
         // If the user is external, check permissions
-        if user.is_external {
-            let stream_type_str = stream_type.to_string();
-            let o2_type = format!(
-                "{}:{}",
-                OFGA_MODELS
-                    .get(stream_type_str.as_str())
-                    .map_or(stream_type_str.as_str(), |model| model.key),
-                stream_name
-            );
+        let stream_type_str = stream_type.as_str();
+        let o2_type = format!(
+            "{}:{}",
+            OFGA_MODELS
+                .get(stream_type_str)
+                .map_or(stream_type_str, |model| model.key),
+            stream_name
+        );
 
-            let auth_extractor = AuthExtractor {
-                auth: "".to_string(),
-                method: "GET".to_string(),
-                o2_type,
-                org_id: org_id.to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-            };
+        let auth_extractor = AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type,
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+        };
 
-            let has_permission = crate::handler::http::auth::validator::check_permissions(
-                user_id,
-                auth_extractor,
-                user.role,
-                user.is_external,
-            )
-            .await;
+        let has_permission = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            auth_extractor,
+            user.role,
+            user.is_external,
+        )
+        .await;
 
-            if !has_permission {
-                return Err("Unauthorized Access".to_string());
-            }
-        }
+        if !has_permission {
+            return Err("Unauthorized Access".to_string());
+        };
 
         Ok(())
     }
@@ -120,54 +118,26 @@ pub mod sessions_cache_utils {
     }
 }
 
-pub mod cancellation_registry_cache_utils {
-    use crate::handler::http::request::websocket::session::CANCELLATION_FLAGS;
+pub mod search_registry_utils {
+    use tokio::sync::mpsc;
 
-    /// Add a new cancellation flag for the given trace_id
-    pub fn add_cancellation_flag(trace_id: &str) {
-        CANCELLATION_FLAGS.insert(trace_id.to_string(), false);
-        log::info!(
-            "[WS_CANCEL]: Added cancellation flag for trace_id: {}",
-            trace_id
-        );
+    use crate::handler::http::request::websocket::session::SEARCH_REGISTRY;
+
+    // Core state management
+    #[derive(Debug)]
+    pub enum SearchState {
+        Running {
+            #[allow(unused)]
+            cancel_tx: mpsc::Sender<()>,
+        },
+        Cancelled,
+        Completed,
     }
 
-    /// Set the cancellation flag for the given trace_id
-    pub fn set_cancellation_flag(trace_id: &str) {
-        if let Some(mut flag) = CANCELLATION_FLAGS.get_mut(trace_id) {
-            *flag = true; // Set the flag to `true`
-            log::info!(
-                "[WS_CANCEL]: Cancellation flag set for trace_id: {}",
-                trace_id
-            );
-        } else {
-            log::warn!(
-                "[WS_CANCEL]: No cancellation flag found for trace_id: {}",
-                trace_id
-            );
-        }
-    }
-
-    /// Remove the cancellation flag for the given trace_id
-    pub fn remove_cancellation_flag(trace_id: &str) {
-        if CANCELLATION_FLAGS.remove(trace_id).is_some() {
-            log::info!(
-                "[WS_CANCEL]: Cancellation flag removed for trace_id: {}",
-                trace_id
-            );
-        } else {
-            log::warn!(
-                "[WS_CANCEL]: No cancellation flag found to remove for trace_id: {}",
-                trace_id
-            );
-        }
-    }
-
-    /// Check if a cancellation flag is set for the given trace_id
     pub fn is_cancelled(trace_id: &str) -> bool {
-        CANCELLATION_FLAGS
+        SEARCH_REGISTRY
             .get(trace_id)
-            .map(|flag| *flag)
+            .map(|state| matches!(state.value(), SearchState::Cancelled))
             .unwrap_or(false)
     }
 }
@@ -219,6 +189,13 @@ impl WsClientEvents {
     }
 }
 
+/// To represent the query start and end time based of partition or cache
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TimeOffset {
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
@@ -229,7 +206,7 @@ pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: Box<config::meta::search::Response>,
-        time_offset: i64,
+        time_offset: TimeOffset,
         streaming_aggs: bool,
     },
     #[cfg(feature = "enterprise")]

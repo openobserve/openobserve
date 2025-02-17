@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -173,10 +173,10 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-
+    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
             .instrument(span),
     );
     let res = match handle.await {
@@ -661,6 +661,7 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }
@@ -981,17 +982,9 @@ pub async fn cancel_query(
         }
     }
 
-    let mut is_success = false;
-    for res in results {
-        if res.is_success {
-            is_success = true;
-            break;
-        }
-    }
-
     Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
-        is_success,
+        is_success: true,
     })
 }
 
@@ -1162,20 +1155,20 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 // generate parquet file search schema
 pub fn generate_search_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<HashMap<String, DataType>, Error> {
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
+) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }
         }
     }
 
-    Ok(diff_fields)
+    diff_fields
 }
 
 pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,7 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
+    let file_data = FileKey::new(key.to_string(), meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
     // retry 5 times
@@ -38,7 +38,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     let cfg = config::get_config();
 
     // notify other nodes
-    if !cfg.common.meta_store_external || cfg.memory_cache.cache_latest_files {
+    if cfg.memory_cache.cache_latest_files {
         let mut q = BROADCAST_QUEUE.write().await;
         q.push(file_data);
     }

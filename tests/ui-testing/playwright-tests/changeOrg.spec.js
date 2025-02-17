@@ -306,20 +306,21 @@ test.describe("Change Organisation", () => {
 
     test("About Page default validation", async ({ page }) => {
 
-
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
         await aboutPage.aboutURLValidation();
     });
 
     test("About Page change organisation validation", async ({ page }) => {
-
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
         await page.waitForTimeout(5000);
        await aboutPage.aboutPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
         await aboutPage.aboutPageURLValidation();
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
-        await aboutPage.aboutPageURLValidation();
+        await aboutPage.aboutURLValidation();
 
     });
 

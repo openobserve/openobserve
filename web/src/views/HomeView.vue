@@ -294,10 +294,10 @@ export default defineComponent({
           summary.value = {
             streams_count: res.data.streams?.num_streams ?? 0,
             ingested_data: formatSizeFromMB(
-              res.data.streams?.total_storage_size.toFixed(2),
+              res.data.streams?.total_storage_size,
             ),
             compressed_data: formatSizeFromMB(
-              res.data.streams?.total_compressed_size.toFixed(2),
+              res.data.streams?.total_compressed_size,
             ),
             doc_count: addCommasToNumber(res.data.streams?.total_records ?? 0),
             index_size: formatSizeFromMB(

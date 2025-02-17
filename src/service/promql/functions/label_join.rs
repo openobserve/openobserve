@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use crate::service::promql::value::{InstantValue, Label, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(
-    data: &Value,
+    data: Value,
     dest_label: &str,
     separator: &str,
     source_labels: Vec<String>,
@@ -56,7 +56,7 @@ pub(crate) fn label_join(
             }));
             InstantValue {
                 labels: new_labels,
-                sample: instant.sample,
+                sample: instant.sample.clone(),
             }
         })
         .collect();

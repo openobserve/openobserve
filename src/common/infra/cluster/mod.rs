@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,8 +40,6 @@ use once_cell::sync::Lazy;
 mod etcd;
 mod nats;
 
-const HEALTH_CHECK_FAILED_TIMES: usize = 3;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
@@ -67,7 +65,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.name.clone());
     }
@@ -235,6 +233,23 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
     }
 }
 
+pub async fn set_unschedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = false;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+pub async fn set_schedulable() -> Result<()> {
+    let node_id = LOCAL_NODE.uuid.clone();
+    if let Some(mut node) = get_node_by_uuid(&node_id).await {
+        node.scheduled = true;
+        update_local_node(&node).await?;
+    };
+    Ok(())
+}
+
 pub async fn leave() -> Result<()> {
     LOCAL_NODE_STATUS.store(NodeStatus::Offline as _, Ordering::Release);
 
@@ -393,13 +408,20 @@ async fn watch_node_list() -> Result<()> {
 
 async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
+    if !cfg.health_check.enabled {
+        return Ok(());
+    }
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
             continue;
         }
         let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
-        let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
+        let resp = client
+            .get(url)
+            .timeout(Duration::from_secs(cfg.health_check.timeout))
+            .send()
+            .await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!(
                 "[CLUSTER] node {}[{}] health check failed",
@@ -409,11 +431,12 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             let mut w = NODES_HEALTH_CHECK.write().await;
             let entry = w.entry(node.uuid.clone()).or_insert(0);
             *entry += 1;
-            if *entry >= HEALTH_CHECK_FAILED_TIMES {
+            if *entry >= cfg.health_check.failed_times {
                 log::error!(
-                    "[CLUSTER] node {}[{}] health check failed 3 times, remove it",
+                    "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
-                    node.http_addr
+                    node.http_addr,
+                    cfg.health_check.failed_times
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(
@@ -549,10 +572,14 @@ mod tests {
         assert!(get_cached_online_query_nodes(None).await.is_some());
         assert!(get_cached_online_ingester_nodes().await.is_some());
         assert!(get_cached_online_querier_nodes(None).await.is_some());
-    }
 
-    #[tokio::test]
-    async fn test_consistent_hashing() {
+        // Reset the global state.
+        QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await.clear();
+        QUERIER_BACKGROUND_CONSISTENT_HASH.write().await.clear();
+        COMPACTOR_CONSISTENT_HASH.write().await.clear();
+        FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await.clear();
+
+        // Test consistent hash logic.
         let node = load_local_node();
         for i in 0..10 {
             let node_q = Node {
@@ -587,13 +614,13 @@ mod tests {
 
         // gxhash hash
         let data = [
-            ["test", "node-q-4", "node-c-8"],
-            ["test1", "node-q-6", "node-c-2"],
-            ["test2", "node-q-2", "node-c-0"],
-            ["test3", "node-q-6", "node-c-3"],
-            ["test4", "node-q-1", "node-c-6"],
-            ["test5", "node-q-1", "node-c-0"],
-            ["test6", "node-q-2", "node-c-1"],
+            ["test", "node-q-2", "node-c-7"],
+            ["test1", "node-q-3", "node-c-0"],
+            ["test2", "node-q-6", "node-c-5"],
+            ["test3", "node-q-9", "node-c-9"],
+            ["test4", "node-q-2", "node-c-0"],
+            ["test5", "node-q-5", "node-c-8"],
+            ["test6", "node-q-5", "node-c-8"],
         ];
 
         remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;

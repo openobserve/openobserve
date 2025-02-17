@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -166,7 +166,7 @@ pub async fn search_parquet(
         wal::release_files(&lock_files);
         return Ok((vec![], ScanStats::new()));
     }
-    let schema_latest_id = schema_versions.len() - 1;
+    let latest_schema_id = schema_versions.len() - 1;
 
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
@@ -188,7 +188,7 @@ pub async fn search_parquet(
                 )));
             }
         };
-        files_group.insert(schema_latest_id, files);
+        files_group.insert(latest_schema_id, files);
     } else {
         scan_stats.files = files.len() as i64;
         for file in files.iter() {
@@ -212,7 +212,7 @@ pub async fn search_parquet(
                         file.meta.max_ts
                     );
                     // HACK: use the latest version if not found in schema versions
-                    schema_latest_id
+                    latest_schema_id
                 }
             };
             let group = files_group.entry(schema_ver_id).or_default();
@@ -238,15 +238,15 @@ pub async fn search_parquet(
     }
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
@@ -267,10 +267,10 @@ pub async fn search_parquet(
             target_partitions: cfg.limit.cpu_num,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         match exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             sorted_by_time,
@@ -326,7 +326,7 @@ pub async fn search_memtable(
 
     let mut batches = ingester::read_from_memtable(
         &query.org_id,
-        &query.stream_type.to_string(),
+        query.stream_type.as_str(),
         &query.stream_name,
         query.time_range,
         &filters,
@@ -336,7 +336,7 @@ pub async fn search_memtable(
     batches.extend(
         ingester::read_from_immutable(
             &query.org_id,
-            &query.stream_type.to_string(),
+            query.stream_type.as_str(),
             &query.stream_name,
             query.time_range,
             &filters,
@@ -375,15 +375,15 @@ pub async fn search_memtable(
     }
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
@@ -392,10 +392,10 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
 
         for batch in record_batches.iter_mut() {
-            *batch = adapt_batch(schema_latest.clone(), batch);
+            *batch = adapt_batch(latest_schema.clone(), batch);
         }
 
         let table = Arc::new(NewMemTable::try_new(
@@ -525,13 +525,13 @@ async fn get_file_list(
     .await
 }
 
-pub fn adapt_batch(schema_latest: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
+pub fn adapt_batch(latest_schema: Arc<Schema>, batch: &RecordBatch) -> RecordBatch {
     let batch_schema = &*batch.schema();
     let batch_cols = batch.columns().to_vec();
 
-    let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema_latest.fields().len());
-    let mut fields = Vec::with_capacity(schema_latest.fields().len());
-    for field_latest in schema_latest.fields() {
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(latest_schema.fields().len());
+    let mut fields = Vec::with_capacity(latest_schema.fields().len());
+    for field_latest in latest_schema.fields() {
         if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
             cols.push(Arc::clone(&batch_cols[idx]));
             fields.push(field.clone());

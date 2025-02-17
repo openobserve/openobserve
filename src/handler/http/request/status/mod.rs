@@ -47,13 +47,17 @@ use {
     },
     crate::service::self_reporting::audit,
     config::{ider, utils::base64},
-    o2_enterprise::enterprise::{
-        common::{
-            auditor::{AuditMessage, HttpMeta, Protocol},
-            infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-            settings::{get_logo, get_logo_text},
-        },
-        dex::service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
+    o2_dex::{
+        config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
+        service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
+    },
+    o2_enterprise::enterprise::common::{
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
+        settings::{get_logo, get_logo_text},
+    },
+    o2_openfga::config::{
+        get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
     std::io::ErrorKind,
 };
@@ -119,6 +123,7 @@ struct ConfigResponse<'a> {
     usage_publish_interval: i64,
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
+    query_default_limit: i64,
 }
 
 #[derive(Serialize)]
@@ -190,16 +195,20 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     let o2cfg = get_o2_config();
     #[cfg(feature = "enterprise")]
-    let sso_enabled = o2cfg.dex.dex_enabled;
+    let dex_cfg = get_dex_config();
+    #[cfg(feature = "enterprise")]
+    let openfga_cfg = get_openfga_config();
+    #[cfg(feature = "enterprise")]
+    let sso_enabled = dex_cfg.dex_enabled;
     #[cfg(not(feature = "enterprise"))]
     let sso_enabled = false;
     #[cfg(feature = "enterprise")]
-    let native_login_enabled = o2cfg.dex.native_login_enabled;
+    let native_login_enabled = dex_cfg.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
 
     #[cfg(feature = "enterprise")]
-    let rbac_enabled = o2cfg.openfga.enabled;
+    let rbac_enabled = openfga_cfg.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
 
@@ -297,6 +306,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
+        query_default_limit: cfg.limit.query_default_limit,
     }))
 }
 
@@ -374,7 +384,10 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = refresh_o2_config() {
+    if let Err(e) = refresh_o2_config()
+        .and_then(|_| refresh_dex_config())
+        .and_then(|_| refresh_openfga_config())
+    {
         return Ok(
             HttpResponse::InternalServerError().json(serde_json::json!({"status": e.to_string()}))
         );
@@ -492,7 +505,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let token_ver = verify_decode_token(
                 &access_token,
                 &keys,
-                &get_o2_config().dex.client_id,
+                &get_dex_config().client_id,
                 true,
                 true,
             )
@@ -589,7 +602,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_login")]
 pub async fn dex_login() -> Result<HttpResponse, Error> {
-    use o2_enterprise::enterprise::dex::meta::auth::PreLoginData;
+    use o2_dex::meta::auth::PreLoginData;
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state;

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -48,7 +48,7 @@ pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
-fn get_cors() -> Rc<Cors> {
+pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
         .allowed_headers(vec![
@@ -320,8 +320,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-        .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
@@ -411,6 +409,11 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::reports::delete_report)
         .service(dashboards::reports::enable_report)
         .service(dashboards::reports::trigger_report)
+        .service(dashboards::timed_annotations::create_annotations)
+        .service(dashboards::timed_annotations::get_annotations)
+        .service(dashboards::timed_annotations::delete_annotations)
+        .service(dashboards::timed_annotations::update_annotations)
+        .service(dashboards::timed_annotations::delete_annotation_panels)
         .service(folders::create_folder)
         .service(folders::list_folders)
         .service(folders::update_folder)
@@ -511,9 +514,20 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::search_job::cancel_job)
         .service(search::search_job::delete_job)
         .service(search::search_job::retry_job)
-        .service(search::job::cancel_multiple_query)
-        .service(search::job::cancel_query)
-        .service(search::job::query_status);
+        .service(search::query_manager::query_status)
+        .service(search::query_manager::cancel_multiple_query)
+        .service(search::query_manager::cancel_query)
+        .service(keys::get)
+        .service(keys::delete)
+        .service(keys::save)
+        .service(keys::list)
+        .service(keys::update)
+        .service(actions::action::get_action_from_id)
+        .service(actions::action::list_actions)
+        .service(actions::action::upload_zipped_action)
+        .service(actions::action::update_action_details)
+        .service(actions::action::serve_action_zip)
+        .service(actions::action::delete_action);
 
     svc.service(service);
 }
