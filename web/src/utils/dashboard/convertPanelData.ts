@@ -132,7 +132,7 @@ export const convertPanelData = async (
         };
       }
       else{
-        if(!loading) throw new Error('No data found')
+        if(!loading && panelSchema.queries[0].query.trim() != "") throw new Error('No data found')
       }
 
     }
