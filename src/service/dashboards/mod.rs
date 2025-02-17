@@ -442,7 +442,7 @@ pub async fn move_dashboard(
     #[cfg(feature = "enterprise")]
     {
         if get_o2_config().super_cluster.enabled {
-            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put_v2(
                 org_id,
                 from_folder,
                 Some(to_folder),
