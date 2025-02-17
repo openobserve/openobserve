@@ -226,5 +226,3 @@ jobs:
           name: coverage-report
           path: tests/ui-testing/coverage-report
           retention-days: 7
-
-             
