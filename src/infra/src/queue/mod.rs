@@ -46,7 +46,7 @@ async fn default() -> Box<dyn Queue> {
         _ => Box::<nop::NopQueue>::default(),
     }
 }
- 
+
 async fn init_super_cluster() -> Box<dyn Queue> {
     if config::get_config().common.local_mode {
         panic!("super cluster is not supported in local mode");
