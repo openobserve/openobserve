@@ -189,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="
-                    searchObj.data.stream.selectedStreamFields &&
-                    searchObj.data.stream.selectedStreamFields.length == 0 &&
+                    (!searchObj.data.stream.selectedStreamFields ||
+                    searchObj.data.stream.selectedStreamFields.length == 0) &&
                     searchObj.loading == false
                   "
                   class="row q-mt-lg"
