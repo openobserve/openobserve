@@ -84,6 +84,12 @@ async fn update_status(msg: Message) -> Result<()> {
         &trigger.module_key,
         trigger.status,
         trigger.retries,
+        // Only update trigger data if it is not empty
+        if trigger.data.is_empty() {
+            None
+        } else {
+            Some(&trigger.data)
+        },
     )
     .await
     {

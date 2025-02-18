@@ -354,6 +354,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 &new_trigger.module_key,
                 db::scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
+                None,
             )
             .await?;
         }
@@ -519,13 +520,15 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     trigger_data_stream.next_run_at = new_trigger.next_run_at;
                     db::scheduler::update_trigger(new_trigger).await?;
                 } else {
-                    // Otherwise update its status only
+                    let trigger_data = json::to_string(&trigger_data).unwrap();
+                    // Otherwise update its status and data only
                     db::scheduler::update_status(
                         &new_trigger.org,
                         new_trigger.module,
                         &new_trigger.module_key,
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
+                        Some(&trigger_data),
                     )
                     .await?;
                     trigger_data_stream.next_run_at = now;
@@ -720,6 +723,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
                     &new_trigger.module_key,
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
+                    None,
                 )
                 .await?;
             }

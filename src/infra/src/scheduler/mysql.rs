@@ -229,20 +229,37 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         key: &str,
         status: TriggerStatus,
         retries: i32,
+        data: Option<&str>,
     ) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#
-        )
-        .bind(status)
-        .bind(retries)
-        .bind(org)
-        .bind(key)
-        .bind(&module)
-        .execute(&pool).await?;
+        let query = match data {
+            Some(data) => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = ?, retries = ?, data = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(data)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            },
+            None => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            }
+        };
+
+        query.execute(&pool).await?;
 
         // For status update of triggers, we don't need to send put events
         // to cluster coordinator for now as it only changes the status and retries
@@ -488,11 +505,15 @@ WHERE id IN ({});",
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
-        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
-            .bind(TriggerStatus::Completed)
-            .bind(max_retries)
-            .execute(&pool)
-            .await?;
+        // Since alert scheduled_jobs contain last_satisfied_at field, we should not delete them
+        sqlx::query(
+            r#"DELETE FROM scheduled_jobs WHERE (status = ? OR retries >= ?) AND module != ?;"#,
+        )
+        .bind(TriggerStatus::Completed)
+        .bind(max_retries)
+        .bind(TriggerModule::Alert)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 

@@ -82,13 +82,22 @@ pub async fn update_status(
     key: &str,
     status: TriggerStatus,
     retries: i32,
+    data: Option<&str>,
 ) -> Result<()> {
-    infra_scheduler::update_status(org, module.clone(), key, status.clone(), retries).await?;
+    infra_scheduler::update_status(
+        org,
+        module.clone(),
+        key,
+        status.clone(),
+        retries,
+        data.clone(),
+    )
+    .await?;
 
     // super cluster
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
-        super_cluster::queue::scheduler_update_status(org, module, key, status, retries)
+        super_cluster::queue::scheduler_update_status(org, module, key, status, retries, data)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
     }

@@ -50,6 +50,7 @@ pub trait Scheduler: Sync + Send + 'static {
         key: &str,
         status: TriggerStatus,
         retries: i32,
+        data: Option<&str>,
     ) -> Result<()>;
     async fn update_trigger(&self, trigger: Trigger) -> Result<()>;
     async fn pull(
@@ -97,9 +98,10 @@ pub async fn update_status(
     key: &str,
     status: TriggerStatus,
     retries: i32,
+    data: Option<&str>,
 ) -> Result<()> {
     CLIENT
-        .update_status(org, module, key, status, retries)
+        .update_status(org, module, key, status, retries, data)
         .await
 }
 

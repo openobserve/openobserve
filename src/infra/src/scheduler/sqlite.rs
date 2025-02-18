@@ -220,18 +220,34 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         key: &str,
         status: TriggerStatus,
         retries: i32,
+        data: Option<&str>,
     ) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module_key = $4 AND module = $5;"#
-        )
-        .bind(status)
-        .bind(retries)
-        .bind(org)
-        .bind(key)
-        .bind(&module)
-        .execute(&*client).await?;
+        let query = match data {
+            Some(data) => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = $1, retries = $2, data = $3 WHERE org = $4 AND module_key = $5 AND module = $6;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(data)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            },
+            None => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module_key = $4 AND module = $5;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            },
+        };
+        query.execute(&*client).await?;
 
         drop(client);
 
@@ -412,11 +428,15 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         if include_max {
             max_retries += 1;
         }
-        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
-            .bind(TriggerStatus::Completed)
-            .bind(max_retries)
-            .execute(&*client)
-            .await?;
+        // Since alert scheduled_jobs contain last_satisfied_at field, we should not delete them
+        sqlx::query(
+            r#"DELETE FROM scheduled_jobs WHERE (status = $1 OR retries >= $2) AND module != $3;"#,
+        )
+        .bind(TriggerStatus::Completed)
+        .bind(max_retries)
+        .bind(TriggerModule::Alert)
+        .execute(&*client)
+        .await?;
         Ok(())
     }
 
