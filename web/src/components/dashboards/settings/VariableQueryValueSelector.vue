@@ -180,13 +180,7 @@ export default defineComponent({
     });
 
     const loadFieldValues = () => {
-      console.debug("Loading field values for", props.variableItem);
       if (props.variableItem.isLoading || !props.loadOptions) {
-        console.debug(
-          "Loading field values for",
-          props.variableItem,
-          "skipped as it is already loading or does not have a load function",
-        );
         return;
       }
       loadVariableTemp();
@@ -194,17 +188,9 @@ export default defineComponent({
 
     const loadVariableTemp = () => {
       try {
-        console.debug(
-          "Loading field values for",
-          props.variableItem,
-          "completed",
-        );
         props.loadOptions(props.variableItem);
         options.value = props.variableItem.options;
-        console.log("options", options.value);
-      } catch (error) {
-        console.error("Error loading options:", error);
-      }
+      } catch (error) {}
     };
 
     return {
