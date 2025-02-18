@@ -149,7 +149,6 @@ export default defineComponent({
 
       // check if variables config list is not empty
       if (!props?.variablesConfig) {
-        console.log("variables config not found, returning");
         return;
       }
 
@@ -267,7 +266,6 @@ export default defineComponent({
     watch(
       () => props.selectedTimeDate,
       () => {
-        console.log("selectedTimeDate changed");
         // reject all promises
         rejectAllPromises();
 
@@ -451,9 +449,6 @@ export default defineComponent({
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
       return new Promise(async (resolve, reject) => {
-        console.log(
-          `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex}`,
-        );
         // if variableIndex is not valid, return
         if (variableIndex < 0) resolve(false);
 
@@ -462,17 +457,11 @@ export default defineComponent({
 
         // if currentVariable is undefined, return
         if (!currentVariable) {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} but currentVariable is undefined`,
-          );
           return resolve(false);
         }
 
         // assign current promise reject object to currentlyExecutingPromises object
         if (currentlyExecutingPromises[currentVariable.name]) {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.name is ${currentVariable.name} and currentlyExecutingPromises[currentVariable.name] is true, so rejecting that promise`,
-          );
           // if the variable is already loading, reject that promise
           currentlyExecutingPromises[currentVariable.name](false);
         }
@@ -481,9 +470,6 @@ export default defineComponent({
 
         // need to load the current variable
         if (currentVariable.isVariableLoadingPending == false) {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.isVariableLoadingPending is false, so resolving that promise`,
-          );
           return resolve(false);
         }
 
@@ -491,9 +477,6 @@ export default defineComponent({
           isInvalidDate(props.selectedTimeDate?.start_time) ||
           isInvalidDate(props.selectedTimeDate?.end_time)
         ) {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and props.selectedTimeDate?.start_time or props.selectedTimeDate?.end_time is invalid, so resolving that promise`,
-          );
           return resolve(false);
         }
 
@@ -501,9 +484,6 @@ export default defineComponent({
         const isAnyDepndentVariableLoadingPending = variablesDependencyGraph[
           currentVariable.name
         ].parentVariables.find((parentVariable: any) => {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.name is ${currentVariable.name} and parentVariable is ${parentVariable}`,
-          );
           // get whole parent variable object from parent variable name
           const variableData = variablesData?.values?.find(
             (variable: any) => variable?.name == parentVariable,
@@ -517,18 +497,12 @@ export default defineComponent({
 
         // if any dependent variable is loading, return
         if (isAnyDepndentVariableLoadingPending) {
-          console.log(
-            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and isAnyDepndentVariableLoadingPending is true, so resolving that promise`,
-          );
           return resolve(false);
         }
 
         switch (currentVariable.type) {
           case "query_values": {
             try {
-              console.log(
-                `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.type is query_values`,
-              );
               // set loading as true
               currentVariable.isLoading = true;
 
@@ -870,22 +844,13 @@ export default defineComponent({
     const loadSingleVariableDataByName = async (variableObject: any) => {
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
-        console.log(
-          `[VariablesValueSelector] Starting to load variable ${name}`,
-        );
 
         if (!name || !variableObject) {
-          console.log(
-            `[VariablesValueSelector] No name or variable object provided for ${name}. Resolving to false`,
-          );
           return resolve(false);
         }
 
         // If the variable is already being processed
         if (currentlyExecutingPromises[name]) {
-          console.log(
-            `[VariablesValueSelector] Canceling previous promise for ${name}`,
-          );
           currentlyExecutingPromises[name](false);
         }
         currentlyExecutingPromises[name] = reject;
@@ -893,9 +858,6 @@ export default defineComponent({
         // Check if this variable has any dependencies
         const hasParentVariables =
           variablesDependencyGraph[name]?.parentVariables?.length > 0;
-        console.log(
-          `[VariablesValueSelector] ${name} has ${hasParentVariables ? "" : "no"} dependencies`,
-        );
 
         // Check dates for all query_values type
         if (variableObject.type === "query_values") {
@@ -903,36 +865,20 @@ export default defineComponent({
             isInvalidDate(props.selectedTimeDate?.start_time) ||
             isInvalidDate(props.selectedTimeDate?.end_time)
           ) {
-            console.log(
-              `[VariablesValueSelector] Invalid date for ${name}. Resolving to false`,
-            );
             return resolve(false);
           }
         }
 
         // For variables with dependencies, check if dependencies are loaded
         if (hasParentVariables && isDependentVariableLoading(variableObject)) {
-          console.log(
-            `[VariablesValueSelector] Dependencies are not loaded for ${name}. Resolving to false`,
-          );
           return resolve(false);
         }
 
         try {
           const success = await handleVariableType(variableObject);
-          console.log(
-            `[VariablesValueSelector] Successfully loaded variable ${name}. Finalizing...`,
-          );
           await finalizeVariableLoading(variableObject, success);
           resolve(success);
         } catch (error) {
-          console.error(
-            `[VariablesValueSelector] Error while loading variable ${name}:`,
-            error,
-          );
-          console.log(
-            `[VariablesValueSelector] Finalizing variable ${name} with success false`,
-          );
           finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
@@ -956,10 +902,6 @@ export default defineComponent({
             updateVariableOptions(variableObject, response.data.hits);
             return true;
           } catch (error) {
-            console.error(
-              `[VariablesValueSelector] Error in query_values for ${variableObject.name}:`,
-              error,
-            );
             resetVariableState(variableObject);
             return false;
           }
@@ -1169,9 +1111,6 @@ export default defineComponent({
      */
     const loadVariableOptions = async (variableObject: any) => {
       // When a dropdown is opened, only load that specific variable
-      console.log(
-        `[loadVariableOptions] Loading options for ${variableObject.name}`,
-      );
       await loadSingleVariableDataByName(variableObject);
     };
 
@@ -1187,29 +1126,19 @@ export default defineComponent({
      */
     const loadAllVariablesData = async (isInitialLoad = false) => {
       if (isLoading) {
-        console.log("[loadAllVariablesData] Already running, skipping.");
         return;
       }
-      console.log("isInitialLoad", isInitialLoad, "skipAPILoad", skipAPILoad);
 
       if (!isInitialLoad && skipAPILoad.value) {
-        console.log(
-          "[loadAllVariablesData] Skipping API load - not initial load",
-        );
         return;
       }
 
       isLoading = true;
-      console.log(
-        "[loadAllVariablesData] Function called. Initial load:",
-        isInitialLoad,
-      );
 
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
-        console.warn("[loadAllVariablesData] Invalid date detected, aborting.");
         isLoading = false;
         return;
       }
@@ -1231,8 +1160,6 @@ export default defineComponent({
           variablesDependencyGraph[variable.name]?.parentVariables?.length > 0,
       );
 
-      console.log("[loadAllVariablesData] Loading independent variables first");
-
       try {
         // Load all independent variables
         await Promise.all(
@@ -1240,14 +1167,7 @@ export default defineComponent({
             loadSingleVariableDataByName(variable),
           ),
         );
-      } catch (error) {
-        console.error(
-          "[loadAllVariablesData] Error loading independent variables:",
-          error,
-        );
-      }
-
-      console.log("[loadAllVariablesData] Loading dependent variables");
+      } catch (error) {}
 
       const loadDependentVariables = async () => {
         for (const variable of dependentVariables) {
@@ -1290,7 +1210,6 @@ export default defineComponent({
         if (allLoaded) break;
       }
 
-      console.log("[loadAllVariablesData] Completed loading all variables");
       isLoading = false;
     };
 
@@ -1338,9 +1257,6 @@ export default defineComponent({
 
       // Check if the value actually changed
       if (oldVariablesData[currentVariable.name] === currentVariable.value) {
-        console.log(
-          `[onVariablesValueUpdated] Value didn't change for ${currentVariable.name}, skipping update`,
-        );
         return;
       }
 
@@ -1374,12 +1290,7 @@ export default defineComponent({
             loadSingleVariableDataByName(variable),
           ),
         );
-      } catch (error) {
-        console.error(
-          "[onVariablesValueUpdated] Error updating dependent variables:",
-          error,
-        );
-      }
+      } catch (error) {}
 
       // Emit updated data
       emitVariablesData();
