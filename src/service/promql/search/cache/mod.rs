@@ -158,7 +158,7 @@ pub async fn get(
         // filter the samples, remove the samples over time range
         let value_n = series.samples.len();
         let mut first_i = 0;
-        while first_i < value_n && series.samples[first_i].time <= start {
+        while first_i < value_n && series.samples[first_i].time < start {
             first_i += 1;
         }
         if first_i > 0 {
@@ -177,7 +177,7 @@ pub async fn get(
         if let Some(exemplars) = series.exemplars.as_mut() {
             let value_n = exemplars.exemplars.len();
             let mut first_i = 0;
-            while first_i < value_n && exemplars.exemplars[first_i].time <= start {
+            while first_i < value_n && exemplars.exemplars[first_i].time < start {
                 first_i += 1;
             }
             if first_i > 0 {
@@ -512,7 +512,7 @@ mod tests {
         let start = end - second_micros(3600);
         let step = second_micros(15);
         let (start, end) = adjust_start_end(start, end, step, false);
-
+        
         // Create test samples
         let mut range_values = vec![RangeValue {
             labels: Labels::new(),
