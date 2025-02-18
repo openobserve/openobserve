@@ -455,30 +455,24 @@ impl From<meta_stream::StreamType> for StreamType {
 
 impl From<Alert> for meta_alerts::alert::Alert {
     fn from(value: Alert) -> Self {
-        Self {
-            id: value.id,
-            name: value.name,
-            org_id: value.org_id,
-            stream_type: value.stream_type.into(),
-            stream_name: value.stream_name,
-            is_real_time: value.is_real_time,
-            query_condition: value.query_condition.into(),
-            trigger_condition: value.trigger_condition.into(),
-            destinations: value.destinations,
-            context_attributes: value.context_attributes,
-            row_template: value.row_template,
-            description: value.description,
-            enabled: value.enabled,
-            tz_offset: value.tz_offset,
-            owner: value.owner,
+        let mut alert: meta_alerts::alert::Alert = Default::default();
+        alert.id = value.id;
+        alert.name = value.name;
+        alert.org_id = value.org_id;
+        alert.stream_type = value.stream_type.into();
+        alert.stream_name = value.stream_name;
+        alert.is_real_time = value.is_real_time;
+        alert.query_condition = value.query_condition.into();
+        alert.trigger_condition = value.trigger_condition.into();
+        alert.destinations = value.destinations;
+        alert.context_attributes = value.context_attributes;
+        alert.row_template = value.row_template;
+        alert.description = value.description;
+        alert.enabled = value.enabled;
+        alert.tz_offset = value.tz_offset;
+        alert.owner = value.owner;
 
-            // These fields are only set by the server so any provided in an
-            // HTTP model are ignored when converting into a service layer
-            // model.
-            updated_at: None,
-            last_edited_by: None,
-            ..Default::default()
-        }
+        alert
     }
 }
 

@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
+use config::{meta::triggers::Trigger, utils::json};
 use infra::{
     errors::{Error, Result},
-    scheduler::{self, Trigger},
+    scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
