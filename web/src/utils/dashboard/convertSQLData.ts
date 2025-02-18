@@ -1231,16 +1231,17 @@ export const convertSQLData = async (
   };
 
   const getSeriesObj = (
-    seriesName: string,
+    yAxisName: string,
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
+    seriesName: string,
   ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
-      name: seriesName?.toString(),
+      name: yAxisName?.toString(),
       ...defaultSeriesProps,
       label: getSeriesLabel(),
-      originalSeriesName: seriesName?.toString(),
+      originalSeriesName: seriesName,
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
@@ -1278,7 +1279,7 @@ export const convertSQLData = async (
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
       return yAxisKeys.length === 1
-        ? xAXisKey
+        ? xAXisKey !== ""
           ? xAXisKey
           : label
         : `${xAXisKey} (${label})`;
@@ -1310,13 +1311,11 @@ export const convertSQLData = async (
 
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
-              // series name will be same as breakdown value
-              return getSeriesObj(key, seriesData, seriesConfig);
+              return getSeriesObj(yAxisName, seriesData, seriesConfig, key);
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            // series name will be same as yAxisName
-            return getSeriesObj(yAxisName, seriesData, seriesConfig);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig, "");
           }
         })
         .flat() || []
