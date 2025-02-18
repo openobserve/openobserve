@@ -1165,7 +1165,7 @@ export const convertSQLData = async (
     // Extract unique values for the second x-axis key
     const uniqueValues = [
       ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
-    ].filter(Boolean);
+    ].filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
   }
@@ -1215,7 +1215,8 @@ export const convertSQLData = async (
     yAxisKey: string,
     xAxisKey: string,
   ) => {
-    if (!(breakdownKey && yAxisKey && xAxisKey)) return [];
+    if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null))
+      return [];
 
     const data = missingValueData.filter(
       (it: any) => it[breakdownKey] == xAxisKey,
@@ -1230,17 +1231,16 @@ export const convertSQLData = async (
   };
 
   const getSeriesObj = (
-    yAxisName: string,
+    seriesName: string,
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
-    seriesName: string,
   ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
-      name: yAxisName,
+      name: seriesName?.toString(),
       ...defaultSeriesProps,
       label: getSeriesLabel(),
-      originalSeriesName: seriesName,
+      originalSeriesName: seriesName?.toString(),
       // markLine if exist
       markLine: getSeriesMarkLine(),
       // markArea: getSeriesMarkArea(),
@@ -1250,7 +1250,7 @@ export const convertSQLData = async (
       color:
         getSeriesColor(
           panelSchema.config.color,
-          yAxisName,
+          seriesName?.toString(),
           seriesData,
           chartMin,
           chartMax,
@@ -1310,11 +1310,13 @@ export const convertSQLData = async (
 
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, seriesConfig, key);
+              // series name will be same as breakdown value
+              return getSeriesObj(key, seriesData, seriesConfig);
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
-            return getSeriesObj(yAxisName, seriesData, seriesConfig, "");
+            // series name will be same as yAxisName
+            return getSeriesObj(yAxisName, seriesData, seriesConfig);
           }
         })
         .flat() || []
