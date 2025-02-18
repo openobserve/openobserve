@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -371,6 +371,7 @@ pub async fn run_datafusion(
         .collect::<HashMap<_, _>>();
 
     // check inverted index prefix search
+    #[allow(deprecated)]
     if sql.stream_type == StreamType::Index
         && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
@@ -450,7 +451,13 @@ pub async fn get_online_querier_nodes(
     node_group: Option<RoleGroup>,
 ) -> Result<Vec<Node>> {
     // get nodes from cluster
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(node_group).await {
+    let cfg = get_config();
+    let nodes = if cfg.common.feature_query_skip_wal {
+        infra_cluster::get_cached_online_querier_nodes(node_group).await
+    } else {
+        infra_cluster::get_cached_online_query_nodes(node_group).await
+    };
+    let mut nodes = match nodes {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] flight->search: no querier node online");
@@ -819,6 +826,7 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -876,6 +884,7 @@ pub async fn get_inverted_index_file_list(
     let terms = match_terms
         .iter()
         .filter_map(|t| {
+            #[allow(deprecated)]
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
             if tokens.is_empty() {
                 None
@@ -890,6 +899,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<HashSet<String>>();
 
+    #[allow(deprecated)]
     let fts_condition = terms
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
@@ -899,6 +909,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<Vec<_>>()
         .join(" OR ");
+    #[allow(deprecated)]
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -940,6 +951,7 @@ pub async fn get_inverted_index_file_list(
         }
     };
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()

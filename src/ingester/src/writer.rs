@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,7 +31,7 @@ use config::{
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{mpsc, RwLock};
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -40,7 +40,7 @@ use crate::{
     immutable::{Immutable, IMMUTABLES},
     memtable::MemTable,
     rwmap::RwMap,
-    ReadRecordBatchEntry,
+    ReadRecordBatchEntry, WriterSignal,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
@@ -56,10 +56,11 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 pub struct Writer {
     idx: usize,
     key: WriterKey,
-    wal: Arc<Mutex<WalWriter>>,
+    wal: Arc<RwLock<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
+    write_queue: Arc<mpsc::Sender<(WriterSignal, Vec<Entry>, bool)>>,
 }
 
 // check total memory size
@@ -91,12 +92,34 @@ pub async fn get_writer(
     stream_type: &str,
     stream_name: &str,
 ) -> Arc<Writer> {
+    let start = std::time::Instant::now();
     let key = WriterKey::new(org_id, stream_type);
     let idx = get_table_idx(thread_id, stream_name);
+    let r = WRITERS[idx].read().await;
+    let data = r.get(&key);
+    if start.elapsed().as_millis() > 500 {
+        log::warn!(
+            "get_writer from read cache took: {} ms",
+            start.elapsed().as_millis()
+        );
+    }
+    if let Some(w) = data {
+        return w.clone();
+    }
+    drop(r);
+
+    // slow path
+    let start = std::time::Instant::now();
     let mut rw = WRITERS[idx].write().await;
     let w = rw
         .entry(key.clone())
-        .or_insert_with(|| Arc::new(Writer::new(idx, key)));
+        .or_insert_with(|| Writer::new(idx, key));
+    if start.elapsed().as_millis() > 500 {
+        log::warn!(
+            "get_writer from write cache took: {} ms",
+            start.elapsed().as_millis()
+        );
+    }
     w.clone()
 }
 
@@ -141,8 +164,13 @@ pub async fn check_ttl() -> Result<()> {
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // check rotation
-            r.rotate(0, 0).await?;
+            if let Err(e) = r
+                .write_queue
+                .send((WriterSignal::Rotate, vec![], false))
+                .await
+            {
+                log::error!("[INGESTER:MEM] writer queue rotate error: {}", e);
+            }
         }
     }
     Ok(())
@@ -164,7 +192,7 @@ pub async fn flush_all() -> Result<()> {
 }
 
 impl Writer {
-    pub(crate) fn new(idx: usize, key: WriterKey) -> Self {
+    pub(crate) fn new(idx: usize, key: WriterKey) -> Arc<Writer> {
         let now = Utc::now().timestamp_micros();
         let cfg = get_config();
         let next_seq = AtomicU64::new(now as u64);
@@ -173,16 +201,18 @@ impl Writer {
             .join("logs")
             .join(idx.to_string());
         log::info!(
-            "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
+            "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
             wal_dir.display().to_string(),
             &key.org_id,
             &key.stream_type,
             wal_id
         );
-        Self {
+
+        let (tx, mut rx) = mpsc::channel(cfg.limit.wal_write_queue_size);
+        let writer = Self {
             idx,
             key: key.clone(),
-            wal: Arc::new(Mutex::new(
+            wal: Arc::new(RwLock::new(
                 WalWriter::new(
                     wal_dir,
                     &key.org_id,
@@ -196,7 +226,47 @@ impl Writer {
             memtable: Arc::new(RwLock::new(MemTable::new())),
             next_seq,
             created_at: AtomicI64::new(now),
-        }
+            write_queue: Arc::new(tx),
+        };
+        let writer = Arc::new(writer);
+        let writer_clone = writer.clone();
+
+        log::info!("[INGESTER:MEM:{idx}] writer queue start consuming");
+        tokio::spawn(async move {
+            let mut total: usize = 0;
+            loop {
+                match rx.recv().await {
+                    None => break,
+                    Some((sign, entries, fsync)) => match sign {
+                        WriterSignal::Close => break,
+                        WriterSignal::Rotate => {
+                            if let Err(e) = writer.rotate(0, 0).await {
+                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {}", e);
+                            }
+                        }
+                        WriterSignal::Produce => {
+                            if let Err(e) = writer.consume(entries, fsync).await {
+                                log::error!(
+                                    "[INGESTER:MEM:{idx}] writer consume batch error: {}",
+                                    e
+                                );
+                            }
+                        }
+                    },
+                }
+                total += 1;
+                if total % 1000 == 0 {
+                    log::info!(
+                        "[INGESTER:MEM:{idx}] writer queue consuming, total: {}, in queue: {}",
+                        total,
+                        rx.len()
+                    );
+                }
+            }
+            log::info!("[INGESTER:MEM:{idx}] writer queue closed");
+        });
+
+        writer_clone
     }
 
     pub fn get_key_str(&self) -> String {
@@ -213,7 +283,40 @@ impl Writer {
         self.write_batch(vec![entry], fsync).await
     }
 
-    pub async fn write_batch(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
+    pub async fn write_batch(&self, entries: Vec<Entry>, fsync: bool) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let cfg = get_config();
+        if !cfg.common.wal_write_queue_enabled {
+            return self.consume(entries, fsync).await;
+        }
+
+        if cfg.common.wal_write_queue_full_reject {
+            if let Err(e) = self
+                .write_queue
+                .try_send((WriterSignal::Produce, entries, fsync))
+            {
+                log::error!(
+                    "[INGESTER:MEM:{}] write queue full, reject write: {}",
+                    self.idx,
+                    e
+                );
+                return Err(Error::WalError {
+                    source: wal::Error::WriteQueueFull { idx: self.idx },
+                });
+            }
+        } else {
+            self.write_queue
+                .send((WriterSignal::Produce, entries, fsync))
+                .await
+                .context(TokioMpscSendEntriesSnafu)?;
+        }
+
+        Ok(())
+    }
+
+    async fn consume(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
@@ -243,7 +346,7 @@ impl Writer {
 
         // write into wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
@@ -273,7 +376,7 @@ impl Writer {
 
         // check fsync
         if fsync {
-            let mut wal = self.wal.lock().await;
+            let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
             drop(wal);
         }
@@ -283,20 +386,22 @@ impl Writer {
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
-        let wal_lock_time = start.elapsed().as_millis() as f64;
-        metrics::INGEST_WAL_LOCK_TIME
-            .with_label_values(&[&self.key.org_id])
-            .observe(wal_lock_time);
-
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size)
+        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
             && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
         {
             return Ok(());
         }
 
         // rotation wal
+        let start = std::time::Instant::now();
+        let mut wal = self.wal.write().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
+        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
+            return Ok(()); // check again to avoid race condition
+        }
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
         let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
@@ -348,8 +453,18 @@ impl Writer {
     }
 
     pub async fn close(&self) -> Result<()> {
+        // wait for all messages to be processed
+        if let Err(e) = self
+            .write_queue
+            .send((WriterSignal::Close, vec![], true))
+            .await
+        {
+            log::error!("[INGESTER:MEM:{}] close writer error: {}", self.idx, e);
+        }
+        self.write_queue.closed().await;
+
         // rotation wal
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         wal.sync().context(WalSnafu)?;
         let path = wal.path().clone();
         drop(wal);
@@ -378,9 +493,10 @@ impl Writer {
     /// Check if the wal file size is over the threshold or the file is too old
     fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
         let cfg = get_config();
-        let (compressed_size, _uncompressed_size) = written_size;
+        let (compressed_size, uncompressed_size) = written_size;
         compressed_size > wal::FILE_TYPE_IDENTIFIER_LEN
             && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
+                || uncompressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                         .unwrap()

@@ -74,6 +74,7 @@ async fn merge(msg: Message) -> Result<()> {
                 start_dt: Some(chrono::Utc::now().timestamp_micros()),
                 need_watch: msg.need_watch,
                 message_type: msg.message_type,
+                source_cluster: msg.source_cluster,
             };
             return merge(msg).await;
         }

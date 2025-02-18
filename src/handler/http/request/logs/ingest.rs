@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,10 +62,8 @@ pub async fn bulk(
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-                HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                ))
+                // TODO: remove this once we have a proper error response
+                MetaHttpResponse::json(crate::common::meta::ingestion::BulkResponse::default())
             }
         },
     )

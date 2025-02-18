@@ -17,7 +17,7 @@ export class LoginPage {
     if (await this.page.getByText('Login as internal user').isVisible()) {
 
        await this.page.getByText('Login as internal user').click();
-       await this.page.waitForURL(process.env["ZO_BASE_URL_SC"] + "/web/login", {
+       await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/login", {
         waitUntil: "networkidle",
         });
    

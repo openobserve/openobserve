@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -267,7 +267,7 @@ pub async fn search_parquet(
             target_partitions: cfg.limit.cpu_num,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         match exec::create_parquet_table(
             &session,
             latest_schema.clone(),
@@ -392,7 +392,7 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
 
         for batch in record_batches.iter_mut() {
             *batch = adapt_batch(latest_schema.clone(), batch);

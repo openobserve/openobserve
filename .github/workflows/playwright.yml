@@ -17,6 +17,7 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
+  WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
@@ -29,6 +30,8 @@ env:
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
+  ZO_WEBSOCKET_ENABLED: true
+  ZO_COLS_PER_RECORD_LIMIT: "80000"
 
 jobs:
   build_binary:
@@ -84,7 +87,7 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubuntu-latest
+      labels: ubicloud-standard-8
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
@@ -117,7 +120,8 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
-            "sanity2.spec.js"
+            "sanity2.spec.js",
+            "schemaload.spec.js",
             # "remotepipeline.spec.js",
 
           ]
@@ -150,6 +154,7 @@ jobs:
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
           echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
           echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
           echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
@@ -190,7 +195,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-8
     if: always()
 
     steps:
@@ -220,4 +225,4 @@ jobs:
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
-          retention-days: 30
+          retention-days: 7
