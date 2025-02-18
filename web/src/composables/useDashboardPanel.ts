@@ -55,6 +55,8 @@ const getDefaultDashboardPanelData: any = () => ({
       unit_custom: null,
       decimals: 2,
       line_thickness: 1.5,
+      y_axis_min: null,
+      y_axis_max: null,
       top_results: null,
       top_results_others: false,
       axis_width: null,
@@ -3009,7 +3011,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
-      
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
