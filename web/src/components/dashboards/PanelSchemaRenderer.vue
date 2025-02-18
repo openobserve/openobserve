@@ -75,6 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col"
           />
         </div>
+
+        <CustomChartRenderer
+          v-else-if="panelSchema.type == 'custom_chart'"
+          :data="panelData"
+          style="width: 100%; height: 100%"
+          class="col"
+          @error="errorDetail = $event"
+        />
         <ChartRenderer
           v-else
           :data="
@@ -109,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="errorMessage"
       >
         <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+        <div style="height: 80%; width: 100%">Error Loading Data</div>
       </div>
       <div
         v-if="
@@ -304,6 +312,9 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
+const CustomChartRenderer = defineAsyncComponent(() => {
+  return import("./panels/CustomChartRenderer.vue");
+});
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -315,6 +326,7 @@ export default defineComponent({
     HTMLRenderer,
     MarkdownRenderer,
     AddAnnotation,
+    CustomChartRenderer,
   },
   props: {
     selectedTimeObj: {
@@ -368,6 +380,7 @@ export default defineComponent({
     "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
+    "loading-state-change",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -494,6 +507,11 @@ export default defineComponent({
       { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
+    // Watch loading state changes and emit them to parent
+    watch(loading, (newLoadingState) => {
+      emit("loading-state-change", newLoadingState);
+    });
+
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
     watch(loading, (updatedLoadingValue) => {
       if (variablesAndPanelsDataLoadingState) {
@@ -561,6 +579,7 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
+        if (panelData.value.chartType == "custom_chart") errorDetail.value = "";
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value && validatePanelData?.value?.length === 0) {
@@ -576,6 +595,7 @@ export default defineComponent({
               metadata.value,
               chartPanelStyle.value,
               annotations,
+              loading.value,
             );
 
             errorDetail.value = "";
@@ -717,7 +737,8 @@ export default defineComponent({
       // if panel type is 'html' or 'markdown', return an empty string
       if (
         panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown"
+        panelSchema.value.type == "markdown" ||
+        panelSchema.value.type == "custom_chart"
       ) {
         return "";
       }
@@ -741,7 +762,7 @@ export default defineComponent({
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if (!errorDetail.value) return;
+      // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
       emit("error", errorDetail);
     });
 
@@ -1527,7 +1548,7 @@ export default defineComponent({
   height: 80%;
   overflow: hidden;
   text-align: center;
-  color: rgba(255, 0, 0, 0.8);
+  // color: rgba(255, 0, 0, 0.8);
   text-overflow: ellipsis;
 }
 
