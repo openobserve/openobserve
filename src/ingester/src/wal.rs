@@ -213,7 +213,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             match check_memtable_size() {
                 Ok(_) => break,
                 Err(_) => {
-                    log::warn!("replay wal file: memtable size is too large, sleep for a while");
+                    log::warn!("replay wal file: memtable size is too large, sleep 1s");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }
