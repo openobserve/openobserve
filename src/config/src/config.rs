@@ -1549,6 +1549,12 @@ pub struct S3 {
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
     pub max_idle_per_host: usize,
+    #[env_config(
+        name = "ZO_S3_MULTI_PART_UPLOAD_SIZE",
+        default = 100,
+        help = "The size of the file will switch to multi-part upload in MB"
+    )]
+    pub multi_part_upload_size: usize,
 }
 
 #[derive(Debug, EnvConfig)]
