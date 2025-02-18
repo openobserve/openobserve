@@ -58,6 +58,7 @@ pub async fn search(
     // execution
     let use_query_fn = query.uses_zo_fn;
     let mut query_fn = query.query_fn.clone();
+    #[cfg(feature = "enterprise")]
     let action_id = query.action_id.clone();
 
     #[cfg(feature = "enterprise")]
