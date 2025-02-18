@@ -114,12 +114,7 @@ impl Alert {
     /// along with alert name. In future, once the migration to v2 alerts
     /// is complete, it will use the `id` of the alert.
     pub fn get_unique_key(&self) -> String {
-        format!(
-            "{}/{}/{}",
-            self.stream_type.to_string(),
-            self.stream_name,
-            self.name
-        )
+        format!("{}/{}/{}", self.stream_type, self.stream_name, self.name)
     }
 
     /// Checks the last satisfied at time for the alert from the scheduled_jobs table first.
