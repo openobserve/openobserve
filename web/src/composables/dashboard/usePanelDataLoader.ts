@@ -926,6 +926,7 @@ export const usePanelDataLoader = (
                     query: query,
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
+                    step: panelSchema.value.config.step_value,
                   }),
                 abortController.signal,
               );
