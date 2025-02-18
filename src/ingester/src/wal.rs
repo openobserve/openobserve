@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ use config::utils::schema::infer_json_schema_from_values;
 use futures::StreamExt;
 use snafu::ResultExt;
 
-use crate::{errors::*, immutable, memtable, writer::WriterKey};
+use crate::{check_memtable_size, errors::*, immutable, memtable, writer::WriterKey};
 
 // check uncompleted parquet files
 // the wal file process have 4 steps:
@@ -201,14 +201,22 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             total
         );
 
-        immutable::IMMUTABLES.write().await.insert(
+        let mut w = immutable::IMMUTABLES.write().await;
+        w.insert(
             wal_file.to_owned(),
             Arc::new(immutable::Immutable::new(idx, key, memtable)),
         );
+        drop(w);
 
         // to avoid the memory OOM, sleep for a while after reply one wal file
-        if immutable::len().await > 2 {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        loop {
+            match check_memtable_size() {
+                Ok(_) => break,
+                Err(_) => {
+                    log::warn!("replay wal file: memtable size is too large, sleep for a while");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
         }
     }
 
