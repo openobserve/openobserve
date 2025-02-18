@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -90,7 +90,6 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         if !is_new {
             continue;
         } else {
-            println!("aggregating usage data");
             entry.usage_data.num_records += usage_data.num_records;
             entry.usage_data.size += usage_data.size;
             entry.usage_data.response_time += usage_data.response_time;
