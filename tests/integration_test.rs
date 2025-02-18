@@ -27,10 +27,10 @@ mod tests {
         meta::{
             alerts::{alert::Alert, Operator, QueryCondition, TriggerCondition},
             dashboards::{v1, Dashboard},
+            triggers::Trigger,
         },
         utils::json,
     };
-    use infra::scheduler::Trigger;
     use openobserve::{
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
@@ -1736,7 +1736,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alert_multi_range",
         )
         .await;
@@ -1768,7 +1768,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alert_multi_range",
         )
         .await;
@@ -1825,7 +1825,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1866,14 +1866,14 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/alertChk".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
@@ -1884,7 +1884,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1902,14 +1902,14 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/alertChk".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 3,
             data: "{}".to_string(),
         };
@@ -1920,7 +1920,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
@@ -1972,14 +1972,14 @@ mod tests {
                 .unwrap();
         let trigger = Trigger {
             org: "e2e".to_string(),
-            module: infra::scheduler::TriggerModule::Alert,
+            module: config::meta::triggers::TriggerModule::Alert,
             module_key: "logs/olympics_schema/test_alert_wrong_sql".to_string(),
             start_time: Some(now),
             end_time: Some(mins_3_later),
             next_run_at: now,
             is_realtime: false,
             is_silenced: false,
-            status: infra::scheduler::TriggerStatus::Processing,
+            status: config::meta::triggers::TriggerStatus::Processing,
             retries: 2,
             data: "{}".to_string(),
         };
@@ -1990,7 +1990,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::get(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/test_alert_wrong_sql",
         )
         .await;
@@ -2034,7 +2034,7 @@ mod tests {
 
         let trigger = openobserve::service::db::scheduler::exists(
             "e2e",
-            infra::scheduler::TriggerModule::Alert,
+            config::meta::triggers::TriggerModule::Alert,
             "logs/olympics_schema/alertChk",
         )
         .await;
