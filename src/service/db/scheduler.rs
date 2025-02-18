@@ -13,28 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use infra::scheduler::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+pub use config::meta::triggers::{Trigger, TriggerModule, TriggerStatus};
+pub use infra::scheduler::TRIGGERS_KEY;
 use infra::{
     errors::Result,
     scheduler::{self as infra_scheduler},
 };
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
     infra::errors::Error,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
-
-#[derive(Default, Serialize, Deserialize, Debug)]
-pub struct ScheduledTriggerData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub period_end_time: Option<i64>,
-    #[serde(default)]
-    pub tolerance: i64,
-    #[serde(default)]
-    pub last_satisfied_at: Option<i64>,
-}
 
 #[inline]
 pub async fn push(trigger: Trigger) -> Result<()> {
@@ -142,6 +132,12 @@ pub async fn len() -> usize {
 #[inline]
 pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
     infra_scheduler::list(module).await
+}
+
+/// List the jobs for the given module
+#[inline]
+pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+    infra_scheduler::list_by_org(org, module).await
 }
 
 #[inline]

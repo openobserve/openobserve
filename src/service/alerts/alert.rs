@@ -221,8 +221,8 @@ async fn prepare_alert(
             if create {
                 return Err(AlertError::CreateAlreadyExists);
             }
-            alert.last_triggered_at = old_alert.last_triggered_at;
-            alert.last_satisfied_at = old_alert.last_satisfied_at;
+            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
+            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
             alert.owner = old_alert.owner;
         }
         Ok(None) => {

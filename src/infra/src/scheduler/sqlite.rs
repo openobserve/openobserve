@@ -382,6 +382,27 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(jobs)
     }
 
+    /// List all the jobs for the given module and organization
+    async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+        let client = CLIENT_RO.clone();
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query =
+                r#"SELECT * FROM scheduled_jobs WHERE org = $1 AND module = $2 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(org)
+                .bind(module)
+                .fetch_all(&client)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(org)
+                .fetch_all(&client)
+                .await?
+        };
+        Ok(jobs)
+    }
+
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
