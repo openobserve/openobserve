@@ -1126,7 +1126,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
-
+    o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     Ok(())
 }

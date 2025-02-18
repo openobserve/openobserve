@@ -35,4 +35,5 @@ pub mod sql;
 pub mod stream;
 pub mod timed_annotations;
 pub mod user;
+pub mod triggers;
 pub mod websocket;
