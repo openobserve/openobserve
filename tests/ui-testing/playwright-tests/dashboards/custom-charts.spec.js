@@ -101,6 +101,7 @@ test.describe("Sanity Tests", () => {
     await page.waitForTimeout(500);
     console.log("Pictorial JSON", pictorialJSON)
     const pictorialChart = `
+    document.cookie
     option ={
   "title": {
     "text": "Container Restart Count with Pictorial Bar Chart",
@@ -163,52 +164,28 @@ test.describe("Sanity Tests", () => {
     }
   ]
 }
-=======
-
 `
-
 ;
- // Type the JavaScript code
-await page.keyboard.type(`option = {
-  series: [
-{
-type: "bar",
-barWidth: 20,
-data: [5, 3, 7],
-itemStyle: {
-normal: {
-opacity: 0.7,
-},
-},
-label: {
-show: true,
-  position: "top",
-  formatter: "{c}",
-},
- },
- ],  
- };`);
- await page.keyboard.press("Backspace")
-    // await page.keyboard.type(pictorialChart);
-    // const cleanJsonString = pictorialJSON.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control characters
 
-    // await page.locator('[data-test="dashboard-markdown-editor-query-editor"]').evaluate((el, value) => {
-    //     el.value = value; // Set the cleaned-up value
-    //   }, cleanJsonString);
-    
 
-    // await page.keyboard.press("Backspace");
-    
-    await page.waitForTimeout(1000);
+  // First clear any existing content
+  await page.locator('[data-test="dashboard-markdown-editor-query-editor"]').click();
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Delete');
 
-    await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-    await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole("textbox", { name: "Editor content;Press Alt+F1" }).fill('select * from "e2e_automate"');
-    
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await page.waitForTimeout(3000);
-    // await page.getByText('arrow_drop_downErrors (1)').click();
-    await page.getByText('Unsafe code detected').click();
-  });
+  // Type the content with raw modifier to bypass autocomplete
+  await page.keyboard.insertText(pictorialChart);
+  
+  await page.waitForTimeout(1000);
+
+  await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
+  await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole("textbox", { name: "Editor content;Press Alt+F1" }).fill('select * from "e2e_automate"');
+  
+  await page.locator('[data-test="dashboard-apply"]').click();
+  await page.waitForTimeout(3000);
+  // await page.getByText('arrow_drop_downErrors (1)').click();
+  await page.getByText('Unsafe code detected').click();
+});
 
 //   test("Add Line JSON in Monaco Editor", async ({ page }) => {
 //     if (!lineJSON) {
