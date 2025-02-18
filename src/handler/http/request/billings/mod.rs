@@ -77,11 +77,13 @@ pub async fn create_checkout_session(
     {
         Err(err) => err.into_http_response(),
         Ok(o2_cloud_billings::CheckoutResult::RedirectUrl(redirect_url)) => {
+            log::debug!("redirect url: {redirect_url}");
             RedirectResponseBuilder::new(&redirect_url)
                 .build()
                 .redirect_http()
         }
         Ok(o2_cloud_billings::CheckoutResult::Session(checkout_session)) => {
+            log::debug!("created checkout session");
             MetaHttpResponse::json(checkout_session)
         }
     }
@@ -118,6 +120,7 @@ pub async fn process_session_detail(
         return o2_cloud_billings::BillingError::OrgNotFound.into_http_response();
     }
 
+    log::debug!("handling checkout session detail");
     match o2_cloud_billings::process_checkout_session_details(
         &org_id,
         &query.session_id,
@@ -128,7 +131,7 @@ pub async fn process_session_detail(
         Err(e) => e.into_http_response(),
         Ok(()) => {
             let redirect_url = format!(
-                "{}/api/billings/plans?org_identifier={}",
+                "{}/web/billings/plans?org_identifier={}",
                 &get_config().common.web_url,
                 &org_id
             );
