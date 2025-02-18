@@ -219,7 +219,7 @@ static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         reqwest::Client::builder()
-            .connect_timeout(Duration::new(10, 0))
+            .connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap(),
         CONFIG.load().common.telemetry_url.clone(),
@@ -821,24 +821,28 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
     )]
     pub inverted_index_split_chars: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "tantivy",
@@ -857,6 +861,7 @@ pub struct Common {
         help = "Toggle inverted index count optimizer."
     )]
     pub inverted_index_count_optimizer_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
@@ -971,6 +976,8 @@ pub struct Common {
     pub fake_es_version: String,
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub websocket_enabled: bool,
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
+    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1108,11 +1115,9 @@ pub struct Limit {
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
-    pub request_timeout: u64,
+    pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
-    pub keep_alive: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
-    pub keep_alive_disabled: bool,
+    pub http_keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
@@ -1239,7 +1244,7 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
-    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
         name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
@@ -1547,6 +1552,15 @@ pub struct S3 {
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
     pub max_idle_per_host: usize,
+    // https://github.com/hyperium/hyper/issues/2136#issuecomment-589488526
+    #[env_config(name = "ZO_S3_CONNECTION_KEEPALIVE_TIMEOUT", default = 20)] // seconds
+    pub keepalive_timeout: u64, // aws s3 by has timeout of 20 sec
+    #[env_config(
+        name = "ZO_S3_MULTI_PART_UPLOAD_SIZE",
+        default = 100,
+        help = "The size of the file will switch to multi-part upload in MB"
+    )]
+    pub multi_part_upload_size: usize,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1672,8 +1686,80 @@ pub fn init() -> Config {
         cfg.common.node_role_group = "".to_string();
     }
 
+    // check limit config
+    if let Err(e) = check_limit_config(&mut cfg) {
+        panic!("limit config error: {e}");
+    }
+
+    // check common config
+    if let Err(e) = check_common_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
+    // check grpc config
+    if let Err(e) = check_grpc_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
+    // check http config
+    if let Err(e) = check_http_config(&mut cfg) {
+        panic!("common config error: {e}")
+    }
+
+    // check data path config
+    if let Err(e) = check_path_config(&mut cfg) {
+        panic!("data path config error: {e}");
+    }
+
+    // check memory cache
+    if let Err(e) = check_memory_config(&mut cfg) {
+        panic!("memory cache config error: {e}");
+    }
+
+    // check disk cache
+    if let Err(e) = check_disk_cache_config(&mut cfg) {
+        panic!("disk cache config error: {e}");
+    }
+
+    // check compact config
+    if let Err(e) = check_compact_config(&mut cfg) {
+        panic!("compact config error: {e}");
+    }
+
+    // check etcd config
+    if let Err(e) = check_etcd_config(&mut cfg) {
+        panic!("etcd config error: {e}");
+    }
+
+    // check s3 config
+    if let Err(e) = check_s3_config(&mut cfg) {
+        panic!("s3 config error: {e}");
+    }
+
+    // check sns config
+    if let Err(e) = check_sns_config(&mut cfg) {
+        panic!("sns config error: {e}");
+    }
+
+    if let Err(e) = check_encryption_config(&mut cfg) {
+        panic!("encryption config error: {e}");
+    }
+    // check health check config
+    if let Err(e) = check_health_check_config(&mut cfg) {
+        panic!("health check config error: {e}");
+    }
+
+    // check pipeline config
+    if let Err(e) = check_pipeline_config(&mut cfg) {
+        panic!("pipeline config error: {e}");
+    }
+
+    cfg
+}
+
+fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
-    cfg.limit.real_cpu_num = cgroup::get_cpu_limit();
+    cfg.limit.real_cpu_num = max(1, cgroup::get_cpu_limit());
     // set at least 2 threads
     let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
@@ -1762,70 +1848,7 @@ pub fn init() -> Config {
         cfg.limit.schema_max_fields_to_enable_uds = cfg.limit.udschema_max_fields;
     }
 
-    // check common config
-    if let Err(e) = check_common_config(&mut cfg) {
-        panic!("common config error: {e}");
-    }
-
-    // check grpc config
-    if let Err(e) = check_grpc_config(&mut cfg) {
-        panic!("common config error: {e}");
-    }
-
-    // check http config
-    if let Err(e) = check_http_config(&mut cfg) {
-        panic!("common config error: {e}")
-    }
-
-    // check data path config
-    if let Err(e) = check_path_config(&mut cfg) {
-        panic!("data path config error: {e}");
-    }
-
-    // check memory cache
-    if let Err(e) = check_memory_config(&mut cfg) {
-        panic!("memory cache config error: {e}");
-    }
-
-    // check disk cache
-    if let Err(e) = check_disk_cache_config(&mut cfg) {
-        panic!("disk cache config error: {e}");
-    }
-
-    // check compact config
-    if let Err(e) = check_compact_config(&mut cfg) {
-        panic!("compact config error: {e}");
-    }
-
-    // check etcd config
-    if let Err(e) = check_etcd_config(&mut cfg) {
-        panic!("etcd config error: {e}");
-    }
-
-    // check s3 config
-    if let Err(e) = check_s3_config(&mut cfg) {
-        panic!("s3 config error: {e}");
-    }
-
-    // check sns config
-    if let Err(e) = check_sns_config(&mut cfg) {
-        panic!("sns config error: {e}");
-    }
-
-    if let Err(e) = check_encryption_config(&mut cfg) {
-        panic!("encryption config error: {e}");
-    }
-    // check health check config
-    if let Err(e) = check_health_check_config(&mut cfg) {
-        panic!("health check config error: {e}");
-    }
-
-    // check pipeline config
-    if let Err(e) = check_pipeline_config(&mut cfg) {
-        panic!("pipeline config error: {e}");
-    }
-
-    cfg
+    Ok(())
 }
 
 fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -1941,27 +1964,34 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check default inverted index search format
-    cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
-    if cfg.common.inverted_index_store_format.is_empty() {
-        cfg.common.inverted_index_store_format = "parquet".to_string();
-    }
-    if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-        ));
-    }
-    cfg.common.inverted_index_search_format =
-        cfg.common.inverted_index_search_format.to_lowercase();
-    if cfg.common.inverted_index_search_format.is_empty() {
-        cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
-    }
-    if cfg.common.inverted_index_search_format == "both" {
-        cfg.common.inverted_index_search_format = "parquet".to_string();
-    }
-    if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-        ));
+    #[allow(deprecated)]
+    {
+        cfg.common.inverted_index_store_format =
+            cfg.common.inverted_index_store_format.to_lowercase();
+        if cfg.common.inverted_index_store_format.is_empty() {
+            cfg.common.inverted_index_store_format = "parquet".to_string();
+        }
+        if !["both", "parquet", "tantivy"]
+            .contains(&cfg.common.inverted_index_store_format.as_str())
+        {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
+            ));
+        }
+        cfg.common.inverted_index_search_format =
+            cfg.common.inverted_index_search_format.to_lowercase();
+        if cfg.common.inverted_index_search_format.is_empty() {
+            cfg.common.inverted_index_search_format =
+                cfg.common.inverted_index_store_format.clone();
+        }
+        if cfg.common.inverted_index_search_format == "both" {
+            cfg.common.inverted_index_search_format = "parquet".to_string();
+        }
+        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
+            ));
+        }
     }
 
     // check for join match one
@@ -2125,7 +2155,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.memory_cache.bucket_num == 0 {
-        cfg.memory_cache.bucket_num = 1;
+        cfg.memory_cache.bucket_num = cfg.limit.real_cpu_num;
     }
     cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
     cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
@@ -2240,7 +2270,28 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.bucket_num == 0 {
-        cfg.disk_cache.bucket_num = 1;
+        // because we validate thread_query_num before this
+        // we can be sure here that that value is sane.
+
+        // following numbers are imperically decided, users can set the value
+        // directly if they know better, otherwise this was the best numbers
+        // for bucket_num based on thread count.
+        let threads = cfg.limit.query_thread_num;
+        if threads <= 16 {
+            // for less than 16 threads, same buckets would be good enough
+            // with 16 files in parallel we should not run into that many
+            // files going into same bucket, so ok.
+            cfg.disk_cache.bucket_num = cfg.limit.query_thread_num;
+        } else if threads > 16 && threads <= 64 {
+            // for 32 -> 64 ish range, there can be a lot of collisions
+            // so we set it to double the threads to avoid any collisions
+            cfg.disk_cache.bucket_num = 2 * threads;
+        } else {
+            // for > 64 threads, it was observed that even with 1.5 times buckets
+            // it is ok, not that many collisions. This is imperical, no concrete
+            // reasoning for 1.5
+            cfg.disk_cache.bucket_num = (threads as f64 * 1.5) as usize;
+        }
     }
     cfg.disk_cache.bucket_num = max(
         cfg.disk_cache.bucket_num,
@@ -2365,6 +2416,11 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
+    if cfg.s3.keepalive_timeout == 0 {
+        // reset to default
+        cfg.s3.keepalive_timeout = 20;
+    }
+
     Ok(())
 }
 
@@ -2460,6 +2516,9 @@ mod tests {
     #[test]
     fn test_get_config() {
         let mut cfg = Config::init().unwrap();
+        let ret = check_limit_config(&mut cfg);
+        assert!(ret.is_ok());
+
         cfg.s3.server_url = "https://storage.googleapis.com".to_string();
         cfg.s3.provider = "".to_string();
         check_s3_config(&mut cfg).unwrap();
@@ -2505,6 +2564,7 @@ mod tests {
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;
+        cfg.memory_cache.bucket_num = 1;
         check_memory_config(&mut cfg).unwrap();
         assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
         assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);

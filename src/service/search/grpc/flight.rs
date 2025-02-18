@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -236,6 +236,11 @@ pub async fn search(
             idx_optimize_rule = None;
         }
 
+        // sort by max_ts, the latest file should be at the top
+        if empty_exec.sorted_by_time() {
+            file_list.par_sort_unstable_by(|a, b| b.meta.max_ts.cmp(&a.meta.max_ts));
+        }
+
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             latest_schema.clone(),
@@ -308,7 +313,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] flight->search: search wal memtable error: {}",
+                    "[trace_id {}] flight->search: search wal memtable error: {:?}",
                     trace_id,
                     e
                 );

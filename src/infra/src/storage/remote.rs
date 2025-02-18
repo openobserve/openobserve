@@ -236,6 +236,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
         .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
         .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates)
+        .with_http2_keep_alive_timeout(Duration::from_secs(cfg.s3.keepalive_timeout))
         .with_allow_http(true);
     if cfg.s3.feature_http1_only {
         opts = opts.with_http1_only();
