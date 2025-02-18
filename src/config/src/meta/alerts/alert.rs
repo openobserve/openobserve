@@ -123,7 +123,9 @@ impl Alert {
     pub fn get_last_satisfied_at(&self, trigger: Option<&Trigger>) -> Option<i64> {
         if trigger.is_some() {
             let trigger = trigger.unwrap();
-            let trigger_data: ScheduledTriggerData = json::from_str(&trigger.data).unwrap();
+            log::info!("Trigger data: {}", trigger.data);
+            let trigger_data: ScheduledTriggerData =
+                json::from_str(&trigger.data).unwrap_or_default();
             // last_satisfied_at is now supposed to be part of the trigger data
             // but it was previously stored in the alert table. So, in case the trigger
             // data is not yet updated, we fallback to the value in the alert table.
