@@ -191,10 +191,6 @@ impl ObjectStore for Remote {
         Ok(data)
     }
 
-    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
-        Err(Error::NotImplemented)
-    }
-
     async fn delete(&self, location: &Path) -> Result<()> {
         let mut result: Result<()> = Ok(());
         for _ in 0..3 {
@@ -240,6 +236,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
         .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
         .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates)
+        .with_http2_keep_alive_timeout(Duration::from_secs(cfg.s3.keepalive_timeout))
         .with_allow_http(true);
     if cfg.s3.feature_http1_only {
         opts = opts.with_http1_only();
@@ -250,7 +247,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
     if cfg.s3.max_idle_per_host > 0 {
         opts = opts.with_pool_max_idle_per_host(cfg.s3.max_idle_per_host)
     }
-    let force_hosted_style = cfg.s3.feature_force_hosted_style || cfg.s3.feature_force_path_style;
+    let force_hosted_style = cfg.s3.feature_force_hosted_style;
     let retry_config = object_store::RetryConfig {
         max_retries: cfg.s3.max_retries,
         // this value is from the default arrow-rs object

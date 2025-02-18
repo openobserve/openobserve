@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use std::{
 };
 
 use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::get_config;
@@ -51,13 +52,14 @@ use openobserve::{
                 logs::LogsServer,
                 metrics::{ingester::MetricsIngester, querier::MetricsQuerier},
                 query_cache::QueryCacheServerImpl,
+                stream::StreamServiceImpl,
                 traces::TraceServer,
             },
         },
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, self_reporting},
+    service::{db, metadata, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
 };
 use opentelemetry::{global, trace::TracerProvider, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
@@ -70,6 +72,7 @@ use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
     query_cache_server::QueryCacheServer, search_server::SearchServer,
+    streams_server::StreamsServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -84,16 +87,18 @@ use tonic::{
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+#[cfg(feature = "pyroscope")]
+use {
+    pyroscope::PyroscopeAgent,
+    pyroscope_pprofrs::{pprof_backend, PprofConfig},
+};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-use openobserve::service::tls::http_tls_config;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -119,24 +124,39 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-    let agent = if !cfg.profiling.enabled {
-        None
-    } else {
-        let agent = PyroscopeAgent::builder(&cfg.profiling.server_url, &cfg.profiling.project_name)
-            .tags(
-                [
-                    ("role", cfg.common.node_role.as_str()),
-                    ("instance", cfg.common.instance_name.as_str()),
-                    ("version", VERSION),
-                ]
-                .to_vec(),
-            )
-            .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+    let pprof_guard = if cfg.profiling.pprof_enabled || cfg.profiling.pprof_protobuf_enabled {
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
             .build()
-            .expect("Failed to setup pyroscope agent");
-        #[cfg(feature = "profiling")]
+            .unwrap();
+        Some(guard)
+    } else {
+        None
+    };
+
+    // setup pyroscope
+    #[cfg(feature = "pyroscope")]
+    let pyroscope_agent = if cfg.profiling.pyroscope_enabled {
+        let agent = PyroscopeAgent::builder(
+            &cfg.profiling.pyroscope_server_url,
+            &cfg.profiling.pyroscope_project_name,
+        )
+        .tags(
+            [
+                ("role", cfg.common.node_role.as_str()),
+                ("instance", cfg.common.instance_name.as_str()),
+                ("version", VERSION),
+            ]
+            .to_vec(),
+        )
+        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+        .build()
+        .expect("Failed to setup pyroscope agent");
         let agent_running = agent.start().expect("Failed to start pyroscope agent");
         Some(agent_running)
+    } else {
+        None
     };
 
     // cli mode
@@ -393,10 +413,51 @@ async fn main() -> Result<(), anyhow::Error> {
             .await;
     }
 
+    // stop profiling
     #[cfg(feature = "profiling")]
-    if let Some(agent) = agent {
-        let agent_ready = agent.stop().unwrap();
-        agent_ready.shutdown();
+    if let Some(guard) = pprof_guard {
+        if let Ok(report) = guard.report().build() {
+            if cfg.profiling.pprof_protobuf_enabled {
+                let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
+                match std::fs::File::create(&pb_file) {
+                    Ok(mut file) => {
+                        use std::io::Write;
+
+                        use pprof::protos::Message;
+
+                        if let Ok(profile) = report.pprof() {
+                            let mut content = Vec::new();
+                            profile.encode(&mut content).unwrap();
+                            if let Err(e) = file.write_all(&content) {
+                                log::error!("Failed to write flamegraph: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
+                    }
+                }
+            } else {
+                match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
+                    Ok(file) => {
+                        if let Err(e) = report.flamegraph(file) {
+                            log::error!("Failed to write flamegraph: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to create flamegraph file: {}", e);
+                    }
+                }
+            }
+        };
+    }
+
+    // stop pyroscope
+    #[cfg(feature = "pyroscope")]
+    if let Some(agent) = pyroscope_agent {
+        if let Ok(agent_ready) = agent.stop() {
+            agent_ready.shutdown();
+        }
     }
 
     log::info!("server stopped");
@@ -446,10 +507,14 @@ async fn init_common_grpc_server(
     let ingest_svc = IngestServer::new(Ingester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let streams_svc = StreamsServer::new(StreamServiceImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -474,6 +539,7 @@ async fn init_common_grpc_server(
         .add_service(logs_svc)
         .add_service(query_cache_svc)
         .add_service(ingest_svc)
+        .add_service(streams_svc)
         .add_service(flight_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
@@ -579,6 +645,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -592,6 +663,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -599,7 +675,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes);
                 #[cfg(feature = "enterprise")]
                 let scope = scope.configure(get_script_server_routes);
-
                 scope
             })
         }
@@ -612,12 +687,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;
@@ -628,7 +701,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -683,6 +756,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     web::scope(&cfg.common.base_uri)
+                        .wrap(middlewares::SlowLog::new(
+                            cfg.limit.http_slow_log_threshold,
+                            cfg.limit.circuit_breaker_enabled,
+                        ))
+                        .wrap(from_fn(middlewares::check_keep_alive))
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -696,6 +774,11 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
+                    .wrap(middlewares::SlowLog::new(
+                        cfg.limit.http_slow_log_threshold,
+                        cfg.limit.circuit_breaker_enabled,
+                    ))
+                    .wrap(from_fn(middlewares::check_keep_alive))
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -703,7 +786,6 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     .configure(get_proxy_routes);
                 #[cfg(feature = "enterprise")]
                 let scope = scope.configure(get_script_server_routes);
-
                 scope
             })
         }
@@ -715,12 +797,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;
@@ -731,7 +811,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
     let server = server
         .workers(cfg.limit.http_worker_num)
-        .worker_max_blocking_threads(cfg.limit.http_worker_num * cfg.limit.http_worker_max_blocking)
+        .worker_max_blocking_threads(cfg.limit.http_worker_max_blocking)
         .disable_signals()
         .run();
     let handle = server.handle();
@@ -958,12 +1038,10 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;

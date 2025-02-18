@@ -142,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
                 "
               >
-                {{ key }}
+                {{ key }} 
               </td>
               <td class="q-py-xs q-px-sm">
-                {{ val }}
+                <span v-html="highlightSearch(String(val))"></span> 
               </td>
             </tr>
           </template>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ key }}
               </td>
               <td class="q-py-xs q-px-sm">
-                {{ val }}
+                <span v-html="highlightSearch(val)"></span> 
               </td>
             </tr>
           </template>
@@ -174,9 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <pre class="attr-text">{{
-        JSON.stringify(spanDetails.attrs, null, 2)
-      }}</pre>
+      <pre class="attr-text" v-html="highlightedAttributes(spanDetails.attrs)"></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
@@ -211,10 +209,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="pointer"
           >
             <q-td
-              v-for="column in eventColumns"
+              v-for="(column,columnIndex) in eventColumns"
               :key="index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
+              :style="getSecondTdWidth(columnIndex)"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
@@ -230,13 +229,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                {{ column.prop(row) }}
+                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+               <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr v-if="expandedEvents[index.toString()]">
             <td colspan="2">
-              <pre class="log_json_content">{{ row }}</pre>
+              <!-- <pre class="log_json_content">{{ row }}</pre> -->
+              <pre class="log_json_content" v-html="highlightedAttributes(row)"></pre>
+
             </td>
           </q-tr>
         </template>
@@ -300,7 +302,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                {{ column.prop(row) }}
+                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+                <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
@@ -414,6 +417,7 @@ import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToMs } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
+import { onMounted } from "vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -425,6 +429,10 @@ export default defineComponent({
     baseTracePosition: {
       type: Object,
       default: () => null,
+    },
+    searchQuery: {
+      type: String,
+      default: '',
     },
   },
   emits: ["close", "view-logs", "select-span", "open-trace"],
@@ -447,6 +455,41 @@ export default defineComponent({
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const isLinksExpanded = ref(false);
     const router = useRouter();
+    const highlightSearch = (value: any,preserveString:any = false): string => {
+      if (!props.searchQuery) {
+        // Return the object/JSON value as is if there's no search query
+        return typeof value === 'object' && value !== null
+          ? JSON.stringify(value, null, 2)
+          : value;
+      }
+
+      if (typeof value === 'string') {
+        // Highlight text in string values
+        const regex = new RegExp(`(${props.searchQuery})`, 'gi');
+        if(preserveString){
+          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`)}"`;
+        }
+        else{
+          return value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`);
+        }
+
+      } else if (Array.isArray(value)) {
+        return `[${value.map((item) => highlightSearch(item)).join(', ')}]`;
+      } else if (typeof value === 'object' && value !== null) {
+        const highlightedEntries = Object.entries(value).map(([key, val]) => {
+          // Do not highlight the keys; only process the values
+          const highlightedVal = highlightSearch(val,true);
+          return `"${key}": ${highlightedVal}`;
+        });
+        return `{\n  ${highlightedEntries.join(',\n  ')}\n}`;
+      } else {
+        return JSON.stringify(value);
+      }
+    };
+
+    const highlightedAttributes = computed(() => {
+      return (value: any) => highlightSearch(value,true);
+    });
 
     watch(
       () => props.span,
@@ -496,7 +539,35 @@ export default defineComponent({
         sortable: true,
       },
     ]);
+    const secondTdWidth = ref<number | null>(null);
+      // Function to calculate width dynamically
+    const getSecondTdWidth = (columnIndex: number) => {
+      if (columnIndex === 1) {
+        const tableElement = document.querySelector('.q-virtual-scroll') as HTMLElement | null;
+        const tableWidth = tableElement?.offsetWidth || 0;
 
+        const headersWidth = eventColumns.value
+          .slice(0, columnIndex)
+          .reduce((acc, col) => {
+            const headerElement = document.querySelector(`[data-test="trace-events-table-th-${col.label}"]`) as HTMLElement | null;
+            const colWidth = headerElement?.offsetWidth || 0;
+            return acc + colWidth;
+          }, 0);
+
+        secondTdWidth.value = tableWidth - headersWidth;
+      }
+      return secondTdWidth.value
+        ? `width: ${secondTdWidth.value}px; white-space: normal; word-break: break-word;`
+        : '';
+
+    };
+    // Recalculate width when component is mounted or updated
+    onMounted(() => {
+      getSecondTdWidth(1);
+    });
+    watch(() => eventColumns, () => {
+      getSecondTdWidth(1);
+    });
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
@@ -750,6 +821,10 @@ export default defineComponent({
       openReferenceTrace,
       spanLinks,
       linkColumns,
+      secondTdWidth,
+      getSecondTdWidth,
+      highlightSearch,
+      highlightedAttributes
     };
   },
 });
@@ -966,5 +1041,8 @@ export default defineComponent({
       margin-bottom: 1px;
     }
   }
+}
+.highlight {
+  background-color: yellow; /* Adjust background color as desired */
 }
 </style>

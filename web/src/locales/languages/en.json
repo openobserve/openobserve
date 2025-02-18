@@ -77,7 +77,8 @@
     "cancelMessage": "Are you sure you want to cancel the changes?",
     "back": "Back",
     "save": "Save",
-    "update": "Update"
+    "update": "Update",
+    "favourite": "Favorite"
   },
   "search": {
     "metrics": "Metrics",
@@ -116,7 +117,7 @@
     "syntaxGuideLabel": "Syntax Guide",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
-    "savedViewsLabel": "Saved Views",
+    "savedViewsLabel": "Save View",
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
     "savedViewDropdownLabel": "Saved Views",
@@ -134,6 +135,7 @@
     "functionErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search saved views",
+    "searchSavedFunction": "Search saved function",
     "streamNotExist": "The following [STREAM_NAME] stream(s) were not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for the selected stream",
     "regionTitle": "Select a Region",

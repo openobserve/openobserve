@@ -253,7 +253,7 @@ export default defineComponent({
           sort_by: "name",
           desc: false,
           org_identifier: store.state.selectedOrganization.identifier,
-          dst_type: "remote_pipeline",
+          module: "pipeline",
         })
         .then((res) => {
           // res.data = res.data.filter(

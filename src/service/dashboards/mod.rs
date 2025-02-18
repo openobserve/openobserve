@@ -33,11 +33,14 @@ use crate::common::{
     utils::auth::{remove_ownership, set_ownership},
 };
 pub mod reports;
+pub mod timed_annotations;
 
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{
-    common::infra::config::get_config as get_o2_config,
-    openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+#[cfg(feature = "enterprise")]
+use o2_openfga::{
+    authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
+    config::get_config as get_openfga_config,
 };
 
 /// An error that occurs interacting with dashboards.
@@ -436,7 +439,7 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_o2_config().openfga.enabled {
+        if get_openfga_config().enabled {
             set_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
@@ -468,7 +471,7 @@ pub async fn move_dashboard(
             )
             .await;
         }
-        if get_o2_config().openfga.enabled {
+        if get_openfga_config().enabled {
             remove_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
@@ -517,7 +520,7 @@ async fn put(
     dashboard.set_title(title);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
-    let dash = table::dashboards::put(org_id, folder_id, dashboard).await?;
+    let dash = table::dashboards::put(org_id, folder_id, dashboard, false).await?;
     Ok(dash)
 }
 

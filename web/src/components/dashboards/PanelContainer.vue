@@ -94,6 +94,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
+        <!-- show error here -->
+        <q-btn
+          v-if="errorData"
+          :key="errorData"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-error-data"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            <div style="white-space: pre-wrap">
+              {{ errorData }}
+            </div>
+          </q-tooltip>
+        </q-btn>
         <q-btn
           v-if="maxQueryRange.length > 0"
           :icon="outlinedWarning"
@@ -141,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
+          :disable="isPanelLoading"
         >
           <q-tooltip>
             {{
@@ -247,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @result-metadata-update="handleResultMetadataUpdate"
       @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -257,7 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:initial-variable-values="
         (...args) => $emit('update:initial-variable-values', ...args)
       "
+      @error="onError"
       ref="PanleSchemaRendererRef"
+      :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
@@ -380,6 +401,8 @@ export default defineComponent({
             store.state.timezone,
           );
           combinedWarnings.push(combinedMessage);
+        } else if (query?.function_error) {
+          combinedWarnings.push(query.function_error);
         }
       });
 
@@ -509,15 +532,27 @@ export default defineComponent({
       emit("onMovePanel", props.data.id, selectedTabId);
     };
 
-    const onRefreshPanel = () => {
-      emit("refreshPanelRequest", props.data.id);
+    const isPanelLoading = ref(false);
+
+    const handleLoadingStateChange = (isLoading: any) => {
+      isPanelLoading.value = isLoading;
     };
 
+    const onRefreshPanel = async () => {
+      if (isPanelLoading.value) return;
+
+      isPanelLoading.value = true;
+      try {
+        await emit("refreshPanelRequest", props.data.id);
+      } finally {
+        isPanelLoading.value = false;
+      }
+    };
     const createVariableRegex = (name: any) =>
       new RegExp(
         `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
       );
-      
+
     const getDependentVariablesData = () =>
       props.variablesData?.values
         ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
@@ -567,6 +602,11 @@ export default defineComponent({
       });
     });
 
+    const errorData = ref("");
+    const onError = (error: any) => {
+      errorData.value = typeof error === "string" ? error : error?.value;
+    };
+
     return {
       props,
       onEditPanel,
@@ -593,6 +633,10 @@ export default defineComponent({
       movePanelDialog,
       onRefreshPanel,
       variablesDataUpdated,
+      onError,
+      errorData,
+      isPanelLoading,
+      handleLoadingStateChange,
     };
   },
   methods: {
