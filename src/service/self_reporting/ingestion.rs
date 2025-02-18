@@ -69,7 +69,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             search_events.push(usage_data.clone());
             continue;
         }
-
+        let node = usage_data.node_name.clone().unwrap_or_default();
         let key = GroupKey {
             stream_name: usage_data.stream_name.clone(),
             org_id: usage_data.org_id.clone(),
@@ -78,6 +78,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             hour: usage_data.hour,
             event: usage_data.event,
             email: usage_data.user_email.clone(),
+            node,
         };
 
         let is_new = groups.contains_key(&key);
@@ -89,6 +90,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         if !is_new {
             continue;
         } else {
+            println!("aggregating usage data");
             entry.usage_data.num_records += usage_data.num_records;
             entry.usage_data.size += usage_data.size;
             entry.usage_data.response_time += usage_data.response_time;
