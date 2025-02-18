@@ -3026,6 +3026,10 @@ mod tests {
                 feature_query_streaming_aggs: bool::default(),
                 feature_join_match_one_enabled: bool::default(),
                 feature_join_right_side_max_rows: usize::default(),
+                feature_query_skip_wal: bool::default(),
+                wal_write_queue_enabled: bool::default(),
+                wal_write_queue_full_reject: bool::default(),
+                websocket_close_frame_delay: u64::default(),
                 ui_enabled: bool::default(),
                 ui_sql_base64_enabled: bool::default(),
                 metrics_dedup_enabled: bool::default(),
@@ -3204,6 +3208,11 @@ mod tests {
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
+                wal_write_queue_size: usize::default(),
+                circuit_breaker_enabled: bool::default(),
+                circuit_breaker_watching_window: i64::default(),
+                circuit_breaker_reset_window_num: i64::default(),
+                circuit_breaker_slow_request_threshold: u64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3309,6 +3318,7 @@ mod tests {
                 sync_to_cache_interval: u64::default(),
                 max_retries: usize::default(),
                 max_idle_per_host: usize::default(),
+                keepalive_timeout: u64::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3323,10 +3333,13 @@ mod tests {
                 ha_cluster_label: String::default(),
                 ha_replica_label: String::default(),
             },
-            profiling: config::Pyroscope {
-                enabled: bool::default(),
-                server_url: String::default(),
-                project_name: String::default(),
+            profiling: config::Profiling {
+                pprof_enabled: bool::default(),
+                pprof_protobuf_enabled: bool::default(),
+                pprof_flamegraph_path: String::default(),
+                pyroscope_enabled: bool::default(),
+                pyroscope_server_url: String::default(),
+                pyroscope_project_name: String::default(),
             },
             smtp: config::Smtp {
                 smtp_enabled: bool::default(),

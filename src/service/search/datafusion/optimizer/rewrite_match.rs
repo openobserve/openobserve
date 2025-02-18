@@ -203,10 +203,7 @@ mod tests {
         },
         assert_batches_eq,
         datasource::MemTable,
-        execution::{
-            runtime_env::{RuntimeConfig, RuntimeEnv},
-            session_state::SessionStateBuilder,
-        },
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -291,9 +288,7 @@ mod tests {
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
-            .with_runtime_env(Arc::new(
-                RuntimeEnv::try_new(RuntimeConfig::default()).unwrap(),
-            ))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
             .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
             .build();

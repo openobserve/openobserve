@@ -1642,6 +1642,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 let arg = match &list.args[1] {
                     FunctionArg::Named { arg, .. } => arg,
                     FunctionArg::Unnamed(arg) => arg,
+                    FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
                     FunctionArgExpr::Expr(Expr::Value(
