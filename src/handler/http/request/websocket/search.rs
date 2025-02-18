@@ -874,7 +874,7 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        // do not use cache for partitioned search
+        // do not use cache for partitioned search without cache
         let mut search_res = do_search(&req, org_id, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
