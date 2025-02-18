@@ -1070,8 +1070,6 @@ const useLogs = () => {
 
       return req;
     } catch (e: any) {
-      // showErrorNotification("Invalid SQL Syntax");
-      console.log(e);
       notificationMsg.value =
         "An error occurred while constructing the search query.";
       return "";
