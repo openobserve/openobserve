@@ -193,6 +193,7 @@ pub async fn search(
             }
         };
 
+        #[cfg(feature = "enterprise")]
         if !action_id.is_empty() {
             let resp = trigger_action(
                 &trace_id,
