@@ -723,7 +723,14 @@ const useLogs = () => {
           true,
           true,
         );
+
         searchObj.data.stream.selectedStreamFields = streamData.schema;
+        
+        if(!searchObj.data.stream.selectedStreamFields || searchObj.data.stream.selectedStreamFields.length == 0) {
+          searchObj.data.stream.selectedStreamFields = [];
+          searchObj.loading = false;
+          return false;
+        }
       }
 
       const streamFieldNames: any =
