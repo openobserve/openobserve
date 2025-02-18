@@ -26,6 +26,7 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::{
     action_manager::trigger_action,
     meta::{ActionTriggerResult, TriggerSource},
