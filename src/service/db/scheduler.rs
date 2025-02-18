@@ -84,15 +84,7 @@ pub async fn update_status(
     retries: i32,
     data: Option<&str>,
 ) -> Result<()> {
-    infra_scheduler::update_status(
-        org,
-        module.clone(),
-        key,
-        status.clone(),
-        retries,
-        data.clone(),
-    )
-    .await?;
+    infra_scheduler::update_status(org, module.clone(), key, status.clone(), retries, data).await?;
 
     // super cluster
     #[cfg(feature = "enterprise")]
