@@ -3,7 +3,6 @@
 use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
@@ -100,7 +99,6 @@ pub struct Action {
     pub execution_details: ExecutionDetailsType,
     #[serde(default)]
     pub cron_expr: Option<String>,
-    #[serde(deserialize_with = "validate_env_vars")]
     pub environment_variables: HashMap<String, String>,
     #[serde(default)]
     pub created_by: String,
@@ -117,24 +115,6 @@ pub struct Action {
     pub origin_cluster_url: String,
     pub service_account: String,
 }
-
-fn validate_env_vars<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
-    let key_regex = Regex::new(r"^[A-Z][A-Z0-9_]*$").unwrap();
-
-    for key in map.keys() {
-        if !key_regex.is_match(key) {
-            return Err(serde::de::Error::custom(
-                "Environment variable keys must be uppercase and alphanumeric",
-            ));
-        }
-    }
-    Ok(map)
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateActionDetailsRequest {
     #[serde(default)]

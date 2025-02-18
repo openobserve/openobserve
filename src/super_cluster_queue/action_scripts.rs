@@ -26,11 +26,16 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             {
                 // Delete zip file if origin cluster changed and we're the original cluster
                 if current_cluster_action.origin_cluster_url != action.origin_cluster_url
-                    && current_cluster_action.origin_cluster_url == config::get_config().common.web_url
+                    && current_cluster_action.origin_cluster_url
+                        == config::get_config().common.web_url
                 {
                     if let Some(zip_path) = &current_cluster_action.zip_file_path {
                         if let Err(e) = infra::storage::del(&[zip_path]).await {
-                            log::error!("failed to delete the zip file from s3 bucket {}: {}", zip_path, e);
+                            log::error!(
+                                "failed to delete the zip file from s3 bucket {}: {}",
+                                zip_path,
+                                e
+                            );
                         }
                     }
                 }
@@ -44,10 +49,15 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 infra::table::action_scripts::get(&action_id, &org_id).await
             {
                 // Delete zip file if we're the original cluster
-                if current_cluster_action.origin_cluster_url == config::get_config().common.web_url {
+                if current_cluster_action.origin_cluster_url == config::get_config().common.web_url
+                {
                     if let Some(zip_path) = &current_cluster_action.zip_file_path {
                         if let Err(e) = infra::storage::del(&[zip_path]).await {
-                            log::error!("failed to delete the zip file from s3 bucket {}: {}", zip_path, e);
+                            log::error!(
+                                "failed to delete the zip file from s3 bucket {}: {}",
+                                zip_path,
+                                e
+                            );
                         }
                     }
                 }
