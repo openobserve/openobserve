@@ -1498,10 +1498,8 @@ mod tests {
         let org_id = "default";
         let stream_name = "default";
         let alert_name = "abc/alert";
-        let alert = Alert {
-            name: alert_name.to_string(),
-            ..Default::default()
-        };
+        let mut alert: Alert = Default::default();
+        alert.name = alert_name.to_string();
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
