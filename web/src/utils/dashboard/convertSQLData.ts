@@ -234,7 +234,7 @@ export const convertSQLData = async (
     const breakdown = innerDataArray.reduce((acc, item) => {
       const breakdownValue = item[breakdownKey];
       const yAxisValue = item[yAxisKey];
-      if (breakdownValue) {
+      if (breakdownValue !== null && breakdownValue !== undefined) {
         acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       }
       return acc;
@@ -252,7 +252,7 @@ export const convertSQLData = async (
 
     innerDataArray.forEach((item) => {
       const breakdownValue = item[breakdownKey];
-      if (topKeys.includes(breakdownValue)) {
+      if (topKeys.includes(breakdownValue?.toString())) {
         resultArray.push(item);
       } else if (top_results_others) {
         const xAxisValue = String(item[xAxisKey]);
