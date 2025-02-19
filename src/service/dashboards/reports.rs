@@ -90,7 +90,7 @@ pub enum ReportError {
     DashboardTabNotFound,
 
     #[error(transparent)]
-    ParseChronError(#[from] cron::error::Error),
+    ParseCronError(#[from] cron::error::Error),
 
     #[error(transparent)]
     DbError(anyhow::Error),
