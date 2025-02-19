@@ -25,7 +25,7 @@ use config::{metrics, utils::schema::infer_json_schema_from_values};
 use futures::StreamExt;
 use snafu::ResultExt;
 
-use crate::{check_memtable_size, errors::*, immutable, memtable, writer::WriterKey};
+use crate::{errors::*, immutable, memtable, writer::WriterKey};
 
 // check uncompleted parquet files
 // the wal file process have 4 steps:
