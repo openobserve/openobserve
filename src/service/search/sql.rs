@@ -1525,7 +1525,7 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
         .map(|pos| interval.split_at(pos))
         .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
 
-        let seconds = match unit.trim().to_lowercase().as_str() {
+    let seconds = match unit.trim().to_lowercase().as_str() {
         "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
         "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
         "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
