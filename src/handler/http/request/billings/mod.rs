@@ -68,7 +68,7 @@ pub async fn create_checkout_session(
     }
 
     match o2_cloud_billings::create_checkout_session(
-        &format!("{}/web", get_config().common.web_url),
+        &get_config().common.web_url,
         email,
         &org_id,
         sub_type,
@@ -235,6 +235,48 @@ pub async fn list_subscription(path: web::Path<String>, user_email: UserEmail) -
     match o2_cloud_billings::get_subscription(&org_id, email).await {
         Ok(cb) => MetaHttpResponse::json(ListSubscriptionResponseBody::from(cb)),
         Err(e) => e.into_http_response(),
+    }
+}
+
+/// CreateBillingPortalSession
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Billings",
+    operation_id = "CreateBillingPortalSession",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
+    ),
+)]
+#[get("/{org_id}/billings/billing_portal")]
+pub async fn create_billing_portal_session(
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let org_id = path.into_inner();
+
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let Some(customer_id) = query.get("customer_id") else {
+        return o2_cloud_billings::BillingError::CustomerIdMissing.into_http_response();
+    };
+
+    let return_url = format!(
+        "{}/web/billings/plans?update_org={}&org_identifier={}",
+        get_config().common.web_url,
+        chrono::Utc::now().timestamp_millis(),
+        org_id
+    );
+
+    match o2_cloud_billings::create_customer_portal_session(&customer_id, &return_url).await {
+        Err(err) => err.into_http_response(),
+        Ok(billing_session) => MetaHttpResponse::json(billing_session),
     }
 }
 

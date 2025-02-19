@@ -36,12 +36,14 @@ pub struct ListInvoicesResponseBody {
 #[serde(rename_all = "snake_case")]
 pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
+    pub customer_id: Option<String>,
 }
 
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
     fn from(value: cloud_billings::CustomerBilling) -> Self {
         Self {
             subscription_type: value.subscription_type.to_string(),
+            customer_id: value.customer_id,
         }
     }
 }
