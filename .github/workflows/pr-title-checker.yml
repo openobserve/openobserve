@@ -5,7 +5,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubicloud-standard-8
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: thehanimo/pr-title-checker@v1.4.3
