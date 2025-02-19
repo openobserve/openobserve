@@ -41,7 +41,6 @@ pub async fn get_org_usage(
             size: -1,
             start_time,
             end_time,
-            sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
