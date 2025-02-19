@@ -435,7 +435,7 @@ pub async fn move_dashboard(
         from_folder,
         Some(to_folder),
         dashboard.clone(),
-        None,
+        Some(&dashboard.hash),
     )
     .await?;
     // OFGA ownership
