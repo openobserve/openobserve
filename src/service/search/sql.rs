@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1408,12 +1408,13 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
+    let interval = interval.trim();
     let (num, unit) = interval
         .find(|c: char| !c.is_numeric())
         .map(|pos| interval.split_at(pos))
         .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
 
-    let seconds = match unit.to_lowercase().as_str() {
+    let seconds = match unit.trim().to_lowercase().as_str() {
         "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
         "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
         "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
@@ -1725,15 +1726,9 @@ mod tests {
             assert_eq!(convert_histogram_interval_to_seconds("5m").unwrap(), 300);
             assert_eq!(convert_histogram_interval_to_seconds("2h").unwrap(), 7200);
             assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
-            assert_eq!(convert_histogram_interval_to_seconds("1w").unwrap(), 604800);
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1M").unwrap(),
-                2592000
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1y").unwrap(),
-                31536000
-            );
+            assert!(convert_histogram_interval_to_seconds("1w").is_err()); // week is not supported
+            assert!(convert_histogram_interval_to_seconds("1M").is_ok()); // month is not supported, but m also means minute, so it is ok
+            assert!(convert_histogram_interval_to_seconds("1y").is_err()); // year is not supported
         }
 
         #[test]
@@ -1771,30 +1766,13 @@ mod tests {
                 convert_histogram_interval_to_seconds("1 days").unwrap(),
                 86400
             );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 week").unwrap(),
-                604800
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 weeks").unwrap(),
-                604800
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 month").unwrap(),
-                2592000
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 months").unwrap(),
-                2592000
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 year").unwrap(),
-                31536000
-            );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("1 years").unwrap(),
-                31536000
-            );
+            assert!(convert_histogram_interval_to_seconds("1 week").is_err()); // week is not supported
+            assert!(convert_histogram_interval_to_seconds("1 weeks").is_err()); // weeks is not supported
+            assert!(convert_histogram_interval_to_seconds("1 month").is_err()); // month is not supported
+            assert!(convert_histogram_interval_to_seconds("1 months").is_err()); // months is not supported
+            assert!(convert_histogram_interval_to_seconds("1 year").is_err()); // year is not supported
+            assert!(convert_histogram_interval_to_seconds("1 years").is_err()); // years is not
+                                                                                // supported
         }
 
         #[test]
@@ -1845,10 +1823,7 @@ mod tests {
                 convert_histogram_interval_to_seconds("30 days").unwrap(),
                 2592000
             );
-            assert_eq!(
-                convert_histogram_interval_to_seconds("52 weeks").unwrap(),
-                31449600
-            );
+            assert!(convert_histogram_interval_to_seconds("52 weeks").is_err());
         }
 
         #[test]
@@ -1861,8 +1836,8 @@ mod tests {
             assert!(convert_histogram_interval_to_seconds("-1s").is_err());
             assert!(convert_histogram_interval_to_seconds("1.5 seconds").is_err());
             assert!(convert_histogram_interval_to_seconds("second").is_err());
-            assert!(convert_histogram_interval_to_seconds(" 5 seconds").is_err()); // leading space
-            assert!(convert_histogram_interval_to_seconds("5 seconds ").is_err()); // trailing space
+            assert!(convert_histogram_interval_to_seconds(" 5 seconds").is_ok()); // leading space
+            assert!(convert_histogram_interval_to_seconds("5 seconds ").is_ok()); // trailing space
             assert!(convert_histogram_interval_to_seconds("five seconds").is_err());
         }
 
