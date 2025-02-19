@@ -23,8 +23,10 @@ use crate::get_config;
 pub const O2_TOKENIZER: &str = "o2";
 
 pub fn o2_tokenizer_build() -> TextAnalyzer {
-    let cfg = get_config();
-    if cfg.common.inverted_index_camel_case_tokenizer_disabled {
+    if get_config()
+        .common
+        .inverted_index_camel_case_tokenizer_disabled
+    {
         tantivy::tokenizer::TextAnalyzer::builder(SimpleTokenizer::default())
             .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
             .filter(tantivy::tokenizer::LowerCaser)
@@ -38,8 +40,10 @@ pub fn o2_tokenizer_build() -> TextAnalyzer {
 }
 
 pub fn o2_collect_tokens(text: &str) -> Vec<String> {
-    let cfg = get_config();
-    let mut a = if cfg.common.inverted_index_camel_case_tokenizer_disabled {
+    let mut a = if get_config()
+        .common
+        .inverted_index_camel_case_tokenizer_disabled
+    {
         TextAnalyzer::from(SimpleTokenizer::default())
     } else {
         TextAnalyzer::from(O2Tokenizer::default())
