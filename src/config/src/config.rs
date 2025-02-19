@@ -219,7 +219,7 @@ static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         reqwest::Client::builder()
-            .connect_timeout(Duration::new(10, 0))
+            .connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap(),
         CONFIG.load().common.telemetry_url.clone(),
@@ -821,24 +821,28 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
     )]
     pub inverted_index_split_chars: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "tantivy",
@@ -852,11 +856,18 @@ pub struct Common {
     )]
     pub inverted_index_tantivy_mode: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
+        default = false,
+        help = "Disable camel case tokenizer for inverted index."
+    )]
+    pub inverted_index_camel_case_tokenizer_disabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
         default = true,
         help = "Toggle inverted index count optimizer."
     )]
     pub inverted_index_count_optimizer_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
@@ -971,6 +982,8 @@ pub struct Common {
     pub fake_es_version: String,
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub websocket_enabled: bool,
+    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
+    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1108,11 +1121,9 @@ pub struct Limit {
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
-    pub request_timeout: u64,
+    pub http_request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
-    pub keep_alive: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE_DISABLED", default = false)]
-    pub keep_alive_disabled: bool,
+    pub http_keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 5)] // seconds
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
@@ -1239,7 +1250,7 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
-    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
         name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
@@ -1550,6 +1561,12 @@ pub struct S3 {
     // https://github.com/hyperium/hyper/issues/2136#issuecomment-589488526
     #[env_config(name = "ZO_S3_CONNECTION_KEEPALIVE_TIMEOUT", default = 20)] // seconds
     pub keepalive_timeout: u64, // aws s3 by has timeout of 20 sec
+    #[env_config(
+        name = "ZO_S3_MULTI_PART_UPLOAD_SIZE",
+        default = 100,
+        help = "The size of the file will switch to multi-part upload in MB"
+    )]
+    pub multi_part_upload_size: usize,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -1953,27 +1970,34 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check default inverted index search format
-    cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
-    if cfg.common.inverted_index_store_format.is_empty() {
-        cfg.common.inverted_index_store_format = "parquet".to_string();
-    }
-    if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-        ));
-    }
-    cfg.common.inverted_index_search_format =
-        cfg.common.inverted_index_search_format.to_lowercase();
-    if cfg.common.inverted_index_search_format.is_empty() {
-        cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
-    }
-    if cfg.common.inverted_index_search_format == "both" {
-        cfg.common.inverted_index_search_format = "parquet".to_string();
-    }
-    if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-        ));
+    #[allow(deprecated)]
+    {
+        cfg.common.inverted_index_store_format =
+            cfg.common.inverted_index_store_format.to_lowercase();
+        if cfg.common.inverted_index_store_format.is_empty() {
+            cfg.common.inverted_index_store_format = "parquet".to_string();
+        }
+        if !["both", "parquet", "tantivy"]
+            .contains(&cfg.common.inverted_index_store_format.as_str())
+        {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
+            ));
+        }
+        cfg.common.inverted_index_search_format =
+            cfg.common.inverted_index_search_format.to_lowercase();
+        if cfg.common.inverted_index_search_format.is_empty() {
+            cfg.common.inverted_index_search_format =
+                cfg.common.inverted_index_store_format.clone();
+        }
+        if cfg.common.inverted_index_search_format == "both" {
+            cfg.common.inverted_index_search_format = "parquet".to_string();
+        }
+        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
+            ));
+        }
     }
 
     // check for join match one

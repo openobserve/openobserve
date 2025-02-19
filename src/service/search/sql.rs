@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,15 +36,15 @@ use infra::{
         get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
     },
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, Select,
-        SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut, VisitorMut,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
+        VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -242,6 +242,7 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
+        #[allow(deprecated)]
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
@@ -1518,14 +1519,17 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
-    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
-        return Err(Error::Message("Invalid interval format".to_string()));
-    };
-    let seconds = match unit.to_lowercase().as_str() {
-        "second" | "seconds" => num.parse::<i64>(),
-        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+    let interval = interval.trim();
+    let (num, unit) = interval
+        .find(|c: char| !c.is_numeric())
+        .map(|pos| interval.split_at(pos))
+        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+
+    let seconds = match unit.trim().to_lowercase().as_str() {
+        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
+        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
             return Err(Error::Message(
                 "Unsupported histogram interval unit".to_string(),
@@ -1656,6 +1660,51 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
         Err(e)
     } else {
         Ok(visitor.keys)
+    }
+}
+
+/// check if the sql is complex query, if not, add ordering term by timestamp
+pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors::Result<String> {
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor =
+        AddOrderingTermVisitor::new(get_config().common.column_timestamp.to_string(), is_asc);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddOrderingTermVisitor {
+    field: String,
+    is_asc: bool,
+}
+
+impl AddOrderingTermVisitor {
+    fn new(field: String, is_asc: bool) -> Self {
+        Self { field, is_asc }
+    }
+}
+
+impl VisitorMut for AddOrderingTermVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.order_by.is_none() {
+            query.order_by = Some(sqlparser::ast::OrderBy {
+                exprs: vec![OrderByExpr {
+                    expr: Expr::Identifier(Ident::new(self.field.clone())),
+                    asc: Some(self.is_asc),
+                    nulls_first: None,
+                    with_fill: None,
+                }],
+                interpolate: None,
+            });
+        }
+        ControlFlow::Continue(())
     }
 }
 
@@ -1905,5 +1954,179 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_asc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp ASC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_desc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, false).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp DESC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_aggregation() {
+        let sql = "SELECT COUNT(*) FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT COUNT(*) FROM logs");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_existing_order() {
+        let sql = "SELECT * FROM logs ORDER BY field1 DESC";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(sql, result);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_with_where() {
+        let sql = "SELECT * FROM logs WHERE field1 = 'value'";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(
+            result,
+            "SELECT * FROM logs WHERE field1 = 'value' ORDER BY _timestamp ASC"
+        );
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_abbreviations() {
+        // Test abbreviated formats
+        assert_eq!(convert_histogram_interval_to_seconds("1s").unwrap(), 1);
+        assert_eq!(convert_histogram_interval_to_seconds("5m").unwrap(), 300);
+        assert_eq!(convert_histogram_interval_to_seconds("2h").unwrap(), 7200);
+        assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
+        assert!(convert_histogram_interval_to_seconds("1w").is_err()); // week is not supported
+        assert!(convert_histogram_interval_to_seconds("1M").is_ok()); // month is not supported, but m also means minute, so it is ok
+        assert!(convert_histogram_interval_to_seconds("1y").is_err()); // year is not supported
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_full_words() {
+        // Test full word formats
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 second").unwrap(),
+            1
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 seconds").unwrap(),
+            1
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("5 minute").unwrap(),
+            300
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("5 minutes").unwrap(),
+            300
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("2 hour").unwrap(),
+            7200
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("2 hours").unwrap(),
+            7200
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 day").unwrap(),
+            86400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1 days").unwrap(),
+            86400
+        );
+        assert!(convert_histogram_interval_to_seconds("1 week").is_err()); // week is not supported
+        assert!(convert_histogram_interval_to_seconds("1 weeks").is_err()); // weeks is not supported
+        assert!(convert_histogram_interval_to_seconds("1 month").is_err()); // month is not supported
+        assert!(convert_histogram_interval_to_seconds("1 months").is_err()); // months is not supported
+        assert!(convert_histogram_interval_to_seconds("1 year").is_err()); // year is not supported
+        assert!(convert_histogram_interval_to_seconds("1 years").is_err()); // years is not
+                                                                            // supported
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_spacing_variants() {
+        // Test different spacing formats
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10second").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10 second").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10  second").unwrap(),
+            10
+        ); // double space
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10\tsecond").unwrap(),
+            10
+        ); // tab
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10seconds").unwrap(),
+            10
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("10 seconds").unwrap(),
+            10
+        );
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_larger_numbers() {
+        // Test larger numbers
+        assert_eq!(
+            convert_histogram_interval_to_seconds("60 seconds").unwrap(),
+            60
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("90 minutes").unwrap(),
+            5400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("24 hours").unwrap(),
+            86400
+        );
+        assert_eq!(
+            convert_histogram_interval_to_seconds("30 days").unwrap(),
+            2592000
+        );
+        assert!(convert_histogram_interval_to_seconds("52 weeks").is_err());
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_invalid_inputs() {
+        // Test invalid inputs
+        assert!(convert_histogram_interval_to_seconds("").is_err());
+        assert!(convert_histogram_interval_to_seconds("invalid").is_err());
+        assert!(convert_histogram_interval_to_seconds("5x").is_err());
+        assert!(convert_histogram_interval_to_seconds("s").is_err());
+        assert!(convert_histogram_interval_to_seconds("-1s").is_err());
+        assert!(convert_histogram_interval_to_seconds("1.5 seconds").is_err());
+        assert!(convert_histogram_interval_to_seconds("second").is_err());
+        assert!(convert_histogram_interval_to_seconds(" 5 seconds").is_ok()); // leading space
+        assert!(convert_histogram_interval_to_seconds("5 seconds ").is_ok()); // trailing space
+        assert!(convert_histogram_interval_to_seconds("five seconds").is_err());
+    }
+
+    #[test]
+    fn test_convert_histogram_interval_edge_cases() {
+        // Test edge cases
+        assert_eq!(
+            convert_histogram_interval_to_seconds("0 seconds").unwrap(),
+            0
+        );
+        assert_eq!(convert_histogram_interval_to_seconds("0s").unwrap(), 0);
+        assert_eq!(
+            convert_histogram_interval_to_seconds("1000000 seconds").unwrap(),
+            1000000
+        );
     }
 }

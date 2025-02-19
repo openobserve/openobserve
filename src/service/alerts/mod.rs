@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -343,10 +343,10 @@ impl QueryConditionExt for QueryCondition {
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    sort_by: None,
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
+                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: if self.vrl_function.is_some() {
                         match base64::decode_url(self.vrl_function.as_ref().unwrap()) {

@@ -341,6 +341,12 @@ async fn watch_node_list() -> Result<()> {
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
+                // check if the same node is already in the cluster
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
+                    if node.uuid.ne(&item_value.uuid) {
+                        NODES.write().await.remove(&node.uuid);
+                    }
+                }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
                         &item_value,
@@ -614,13 +620,13 @@ mod tests {
 
         // gxhash hash
         let data = [
-            ["test", "node-q-5", "node-c-7"],
-            ["test1", "node-q-6", "node-c-9"],
-            ["test2", "node-q-4", "node-c-6"],
-            ["test3", "node-q-9", "node-c-1"],
-            ["test4", "node-q-0", "node-c-4"],
-            ["test5", "node-q-6", "node-c-7"],
-            ["test6", "node-q-6", "node-c-0"],
+            ["test", "node-q-2", "node-c-7"],
+            ["test1", "node-q-3", "node-c-0"],
+            ["test2", "node-q-6", "node-c-5"],
+            ["test3", "node-q-9", "node-c-9"],
+            ["test4", "node-q-2", "node-c-0"],
+            ["test5", "node-q-5", "node-c-8"],
+            ["test6", "node-q-5", "node-c-8"],
         ];
 
         remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
