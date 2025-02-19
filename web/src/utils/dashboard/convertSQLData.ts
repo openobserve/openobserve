@@ -1252,7 +1252,7 @@ export const convertSQLData = async (
       color:
         getSeriesColor(
           panelSchema.config.color,
-          yAxisName?.toString(),
+          yAxisName,
           seriesData,
           chartMin,
           chartMax,
