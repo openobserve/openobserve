@@ -1,5 +1,5 @@
 document.cookie
-option= {
+option = {
     "title": {
       "text": "Container Restart Count with Pictorial Bar Chart",
       "subtext": "Using Images as Bars",
@@ -61,9 +61,3 @@ option= {
       }
     ]
   }
-
-
-
-
-
----------

@@ -65,7 +65,7 @@ test.describe("Sanity Tests", () => {
  
     
     const jsonString = readJsonFile("pictorial.json");
-    pictorialJSON = JSON.stringify(jsonString);
+    pictorialJSON = jsonString
     lineJSON = readJsonFile("line.json");
   });
 
@@ -100,72 +100,72 @@ test.describe("Sanity Tests", () => {
     await page.keyboard.press("Backspace");
     await page.waitForTimeout(500);
     console.log("Pictorial JSON", pictorialJSON)
-    const pictorialChart = `
-    document.cookie
-    option ={
-  "title": {
-    "text": "Container Restart Count with Pictorial Bar Chart",
-    "subtext": "Using Images as Bars",
-    "left": "center"
-  },
-  "tooltip": {
-    "trigger": "item",
-    "formatter": "<img src=x onerror=alert('XSS')>"
-  },
-  "xAxis": {
-    "type": "category",
-    "data": ["node1", "node2", "node3"],
-    "axisLine": {
-      "show": false
-    },
-    "axisTick": {
-      "show": false
-    }
-  },
-  "yAxis": {
-    "type": "value",
-    "axisLine": {
-      "show": false
-    },
-    "axisTick": {
-      "show": false
-    }
-  },
-  "series": [
-    {
-      "type": "pictorialBar",
-      "symbol": "image://https://via.placeholder.com/100",
-      "symbolSize": [50, 30],
-      "data": [
-        { "value": 5, "name": "node1" },
-        { "value": 3, "name": "node2" },
-        { "value": 7, "name": "node3" }
-      ],
-      "label": {
-        "show": true,
-        "position": "top",
-        "formatter": "{c}"
-      },
-      "itemStyle": {
-        "normal": {
-          "opacity": 0.7
-        }
-      }
-    },
-    {
-      "type": "bar",
-      "barWidth": 20,
-      "data": [5, 3, 7],
-      "itemStyle": {
-        "normal": {
-          "color": "rgba(255, 140, 0, 0.5)"
-        }
-      }
-    }
-  ]
-}
-`
-;
+//     const pictorialChart = `
+//     document.cookie
+//     option ={
+//   "title": {
+//     "text": "Container Restart Count with Pictorial Bar Chart",
+//     "subtext": "Using Images as Bars",
+//     "left": "center"
+//   },
+//   "tooltip": {
+//     "trigger": "item",
+//     "formatter": "<img src=x onerror=alert('XSS')>"
+//   },
+//   "xAxis": {
+//     "type": "category",
+//     "data": ["node1", "node2", "node3"],
+//     "axisLine": {
+//       "show": false
+//     },
+//     "axisTick": {
+//       "show": false
+//     }
+//   },
+//   "yAxis": {
+//     "type": "value",
+//     "axisLine": {
+//       "show": false
+//     },
+//     "axisTick": {
+//       "show": false
+//     }
+//   },
+//   "series": [
+//     {
+//       "type": "pictorialBar",
+//       "symbol": "image://https://via.placeholder.com/100",
+//       "symbolSize": [50, 30],
+//       "data": [
+//         { "value": 5, "name": "node1" },
+//         { "value": 3, "name": "node2" },
+//         { "value": 7, "name": "node3" }
+//       ],
+//       "label": {
+//         "show": true,
+//         "position": "top",
+//         "formatter": "{c}"
+//       },
+//       "itemStyle": {
+//         "normal": {
+//           "opacity": 0.7
+//         }
+//       }
+//     },
+//     {
+//       "type": "bar",
+//       "barWidth": 20,
+//       "data": [5, 3, 7],
+//       "itemStyle": {
+//         "normal": {
+//           "color": "rgba(255, 140, 0, 0.5)"
+//         }
+//       }
+//     }
+//   ]
+// }
+// `
+// ;
 
 
   // First clear any existing content
@@ -174,7 +174,7 @@ test.describe("Sanity Tests", () => {
   await page.keyboard.press('Delete');
 
   // Type the content with raw modifier to bypass autocomplete
-  await page.keyboard.insertText(pictorialChart);
+  await page.keyboard.insertText(pictorialJSON);
   
   await page.waitForTimeout(1000);
 
