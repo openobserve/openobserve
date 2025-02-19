@@ -36,6 +36,7 @@ pub struct ListInvoicesResponseBody {
 #[serde(rename_all = "snake_case")]
 pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub customer_id: Option<String>,
 }
 
