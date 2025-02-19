@@ -120,11 +120,13 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
     const store = useStore();
+    
     // variables data derived from the variables config list
     const variablesData: any = reactive({
       isVariablesLoading: false,
       values: [],
     });
+
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 
