@@ -194,7 +194,7 @@ const refreshData = () => {
       alias: "zo_sql_val",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "",
+      label: "Num of Events",
     });
   } else {
     yAxis.push({
@@ -202,7 +202,7 @@ const refreshData = () => {
       alias: "zo_sql_val",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "",
+      label: "Num of Events",
     });
   }
 
