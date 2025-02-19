@@ -15,13 +15,13 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::dashboards::reports::{Report, ReportListFilters};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::models::reports::ListReportsResponseBody,
-    service::dashboards::reports,
+    handler::http::models::reports::responses::ListReportsResponseBody,
+    service::dashboards::reports::{self, ReportError},
 };
 
 /// CreateReport
@@ -223,9 +223,8 @@ async fn delete_report(path: web::Path<(String, String)>) -> Result<HttpResponse
     match reports::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report deleted")),
         Err(e) => match e {
-            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }
@@ -265,8 +264,8 @@ async fn enable_report(
     match reports::enable(&org_id, &name, enable).await {
         Ok(_) => Ok(MetaHttpResponse::json(resp)),
         Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }
@@ -295,8 +294,8 @@ async fn trigger_report(path: web::Path<(String, String)>) -> Result<HttpRespons
     match reports::trigger(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report triggered")),
         Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+            ReportError::ReportNotFound => Ok(MetaHttpResponse::not_found(e)),
+            e => Ok(MetaHttpResponse::internal_error(e)),
         },
     }
 }
