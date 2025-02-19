@@ -68,7 +68,7 @@ pub async fn test_action(
         return Ok(HttpResponse::Forbidden().body("Unauthorized Access"));
     }
 
-    let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span!(Level::TRACE, "test"));
+    let trace_id = get_or_create_trace_id(&HeaderMap::new(), &span!(Level::TRACE, "action_test"));
     match trigger_action(
         &trace_id,
         &org_id,
