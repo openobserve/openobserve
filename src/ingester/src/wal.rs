@@ -21,7 +21,7 @@ use std::{
 };
 
 use async_walkdir::WalkDir;
-use config::utils::schema::infer_json_schema_from_values;
+use config::{metrics, utils::schema::infer_json_schema_from_values};
 use futures::StreamExt;
 use snafu::ResultExt;
 
@@ -112,7 +112,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         return Ok(());
     }
     for wal_file in wal_files.iter() {
-        log::warn!("starting replay wal file: {:?}", wal_file);
+        log::warn!("replay wal file: {:?} starting...", wal_file);
         let file_str = wal_file
             .strip_prefix(&wal_dir)
             .unwrap()
@@ -194,30 +194,37 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
             memtable.write(infer_schema, entry, batch)?;
         }
-        log::warn!(
-            "replay wal file: {:?}, entries: {}, records: {}",
-            wal_file,
-            i,
-            total
-        );
 
-        let mut w = immutable::IMMUTABLES.write().await;
-        w.insert(
-            wal_file.to_owned(),
-            Arc::new(immutable::Immutable::new(idx, key, memtable)),
-        );
-        drop(w);
-
-        // to avoid the memory OOM, sleep for a while after reply one wal file
-        loop {
-            match check_memtable_size() {
-                Ok(_) => break,
-                Err(_) => {
-                    log::warn!("replay wal file: memtable size is too large, sleep for a while");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
+        // directly dump the memtable to disk
+        let start = std::time::Instant::now();
+        let wal_path = wal_file.to_owned();
+        let immutable = immutable::Immutable::new(idx, key, memtable);
+        let stat = match immutable.persist(&wal_path).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("persist wal file: {:?} to disk error: {}", wal_file, e);
+                continue;
             }
-        }
+        };
+
+        // update metrics
+        metrics::INGEST_MEMTABLE_BYTES
+            .with_label_values(&[])
+            .sub(stat.json_size);
+        metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values(&[])
+            .sub(stat.arrow_size as i64);
+        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+
+        log::warn!(
+            "replay wal file: {:?} done, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+            wal_path.to_string_lossy(),
+            stat.json_size,
+            stat.arrow_size,
+            stat.file_num,
+            stat.batch_num,
+            start.elapsed().as_millis(),
+        );
     }
 
     Ok(())
