@@ -1163,6 +1163,7 @@ export const convertSQLData = async (
     if (!breakDownKey) return [];
 
     // Extract unique values for the second x-axis key
+    // NOTE: while filter, we can't compare type as well because set will have string values
     const uniqueValues = [
       ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
     ].filter((value: any) => value != null || value != undefined);
@@ -1251,7 +1252,7 @@ export const convertSQLData = async (
       color:
         getSeriesColor(
           panelSchema.config.color,
-          seriesName?.toString(),
+          yAxisName?.toString(),
           seriesData,
           chartMin,
           chartMax,
