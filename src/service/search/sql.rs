@@ -1711,4 +1711,173 @@ mod tests {
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
     }
+
+    // ... existing code ...
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_convert_histogram_interval_abbreviations() {
+            // Test abbreviated formats
+            assert_eq!(convert_histogram_interval_to_seconds("1s").unwrap(), 1);
+            assert_eq!(convert_histogram_interval_to_seconds("5m").unwrap(), 300);
+            assert_eq!(convert_histogram_interval_to_seconds("2h").unwrap(), 7200);
+            assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
+            assert_eq!(convert_histogram_interval_to_seconds("1w").unwrap(), 604800);
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1M").unwrap(),
+                2592000
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1y").unwrap(),
+                31536000
+            );
+        }
+
+        #[test]
+        fn test_convert_histogram_interval_full_words() {
+            // Test full word formats
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 second").unwrap(),
+                1
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 seconds").unwrap(),
+                1
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("5 minute").unwrap(),
+                300
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("5 minutes").unwrap(),
+                300
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("2 hour").unwrap(),
+                7200
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("2 hours").unwrap(),
+                7200
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 day").unwrap(),
+                86400
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 days").unwrap(),
+                86400
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 week").unwrap(),
+                604800
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 weeks").unwrap(),
+                604800
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 month").unwrap(),
+                2592000
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 months").unwrap(),
+                2592000
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 year").unwrap(),
+                31536000
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1 years").unwrap(),
+                31536000
+            );
+        }
+
+        #[test]
+        fn test_convert_histogram_interval_spacing_variants() {
+            // Test different spacing formats
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10second").unwrap(),
+                10
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10 second").unwrap(),
+                10
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10  second").unwrap(),
+                10
+            ); // double space
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10\tsecond").unwrap(),
+                10
+            ); // tab
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10seconds").unwrap(),
+                10
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("10 seconds").unwrap(),
+                10
+            );
+        }
+
+        #[test]
+        fn test_convert_histogram_interval_larger_numbers() {
+            // Test larger numbers
+            assert_eq!(
+                convert_histogram_interval_to_seconds("60 seconds").unwrap(),
+                60
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("90 minutes").unwrap(),
+                5400
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("24 hours").unwrap(),
+                86400
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("30 days").unwrap(),
+                2592000
+            );
+            assert_eq!(
+                convert_histogram_interval_to_seconds("52 weeks").unwrap(),
+                31449600
+            );
+        }
+
+        #[test]
+        fn test_convert_histogram_interval_invalid_inputs() {
+            // Test invalid inputs
+            assert!(convert_histogram_interval_to_seconds("").is_err());
+            assert!(convert_histogram_interval_to_seconds("invalid").is_err());
+            assert!(convert_histogram_interval_to_seconds("5x").is_err());
+            assert!(convert_histogram_interval_to_seconds("s").is_err());
+            assert!(convert_histogram_interval_to_seconds("-1s").is_err());
+            assert!(convert_histogram_interval_to_seconds("1.5 seconds").is_err());
+            assert!(convert_histogram_interval_to_seconds("second").is_err());
+            assert!(convert_histogram_interval_to_seconds(" 5 seconds").is_err()); // leading space
+            assert!(convert_histogram_interval_to_seconds("5 seconds ").is_err()); // trailing space
+            assert!(convert_histogram_interval_to_seconds("five seconds").is_err());
+        }
+
+        #[test]
+        fn test_convert_histogram_interval_edge_cases() {
+            // Test edge cases
+            assert_eq!(
+                convert_histogram_interval_to_seconds("0 seconds").unwrap(),
+                0
+            );
+            assert_eq!(convert_histogram_interval_to_seconds("0s").unwrap(), 0);
+            assert_eq!(
+                convert_histogram_interval_to_seconds("1000000 seconds").unwrap(),
+                1000000
+            );
+        }
+    }
 }
