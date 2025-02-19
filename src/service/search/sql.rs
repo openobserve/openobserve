@@ -36,7 +36,6 @@ use infra::{
         SchemaCache,
     },
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
@@ -1409,14 +1408,16 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
-    let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
-        return Err(Error::Message("Invalid interval format".to_string()));
-    };
+    let (num, unit) = interval
+        .find(|c: char| !c.is_numeric())
+        .map(|pos| interval.split_at(pos))
+        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+
     let seconds = match unit.to_lowercase().as_str() {
-        "second" | "seconds" => num.parse::<i64>(),
-        "minute" | "minutes" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" => num.parse::<i64>().map(|n| n * 86400),
+        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
+        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
+        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
+        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
         _ => {
             return Err(Error::Message(
                 "Unsupported histogram interval unit".to_string(),
