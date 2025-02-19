@@ -6165,6 +6165,7 @@ dependencies = [
  "lettre",
  "log",
  "maxminddb",
+ "memchr",
  "memory-stats",
  "mimalloc",
  "object_store",
