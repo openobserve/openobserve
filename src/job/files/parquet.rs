@@ -740,7 +740,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+        "[INGESTER:JOB:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -999,7 +999,7 @@ pub(crate) async fn generate_index_on_ingester(
     .await;
 
     log::info!(
-        "[INGESTER:JOB] Written index wal file successfully, took: {} ms",
+        "[INGESTER:JOB] Written index data successfully, took: {} ms",
         start.elapsed().as_millis(),
     );
 
@@ -1113,7 +1113,7 @@ pub(crate) async fn generate_index_on_compactor(
     .await?;
 
     log::info!(
-        "[COMPACT:JOB] generate index successfully, data file: {}, index files: {:?}, took: {} ms",
+        "[COMPACT:JOB] generated parquet index file: {}, index files: {:?}, took: {} ms",
         new_file_key,
         files.iter().map(|(k, _)| k).collect::<Vec<_>>(),
         start.elapsed().as_millis(),
@@ -1392,7 +1392,7 @@ pub(crate) async fn create_tantivy_index(
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
         Ok(_) => {
             log::info!(
-                "{} Written tantivy index file successfully: {}, index size {}, took: {} ms",
+                "{} generated tantivy index file: {}, size {}, took: {} ms",
                 caller,
                 idx_file_name,
                 index_size,
@@ -1401,7 +1401,7 @@ pub(crate) async fn create_tantivy_index(
         }
         Err(e) => {
             log::error!(
-                "{} Written tantivy index file error: {}",
+                "{} generated tantivy index file error: {}",
                 caller,
                 e.to_string()
             );
