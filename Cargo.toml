@@ -112,7 +112,6 @@ jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
 memchr.workspace = true
-memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
@@ -218,7 +217,7 @@ report_server = { path = "src/report_server" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
-actix-web-prometheus = { version = "0.1", features = ["process"] }
+actix-web-prometheus = "0.1"
 actix-tls = { version = "3.4", features = [
     "connect",
     "uri",
