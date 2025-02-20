@@ -177,6 +177,14 @@ pub async fn handle_text_message(
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             match client_msg {
+                WsClientEvents::Close => {
+                    log::info!("[WS_HANDLER] Client requested close via text message");
+                    let close_reason = CloseReason {
+                        code: CloseCode::Normal,
+                        description: Some("Client requested close".to_string()),
+                    };
+                    cleanup_and_close_session(req_id, Some(close_reason)).await;
+                }
                 WsClientEvents::Search(ref search_req) => {
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }

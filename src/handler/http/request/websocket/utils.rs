@@ -173,21 +173,23 @@ pub enum WsClientEvents {
     Benchmark {
         id: String,
     },
+    Close,
 }
 
 impl WsClientEvents {
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("Failed to serialize WsClientEvents")
-    }
-
     pub fn get_type(&self) -> String {
         match self {
             WsClientEvents::Search(_) => "search",
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
+            WsClientEvents::Close => "close",
         }
         .to_string()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Failed to serialize WsClientEvents")
     }
 }
 
