@@ -208,10 +208,13 @@ pub async fn handle_text_message(
         Ok(client_msg) => {
             match client_msg {
                 WsClientEvents::Close => {
-                    log::info!("[WS_HANDLER] Client requested close via text message");
+                    log::info!(
+                        "[WS_HANDLER] req_id: {} client requested close via text message",
+                        req_id
+                    );
                     let close_reason = CloseReason {
                         code: CloseCode::Normal,
-                        description: Some("Client requested close".to_string()),
+                        description: Some(format!("[req_id: {}] client close", req_id)),
                     };
                     cleanup_and_close_session(req_id, Some(close_reason)).await;
                 }
