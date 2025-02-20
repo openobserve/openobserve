@@ -43,6 +43,7 @@ pub mod syslog;
 pub mod traces;
 pub mod users;
 pub mod websocket;
+pub mod ratelimit;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

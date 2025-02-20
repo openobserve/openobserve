@@ -47,6 +47,8 @@ pub mod syslogs_route;
 pub mod tls;
 pub mod traces;
 pub mod users;
+#[cfg(feature = "enterprise")]
+pub mod ratelimit;
 
 // format stream name
 pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
