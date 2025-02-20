@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::{errors::Error, table::ratelimit::RatelimitRule};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use infra::errors::Error;
-use infra::table::ratelimit::RatelimitRule;
-
 
 pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
     log::debug!(

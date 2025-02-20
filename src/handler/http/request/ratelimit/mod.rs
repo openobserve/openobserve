@@ -14,12 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::io::Error;
-use actix_web::{post, http, web, HttpRequest, HttpResponse, delete, put};
+
+use actix_web::{delete, http, post, put, web, HttpRequest, HttpResponse};
 use config::ider;
 use infra::table::ratelimit::RatelimitRule;
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-use crate::service::ratelimit;
-use crate::service::ratelimit::rule::RatelimitError;
+
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    service::{ratelimit, ratelimit::rule::RatelimitError},
+};
 
 impl From<RatelimitError> for HttpResponse {
     fn from(value: RatelimitError) -> Self {
@@ -29,7 +32,6 @@ impl From<RatelimitError> for HttpResponse {
         }
     }
 }
-
 
 #[utoipa::path(
     context_path = "/api",
@@ -58,15 +60,14 @@ pub async fn save_ratelimit(
     rr.resource = rr.resource.trim().to_string();
     rr.org = org_id;
     rr.rule_id = Some(ider::generate());
-    match ratelimit::rule::save(rr).await {
+    match ratelimit::rule::save(rr.clone()).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
-            "Ratelimit rule created successfully".to_string(),
+            serde_json::to_string(&rr)?,
         ))),
         Err(e) => Ok(e.into()),
     }
 }
-
 
 #[utoipa::path(
     context_path = "/api",

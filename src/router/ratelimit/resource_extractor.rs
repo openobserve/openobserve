@@ -15,8 +15,11 @@
 
 use actix_web::dev::ServiceRequest;
 use futures_util::future::BoxFuture;
-use crate::common::utils::auth::extract_auth_str;
-use crate::handler::http::auth::validator::get_user_email_from_auth_str;
+
+use crate::{
+    common::utils::auth::extract_auth_str,
+    handler::http::auth::validator::get_user_email_from_auth_str,
+};
 
 pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, String> {
     let auth_str = extract_auth_str(req.request());
@@ -32,7 +35,9 @@ pub fn default_extractor(req: &ServiceRequest) -> BoxFuture<'_, String> {
     let (path, org_id) = (path.to_string(), path_columns[0].to_string());
 
     Box::pin(async move {
-        let user_email = get_user_email_from_auth_str(&auth_str).await.unwrap_or_default();
+        let user_email = get_user_email_from_auth_str(&auth_str)
+            .await
+            .unwrap_or_default();
         format!("{}:{}:{}", org_id, user_email, path)
     })
 }

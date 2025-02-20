@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::future::Future;
+
 use anyhow::Context;
 use infra::table::ratelimit::RatelimitRule;
 use o2_enterprise::enterprise::super_cluster::queue_item::ratelimit::{
-    ratelimit_rule_put, ratelimit_rule_update, ratelimit_rule_delete, SUPER_CLUSTER_TOPIC_RATELIMIT
+    ratelimit_rule_delete, ratelimit_rule_put, ratelimit_rule_update, SUPER_CLUSTER_TOPIC_RATELIMIT,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -93,7 +94,9 @@ async fn sync_to_super_cluster(
         rule.rule_id.clone().unwrap_or("".to_string()),
     );
 
-    operation.execute_cluster_operation(key, value_vec.into()).await
+    operation
+        .execute_cluster_operation(key, value_vec.into())
+        .await
 }
 
 pub async fn save(rule: RatelimitRule) -> Result<(), RatelimitError> {
@@ -101,7 +104,8 @@ pub async fn save(rule: RatelimitRule) -> Result<(), RatelimitError> {
         rule.clone(),
         RuleOperation::Save,
         infra::table::ratelimit::add(rule),
-    ).await
+    )
+    .await
 }
 
 pub async fn update(rule: RatelimitRule) -> Result<(), RatelimitError> {
@@ -109,7 +113,8 @@ pub async fn update(rule: RatelimitRule) -> Result<(), RatelimitError> {
         rule.clone(),
         RuleOperation::Update,
         infra::table::ratelimit::update(rule),
-    ).await
+    )
+    .await
 }
 
 pub async fn delete(rule: RatelimitRule) -> Result<(), RatelimitError> {
@@ -117,5 +122,6 @@ pub async fn delete(rule: RatelimitRule) -> Result<(), RatelimitError> {
         rule.clone(),
         RuleOperation::Delete,
         infra::table::ratelimit::delete(rule),
-    ).await
+    )
+    .await
 }

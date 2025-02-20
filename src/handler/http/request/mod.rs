@@ -31,6 +31,8 @@ pub mod metrics;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
+#[cfg(feature = "enterprise")]
+pub mod ratelimit;
 pub mod rum;
 #[cfg(feature = "enterprise")]
 pub mod script_server;
@@ -43,8 +45,6 @@ pub mod syslog;
 pub mod traces;
 pub mod users;
 pub mod websocket;
-#[cfg(feature = "enterprise")]
-pub mod ratelimit;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
