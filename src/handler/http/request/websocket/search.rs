@@ -577,7 +577,7 @@ async fn process_delta(
         // Check if the cancellation flag is set
         if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id) {
             if is_cancelled {
-                // Handle cancellation
+                // Search is cancelled, stop processing
                 return Ok(());
             }
         } else {
