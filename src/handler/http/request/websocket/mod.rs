@@ -67,3 +67,10 @@ pub async fn websocket(
 
     Ok(res)
 }
+
+/// Initialize the job init for websocket
+pub async fn init() -> Result<(), anyhow::Error> {
+    // Run the garbage collector for websocket sessions
+    sessions_cache_utils::run_gc_ws_sessions().await;
+    Ok(())
+}

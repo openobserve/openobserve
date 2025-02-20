@@ -88,9 +88,79 @@ pub mod enterprise_utils {
 }
 
 pub mod sessions_cache_utils {
+    use actix_ws::{CloseCode, CloseReason};
+    use config::get_config;
+    use futures::FutureExt;
+
     use crate::{
         common::infra::config::WS_SESSIONS, handler::http::request::websocket::session::WsSession,
     };
+
+    pub async fn run_gc_ws_sessions() {
+        log::info!("[WS_GC] Running garbage collector for websocket sessions");
+        let cfg = get_config();
+        let interval_secs = cfg.common.websocket_session_gc_interval_secs;
+
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(interval_secs as u64));
+
+        tokio::spawn(async move {
+            loop {
+                interval.tick().await;
+                log::info!("[WS_GC] Running garbage collector for websocket sessions");
+
+                // Use catch_unwind to prevent task from crashing
+                if let Err(e) = std::panic::AssertUnwindSafe(cleanup_expired_sessions())
+                    .catch_unwind()
+                    .await
+                {
+                    log::error!("[WS_GC] Panic in cleanup: {:?}", e);
+                    // Add delay before next attempt
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    continue;
+                }
+
+                // Add delay between runs if too many sessions
+                if WS_SESSIONS.len() > 1000 {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            }
+        });
+    }
+
+    async fn cleanup_expired_sessions() {
+        let expired: Vec<String> = WS_SESSIONS
+            .iter()
+            .filter(|entry| entry.value().is_expired())
+            .map(|entry| entry.key().clone())
+            .collect();
+
+        for session_id in expired {
+            if let Some(mut session) = get_mut_session(&session_id) {
+                log::info!("[WS_GC] Closing expired session: {}", session_id);
+
+                // Send close frame to router
+                if let Err(e) = session
+                    .close(Some(CloseReason {
+                        code: CloseCode::Normal,
+                        description: Some("Session expired".to_string()),
+                    }))
+                    .await
+                {
+                    log::warn!("[WS_GC] Error closing session {}: {}", session_id, e);
+                }
+
+                log::info!("[WS_GC] Closed expired session: {}", session_id);
+            }
+
+            // Remove from sessions cache
+            remove_session(&session_id);
+            log::info!("[WS_GC] Removed expired session: {}", session_id);
+        }
+
+        // Log remaining sessions count
+        log::info!("[WS_GC] Remaining active sessions: {}", len_sessions());
+    }
 
     /// Insert a new session into the cache
     pub fn insert_session(session_id: &str, session: WsSession) {

@@ -967,6 +967,15 @@ pub struct Common {
     pub websocket_enabled: bool,
     #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
     pub websocket_close_frame_delay: u64, // in milliseconds
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
+    pub websocket_session_idle_timeout_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]
+    pub websocket_session_max_lifetime_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
+    pub websocket_session_gc_interval_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 5)]
+    pub websocket_ping_interval_secs: i64,
+
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 300,

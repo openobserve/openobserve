@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
 use config::{
@@ -47,15 +49,41 @@ pub static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashM
 // Do not clone the session, instead use a reference to the session
 pub struct WsSession {
     inner: Option<Session>,
+    // Utc timestamp in microseconds
+    last_activity_ts: i64,
+    // Utc timestamp in microseconds
+    created_ts: i64,
 }
 
 impl WsSession {
     pub fn new(inner: Session) -> Self {
-        Self { inner: Some(inner) }
+        let now = chrono::Utc::now().timestamp_micros();
+        Self {
+            inner: Some(inner),
+            last_activity_ts: now,
+            created_ts: now,
+        }
+    }
+
+    pub fn update_activity(&mut self) {
+        self.last_activity_ts = chrono::Utc::now().timestamp_micros();
+    }
+
+    pub fn is_expired(&self) -> bool {
+        let cfg = get_config();
+        let now = chrono::Utc::now().timestamp_micros();
+        let idle_timeout_micros = cfg.common.websocket_session_idle_timeout_secs * 1_000_000;
+        let max_lifetime_micros = cfg.common.websocket_session_max_lifetime_secs * 1_000_000;
+
+        // 1. if the session has been idle for too long
+        // 2. if the session has exceeded the max lifetime
+        (now - self.last_activity_ts) > idle_timeout_micros
+            || (now - self.created_ts) > max_lifetime_micros
     }
 
     /// Send a text message to the client
     pub async fn text(&mut self, msg: String) -> Result<(), actix_ws::Closed> {
+        self.update_activity();
         if let Some(ref mut session) = self.inner {
             session.text(msg).await
         } else {
@@ -65,6 +93,7 @@ impl WsSession {
 
     /// Close the session with a reason
     pub async fn close(&mut self, reason: Option<CloseReason>) -> Result<(), actix_ws::Closed> {
+        self.update_activity();
         if let Some(session) = self.inner.take() {
             session.close(reason).await
         } else {
@@ -74,6 +103,7 @@ impl WsSession {
 
     /// Send a pong response
     pub async fn pong(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
+        self.update_activity();
         if let Some(ref mut session) = self.inner {
             session.pong(payload).await
         } else {
@@ -81,7 +111,9 @@ impl WsSession {
         }
     }
 
+    /// Send a ping request
     pub async fn ping(&mut self, payload: &[u8]) -> Result<(), actix_ws::Closed> {
+        self.update_activity();
         if let Some(ref mut session) = self.inner {
             session.ping(payload).await
         } else {
@@ -98,41 +130,31 @@ pub async fn run(
     path: String,
 ) {
     let cfg = get_config();
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(
+        cfg.common.websocket_ping_interval_secs as u64,
+    ));
     let mut close_reason: Option<CloseReason> = None;
 
     loop {
         tokio::select! {
             Some(msg) = msg_stream.next() => {
+                // Update activity on any message
+                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                    session.update_activity();
+                }
+
                 match msg {
                     Ok(actix_ws::Message::Ping(bytes)) => {
-                        let mut session = if let Some(session) =
-                                    sessions_cache_utils::get_mut_session(&req_id)
-                                {
-                                    session
-                                } else {
-                                    log::error!(
-                                        "[WS_HANDLER]: req_id: {} session not found",
-                                        req_id
-                                    );
-                                    return;
-                                };
-                        if session.pong(&bytes).await.is_err() {
-                            log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
-                            break;
-                        }
+                        let mut session = sessions_cache_utils::get_mut_session(&req_id).unwrap();
+                        session.pong(&bytes).await.unwrap();
                     }
-                    // handle pong as well
-                    Ok(actix_ws::Message::Pong(bytes)) => {
-                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received pong {:?}",
-                            req_id,
-                            cfg.common.node_role,
-                            bytes
-                        );
+                    Ok(actix_ws::Message::Pong(_)) => {
+                        log::debug!("[WS_HANDLER] Received pong from {}", req_id);
                     }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
                             req_id,
-                            cfg.common.node_role,
+                            get_config().common.node_role,
                             msg
                         );
                         handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
@@ -143,12 +165,12 @@ pub async fn run(
                                 CloseCode::Normal | CloseCode::Error => {
                                     log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
                                         req_id,
-                                        cfg.common.node_role,
+                                        get_config().common.node_role,
                                         reason
                                     );
                                 },
                                 _ => {
-                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,cfg.common.node_role,reason);
+                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,get_config().common.node_role,reason);
                                 },
                             }
                         }
@@ -156,6 +178,15 @@ pub async fn run(
                         break;
                     }
                     _ => ()
+                }
+            }
+            // Heartbeat to keep the connection alive
+            _ = ping_interval.tick() => {
+                if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                    if let Err(e) = session.ping(&[]).await {
+                        log::error!("[WS_HANDLER] Failed to send ping: {}", e);
+                        break;
+                    }
                 }
             }
         }
