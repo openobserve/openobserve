@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-            v-if="props.row.enableDelete"
+            v-if="props.row.enableDelete && props.row.status != 'pending'"
             :icon="outlinedDelete"
             :title="t('user.delete')"
             class="q-ml-xs"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit"
+            v-if="props.row.enableEdit && props.row.status != 'pending'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -355,6 +355,31 @@ export default defineComponent({
         });
     };
 
+    const getInvitedMembers = () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading users...",
+      });
+
+      return new Promise((resolve, reject) => {
+        usersService
+          .invitedUsers(store.state.selectedOrganization.identifier)
+          .then((res) => {
+            if(res.status == 200) {
+              dismiss();
+              resolve(res.data);
+            } else {
+              dismiss();
+              resolve([]);
+            }
+          })
+          .catch(() => {
+            dismiss();
+            reject([]);
+          });
+      });
+    }
+
     const getOrgMembers = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -364,11 +389,19 @@ export default defineComponent({
       return new Promise((resolve, reject) => {
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
-          .then((res) => {
+          .then(async (res) => {
             resultTotal.value = res.data.data.length;
+            let users = [...res.data.data];
+
+            if (config.isCloud) {
+              const invitedMembers: any = await getInvitedMembers();
+              resultTotal.value += invitedMembers.length;
+              users = [...res.data.data, ...invitedMembers];
+            }
+            
             let counter = 1;
             currentUserRole.value = "";
-            usersState.users = res.data.data.map((data: any) => {
+            usersState.users = users.map((data: any) => {
               if (store.state.userInfo.email == data.email) {
                 currentUserRole.value = data.role;
                 isCurrentUserInternal.value = !data.is_external;
@@ -383,22 +416,11 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data.role,
-                // member_created: date.formatDate(
-                //   parseInt(data.member_created),
-                //   "YYYY-MM-DDTHH:mm:ssZ",
-                // ),
-                // member_updated: date.formatDate(
-                //   parseInt(data.member_updated),
-                //   "YYYY-MM-DDTHH:mm:ssZ",
-                // ),
-                // org_member_id: data.org_member_id,
-                // isLoggedinUser: store.state.userInfo.email == data.email,
-                // isExternal: !!data.is_external,
+                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
                 enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud ? true : false,
-                // status: data.status,
+                status: data?.status,
               };
             });
 

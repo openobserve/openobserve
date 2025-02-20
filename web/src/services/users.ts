@@ -68,6 +68,9 @@ const users = {
   },
   getUserRoles:(orgId:any, userEmail:any) => {
     return http().get(`api/${orgId}/users/${userEmail}/roles`);
+  },
+  invitedUsers: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/invites`);
   }
 };
 

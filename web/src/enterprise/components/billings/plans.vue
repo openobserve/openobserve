@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <q-btn
-          v-if="listSubscriptionResponse.hasOwnProperty('card')"
+          v-if="currentPlanDetail?.customer_id"
           class="q-ml-md q-mb-xs text-bold"
           outline
           padding="sm lg"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('billing.manageCards')"
           @click="
             onChangePaymentDetail(
-              listSubscriptionResponse.card.gateway_account_id,
+              currentPlanDetail.customer_id
             )
           "
         />
@@ -243,15 +243,17 @@ export default defineComponent({
           });
         });
     },
-    onChangePaymentDetail(gatewayId: string) {
-      this.changePayment = true;
-      BillingService.change_payment_detail(
+    onChangePaymentDetail(customer_id: string) {
+      BillingService.get_session_url(
         this.store.state.selectedOrganization.identifier,
-        gatewayId,
+        customer_id,
       )
         .then((res) => {
-          this.updatePaymentResponse = res.data.data.hosted_page;
-          setInterval(this.retrieveHostedPage, 5000);
+          // this.updatePaymentResponse = res.data.data.url;
+          // setInterval(this.retrieveHostedPage, 5000);
+          if(res.data?.data?.url) {
+            window.location.href = res.data.data.url;
+          }
         })
         .catch((e) => {
           this.$q.notify({
