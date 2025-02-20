@@ -13,8 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sysinfo::{CpuExt, SystemExt};
+use sysinfo::{CpuExt, ProcessExt, SystemExt};
 
+// Get number of CPUs
+pub fn get_cpu_num() -> usize {
+    let mut system = sysinfo::System::new();
+    system.refresh_cpu();
+    system.cpus().len()
+}
+
+// Get average CPU usage
 pub fn get_cpu_usage() -> f32 {
     let mut system = sysinfo::System::new();
     system.refresh_cpu();
@@ -24,6 +32,19 @@ pub fn get_cpu_usage() -> f32 {
     }
     let total_usage = cpus.iter().map(|cpu| cpu.cpu_usage()).sum::<f32>();
     total_usage / cpus.len() as f32
+}
+
+// Get process CPU usage
+pub fn get_process_cpu_usage() -> f32 {
+    let Ok(pid) = sysinfo::get_current_pid() else {
+        return 0.0;
+    };
+    let mut system = sysinfo::System::new();
+    system.refresh_process(pid);
+    system
+        .process(pid)
+        .map(|p| p.cpu_usage() as f32)
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

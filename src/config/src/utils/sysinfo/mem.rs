@@ -15,12 +15,21 @@
 
 use sysinfo::{ProcessExt, SystemExt};
 
+// Get total memory in bytes
+pub fn get_total_memory() -> usize {
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+    system.total_memory() as usize
+}
+
+// Get used memory in bytes
 pub fn get_memory_usage() -> usize {
     let mut system = sysinfo::System::new();
     system.refresh_memory();
     system.used_memory() as usize
 }
 
+// Get process memory usage in bytes
 pub fn get_process_memory_usage() -> usize {
     let Ok(pid) = sysinfo::get_current_pid() else {
         return 0;
@@ -33,6 +42,7 @@ pub fn get_process_memory_usage() -> usize {
         .unwrap_or_default()
 }
 
+// Get memory usage from memory stats
 pub fn get_memory_usage_from_memory_stats() -> usize {
     memory_stats::memory_stats()
         .map(|memory_stats| memory_stats.physical_mem)
