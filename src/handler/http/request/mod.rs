@@ -43,6 +43,7 @@ pub mod syslog;
 pub mod traces;
 pub mod users;
 pub mod websocket;
+#[cfg(feature = "enterprise")]
 pub mod ratelimit;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
