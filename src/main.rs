@@ -283,7 +283,7 @@ async fn main() -> Result<(), anyhow::Error> {
             };
 
             // init websocket gc
-            if cfg.common.websocket_enabled {
+            if cfg.websocket.enabled {
                 log::info!("Initializing WebSocket session garbage collector");
                 if let Err(e) = handler::http::request::websocket::init().await {
                     job_init_tx.send(false).ok();

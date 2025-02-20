@@ -99,7 +99,7 @@ pub mod sessions_cache_utils {
     pub async fn run_gc_ws_sessions() {
         log::info!("[WS_GC] Running garbage collector for websocket sessions");
         let cfg = get_config();
-        let interval_secs = cfg.common.websocket_session_gc_interval_secs;
+        let interval_secs = cfg.websocket.session_gc_interval_secs;
 
         let mut interval =
             tokio::time::interval(std::time::Duration::from_secs(interval_secs as u64));

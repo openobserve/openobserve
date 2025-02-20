@@ -32,7 +32,7 @@ pub async fn websocket(
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
 
-    if !cfg.common.websocket_enabled {
+    if !cfg.websocket.enabled {
         log::info!(
             "[WS_HANDLER]: Node Role: {} Websocket is disabled",
             cfg.common.node_role

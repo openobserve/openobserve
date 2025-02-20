@@ -72,8 +72,8 @@ impl WsSession {
     pub fn is_expired(&self) -> bool {
         let cfg = get_config();
         let now = chrono::Utc::now().timestamp_micros();
-        let idle_timeout_micros = cfg.common.websocket_session_idle_timeout_secs * 1_000_000;
-        let max_lifetime_micros = cfg.common.websocket_session_max_lifetime_secs * 1_000_000;
+        let idle_timeout_micros = cfg.websocket.session_idle_timeout_secs * 1_000_000;
+        let max_lifetime_micros = cfg.websocket.session_max_lifetime_secs * 1_000_000;
 
         // 1. if the session has been idle for too long
         // 2. if the session has exceeded the max lifetime
@@ -130,9 +130,8 @@ pub async fn run(
     path: String,
 ) {
     let cfg = get_config();
-    let mut ping_interval = tokio::time::interval(Duration::from_secs(
-        cfg.common.websocket_ping_interval_secs as u64,
-    ));
+    let mut ping_interval =
+        tokio::time::interval(Duration::from_secs(cfg.websocket.ping_interval_secs as u64));
     let mut close_reason: Option<CloseReason> = None;
 
     loop {
@@ -350,7 +349,7 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         // where the close frame (control frame) is treated as a data frame
         // and mal forms the data frame
         let cfg = get_config();
-        let interval = cfg.common.websocket_close_frame_delay;
+        let interval = cfg.websocket.close_frame_delay;
         if interval > 0 {
             tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
         }
