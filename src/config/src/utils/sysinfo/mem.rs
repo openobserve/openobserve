@@ -44,7 +44,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_memory_usage() {
+    fn test_sysinfo_get_memory_usage() {
         let memory_usage_v1 = get_process_memory_usage();
         let memory_usage_v2 = get_memory_usage_from_memory_stats();
         // the diff should be less than 1%
