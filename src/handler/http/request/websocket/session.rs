@@ -345,9 +345,8 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
-        // Experiment: sleep for the interval duration in milliseconds to avoid race condition
-        // where the close frame (control frame) is treated as a data frame
-        // and mal forms the data frame
+        // sleep for the interval duration in milliseconds to avoid race condition
+        // between the close frame (control frame) and the data frame
         let cfg = get_config();
         let interval = cfg.websocket.close_frame_delay;
         if interval > 0 {
