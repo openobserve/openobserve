@@ -66,6 +66,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     log::info!("Pulled {} jobs from scheduler", triggers.len());
 
+    if !triggers.is_empty() {
+        let mut grouped_triggers: std::collections::HashMap<
+            infra::scheduler::TriggerModule,
+            Vec<&infra::scheduler::Trigger>,
+        > = HashMap::new();
+
+        // Group triggers by module
+        for trigger in &triggers {
+            grouped_triggers
+                .entry(trigger.module.clone())
+                .or_default()
+                .push(trigger);
+        }
+
+        // Print counts for each module
+        for (module, triggers) in grouped_triggers {
+            log::info!("Pulled {:?}: {} jobs", module, triggers.len());
+        }
+    }
+
     let mut tasks = Vec::new();
     for trigger in triggers {
         let task = tokio::task::spawn(async move {

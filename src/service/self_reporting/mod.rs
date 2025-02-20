@@ -132,6 +132,7 @@ pub async fn report_request_usage_stats(
             result_cache_ratio: None,
             is_partial: stats.is_partial,
             work_group: None,
+            node_name: stats.node_name.clone(),
         });
     };
 
@@ -171,6 +172,7 @@ pub async fn report_request_usage_stats(
         result_cache_ratio: stats.result_cache_ratio,
         is_partial: stats.is_partial,
         work_group: stats.work_group,
+        node_name: stats.node_name,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

@@ -75,7 +75,9 @@ pub enum TriggerStatus {
     Completed,
 }
 
-#[derive(Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, sqlx::Type, PartialEq, Serialize, Deserialize, Default, Eq, std::hash::Hash,
+)]
 #[repr(i32)]
 pub enum TriggerModule {
     Report,
