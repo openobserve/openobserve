@@ -644,7 +644,6 @@ async fn get_cpu_and_mem_limit(
 
 #[cfg(feature = "enterprise")]
 fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
-    let cfg = get_config();
     let step = rule.step;
     let fields = schema
         .fields()
@@ -712,7 +711,6 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 #[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
@@ -724,7 +722,6 @@ fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
 
 #[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
         .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
