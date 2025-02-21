@@ -122,7 +122,7 @@ const removeHandler = (
 
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
-  if (socket && socket.readyState === WebSocket.OPEN) {
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     setTimeout(() => {
       sendMessage(socketId, JSON.stringify({ type: "close" }));
       socket.close(1000, "search cancelled");
@@ -149,7 +149,7 @@ const useWebSocket = () => {
     socket.onerror = null;
 
     // Close connection if still open
-    if (socket.readyState === WebSocket.OPEN) {
+    if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
       socket.close();
     }
 
