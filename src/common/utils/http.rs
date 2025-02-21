@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,25 +34,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 pub(crate) fn get_stream_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<StreamType>, Error> {
-    let stream_type = match query.get("type") {
-        Some(s) => match s.to_lowercase().as_str() {
-            "logs" => Some(StreamType::Logs),
-            "metrics" => Some(StreamType::Metrics),
-            "traces" => Some(StreamType::Traces),
-            "enrichment_tables" => Some(StreamType::EnrichmentTables),
-            "metadata" => Some(StreamType::Metadata),
-            "index" => Some(StreamType::Index),
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "'type' query param with value 'logs', 'metrics', 'traces', 'enrichment_table', 'metadata' or 'index' allowed",
-                ));
-            }
-        },
-        None => None,
-    };
-
-    Ok(stream_type)
+    Ok(query.get("type").map(|s| StreamType::from(s.as_str())))
 }
 
 #[inline(always)]
@@ -60,15 +42,8 @@ pub(crate) fn get_search_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Result<Option<SearchEventType>, Error> {
     let event_type = match query.get("search_type") {
-        Some(s) => match s.to_lowercase().as_str() {
-            "ui" => Some(SearchEventType::UI),
-            "dashboards" => Some(SearchEventType::Dashboards),
-            "reports" => Some(SearchEventType::Reports),
-            "alerts" => Some(SearchEventType::Alerts),
-            "values" => Some(SearchEventType::Values),
-            "rum" => Some(SearchEventType::RUM),
-            "derived_stream" => Some(SearchEventType::DerivedStream),
-            "search_job" => Some(SearchEventType::SearchJob),
+        Some(s) => match SearchEventType::try_from(s.as_str()) {
+            Ok(search_type) => Some(search_type),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,

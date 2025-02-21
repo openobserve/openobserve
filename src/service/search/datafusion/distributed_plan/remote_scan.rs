@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,10 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::{meta::search::ScanStats, utils::rand::generate_random_string};
+use config::{
+    meta::search::{ScanStats, SearchEventType},
+    utils::rand::generate_random_string,
+};
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -182,21 +185,36 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
 ) -> Result<SendableRecordBatchStream> {
+    let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
     let is_querier = remote_scan_node.is_querier(partition);
+    let search_type = remote_scan_node
+        .super_cluster_info
+        .search_event_type
+        .as_ref()
+        .and_then(|s| s.as_str().try_into().ok());
+    let mut timeout = remote_scan_node.search_infos.timeout;
+    if matches!(search_type, Some(SearchEventType::UI)) && !is_querier {
+        timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
+    }
+    if timeout == 0 {
+        timeout = cfg.limit.query_timeout;
+    }
 
     let mut request = remote_scan_node.get_flight_search_request(partition);
     request.set_job_id(generate_random_string(7));
     request.set_partition(partition);
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
         trace_id,
         &node.get_grpc_addr(),
+        search_type.unwrap_or(SearchEventType::UI),
         is_querier,
+        timeout,
         request.search_info.file_id_list.len(),
         request.search_info.idx_file_list.len(),
     );
@@ -211,7 +229,6 @@ async fn get_remote_batch(
         ticket: buf.clone().into(),
     });
 
-    let cfg = config::get_config();
     let org_id: MetadataValue<_> = org_id
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid org_id".to_string()))?;
@@ -240,11 +257,13 @@ async fn get_remote_batch(
             );
             DataFusionError::Internal("connect search node error".to_string())
         })?;
+
     let mut client =
         FlightServiceClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             req.metadata_mut()
                 .insert(org_header_key.clone(), org_id.clone());
+            req.set_timeout(std::time::Duration::from_secs(timeout));
             Ok(req)
         });
     client = client
