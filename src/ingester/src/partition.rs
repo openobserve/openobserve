@@ -142,7 +142,7 @@ impl Partition {
             if data.data.is_empty() {
                 continue;
             }
-            let chunk = data.data.chunks(1000);
+            let chunk = data.data.chunks(2000);
             for data in chunk.into_iter() {
                 let mut file_meta = FileMeta::default();
                 data.iter().for_each(|r| {
