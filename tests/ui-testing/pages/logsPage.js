@@ -535,12 +535,25 @@ async clickJobID () {
 
 }
 
+
+
  
 
 
-async searchSchedulerDropdownOption(option) {
-  await this.page.waitForSelector(`[data-test="search-scheduler-dropdown-btn-${option}"]`);
-  await this.page.locator(`[data-test="search-scheduler-dropdown-btn-${option}"]`).click();
+async searchSchedulerInvalid() {
+  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('100000000');
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
+  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
+  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
+}
+
+
+async validateInvalidData() {
+  await expect(this.page.locator('#q-notify')).toContainText('Job Scheduler should be between 1 and 100000');
+  
+  
 }
 
 }

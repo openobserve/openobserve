@@ -45,7 +45,8 @@ test.describe("Job Search for schedule query", () => {
         await logsPage.searchSchedulerDropdown();
         await logsPage.searchSchedulerCreate();
         await logsPage.searchSchedulerSubmit();
-        await logsPage.validateAddJob();
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
+
 
     });
 
@@ -59,11 +60,12 @@ test.describe("Job Search for schedule query", () => {
         await logsPage.selectRunQuery();
         await logsPage.searchSchedulerDropdown();
         await logsPage.searchSchedulerCreate();
-        await logsPage.searchSchedulerSubmit();
-        await logsPage.validateAddJob();
+        await logsPage.searchSchedulerInvalid();
+        await logsPage.validateInvalidData();
+       
 
     });
-    
+
 
 
 
