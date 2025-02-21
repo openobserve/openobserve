@@ -1670,13 +1670,13 @@ pub struct HealthCheck {
     pub enabled: bool,
     #[env_config(
         name = "ZO_HEALTH_CHECK_TIMEOUT",
-        default = 10,
+        default = 5,
         help = "Health check timeout in seconds"
     )]
     pub timeout: u64,
     #[env_config(
         name = "ZO_HEALTH_CHECK_FAILED_TIMES",
-        default = 5,
+        default = 3,
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
