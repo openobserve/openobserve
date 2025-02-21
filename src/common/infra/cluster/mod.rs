@@ -40,8 +40,8 @@ use once_cell::sync::Lazy;
 mod etcd;
 mod nats;
 
-const HEALTH_CHECK_FAILED_TIMES: usize = 5;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(10);
+const HEALTH_CHECK_FAILED_TIMES: usize = 3;
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
