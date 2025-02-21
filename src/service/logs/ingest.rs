@@ -787,7 +787,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         "region": resource_attributes.get("cloud.region").unwrap(),
                         "namespace": summary_attributes.get("Namespace").unwrap(),
                         "metric_name": summary_attributes.get("MetricName").unwrap(),
-                        TIMESTAMP_COL_NAME.to_string(): std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
+                        TIMESTAMP_COL_NAME: std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
                         "unit": m.unit,
                         "count": i_sum.count,
                         "sum": i_sum.sum,
