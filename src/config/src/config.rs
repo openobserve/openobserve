@@ -76,6 +76,7 @@ pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 // Used for storing and querying unflattened original data
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ID_COL_NAME: &str = "_o2_id";
+pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
@@ -625,8 +626,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
-    pub column_timestamp: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -1669,13 +1668,13 @@ pub struct HealthCheck {
     pub enabled: bool,
     #[env_config(
         name = "ZO_HEALTH_CHECK_TIMEOUT",
-        default = 10,
+        default = 5,
         help = "Health check timeout in seconds"
     )]
     pub timeout: u64,
     #[env_config(
         name = "ZO_HEALTH_CHECK_FAILED_TIMES",
-        default = 5,
+        default = 3,
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,

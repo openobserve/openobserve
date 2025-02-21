@@ -48,11 +48,11 @@ pub fn new_parquet_writer<'a>(
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
         .set_column_dictionary_enabled(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             false,
         )
         .set_column_encoding(
-            cfg.common.column_timestamp.as_str().into(),
+            TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
         );
     if write_metadata {
