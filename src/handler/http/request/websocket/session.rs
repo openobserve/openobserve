@@ -144,8 +144,15 @@ pub async fn run(
 
                 match msg {
                     Ok(actix_ws::Message::Ping(bytes)) => {
-                        let mut session = sessions_cache_utils::get_mut_session(&req_id).unwrap();
-                        session.pong(&bytes).await.unwrap();
+                        if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                            if let Err(e) = session.pong(&bytes).await {
+                                log::error!("[WS_HANDLER]: Failed to send pong: {}", e);
+                                break;
+                            }
+                        } else {
+                            log::error!("[WS_HANDLER]: Session not found for ping response");
+                            break;
+                        }
                     }
                     Ok(actix_ws::Message::Pong(_)) => {
                         log::debug!("[WS_HANDLER] Received pong from {}", req_id);
@@ -226,14 +233,14 @@ pub async fn handle_text_message(
                     // First handle the cancel event
                     // send a cancel flag to the search task
                     if let Err(e) = handle_cancel_event(&trace_id).await {
-                        log::warn!("[WS_HANDLER]: {}", e);
+                        log::warn!("[WS_HANDLER]: Error in cancelling : {}", e);
                         return;
                     }
 
                     log::info!(
-                        "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {}",
+                        "[WS_HANDLER]: trace_id: {}, Cancellation flag set to: {:?}",
                         trace_id,
-                        search_registry_utils::is_cancelled(&trace_id).unwrap_or(false)
+                        search_registry_utils::is_cancelled(&trace_id)
                     );
 
                     let res = search::handle_cancel(&trace_id, org_id).await;
@@ -394,7 +401,7 @@ async fn handle_search_event(
     org_id: &str,
     user_id: &str,
     req_id: &str,
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] 
     path: String,
 ) {
     let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
