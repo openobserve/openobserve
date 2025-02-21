@@ -25,7 +25,7 @@ use arrow_flight::{
     flight_service_client::FlightServiceClient, utils::flight_data_to_arrow_batch, FlightData,
     Ticket,
 };
-use arrow_schema::{Schema, SchemaRef};
+use arrow_schema::{Field, Schema, SchemaRef};
 use config::{
     meta::search::{ScanStats, SearchEventType},
     utils::rand::generate_random_string,
@@ -279,11 +279,16 @@ async fn get_remote_batch(
         is_querier,
     );
 
-    let mut stream = client
-        .do_get(request)
-        .await
-        .map_err(|e| DataFusionError::Execution(e.to_string()))?
-        .into_inner();
+    let mut stream = match client.do_get(request).await {
+        Ok(stream) => stream,
+        Err(e) => {
+            if e.code() == tonic::Code::Cancelled {
+                return Ok(get_empty_record_batch_stream(partial_err, e));
+            }
+            return Err(DataFusionError::Execution(e.to_string()));
+        }
+    }
+    .into_inner();
 
     let start = std::time::Instant::now();
 
@@ -323,6 +328,24 @@ async fn get_remote_batch(
         partial_err,
         start,
     )))
+}
+
+fn get_empty_record_batch_stream(
+    partial_err: Arc<Mutex<String>>,
+    e: tonic::Status,
+) -> SendableRecordBatchStream {
+    let mut guard = partial_err.lock();
+    let partial_err = guard.clone();
+    if partial_err.is_empty() {
+        guard.push_str(e.to_string().as_str());
+    } else {
+        guard.push_str(format!(" \n {}", e).as_str());
+    }
+
+    let fields: Vec<Field> = vec![];
+    let schema = Arc::new(Schema::new(fields));
+    let stream = futures::stream::pending::<Result<RecordBatch>>();
+    Box::pin(RecordBatchStreamAdapter::new(schema, stream))
 }
 
 struct FlightStream {
