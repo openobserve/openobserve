@@ -13,19 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sysinfo::{CpuExt, ProcessExt, SystemExt};
+use sysinfo::{CpuRefreshKind, ProcessRefreshKind, ProcessesToUpdate, RefreshKind};
 
 // Get number of CPUs
 pub fn get_cpu_num() -> usize {
     let mut system = sysinfo::System::new();
-    system.refresh_cpu();
+    system.refresh_cpu_list(CpuRefreshKind::nothing());
     system.cpus().len()
 }
 
 // Get average CPU usage
 pub fn get_cpu_usage() -> f32 {
-    let mut system = sysinfo::System::new();
-    system.refresh_cpu();
+    let mut system = sysinfo::System::new_with_specifics(
+        RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
+    );
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    system.refresh_cpu_usage();
     let cpus = system.cpus();
     if cpus.is_empty() {
         return 0.0;
@@ -35,15 +38,19 @@ pub fn get_cpu_usage() -> f32 {
 }
 
 // Get process CPU usage
+#[allow(dead_code)]
 pub fn get_process_cpu_usage() -> f32 {
     let Ok(pid) = sysinfo::get_current_pid() else {
         return 0.0;
     };
-    let mut system = sysinfo::System::new();
-    system.refresh_process(pid);
+    let mut system = sysinfo::System::new_with_specifics(
+        RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing().with_cpu()),
+    );
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
     system
         .process(pid)
-        .map(|p| p.cpu_usage() as f32)
+        .map(|p| p.cpu_usage())
         .unwrap_or_default()
 }
 
@@ -52,7 +59,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_sysinfo_get_cpu_num() {
+        assert!(get_cpu_num() > 0);
+    }
+
+    #[test]
     fn test_sysinfo_get_cpu_usage() {
         assert!(get_cpu_usage() > 0.0);
+    }
+
+    #[test]
+    fn test_sysinfo_get_process_cpu_usage() {
+        assert!(get_process_cpu_usage() >= 0.0);
     }
 }

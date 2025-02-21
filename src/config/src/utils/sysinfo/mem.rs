@@ -13,39 +13,53 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sysinfo::{ProcessExt, SystemExt};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind};
+
+pub struct MemoryStats {
+    pub total_memory: usize,
+    pub used_memory: usize,
+    pub free_memory: usize,
+}
+
+/// Get memory stats
+pub fn get_memory_stats() -> MemoryStats {
+    let mut system = sysinfo::System::new();
+    system.refresh_memory();
+    MemoryStats {
+        total_memory: system.total_memory() as usize,
+        used_memory: system.used_memory() as usize,
+        free_memory: system.free_memory() as usize,
+    }
+}
 
 // Get total memory in bytes
 pub fn get_total_memory() -> usize {
-    let mut system = sysinfo::System::new();
-    system.refresh_memory();
-    system.total_memory() as usize
+    get_memory_stats().total_memory
 }
 
 // Get used memory in bytes
 pub fn get_memory_usage() -> usize {
-    let mut system = sysinfo::System::new();
-    system.refresh_memory();
-    system.used_memory() as usize
+    get_memory_stats().used_memory
+}
+
+// Get free memory in bytes
+pub fn get_free_memory() -> usize {
+    get_memory_stats().free_memory
 }
 
 // Get process memory usage in bytes
+#[allow(dead_code)]
 pub fn get_process_memory_usage() -> usize {
     let Ok(pid) = sysinfo::get_current_pid() else {
         return 0;
     };
-    let mut system = sysinfo::System::new();
-    system.refresh_process(pid);
+    let mut system = sysinfo::System::new_with_specifics(
+        RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing().with_memory()),
+    );
+    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
     system
         .process(pid)
         .map(|p| p.memory() as usize)
-        .unwrap_or_default()
-}
-
-// Get memory usage from memory stats
-pub fn get_memory_usage_from_memory_stats() -> usize {
-    memory_stats::memory_stats()
-        .map(|memory_stats| memory_stats.physical_mem)
         .unwrap_or_default()
 }
 
@@ -54,20 +68,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_sysinfo_get_total_memory() {
+        assert!(get_total_memory() > 0);
+    }
+
+    #[test]
     fn test_sysinfo_get_memory_usage() {
-        let memory_usage_v1 = get_process_memory_usage();
-        let memory_usage_v2 = get_memory_usage_from_memory_stats();
-        // the diff should be less than 1%
-        let diff = if memory_usage_v1 > memory_usage_v2 {
-            memory_usage_v1 - memory_usage_v2
-        } else {
-            memory_usage_v2 - memory_usage_v1
-        };
-        let capp = memory_usage_v1 / 100;
-        println!("memory_usage: {}", memory_usage_v1);
-        println!("memory_stats: {}", memory_usage_v2);
-        println!("diff: {}", diff);
-        println!("capp: {}", capp);
-        assert!(diff <= capp);
+        assert!(get_memory_usage() > 0);
+    }
+
+    #[test]
+    fn test_sysinfo_get_process_memory_usage() {
+        assert!(get_process_memory_usage() > 0);
     }
 }

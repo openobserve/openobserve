@@ -40,7 +40,8 @@ use std::io::{BufRead, BufReader};
 /// 0A: LISTEN - The socket is listening for incoming connections.
 /// 0B: CLOSING - Both sockets are shut down, but not all data has been sent.
 #[derive(PartialEq)]
-pub enum TcpConnectionType {
+#[allow(dead_code)]
+pub enum TcpConnState {
     Established,
     SynSent,
     SynRecv,
@@ -56,7 +57,7 @@ pub enum TcpConnectionType {
 
 // only support linux for now
 #[cfg(target_os = "linux")]
-pub fn get_tcp_connection_num(state: Option<TcpConnectionType>) -> usize {
+pub fn get_tcp_connections(state: Option<TcpConnState>) -> usize {
     let Ok(file) = std::fs::File::open("/proc/net/tcp") else {
         return 0;
     };
@@ -85,25 +86,25 @@ pub fn get_tcp_connection_num(state: Option<TcpConnectionType>) -> usize {
 }
 
 #[cfg(target_os = "linux")]
-fn get_tcp_connection_state(state: &str) -> Option<TcpConnectionType> {
+fn get_tcp_connection_state(state: &str) -> Option<TcpConnState> {
     match state {
-        "01" => Some(TcpConnectionType::Established),
-        "02" => Some(TcpConnectionType::SynSent),
-        "03" => Some(TcpConnectionType::SynRecv),
-        "04" => Some(TcpConnectionType::FinWait1),
-        "05" => Some(TcpConnectionType::FinWait2),
-        "06" => Some(TcpConnectionType::TimeWait),
-        "07" => Some(TcpConnectionType::Close),
-        "08" => Some(TcpConnectionType::CloseWait),
-        "09" => Some(TcpConnectionType::LastAck),
-        "0A" => Some(TcpConnectionType::Listen),
-        "0B" => Some(TcpConnectionType::Closing),
+        "01" => Some(TcpConnState::Established),
+        "02" => Some(TcpConnState::SynSent),
+        "03" => Some(TcpConnState::SynRecv),
+        "04" => Some(TcpConnState::FinWait1),
+        "05" => Some(TcpConnState::FinWait2),
+        "06" => Some(TcpConnState::TimeWait),
+        "07" => Some(TcpConnState::Close),
+        "08" => Some(TcpConnState::CloseWait),
+        "09" => Some(TcpConnState::LastAck),
+        "0A" => Some(TcpConnState::Listen),
+        "0B" => Some(TcpConnState::Closing),
         _ => None,
     }
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn get_tcp_connection_num(_state: Option<TcpConnectionType>) -> usize {
+pub fn get_tcp_connections(_state: Option<TcpConnState>) -> usize {
     0
 }
 
@@ -113,18 +114,15 @@ mod tests {
 
     #[test]
     #[cfg(target_os = "linux")]
-    fn test_sysinfo_get_tcp_connection_num() {
-        assert!(get_tcp_connection_num(None) > 0);
-        assert!(get_tcp_connection_num(Some(TcpConnectionType::Established)) > 0);
+    fn test_sysinfo_get_tcp_connections() {
+        assert!(get_tcp_connections(None) > 0);
+        assert!(get_tcp_connections(Some(TcpConnState::Established)) > 0);
     }
 
     #[test]
     #[cfg(not(target_os = "linux"))]
-    fn test_sysinfo_get_tcp_connection_num() {
-        assert_eq!(get_tcp_connection_num(None), 0);
-        assert_eq!(
-            get_tcp_connection_num(Some(TcpConnectionType::Established)),
-            0
-        );
+    fn test_sysinfo_get_tcp_connections() {
+        assert_eq!(get_tcp_connections(None), 0);
+        assert_eq!(get_tcp_connections(Some(TcpConnState::Established)), 0);
     }
 }
