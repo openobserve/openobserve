@@ -1197,9 +1197,10 @@ impl VisitorMut for HistogramIntervalVistor {
                     self.interval =
                         Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
                 }
+                return ControlFlow::Break(());
             }
         }
-        ControlFlow::Break(())
+        ControlFlow::Continue(())
     }
 }
 
