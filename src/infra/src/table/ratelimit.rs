@@ -328,10 +328,10 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"INSERT INTO "rate_limit_rules" ("org", "rule_id", "rule_type", "resource", "threshold") VALUES ($1, $2, $3, $4, $5) RETURNING "rule_id""#,
+                r#"INSERT INTO "rate_limit_rules" ("rule_id", "org", "rule_type", "resource", "threshold") VALUES ($1, $2, $3, $4, $5) RETURNING "rule_id""#,
                 vec![
-                    rule.org.into(),
                     rule.rule_id.into(),
+                    rule.org.into(),
                     rule.rule_type.into(),
                     rule.resource.into(),
                     rule.threshold.into(),
