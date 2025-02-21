@@ -1,6 +1,6 @@
 // useWebSocket.ts
 
-import { onUnmounted } from "vue";
+import { onBeforeUnmount } from "vue";
 
 type MessageHandler = (event: MessageEvent) => void;
 type OpenHandler = (event: Event) => void;
@@ -132,7 +132,7 @@ const closeSocket = (socketId: string) => {
 
 // Composable
 const useWebSocket = () => {
-  onUnmounted(() => {
+  onBeforeUnmount(() => {
     for (const socketId in sockets) {
       const socket = sockets[socketId];
       if (socket) {
@@ -149,9 +149,7 @@ const useWebSocket = () => {
     socket.onerror = null;
 
     // Close connection if still open
-    if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CLOSING) {
-      socket.close();
-    }
+    closeSocket(socketId);
 
     // Clear intervals
     clearInterval(pingIntervals[socketId]);

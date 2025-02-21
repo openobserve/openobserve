@@ -1480,6 +1480,12 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+
+      // Reset cancel query on new search request initation
+      searchObj.data.isOperationCancelled = false;
+      searchObj.data.searchRequestTraceIds = [];
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds = [];
+
       // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
