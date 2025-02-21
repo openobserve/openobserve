@@ -59,7 +59,9 @@ pub async fn save_ratelimit(
     let mut rr = rule.into_inner();
     rr.resource = rr.resource.trim().to_string();
     rr.org = org_id;
-    rr.rule_id = Some(ider::generate());
+    if rr.rule_id.is_none() {
+        rr.rule_id = Some(ider::generate());
+    }
     match ratelimit::rule::save(rr.clone()).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),

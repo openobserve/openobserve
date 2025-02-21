@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::{errors::Error, table::ratelimit::RatelimitRule};
+use infra::{
+    errors::Error,
+    table::ratelimit::{RatelimitRule, RULE_EXISTS, RULE_NOT_FOUND},
+};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
@@ -29,14 +32,31 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
     let rule = RatelimitRule::try_from(&bytes)?;
 
     match msg.message_type {
-        MessageType::RatelimitAdd => {
-            infra::table::ratelimit::add(rule).await?;
-        }
-        MessageType::RatelimitUpdate => {
-            infra::table::ratelimit::update(rule).await?;
-        }
+        MessageType::RatelimitAdd => match infra::table::ratelimit::add(rule).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.to_string() == RULE_EXISTS => {
+                log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule already exists, ignoring");
+                Ok(())
+            }
+            Err(e) => Err(e),
+        },
+        MessageType::RatelimitUpdate => match infra::table::ratelimit::update(rule).await {
+            Ok(_) => Ok(()),
+            Err(e) if e.to_string() == RULE_NOT_FOUND => {
+                log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule not found for update, ignoring");
+                Ok(())
+            }
+            Err(e) => Err(e),
+        },
         MessageType::RatelimitDelete => {
-            infra::table::ratelimit::delete(rule).await?;
+            match infra::table::ratelimit::delete(rule.rule_id.unwrap()).await {
+                Ok(_) => Ok(()),
+                Err(e) if e.to_string() == RULE_NOT_FOUND => {
+                    log::warn!("[SUPER_CLUSTER:RATELIMIT] Rule not found for deletion, ignoring");
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
         }
         _ => {
             log::error!(
@@ -44,8 +64,7 @@ pub async fn process(msg: Message) -> Result<(), anyhow::Error> {
                 msg.message_type,
                 msg.key
             );
-            return Err(anyhow::anyhow!("Invalid message type".to_string()));
+            Err(anyhow::anyhow!("Invalid message type".to_string()))
         }
     }
-    Ok(())
 }

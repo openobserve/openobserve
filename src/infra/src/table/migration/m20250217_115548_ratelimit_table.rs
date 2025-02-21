@@ -30,20 +30,14 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
         .table(RateLimitRules::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(RateLimitRules::Id)
-                .big_integer()
-                .not_null()
-                .auto_increment()
-                .primary_key(),
+            ColumnDef::new(RateLimitRules::RuleId)
+                .string_len(256)
+                .primary_key()
+                .not_null(),
         )
         .col(
             ColumnDef::new(RateLimitRules::Org)
                 .string_len(100)
-                .not_null(),
-        )
-        .col(
-            ColumnDef::new(RateLimitRules::RuleId)
-                .string_len(256)
                 .not_null(),
         )
         .col(
@@ -64,8 +58,7 @@ fn create_ratelimit_table_statement() -> TableCreateStatement {
         )
         .col(
             ColumnDef::new(RateLimitRules::CreatedAt)
-                .timestamp()
-                .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
+                .big_integer()
                 .not_null(),
         )
         .to_owned()
@@ -84,7 +77,6 @@ fn create_ratelimit_rule_id_idx_stmnt() -> IndexCreateStatement {
 #[derive(DeriveIden)]
 enum RateLimitRules {
     Table,
-    Id,
     Org,
     RuleId,
     RuleType,

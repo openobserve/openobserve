@@ -6,14 +6,13 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "rate_limit_rules")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i64,
-    pub org: String,
     pub rule_id: String,
+    pub org: String,
     pub rule_type: String,
     pub resource: String,
     #[sea_orm(column_type = "Double")]
     pub threshold: f64,
-    pub created_at: Option<DateTime>,
+    pub created_at: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

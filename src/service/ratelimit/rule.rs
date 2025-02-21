@@ -121,7 +121,7 @@ pub async fn delete(rule: RatelimitRule) -> Result<(), RatelimitError> {
     handle_rule_operation(
         rule.clone(),
         RuleOperation::Delete,
-        infra::table::ratelimit::delete(rule),
+        infra::table::ratelimit::delete(rule.rule_id.unwrap()),
     )
     .await
 }

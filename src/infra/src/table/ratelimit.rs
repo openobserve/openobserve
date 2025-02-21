@@ -15,6 +15,7 @@
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
+use config::utils::time::now;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
     QuerySelect,
@@ -73,6 +74,8 @@ impl std::fmt::Display for RatelimitRuleType {
     }
 }
 
+pub const RULE_EXISTS: &str = "Rule already exists";
+pub const RULE_NOT_FOUND: &str = "Rule not found";
 pub async fn fetch_rules() -> Result<Vec<RatelimitRule>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
@@ -82,7 +85,7 @@ pub async fn fetch_rules() -> Result<Vec<RatelimitRule>, anyhow::Error> {
         .column(Column::RuleType)
         .column(Column::Resource)
         .column(Column::Threshold)
-        .order_by(Column::Id, Order::Desc);
+        .order_by(Column::CreatedAt, Order::Desc);
     let records = res
         .into_model::<RatelimitRule>()
         .all(client)
@@ -91,32 +94,55 @@ pub async fn fetch_rules() -> Result<Vec<RatelimitRule>, anyhow::Error> {
     Ok(records)
 }
 
-pub async fn add(rule: RatelimitRule) -> Result<(), anyhow::Error> {
+pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let active_rule = ActiveModel {
-        id: Default::default(),
-        org: Set(rule.org),
-        rule_id: Set(rule.rule_id.unwrap()),
-        rule_type: Set(rule
-            .rule_type
-            .unwrap_or(RatelimitRuleType::Exact.to_string())),
-        resource: Set(rule.resource),
-        threshold: Set(rule.threshold),
-        created_at: Default::default(),
-    };
-    let _ = match Entity::insert(active_rule)
-        .exec(client)
+    let res = Entity::find()
+        .select_only()
+        .column(Column::Org)
+        .column(Column::RuleId)
+        .column(Column::RuleType)
+        .column(Column::Resource)
+        .column(Column::Threshold)
+        .filter(Column::RuleId.eq(rule_id));
+    let record = res
+        .into_model::<RatelimitRule>()
+        .one(client)
         .await
-        .map_err(|e| anyhow!("DbError# {e}"))
-    {
-        Ok(res) => res,
-        Err(e) => {
-            return orm_err!(format!("add ratelimit rule error: {e}"))
-                .map_err(|e| anyhow!("DbError# {e}"))?
-        }
-    };
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(record)
+}
 
-    Ok(())
+pub async fn add(rule: RatelimitRule) -> Result<(), anyhow::Error> {
+    let rule_id = rule.rule_id.clone();
+    match fetch_rules_by_id(rule_id.unwrap().as_str()).await {
+        Ok(None) => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let active_rule = ActiveModel {
+                org: Set(rule.org),
+                rule_id: Set(rule.rule_id.unwrap()),
+                rule_type: Set(rule
+                    .rule_type
+                    .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                resource: Set(rule.resource),
+                threshold: Set(rule.threshold),
+                created_at: Set(now().timestamp()),
+            };
+            match Entity::insert(active_rule)
+                .exec(client)
+                .await
+                .map_err(|e| anyhow!("DbError# {e}"))
+            {
+                Ok(_) => Ok(()),
+                Err(e) => orm_err!(format!("Add ratelimit rule error: {e}"))
+                    .map_err(|e| anyhow!("DbError# {e}"))?,
+            }
+        }
+        Ok(Some(_)) => Err(anyhow::anyhow!(RULE_EXISTS)),
+        Err(e) => {
+            log::error!("Add Rule Error fetching rule: {:?}", e.to_string());
+            Err(anyhow::anyhow!(e.to_string()))
+        }
+    }
 }
 
 pub async fn update(rule: RatelimitRule) -> Result<(), anyhow::Error> {
@@ -147,22 +173,27 @@ pub async fn update(rule: RatelimitRule) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn delete(rule: RatelimitRule) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _ = match Entity::delete_many()
-        .filter(Column::RuleId.eq(rule.rule_id.unwrap()))
-        .exec(client)
-        .await
-        .map_err(|e| anyhow!("DbError# {e}"))
-    {
-        Ok(res) => res,
-        Err(e) => {
-            return orm_err!(format!("delete ratelimit rule error: {e}"))
-                .map_err(|e| anyhow!("DbError# {e}"))?
+pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
+    match fetch_rules_by_id(rule_id.as_str()).await {
+        Ok(Some(_)) => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            match Entity::delete_many()
+                .filter(Column::RuleId.eq(rule_id))
+                .exec(client)
+                .await
+                .map_err(|e| anyhow!("DbError# {e}"))
+            {
+                Ok(_) => Ok(()),
+                Err(e) => orm_err!(format!("Delete ratelimit rule error: {e}"))
+                    .map_err(|e| anyhow!("DbError# {e}"))?,
+            }
         }
-    };
-
-    Ok(())
+        Ok(None) => Err(anyhow::anyhow!(RULE_NOT_FOUND)),
+        Err(e) => {
+            log::error!("Delete rule Error fetching rule: {:?}", e.to_string());
+            Err(anyhow::anyhow!(e.to_string()))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -186,13 +217,12 @@ mod tests {
 
     fn create_test_model() -> Model {
         Model {
-            id: 1,
             org: "test_org".to_string(),
             rule_type: "exact".to_string(),
             rule_id: "test_rule".to_string(),
             resource: "test_resource".to_string(),
             threshold: 100.0,
-            created_at: None,
+            created_at: 0,
         }
     }
 
@@ -210,7 +240,7 @@ mod tests {
             .column(Column::RuleType)
             .column(Column::Resource)
             .column(Column::Threshold)
-            .order_by(Column::Id, Order::Desc)
+            .order_by(Column::CreatedAt, Order::Desc)
             .into_model::<RatelimitRule>()
             .all(&db)
             .await?;
@@ -227,12 +257,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fetch_rules_by_id() {
+        let test_rule = create_test_model();
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![test_rule.clone()], vec![]])
+            .into_connection();
+
+        let result = Entity::find()
+            .select_only()
+            .column(Column::Org)
+            .column(Column::RuleId)
+            .column(Column::RuleType)
+            .column(Column::Resource)
+            .column(Column::Threshold)
+            .filter(Column::RuleId.eq("test_rule"))
+            .into_model::<RatelimitRule>()
+            .one(&db)
+            .await;
+
+        assert!(result.is_ok());
+        let rule = result.unwrap().unwrap();
+        assert_eq!(rule.rule_id, Some("test_rule".to_string()));
+        assert_eq!(rule.org, "test_org");
+
+        let result = Entity::find()
+            .select_only()
+            .column(Column::Org)
+            .column(Column::RuleId)
+            .column(Column::RuleType)
+            .column(Column::Resource)
+            .column(Column::Threshold)
+            .filter(Column::RuleId.eq("non_existent"))
+            .into_model::<RatelimitRule>()
+            .one(&db)
+            .await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
     async fn test_add_rule() -> Result<(), DbErr> {
         let db = MockDatabase::new(DatabaseBackend::Postgres)
-            .append_query_results(vec![
-                // 添加预期的查询结果
-                vec![create_test_model()],
-            ])
+            .append_query_results(vec![vec![create_test_model()]])
             .append_exec_results(vec![MockExecResult {
                 last_insert_id: 1,
                 rows_affected: 1,
@@ -241,7 +309,6 @@ mod tests {
 
         let rule = create_test_rule();
         let active_rule = ActiveModel {
-            id: Default::default(),
             org: Set(rule.org.clone()),
             rule_id: Set(rule.rule_id.clone().unwrap()),
             rule_type: Set(rule.rule_type.clone().unwrap()),
@@ -255,14 +322,13 @@ mod tests {
 
         // Verify the result
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().last_insert_id, 1);
 
         // Verify the mock database received the expected queries
         assert_eq!(
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"INSERT INTO "rate_limit_rules" ("org", "rule_id", "rule_type", "resource", "threshold") VALUES ($1, $2, $3, $4, $5) RETURNING "id""#,
+                r#"INSERT INTO "rate_limit_rules" ("org", "rule_id", "rule_type", "resource", "threshold") VALUES ($1, $2, $3, $4, $5) RETURNING "rule_id""#,
                 vec![
                     rule.org.into(),
                     rule.rule_id.into(),

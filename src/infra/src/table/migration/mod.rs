@@ -44,7 +44,8 @@ mod m20250125_133700_populate_destinations_table;
 mod m20250125_153005_delete_metas_destinations;
 mod m20250125_172300_delete_metas_templates;
 mod m20250213_000001_add_dashboard_updated_at;
-mod m20250217_115548_ratelimit;
+mod m20250217_115548_ratelimit_table;
+
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -79,7 +80,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250125_133700_populate_destinations_table::Migration),
             Box::new(m20250125_153005_delete_metas_destinations::Migration),
             Box::new(m20250213_000001_add_dashboard_updated_at::Migration),
-            Box::new(m20250217_115548_ratelimit::Migration),
+            Box::new(m20250217_115548_ratelimit_table::Migration),
         ]
     }
 }
