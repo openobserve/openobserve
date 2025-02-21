@@ -123,10 +123,8 @@ const removeHandler = (
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    setTimeout(() => {
-      sendMessage(socketId, JSON.stringify({ type: "close" }));
+      // sendMessage(socketId, JSON.stringify({ type: "close" }));
       socket.close(1000, "search cancelled");
-    });
   }
 };
 
