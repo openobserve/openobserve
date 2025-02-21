@@ -444,4 +444,89 @@ export class LogsPage {
     await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
     await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
 }
+
+async selectStreamDropDown() {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+}
+
+async searchSchedulerDropdown() {
+  await this.page.waitForSelector('[data-test="search-scheduler-dropdown-btn-group"]');
+  await this.page.locator('[data-test="search-scheduler-dropdown-btn-group"]').click();
+}
+
+async searchSchedulerCreate() {
+  await this.page.waitForSelector(`[data-test="search-scheduler-create-new-label"]`);
+  await this.page.locator(`[data-test="search-scheduler-create-new-label"]`).click();
+}
+
+async searchSchedulerSubmit() {
+  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('1000');
+  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
+  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
+  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
+  await this.page.getByRole('button', { name: 'Go To Job Scheduler' }).click();
+
+}
+
+async queryJobSearch() {
+  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]')
+    .getByLabel("Editor content;Press Alt+F1");
+
+  // Clear the existing content
+  await queryEditor.fill(''); // Clear the field
+
+  // Fill with the new query
+  await queryEditor.fill('SELECT * FROM "e2e_automate"');
+
+  // Optional: Wait for any processing or loading after filling the query
+  await this.page.waitForTimeout(5000); // Adjust the timeout as needed
+}
+
+
+
+async clickJobID () {
+  const orgId = process.env["ORGNAME"];
+  const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+  // Intercept the network request and capture the response
+  await this.page.route(
+    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
+      {
+        method: "POST",
+        headers: headers,
+        // body: JSON.stringify(logsdata),
+      }, async (route) => {
+    const response = await route.continue();
+    const responseBody = await response.body();
+    const jsonResponse = JSON.parse(responseBody.toString());
+
+    // Assuming the ID is in the response JSON
+    const idJob = jsonResponse.id; // Adjust this according to your response structure
+    console.log("Job ID Created", idJob);
+    // Use the ID to construct the selector
+    const rowSelector = `tr[data-test="search-scheduler-table-${idJob}-row"]`;
+    await this.page.locator('[data-test="search-scheduler-table-c2fb5cdc4c684956b284bda7fc0738f1-row"] [data-test="search-scheduler-cancel-btn"]').click();
+    // Now you can use this selector to interact with the element
+    await this.page.waitForSelector(rowSelector);
+    await this.page.click(rowSelector); // Example action: clicking the row
+
+    // Continue with your automation steps...
+  });
+
+}
+
+ 
+
+
+async searchSchedulerDropdownOption(option) {
+  await this.page.waitForSelector(`[data-test="search-scheduler-dropdown-btn-${option}"]`);
+  await this.page.locator(`[data-test="search-scheduler-dropdown-btn-${option}"]`).click();
+}
+
 }
