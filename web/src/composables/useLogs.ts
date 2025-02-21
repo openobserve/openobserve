@@ -4120,6 +4120,12 @@ const useLogs = () => {
     }
 
     const tracesIds = [...searchObj.data.searchRequestTraceIds];
+
+    if (!searchObj.data.searchRequestTraceIds.length) {
+      searchObj.data.isOperationCancelled = false;
+      return;
+    }
+
     searchObj.data.isOperationCancelled = true;
 
     searchService
@@ -5196,6 +5202,7 @@ const useLogs = () => {
     if (payload.type === "search") searchObj.loading = false;
     if (payload.type === "histogram" || payload.type === "pageCount")
       searchObj.loadingHistogram = false;
+
     searchObj.data.isOperationCancelled = false;
   };
 
@@ -5332,7 +5339,10 @@ const useLogs = () => {
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
     try {
-      if (!searchRequests.length) return;
+      if (!searchRequests.length) {
+        searchObj.data.isOperationCancelled = false;
+        return;
+      }
 
       searchObj.data.isOperationCancelled = true;
 
