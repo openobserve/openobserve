@@ -1669,7 +1669,7 @@ pub struct HealthCheck {
     pub enabled: bool,
     #[env_config(
         name = "ZO_HEALTH_CHECK_TIMEOUT",
-        default = 10,
+        default = 5,
         help = "Health check timeout in seconds"
     )]
     pub timeout: u64,
