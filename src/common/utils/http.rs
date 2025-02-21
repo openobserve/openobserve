@@ -33,8 +33,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[inline(always)]
 pub(crate) fn get_stream_type_from_request(
     query: &Query<HashMap<String, String>>,
-) -> Result<Option<StreamType>, Error> {
-    Ok(query.get("type").map(|s| StreamType::from(s.as_str())))
+) -> Option<StreamType> {
+    query.get("type").map(|s| StreamType::from(s.as_str()))
 }
 
 #[inline(always)]
@@ -193,26 +193,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_file_from_cache() {
+    fn test_get_stream_type_from_request() {
         let key = "type".to_string();
 
         let mut map: HashMap<String, String> = HashMap::default();
         map.insert(key.clone(), key.clone());
 
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert!(resp.is_err());
+        assert_eq!(resp, Some(StreamType::default()));
 
         map.insert(key.clone(), "LOGS".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Logs));
+        assert_eq!(resp, Some(StreamType::Logs));
 
         map.insert(key.clone(), "METRICS".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Metrics));
+        assert_eq!(resp, Some(StreamType::Metrics));
 
         map.insert(key.clone(), "TRACES".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
-        assert_eq!(resp.unwrap(), Some(StreamType::Traces));
+        assert_eq!(resp, Some(StreamType::Traces));
     }
 
     /// Test logic for IP parsing
