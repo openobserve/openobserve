@@ -30,10 +30,44 @@ test.describe("Job Search for schedule query", () => {
         await logsPage.searchSchedulerDropdown();
         await logsPage.searchSchedulerCreate();
         await logsPage.searchSchedulerSubmit();
-        await logsPage.clickJobID();
-        
+        await logsPage.validateAddJob();
 
     });
+
+    test("Create and Delete Job Search for schedule query", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectStreamDropDown();
+        await logsPage.selectStreamAndStreamTypeForLogs(stream);
+        await logsPage.enableSQLMode();
+        await logsPage.queryJobSearch();
+        await logsPage.selectRunQuery();
+        await logsPage.searchSchedulerDropdown();
+        await logsPage.searchSchedulerCreate();
+        await logsPage.searchSchedulerSubmit();
+        await logsPage.validateAddJob();
+
+    });
+
+    test("Create Job Search for schedule query with invalid data", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectStreamDropDown();
+        await logsPage.selectStreamAndStreamTypeForLogs(stream);
+        await logsPage.enableSQLMode();
+        await logsPage.queryJobSearch();
+        await logsPage.selectRunQuery();
+        await logsPage.searchSchedulerDropdown();
+        await logsPage.searchSchedulerCreate();
+        await logsPage.searchSchedulerSubmit();
+        await logsPage.validateAddJob();
+
+    });
+    
+
+
+
+
 
     
 });

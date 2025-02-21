@@ -471,6 +471,10 @@ async searchSchedulerSubmit() {
 
 }
 
+async validateAddJob() {
+  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully');
+}
+
 async queryJobSearch() {
   const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]')
     .getByLabel("Editor content;Press Alt+F1");
@@ -490,34 +494,44 @@ async queryJobSearch() {
 async clickJobID () {
   const orgId = process.env["ORGNAME"];
   const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+  
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+
   // Intercept the network request and capture the response
   await this.page.route(
     `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-      {
-        method: "POST",
-        headers: headers,
-        // body: JSON.stringify(logsdata),
-      }, async (route) => {
-    const response = await route.continue();
-    const responseBody = await response.body();
-    const jsonResponse = JSON.parse(responseBody.toString());
+    async (route) => {
+      const response = await route.continue();
+      const responseBody = await response.body();
+      const jsonResponse = JSON.parse(responseBody.toString());
 
-    // Assuming the ID is in the response JSON
-    const idJob = jsonResponse.id; // Adjust this according to your response structure
-    console.log("Job ID Created", idJob);
-    // Use the ID to construct the selector
-    const rowSelector = `tr[data-test="search-scheduler-table-${idJob}-row"]`;
-    await this.page.locator('[data-test="search-scheduler-table-c2fb5cdc4c684956b284bda7fc0738f1-row"] [data-test="search-scheduler-cancel-btn"]').click();
-    // Now you can use this selector to interact with the element
-    await this.page.waitForSelector(rowSelector);
-    await this.page.click(rowSelector); // Example action: clicking the row
+      // Assuming the ID is in the response JSON
+      const idJob = jsonResponse.trace_id; // Adjust this according to your response structure
+      console.log("Job ID Created", idJob);
 
-    // Continue with your automation steps...
-  });
+      // Use the ID to construct the selector
+      const rowSelector = `tr[data-test="search-scheduler-table-${idJob}-row"]`;
+      const cancelBtnSelector = `${rowSelector} [data-test="search-scheduler-cancel-btn"]`;
+      const restartBtnSelector = `${rowSelector} [data-test="search-scheduler-restart-btn"]`;
+
+      // Wait for the row to be visible before clicking
+      await this.page.waitForSelector(rowSelector);
+      
+      // Click the cancel button
+      await this.page.locator(cancelBtnSelector).click();
+      
+      // Click the confirm button
+      await this.page.locator('[data-test="confirm-button"]').click();
+      
+      // Click the restart button
+      await this.page.locator(restartBtnSelector).click();
+      
+      // Continue with your automation steps...
+    }
+  )
 
 }
 
