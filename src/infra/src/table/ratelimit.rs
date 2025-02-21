@@ -218,8 +218,8 @@ mod tests {
         assert_eq!(rules.len(), 1);
         let rule = &rules[0];
         assert_eq!(rule.org, "test_org");
-        assert_eq!(rule.rule_type, "exact");
-        assert_eq!(rule.rule_id, "test_rule");
+        assert_eq!(rule.rule_type, Some("exact".to_string()));
+        assert_eq!(rule.rule_id, Some("test_rule".to_string()));
         assert_eq!(rule.resource, "test_resource");
         assert_eq!(rule.threshold, 100.0);
 
@@ -290,10 +290,10 @@ mod tests {
         // Test update
         let result = Entity::update_many()
             .col_expr(Column::Org, Expr::value(&rule.org))
-            .col_expr(Column::RuleType, Expr::value(&rule.rule_type))
+            .col_expr(Column::RuleType, Expr::value(&rule.rule_type.unwrap()))
             .col_expr(Column::Resource, Expr::value(&rule.resource))
             .col_expr(Column::Threshold, Expr::value(rule.threshold))
-            .filter(Column::RuleId.eq(&rule.rule_id))
+            .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
             .exec(&db)
             .await;
 
@@ -316,7 +316,7 @@ mod tests {
 
         // Test delete
         let result = Entity::delete_many()
-            .filter(Column::RuleId.eq(&rule.rule_id))
+            .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
             .exec(&db)
             .await;
 
@@ -343,8 +343,8 @@ mod tests {
 
         let rule = result.unwrap();
         assert_eq!(rule.org, "test_org");
-        assert_eq!(rule.rule_type, "exact");
-        assert_eq!(rule.rule_id, "test_rule");
+        assert_eq!(rule.rule_type, Some("exact".to_string()));
+        assert_eq!(rule.rule_id, Some("test_rule".to_string()));
         assert_eq!(rule.resource, "test_resource");
         assert_eq!(rule.threshold, 100.0);
 
