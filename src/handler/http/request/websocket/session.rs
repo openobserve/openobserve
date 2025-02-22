@@ -401,8 +401,7 @@ async fn handle_search_event(
     org_id: &str,
     user_id: &str,
     req_id: &str,
-    #[allow(unused_variables)] 
-    path: String,
+    #[allow(unused_variables)] path: String,
 ) {
     let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
