@@ -281,11 +281,20 @@ async fn get_remote_batch(
         is_querier,
     );
 
+    let start = std::time::Instant::now();
     let mut stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
             if e.code() == tonic::Code::Cancelled {
-                return Ok(get_empty_record_batch_stream(schema, partial_err, e));
+                return Ok(get_empty_record_batch_stream(
+                    trace_id,
+                    schema,
+                    node.get_grpc_addr(),
+                    is_querier,
+                    partial_err,
+                    e,
+                    start,
+                ));
             }
             return Err(DataFusionError::Execution(e.to_string()));
         }
@@ -299,15 +308,21 @@ async fn get_remote_batch(
         is_querier,
     );
 
-    let start = std::time::Instant::now();
-
     // the schema should be the first message returned, else client should error
     let flight_data = match stream.message().await {
         Ok(Some(flight_data)) => flight_data,
         Ok(None) => return Err(DataFusionError::Execution("No schema returned".to_string())),
         Err(e) => {
             if e.code() == tonic::Code::Cancelled {
-                return Ok(get_empty_record_batch_stream(schema, partial_err, e));
+                return Ok(get_empty_record_batch_stream(
+                    trace_id,
+                    schema,
+                    node.get_grpc_addr(),
+                    is_querier,
+                    partial_err,
+                    e,
+                    start,
+                ));
             }
             return Err(DataFusionError::Execution(e.to_string()));
         }
@@ -338,10 +353,22 @@ async fn get_remote_batch(
 }
 
 fn get_empty_record_batch_stream(
+    trace_id: String,
     schema: SchemaRef,
+    node_addr: String,
+    is_querier: bool,
     partial_err: Arc<Mutex<String>>,
     e: tonic::Status,
+    start: std::time::Instant,
 ) -> SendableRecordBatchStream {
+    log::info!(
+        "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
+        trace_id,
+        node_addr,
+        is_querier,
+        start.elapsed().as_millis(),
+        e.to_string()
+    );
     process_partial_err(partial_err, e);
     let stream = futures::stream::empty::<Result<RecordBatch>>();
     Box::pin(RecordBatchStreamAdapter::new(schema, stream))
