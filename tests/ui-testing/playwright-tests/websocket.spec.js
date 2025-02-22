@@ -26,7 +26,7 @@ test.describe("Websocket for logs", () => {
         await managementPage.checkAndEnableWebSocket();
     });
 
-    test("Run query after selecting two streams", async ({ page }) => {
+    test("Run query after selecting two streams after enabling websocket", async ({ page }) => {
 
         // If using CommonJS
         // const managementPage = require('../pages/managementPage');
@@ -40,7 +40,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams and SQL Mode On", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams and SQL Mode On", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -51,7 +51,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, selecting field and SQL Mode On", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -63,7 +63,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering join queries", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering join queries", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -76,7 +76,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering join limit", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering join limit", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -88,7 +88,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering join like", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering join like", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -100,7 +100,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering Left join queries", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering Left join queries", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -112,7 +112,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering Right join queries", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering Right join queries", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -124,7 +124,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Run query after selecting two streams, SQL Mode On and entering Full join queries", async ({ page }) => {
+    test("Enable Websocket for running query after selecting two streams, SQL Mode On and entering Full join queries", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -136,7 +136,7 @@ test.describe("Websocket for logs", () => {
 
     });
 
-    test("Click on interesting field icon and display field in editor", async ({ page }) => {
+    test("Enable Websocket for clicking on interesting field icon and display field in editor", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -147,7 +147,7 @@ test.describe("Websocket for logs", () => {
         await logsPage.validateInterestingFields();
     });
 
-    test("Click on interesting field icon and display query in editor", async ({ page }) => {
+    test("Enable Websocket for clicking on interesting field icon and display query in editor", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
@@ -158,7 +158,7 @@ test.describe("Websocket for logs", () => {
         await logsPage.validateInterestingFieldsQuery();
     });
 
-    test("Add/remove interesting field removes it from editor and results too", async ({ page }) => {
+    test("Enable Websocket for Adding or removing interesting field removes it from editor and results too", async ({ page }) => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
