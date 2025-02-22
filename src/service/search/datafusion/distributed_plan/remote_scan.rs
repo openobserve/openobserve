@@ -209,6 +209,7 @@ async fn get_remote_batch(
     let mut request = remote_scan_node.get_flight_search_request(partition);
     request.set_job_id(generate_random_string(7));
     request.set_partition(partition);
+    request.search_info.timeout = timeout as i64;
 
     log::info!(
         "[trace_id {}] flight->search: request node: {}, query_type: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
@@ -285,7 +286,7 @@ async fn get_remote_batch(
     let mut stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
-            if e.code() == tonic::Code::Cancelled {
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded {
                 return Ok(get_empty_record_batch_stream(
                     trace_id,
                     schema,
@@ -313,7 +314,7 @@ async fn get_remote_batch(
         Ok(Some(flight_data)) => flight_data,
         Ok(None) => return Err(DataFusionError::Execution("No schema returned".to_string())),
         Err(e) => {
-            if e.code() == tonic::Code::Cancelled {
+            if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded {
                 return Ok(get_empty_record_batch_stream(
                     trace_id,
                     schema,
@@ -349,6 +350,7 @@ async fn get_remote_batch(
         scan_size,
         partial_err,
         start,
+        timeout,
     )))
 }
 
@@ -394,6 +396,7 @@ struct FlightStream {
     scan_size: i64,
     partial_err: Arc<Mutex<String>>,
     start: std::time::Instant,
+    timeout: u64,
 }
 
 impl FlightStream {
@@ -408,6 +411,7 @@ impl FlightStream {
         scan_size: i64,
         partial_err: Arc<Mutex<String>>,
         start: std::time::Instant,
+        timeout: u64,
     ) -> Self {
         Self {
             trace_id,
@@ -419,6 +423,7 @@ impl FlightStream {
             scan_size,
             partial_err,
             start,
+            timeout,
         }
     }
 }
@@ -430,8 +435,15 @@ impl Stream for FlightStream {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        let dictionaries_by_field = HashMap::new();
+        if self.start.elapsed().as_secs() > self.timeout {
+            process_partial_err(
+                self.partial_err.clone(),
+                tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout"),
+            );
+            return Poll::Ready(None);
+        }
 
+        let dictionaries_by_field = HashMap::new();
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(flight_data))) => {
                 let record_batch = flight_data_to_arrow_batch(
