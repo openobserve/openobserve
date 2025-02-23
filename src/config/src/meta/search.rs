@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use std::str::FromStr;
 
 use proto::cluster_rpc;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -767,7 +765,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
             where
                 E: serde::de::Error,
             {
-                SearchEventType::from_str(value).map_err(serde::de::Error::custom)
+                SearchEventType::try_from(value).map_err(serde::de::Error::custom)
             }
         }
 
@@ -791,9 +789,9 @@ impl std::fmt::Display for SearchEventType {
     }
 }
 
-impl FromStr for SearchEventType {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+impl TryFrom<&str> for SearchEventType {
+    type Error = String;
+    fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
         let s = s.to_lowercase();
         match s.as_str() {
             "ui" => Ok(SearchEventType::UI),
