@@ -292,7 +292,6 @@ pub enum WsClientEvents {
     Benchmark {
         id: String,
     },
-    Close,
 }
 
 impl WsClientEvents {
@@ -302,7 +301,6 @@ impl WsClientEvents {
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
-            WsClientEvents::Close => "close",
         }
         .to_string()
     }
