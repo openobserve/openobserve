@@ -439,14 +439,21 @@ async fn check_nodes_status(client: &reqwest::Client, is_nats: bool) -> Result<(
                 node.http_addr
             );
             let mut w = NODES_HEALTH_CHECK.write().await;
-            let entry = w.entry(node.uuid.clone()).or_insert(0);
+            let Some(entry) = w.get_mut(&node.uuid) else {
+                // node haven't been added to the cluster yet, when the health check first succeed,
+                // it will be added to the check map
+                continue;
+            };
             *entry += 1;
-            if is_nats && *entry >= cfg.health_check.failed_times {
+            let times = *entry;
+            drop(w);
+
+            if is_nats && times >= cfg.health_check.failed_times {
                 log::error!(
                     "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
                     node.http_addr,
-                    cfg.health_check.failed_times
+                    times
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(
@@ -471,13 +478,14 @@ async fn check_nodes_status(client: &reqwest::Client, is_nats: bool) -> Result<(
                     remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
                 }
                 NODES.write().await.remove(&node.uuid);
+                NODES_HEALTH_CHECK.write().await.remove(&node.uuid);
             }
         } else {
+            // first time the node is online, add it to the check map, or reset the check count
             let mut w = NODES_HEALTH_CHECK.write().await;
-            if let Some(entry) = w.get_mut(&node.uuid) {
-                if *entry > 0 {
-                    *entry = 0;
-                }
+            let entry = w.entry(node.uuid.clone()).or_insert(0);
+            if *entry > 0 {
+                *entry = 0;
             }
         }
     }
