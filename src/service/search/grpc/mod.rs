@@ -46,7 +46,7 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
     } else {
         scan_stats.original_size
     };
-    let cur_memory = config::utils::sysinfo::mem::get_memory_usage();
+    let cur_memory = config::utils::sysinfo::get_memory_usage();
     if cur_memory > 0 {
         // left memory < datafusion * breaker_ratio and scan_size >=  left memory
         let left_mem = cfg.limit.mem_total - cur_memory;

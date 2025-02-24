@@ -278,8 +278,8 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
 }
 
 async fn update_memory_usage() -> Result<(), anyhow::Error> {
-    let cur_memory = config::utils::sysinfo::mem::get_memory_usage();
-    metrics::MEMORY_USAGE
+    let cur_memory = config::utils::sysinfo::get_memory_usage();
+    metrics::NODE_MEMORY_USAGE
         .with_label_values(&[])
         .set(cur_memory as i64);
     Ok(())

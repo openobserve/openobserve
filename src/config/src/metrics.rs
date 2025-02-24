@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -621,16 +621,6 @@ pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("memory_usage", "Process memory usage")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
 // metrics for query manager
 pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -933,9 +923,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(MEMORY_USAGE.clone()))
         .expect("Metric registered");
 
     // db stats
