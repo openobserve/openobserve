@@ -9,7 +9,8 @@ import { LogsPage } from '../pages/logsPage.js';
 test.describe("Cipher Keys for security", () => {
 
     let loginPage, ingestionPage, cipherKeys, logsPage;
-    const cipherName = `c${Date.now()}`;
+    // const cipherName = `c${Date.now()}`;
+    const cipherName = `c${Date.now()}-${Math.random().toString(36).substring(7)}`;
     const simpleSecret = process.env['SIMPLE_KEYS'];
     const simpleSecretUp = process.env['SIMPLE_KEYS_UP'];
 

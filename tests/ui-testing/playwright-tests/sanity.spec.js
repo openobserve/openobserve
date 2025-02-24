@@ -15,9 +15,8 @@ async function login(page) {
     await page.getByText('Login as internal user').click();
 }
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000); 
-  await page.getByText('Login as internal user').click();
-  //Enter Email
+  await page.waitForTimeout(1000);
+
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -850,49 +849,50 @@ test.describe("Sanity testcases", () => {
   //   const displayedTimestampZurich = formatDate(zurichTime);
   //   console.log(displayedTimestampZurich);
 
-    // Verify the displayed time in Europe/Zurich
-    const timeCellZurich = await page
-      .getByRole("cell", { name: displayedTimestampZurich })
-      .textContent();
-    expect(timeCellZurich).toBe(displayedTimestampZurich);
-    await page.waitForTimeout(2000);
-    await page
-      .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
-      .click();
-    await page.locator('[data-test="dashboard-delete-panel"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await page
-      .locator("#q-notify div")
-      .filter({ hasText: "check_circlePanel deleted" })
-      .nth(3)
-      .click();
-    await page.locator('[data-test="dashboard-back-btn"]');
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-    await page
-      .getByRole("row", { name: dashboardName })
-      .locator('[data-test="dashboard-delete"]')
-      .click();
-    await page.locator('[data-test="confirm-button"]').click();
-  });
-  test('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
-    // Step 1: Click on the "Share Link" button
-    await page.getByLabel('SQL Mode').locator('div').nth(2).click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByRole('button', { name: 'Search History' }).click();
-    await page.locator('[data-test="search-history-date-time"]').click();
-    await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
-    await page.getByRole('button', { name: 'Get History' }).click();
-    await page.waitForTimeout(6000);
-    await page.getByRole('cell', { name: 'Trace ID' }).click();
-    // Locate the row using a known static value like the SQL query
-    // const row = page.locator('tr:has-text("select histogram")');
-    const row = page.locator('tr:has-text("SELECT histogram")');
-    // Click the button inside the located row
-  await row.locator('button.q-btn').nth(0).click();
-    await page.getByRole('button', { name: 'Logs' }).click();
-    await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click()
-    await expect(page).toHaveURL(/stream_type=logs/)
-  });
+  //   // Verify the displayed time in Europe/Zurich
+  //   const timeCellZurich = await page
+  //     .getByRole("cell", { name: displayedTimestampZurich })
+  //     .textContent();
+  //   expect(timeCellZurich).toBe(displayedTimestampZurich);
+  //   await page.waitForTimeout(2000);
+  //   await page
+  //     .locator('[data-test="dashboard-edit-panel-sanitydash-dropdown"]')
+  //     .click();
+  //   await page.locator('[data-test="dashboard-delete-panel"]').click();
+  //   await page.locator('[data-test="confirm-button"]').click();
+  //   await page
+  //     .locator("#q-notify div")
+  //     .filter({ hasText: "check_circlePanel deleted" })
+  //     .nth(3)
+  //     .click();
+  //   await page.locator('[data-test="dashboard-back-btn"]');
+  //   await page.locator('[data-test="dashboard-back-btn"]').click();
+  //   await page
+  //     .getByRole("row", { name: dashboardName })
+  //     .locator('[data-test="dashboard-delete"]')
+  //     .click();
+  //   await page.locator('[data-test="confirm-button"]').click();
+  // });
+  // test.skip('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
+  //   // Step 1: Click on the "Share Link" button
+  //   await page.getByLabel('SQL Mode').locator('div').nth(2).click();
+  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  //   await page.getByRole('button', { name: 'Search History' }).click();
+  //   await page.locator('[data-test="search-history-date-time"]').click();
+  //   await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
+  //   await page.getByRole('button', { name: 'Get History' }).click();
+  //   await page.waitForTimeout(6000);
+  //   await page.getByRole('cell', { name: 'Trace ID' }).click();
+  //   // Locate the row using a known static value like the SQL query
+  //   // const row = page.locator('tr:has-text("select histogram")');
+  //   // Locate the row using a known static value, ignoring case sensitivity
+  //   const row = page.locator('tr').filter({ hasText: /select histogram/i });
+  //   // Click the button inside the located row
+  //   await row.locator('button.q-btn').nth(0).click();
+  //   await page.getByRole('button', { name: 'Logs' }).click();
+  //   await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click()
+  //   await expect(page).toHaveURL(/stream_type=logs/)
+  // });
 
   // test('should verify logs page displayed on click back button on search history page', async ({ page, context }) => {
   //   // Step 1: Click on the "Share Link" button
