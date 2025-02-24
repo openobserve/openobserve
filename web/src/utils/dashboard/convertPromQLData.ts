@@ -450,6 +450,22 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                label: {
+                  show: panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
+                smooth:
+                  panelSchema.config?.line_interpolation === "smooth" ||
+                  panelSchema.config?.line_interpolation == null,
+                step: ["step-start", "step-end", "step-middle"].includes(
+                  panelSchema.config?.line_interpolation,
+                )
+                  ? // TODO: replace this with type integrations
+                    panelSchema.config.line_interpolation.replace("step-", "")
+                  : false,
+                showSymbol: panelSchema.config?.show_symbol ?? false,
                 zlevel: 2,
                 itemStyle: {
                   color: (() => {
@@ -891,8 +907,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
-        showSymbol: false,
         lineStyle: { width: 1.5 },
       };
     case "scatter":
@@ -924,9 +938,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
         areaStyle: {},
-        showSymbol: false,
         lineStyle: { width: 1.5 },
       };
     case "stacked":
@@ -938,10 +950,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area-stacked":
       return {
         type: "line",
-        smooth: true,
         stack: "Total",
         areaStyle: {},
-        showSymbol: false,
         emphasis: {
           focus: "series",
         },
