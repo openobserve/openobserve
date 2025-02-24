@@ -96,12 +96,13 @@ pub async fn ws_proxy(
                     let ws_msg = from_actix_message(msg);
                     match ws_msg {
                         tungstenite::protocol::Message::Close(reason) => {
-                            log::info!("[WS_PROXY] Client initiated close");
                             // Forward close to backend
+                            log::info!("[WS_PROXY] Client -> Router close");
                             let close_msg = tungstenite::protocol::Message::Close(reason.clone());
                             if let Err(e) = backend_ws_sink.send(close_msg).await {
                                 log::error!("[WS_PROXY] Failed to forward close: {}", e);
                             }
+                            log::info!("[WS_PROXY] Client -> Router close completed");
                             break;
                         }
                         _ => {
@@ -127,10 +128,11 @@ pub async fn ws_proxy(
                     let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                     match ws_msg {
                         Message::Close(reason) => {
-                            log::info!("[WS_PROXY] Backend initiated close");
+                            log::info!("[WS_PROXY] Backend -> Router close");
                             if let Err(e) = session.close(reason).await {
                                 log::error!("[WS_PROXY] Failed to close client: {}", e);
                             }
+                            log::info!("[WS_PROXY] Backend -> Router close completed");
                             break;
                         }
                         Message::Text(text) => {
