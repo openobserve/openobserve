@@ -57,12 +57,25 @@ impl Node {
             role: vec![],
             role_group: RoleGroup::None,
             cpu_num: 0,
-            status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            status: NodeStatus::Prepare,
             metrics: Default::default(),
         }
     }
+
+    pub fn is_same(&self, other: &Node) -> bool {
+        self.uuid == other.uuid
+            && self.name == other.name
+            && self.http_addr == other.http_addr
+            && self.grpc_addr == other.grpc_addr
+            && self.role == other.role
+            && self.role_group == other.role_group
+            && self.scheduled == other.scheduled
+            && self.broadcasted == other.broadcasted
+            && self.status == other.status
+    }
+
     pub fn is_single_node(&self) -> bool {
         self.role.len() == 1 && self.role.contains(&Role::All)
     }

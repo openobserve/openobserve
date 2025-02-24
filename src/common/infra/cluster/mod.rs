@@ -305,10 +305,12 @@ async fn watch_node_list() -> Result<()> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
                 let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
-                    Some(v) => (v.broadcasted, item_value.eq(v)),
+                    Some(v) => (v.broadcasted, item_value.is_same(v)),
                     None => (false, false),
                 };
                 if exist {
+                    // update the node status metrics in local cache
+                    set_node_status_metrics(&item_value).await;
                     continue;
                 }
                 if item_value.status == NodeStatus::Offline {
@@ -571,6 +573,14 @@ fn filter_nodes_with_group(
     Some(nodes)
 }
 
+// update the node status metrics in local cache
+async fn set_node_status_metrics(node: &Node) {
+    let mut w = NODES.write().await;
+    if let Some(v) = w.get_mut(node.uuid.as_str()) {
+        v.metrics = node.metrics.clone();
+    }
+}
+
 fn update_node_status_metrics() -> NodeMetrics {
     let node_status = get_node_metrics();
 
@@ -588,16 +598,16 @@ fn update_node_status_metrics() -> NodeMetrics {
         .set(node_status.memory_usage as i64);
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["total"])
-        .set(node_status.tcp_connections as i64);
+        .set(node_status.tcp_conns as i64);
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["established"])
-        .set(node_status.tcp_connections_established as i64);
+        .set(node_status.tcp_conns_established as i64);
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["close_wait"])
-        .set(node_status.tcp_connections_close_wait as i64);
+        .set(node_status.tcp_conns_close_wait as i64);
     config::metrics::NODE_TCP_CONNECTIONS
         .with_label_values(&["time_wait"])
-        .set(node_status.tcp_connections_time_wait as i64);
+        .set(node_status.tcp_conns_time_wait as i64);
 
     node_status
 }
