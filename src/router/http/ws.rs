@@ -24,19 +24,21 @@ use tokio::sync::oneshot;
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
 
-/// WebSocket proxy handler
+/// WebSocket proxy handler that manages two WebSocket connections:
+/// 1. Client<->Router (actix_ws)
+/// 2. Router<->Backend (tokio_tungstenite)
 pub async fn ws_proxy(
     req: HttpRequest,
     payload: web::Payload,
     ws_base_url: &str,
 ) -> Result<HttpResponse, Error> {
-    // log node role
     let cfg = get_config();
     let node_role = cfg.common.node_role.clone();
 
-    // Upgrade the client connection to a WebSocket
+    // Session 1: Client<->Router WebSocket connection
     let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
 
+    // Prepare backend connection request
     let ws_req = match convert_actix_to_tungstenite_request(&req, ws_base_url) {
         Ok(req) => req,
         Err(e) => {
@@ -50,7 +52,7 @@ pub async fn ws_proxy(
         }
     };
 
-    // Connect to the backend WebSocket service
+    // Session 2: Router<->Backend WebSocket connection
     let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
         log::error!(
             "[WS_PROXY] Node Role: {} Failed to connect to backend WebSocket service, error: {:?}",
@@ -60,13 +62,14 @@ pub async fn ws_proxy(
         actix_web::error::ErrorInternalServerError("Failed to connect to backend websocket service")
     })?;
 
-    // Split backend Websocket stream into sink and stream
+    // Split backend connection for bidirectional communication
     let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
 
-    // Add coordination channels for graceful shutdown
+    // Channels for coordinating task shutdown
     let (client_kill_tx, client_kill_rx) = oneshot::channel::<()>();
     let (backend_kill_tx, backend_kill_rx) = oneshot::channel::<()>();
 
+    // Task 1: Forward messages from Client to Backend
     let client_to_backend = {
         let mut client_kill_rx = client_kill_rx;
         async move {
@@ -108,6 +111,7 @@ pub async fn ws_proxy(
         }
     };
 
+    // Task 2: Forward messages from Backend to Client
     let backend_to_client = {
         let mut backend_kill_rx = backend_kill_rx;
         let mut closed_normally = false;
@@ -178,20 +182,19 @@ pub async fn ws_proxy(
         }
     };
 
-    // Spawn tasks with cleanup
+    // Spawn both tasks and wait for completion
     let backend_handle = rt::spawn(backend_to_client);
     let client_handle = rt::spawn(client_to_backend);
 
-    // Join the tasks and log when they complete
     rt::spawn(async move {
         let _ = tokio::join!(backend_handle, client_handle);
         log::info!("[WS_PROXY] backend and client tasks completed");
     });
 
-    // Return the WebSocket handshake response
     Ok(response)
 }
 
+/// Convert actix-web WebSocket message to tungstenite message format
 fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
     match msg {
         Message::Text(text) => tungstenite::protocol::Message::Text(text.to_string()),
@@ -217,6 +220,7 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
     }
 }
 
+/// Convert tungstenite WebSocket message to actix-web message format
 fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Message {
     match msg {
         tungstenite::protocol::Message::Text(text) => Message::Text(text.into()),
