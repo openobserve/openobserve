@@ -474,7 +474,7 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {}, took: {} ms",
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, took: {} ms",
             self.trace_id,
             self.node_addr,
             self.is_querier,
