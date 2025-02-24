@@ -211,7 +211,7 @@ mod tests {
             rule_type: Some("exact".to_string()),
             rule_id: Some("test_rule".to_string()),
             resource: "test_resource".to_string(),
-            threshold: 100.0,
+            threshold: 100,
         }
     }
 
@@ -221,7 +221,7 @@ mod tests {
             rule_type: "exact".to_string(),
             rule_id: "test_rule".to_string(),
             resource: "test_resource".to_string(),
-            threshold: 100.0,
+            threshold: 100,
             created_at: 0,
         }
     }
@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(rule.rule_type, Some("exact".to_string()));
         assert_eq!(rule.rule_id, Some("test_rule".to_string()));
         assert_eq!(rule.resource, "test_resource");
-        assert_eq!(rule.threshold, 100.0);
+        assert_eq!(rule.threshold, 100);
 
         Ok(())
     }
@@ -400,7 +400,7 @@ mod tests {
             "rule_type": "exact",
             "rule_id": "test_rule",
             "resource": "test_resource",
-            "threshold": 100.0
+            "threshold": 100
         });
         let bytes = Bytes::from(json_data.to_string());
 
@@ -412,7 +412,7 @@ mod tests {
         assert_eq!(rule.rule_type, Some("exact".to_string()));
         assert_eq!(rule.rule_id, Some("test_rule".to_string()));
         assert_eq!(rule.resource, "test_resource");
-        assert_eq!(rule.threshold, 100.0);
+        assert_eq!(rule.threshold, 100);
 
         // Test invalid JSON
         let invalid_bytes = Bytes::from("invalid json");
