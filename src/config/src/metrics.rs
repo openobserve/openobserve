@@ -716,6 +716,53 @@ pub static FILE_LIST_CACHE_HIT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Node status metrics
+pub static NODE_CPU_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_cpu_total", "Total CPU usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_CPU_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_cpu_usage", "CPU usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_MEMORY_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_memory_total", "Total memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_memory_usage", "Memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_tcp_connections", "TCP connections")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["state"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -905,6 +952,23 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_LIST_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+
+    // node status metrics
+    registry
+        .register(Box::new(NODE_CPU_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_CPU_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_MEMORY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
 }
 

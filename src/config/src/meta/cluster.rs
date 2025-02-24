@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,9 @@ use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{get_config, get_instance_id, meta::search::SearchEventType};
+use crate::{
+    get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
+};
 
 pub trait NodeInfo: Debug + Send + Sync {
     fn get_grpc_addr(&self) -> String;
@@ -35,11 +37,13 @@ pub struct Node {
     #[serde(default)]
     pub role_group: RoleGroup,
     pub cpu_num: u64,
-    pub status: NodeStatus,
     #[serde(default)]
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
+    pub status: NodeStatus,
+    #[serde(default)]
+    pub metrics: NodeMetrics,
 }
 
 impl Node {
@@ -56,6 +60,7 @@ impl Node {
             status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            metrics: Default::default(),
         }
     }
     pub fn is_single_node(&self) -> bool {

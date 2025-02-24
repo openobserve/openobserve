@@ -28,7 +28,11 @@ use config::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
     },
-    utils::{hash::Sum64, json},
+    utils::{
+        hash::Sum64,
+        json,
+        sysinfo::{get_node_metrics, NodeMetrics},
+    },
     RwAHashMap, RwBTreeMap,
 };
 use infra::{
@@ -186,13 +190,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             .build()
             .unwrap();
         let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
-        let is_nats = matches!(
-            cfg.common.cluster_coordinator.as_str().into(),
-            MetaStore::Nats
-        );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
-            if let Err(e) = check_nodes_status(&client, is_nats).await {
+            if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);
             }
         }
@@ -416,7 +416,7 @@ async fn watch_node_list() -> Result<()> {
     Ok(())
 }
 
-async fn check_nodes_status(client: &reqwest::Client, is_nats: bool) -> Result<()> {
+async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
     if !cfg.health_check.enabled {
         return Ok(());
@@ -448,7 +448,7 @@ async fn check_nodes_status(client: &reqwest::Client, is_nats: bool) -> Result<(
             let times = *entry;
             drop(w);
 
-            if is_nats && times >= cfg.health_check.failed_times {
+            if times >= cfg.health_check.failed_times {
                 log::error!(
                     "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
@@ -569,6 +569,37 @@ fn filter_nodes_with_group(
         _ => {}
     };
     Some(nodes)
+}
+
+fn update_node_status_metrics() -> NodeMetrics {
+    let node_status = get_node_metrics();
+
+    config::metrics::NODE_CPU_TOTAL
+        .with_label_values(&[])
+        .set(node_status.cpu_total as i64);
+    config::metrics::NODE_CPU_USAGE
+        .with_label_values(&[])
+        .set(node_status.cpu_usage as i64);
+    config::metrics::NODE_MEMORY_TOTAL
+        .with_label_values(&[])
+        .set(node_status.memory_total as i64);
+    config::metrics::NODE_MEMORY_USAGE
+        .with_label_values(&[])
+        .set(node_status.memory_usage as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["total"])
+        .set(node_status.tcp_connections as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["established"])
+        .set(node_status.tcp_connections_established as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["close_wait"])
+        .set(node_status.tcp_connections_close_wait as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["time_wait"])
+        .set(node_status.tcp_connections_time_wait as i64);
+
+    node_status
 }
 
 #[cfg(test)]

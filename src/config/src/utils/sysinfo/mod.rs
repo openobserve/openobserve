@@ -13,12 +13,51 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
+
 pub mod cgroup;
 pub mod cpu;
 pub mod disk;
 pub mod mem;
 pub mod net;
 pub mod os;
+
+pub use net::TcpConnState;
+
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NodeMetrics {
+    pub cpu_total: usize,
+    pub cpu_usage: f32,
+    pub memory_total: usize,
+    pub memory_usage: usize,
+    pub tcp_connections: usize,
+    pub tcp_connections_established: usize,
+    pub tcp_connections_close_wait: usize,
+    pub tcp_connections_time_wait: usize,
+}
+
+/// Get the node running metrics
+pub fn get_node_metrics() -> NodeMetrics {
+    let cpu_total = get_cpu_limit();
+    let cpu_usage = get_cpu_usage();
+    let memory_total = get_memory_limit();
+    let memory_usage = get_memory_usage();
+    let tcp_connections = get_tcp_connections();
+    let tcp_connections_established = net::get_tcp_connections(Some(TcpConnState::Established));
+    let tcp_connections_close_wait = net::get_tcp_connections(Some(TcpConnState::CloseWait));
+    let tcp_connections_time_wait = net::get_tcp_connections(Some(TcpConnState::TimeWait));
+
+    NodeMetrics {
+        cpu_total,
+        cpu_usage,
+        memory_total,
+        memory_usage,
+        tcp_connections,
+        tcp_connections_established,
+        tcp_connections_close_wait,
+        tcp_connections_time_wait,
+    }
+}
 
 pub fn get_cpu_limit() -> usize {
     cgroup::get_cpu_limit()
