@@ -31,42 +31,52 @@ use url::Url;
 /// +--------+     +-----------------Router Process----------------+     +---------+
 /// |        |     |  +-------------+        +-------------+       |     |         |
 /// |        |     |  |    Task 1   |        |    Task 2   |       |     |         |
-/// |        |     |  |client_to_bkd|        |backend_to_cl|       |     |         |
+/// |Client  |<--->|  |client_to_bkd|  <-->  |backend_to_cl|       |<--->| Backend |
 /// |        |     |  +-------------+        +-------------+       |     |         |
-/// |        |     |    ↑    |               |     ↓               |     |         |
-/// |Client  |<--->| msg_stream  ws_sink   ws_stream  session      |<--->| Backend |
-/// |        |     |                                               |     |         |
 /// +--------+     +-----------------------------------------------+     +---------+
 /// ```
 ///
-/// # Stream Flow
+/// # Close Sequence Flows
 /// ```text
-/// 1. Client -> Backend (Task 1: client_to_backend)
-///    client_msg_stream -> convert format -> backend_ws_sink
+/// 1. Client Initiates Close:
+///    Client -> Task1 -> Backend
+///                    -> Send Close Frame
+///                    -> Break Task1
+///    Backend -> Task2 -> Client
+///                    -> Send Close Ack to Backend
+///                    -> Close Sink
+///                    -> Break Task2
 ///
-/// 2. Backend -> Client (Task 2: backend_to_client)
-///    backend_ws_stream -> convert format -> session.send
+/// 2. Backend Initiates Close:
+///    Backend -> Task2 -> Client
+///                    -> Send Close Ack to Backend
+///                    -> Close Sink
+///                    -> Break Task2
+///    Client -> Task1 -> Break Task1
 /// ```
 ///
-/// # Key Features
-/// - Two independent tasks handle each direction
-/// - No shared state between tasks
-/// - Tasks complete naturally on connection close
-/// - Automatic message format conversion between protocols
+/// # Implementation Details
+/// - Uses Arc<Mutex> for shared sink access between tasks
+/// - Each task handles one direction of message flow
+/// - Close sequence ensures proper WebSocket protocol shutdown
+/// - Automatic resource cleanup when tasks complete
 ///
-/// # Example Message Flow
+/// # Error Handling
+/// - Connection errors trigger cleanup in both directions
+/// - Timeouts prevent resource leaks
+/// - Automatic task termination on connection close
+///
+/// # Message Flow Example
 /// ```text
-/// Client Message:
-///   1. Client sends message
-///   2. Task 1 receives via client_msg_stream
-///   3. Task 1 converts format (actix -> tungstenite)
-///   4. Task 1 sends to backend via ws_sink
+/// Normal Message:
+///   Client -> Task1 -> convert format -> send to Backend
+///   Backend -> Task2 -> convert format -> send to Client
 ///
-/// Backend Message:
-///   1. Backend sends message
-///   2. Task 2 receives via ws_stream
-///   3. Task 2 converts format (tungstenite -> actix)
-///   4. Task 2 sends to client via session
+/// Close Message:
+///   1. Receive close frame
+///   2. Forward to other endpoint
+///   3. Send acknowledgment
+///   4. Clean up resources
 /// ```
 pub async fn ws_proxy(
     req: HttpRequest,
@@ -105,7 +115,9 @@ pub async fn ws_proxy(
 
     // Split the stream and wrap sink in Arc<Mutex>
     let (backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
+    // Create a new sink for task 1
     let backend_ws_sink = Arc::new(Mutex::new(backend_ws_sink));
+    // Create a new sink for task 2
     let backend_ws_sink2 = backend_ws_sink.clone();
 
     // Task 1: Client to Backend
@@ -157,7 +169,7 @@ pub async fn ws_proxy(
                                         log::error!("[WS_PROXY] Failed to close client: {}", e);
                                     }
 
-                                    // 2. Send acknowledgment and close sink
+                                    // 2. Send acknowledgment to backend and close sink
                                     let mut sink = backend_ws_sink2.lock().await;
                                     let close_frame = reason.map(|r| tungstenite::protocol::CloseFrame {
                                         code: u16::from(r.code).into(),
