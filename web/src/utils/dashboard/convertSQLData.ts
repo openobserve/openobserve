@@ -234,7 +234,7 @@ export const convertSQLData = async (
     const breakdown = innerDataArray.reduce((acc, item) => {
       const breakdownValue = item[breakdownKey];
       const yAxisValue = item[yAxisKey];
-      if (breakdownValue) {
+      if (breakdownValue !== null && breakdownValue !== undefined) {
         acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
       }
       return acc;
@@ -252,7 +252,7 @@ export const convertSQLData = async (
 
     innerDataArray.forEach((item) => {
       const breakdownValue = item[breakdownKey];
-      if (topKeys.includes(breakdownValue)) {
+      if (topKeys.includes(breakdownValue?.toString())) {
         resultArray.push(item);
       } else if (top_results_others) {
         const xAxisValue = String(item[xAxisKey]);
@@ -844,6 +844,21 @@ export const convertSQLData = async (
     });
   };
 
+  const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
+
+  const getFinalAxisValue = (
+    configValue: number | null | undefined,
+    dataValue: number,
+    isMin: boolean,
+  ) => {
+    if (configValue === null || configValue === undefined) {
+      return undefined;
+    }
+    return isMin
+      ? Math.min(configValue, dataValue)
+      : Math.max(configValue, dataValue);
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -1072,6 +1087,8 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
+      min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+      max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap:
         calculateWidthText(
           panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
@@ -1163,9 +1180,10 @@ export const convertSQLData = async (
     if (!breakDownKey) return [];
 
     // Extract unique values for the second x-axis key
+    // NOTE: while filter, we can't compare type as well because set will have string values
     const uniqueValues = [
       ...new Set(missingValueData.map((obj: any) => obj[breakDownKey])),
-    ].filter(Boolean);
+    ].filter((value: any) => value != null || value != undefined);
 
     return uniqueValues;
   }
@@ -1215,7 +1233,8 @@ export const convertSQLData = async (
     yAxisKey: string,
     xAxisKey: string,
   ) => {
-    if (!(breakdownKey && yAxisKey && xAxisKey)) return [];
+    if (!(breakdownKey !== null && yAxisKey !== null && xAxisKey !== null))
+      return [];
 
     const data = missingValueData.filter(
       (it: any) => it[breakdownKey] == xAxisKey,
@@ -1237,7 +1256,7 @@ export const convertSQLData = async (
   ): SeriesObject => {
     return {
       //only append if yaxiskeys length is more than 1
-      name: yAxisName,
+      name: yAxisName?.toString(),
       ...defaultSeriesProps,
       label: getSeriesLabel(),
       originalSeriesName: seriesName,
@@ -1278,7 +1297,7 @@ export const convertSQLData = async (
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
       return yAxisKeys.length === 1
-        ? xAXisKey
+        ? xAXisKey !== ""
           ? xAXisKey
           : label
         : `${xAXisKey} (${label})`;
