@@ -119,13 +119,13 @@ mod tests {
         let now = config::utils::time::now_micros();
         let sqls = [
             (
-                "SELECT 1 from t WHERE time <= cast_to_timestamp(NOW())",
+                "SELECT 1, LENGTH(cast_to_timestamp(NOW())) AS len from t WHERE time <= cast_to_timestamp(NOW())",
                 vec![
-                    "+----------+",
-                    "| Int64(1) |",
-                    "+----------+",
-                    "| 1        |",
-                    "+----------+",
+                    "+----------+-----+",
+                    "| Int64(1) | len |",
+                    "+----------+-----+",
+                    "| 1        | 16  |",
+                    "+----------+-----+",
                 ],
             ),
             (
@@ -150,6 +150,16 @@ mod tests {
             ),
             (
                 "SELECT 1 from t WHERE time > cast_to_timestamp('2025-01-01T00:00:00.000Z')",
+                vec![
+                    "+----------+",
+                    "| Int64(1) |",
+                    "+----------+",
+                    "| 1        |",
+                    "+----------+",
+                ],
+            ),
+            (
+                "SELECT 1 from t WHERE time > cast_to_timestamp('2025-01-01T00:00:00+08:00')",
                 vec![
                     "+----------+",
                     "| Int64(1) |",
