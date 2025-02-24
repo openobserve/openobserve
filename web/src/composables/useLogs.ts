@@ -1480,7 +1480,6 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
       searchObj.data.searchRequestTraceIds = [];
@@ -4628,6 +4627,7 @@ const useLogs = () => {
     queryReq: SearchRequestPayload,
     isPagination: boolean,
     type: "search" | "histogram" | "pageCount",
+    meta?: any,
   ) => {
     const { traceId } = generateTraceContext();
     addTraceId(traceId);
@@ -4638,12 +4638,14 @@ const useLogs = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      meta?: any;
     } = {
       queryReq,
       type,
       isPagination,
       traceId,
       org_id: searchObj.organizationIdentifier,
+      meta,
     };
 
     return payload;
@@ -4726,7 +4728,12 @@ const useLogs = () => {
       }
 
       if (payload.type === "histogram") {
-        handleHistogramResponse(payload.queryReq, payload.traceId, response);
+        handleHistogramResponse(
+          payload.queryReq,
+          payload.traceId,
+          response,
+          payload.meta,
+        );
       }
 
       if (payload.type === "pageCount") {
@@ -4922,6 +4929,7 @@ const useLogs = () => {
     queryReq: SearchRequestPayload,
     traceId: string,
     response: any,
+    meta?: any,
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
@@ -4997,7 +5005,7 @@ const useLogs = () => {
     (async () => {
       try {
         generateHistogramData();
-        refreshPagination(true);
+        if (!meta?.isHistogramOnly) refreshPagination(true);
       } catch (error) {
         console.error("Error processing histogram data:", error);
         searchObj.loadingHistogram = false;
@@ -5017,7 +5025,8 @@ const useLogs = () => {
     //   searchObj.data.queryResults.total = res.data.total;
     // }
 
-    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    if (!meta?.isHistogramOnly)
+      searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
@@ -5468,6 +5477,9 @@ const useLogs = () => {
     extractValueQuery,
     initialQueryPayload,
     refreshPagination,
+    buildWebSocketPayload,
+    initializeWebSocketConnection,
+    addRequestId,
   };
 };
 
