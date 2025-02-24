@@ -875,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
             dashboardPanelData.data.type,
-          )
+          ) && !promqlMode
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
         label="No Value Replacement"
