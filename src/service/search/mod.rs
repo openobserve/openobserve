@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,8 +54,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
-    tracing::info_span,
+    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
@@ -890,9 +889,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
-        let search_type: Option<search::SearchEventType> = result
-            .search_type
-            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
+        let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
+            search::SearchEventType::try_from(s_event_type.as_str())
+                .unwrap_or(search::SearchEventType::UI)
+        });
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,

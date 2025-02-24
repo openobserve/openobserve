@@ -701,8 +701,8 @@ pub fn get_merge_schema_changes(
 #[derive(Clone, Debug, Serialize)]
 pub struct SchemaCache {
     schema: SchemaRef,
-    fields_map: HashMap<String, usize>,
-    hash_key: String,
+    fields_map: Arc<HashMap<String, usize>>,
+    hash_key: Arc<str>,
 }
 
 impl SchemaCache {
@@ -720,8 +720,8 @@ impl SchemaCache {
             .collect();
         Self {
             schema,
-            fields_map,
-            hash_key,
+            fields_map: Arc::new(fields_map),
+            hash_key: hash_key.into(),
         }
     }
 
