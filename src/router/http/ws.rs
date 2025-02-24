@@ -23,35 +23,50 @@ use reqwest::header::{HeaderName, HeaderValue};
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
 
-/// WebSocket proxy handler that manages two WebSocket connections and message forwarding.
+/// WebSocket proxy that manages bidirectional communication using two concurrent tasks.
 ///
-/// # Connections
-/// 1. Client<->Router: Using actix_ws
-///    - Handles client WebSocket connection
-///    - Processes client messages and forwards to backend
-///
-/// 2. Router<->Backend: Using tokio_tungstenite
-///    - Maintains connection to backend service
-///    - Forwards client messages and receives responses
-///
-/// # Message Flow
+/// # Architecture Overview
 /// ```text
-/// Client <-> (actix_ws) <-> Router <-> (tokio_tungstenite) <-> Backend
-///
-/// 1. Client to Backend:
-///    - Client sends message
-///    - Router receives via client_msg_stream.next()
-///    - Router converts format and forwards via backend_ws_sink.send()
-///
-/// 2. Backend to Client:
-///    - Backend sends message
-///    - Router receives via backend_ws_stream.next()
-///    - Router converts format and forwards via session.text/binary()
+/// +--------+     +-----------------Router Process----------------+     +---------+
+/// |        |     |  +-------------+        +-------------+       |     |         |
+/// |        |     |  |    Task 1   |        |    Task 2   |       |     |         |
+/// |        |     |  |client_to_bkd|        |backend_to_cl|       |     |         |
+/// |        |     |  +-------------+        +-------------+       |     |         |
+/// |        |     |    ↑    |               |     ↓               |     |         |
+/// |Client  |<--->| msg_stream  ws_sink   ws_stream  session      |<--->| Backend |
+/// |        |     |                                               |     |         |
+/// +--------+     +-----------------------------------------------+     +---------+
 /// ```
 ///
-/// # Close Handling
-/// - Client initiated: Forward close to backend, wait for ack, then close client
-/// - Backend initiated: Forward close to client, then close backend connection
+/// # Stream Flow
+/// ```text
+/// 1. Client -> Backend (Task 1: client_to_backend)
+///    client_msg_stream -> convert format -> backend_ws_sink
+///
+/// 2. Backend -> Client (Task 2: backend_to_client)
+///    backend_ws_stream -> convert format -> session.send
+/// ```
+///
+/// # Key Features
+/// - Two independent tasks handle each direction
+/// - No shared state between tasks
+/// - Tasks complete naturally on connection close
+/// - Automatic message format conversion between protocols
+///
+/// # Example Message Flow
+/// ```text
+/// Client Message:
+///   1. Client sends message
+///   2. Task 1 receives via client_msg_stream
+///   3. Task 1 converts format (actix -> tungstenite)
+///   4. Task 1 sends to backend via ws_sink
+///
+/// Backend Message:
+///   1. Backend sends message
+///   2. Task 2 receives via ws_stream
+///   3. Task 2 converts format (tungstenite -> actix)
+///   4. Task 2 sends to client via session
+/// ```
 pub async fn ws_proxy(
     req: HttpRequest,
     payload: web::Payload,
@@ -128,6 +143,9 @@ pub async fn ws_proxy(
                     let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                     match ws_msg {
                         Message::Close(reason) => {
+                            // This handles both:
+                            // 1. Backend initiated close
+                            // 2. Backend's acknowledgment of client's close
                             log::info!("[WS_PROXY] Backend -> Router close");
                             if let Err(e) = session.close(reason).await {
                                 log::error!("[WS_PROXY] Failed to close client: {}", e);
