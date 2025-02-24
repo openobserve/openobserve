@@ -1688,6 +1688,12 @@ pub struct HealthCheck {
 #[derive(EnvConfig)]
 pub struct RateLimit {
     #[env_config(
+        name = "ZO_RATELIMIT_ENABLED",
+        default = false,
+        help = "ratelimit enabled"
+    )]
+    pub ratelimit_enabled: bool,
+    #[env_config(
         name = "ZO_RULES_REFRESH_INTERVAL",
         default = 10,
         help = "unit: seconds, refresh interval for rate limit rules"
