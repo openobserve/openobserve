@@ -794,3 +794,9 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
 }
+
+#[get("/list")]
+async fn list_node() -> Result<HttpResponse, Error> {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    Ok(MetaHttpResponse::json(nodes))
+}
