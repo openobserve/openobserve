@@ -179,6 +179,21 @@ export const convertPromQLData = async (
     };
   };
 
+  const [min, max] = getMetricMinMaxValue(searchQueryData);
+  
+  const getFinalAxisValue = (
+    configValue: number | null | undefined,
+    dataValue: number,
+    isMin: boolean,
+  ) => {
+    if (configValue === null || configValue === undefined) {
+      return undefined;
+    }
+    return isMin
+      ? Math.min(configValue, dataValue)
+      : Math.max(configValue, dataValue);
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -320,6 +335,8 @@ export const convertPromQLData = async (
     },
     yAxis: {
       type: "value",
+      min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+      max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
         formatter: function (name: any) {
           return formatUnitValue(
@@ -723,7 +740,7 @@ export const convertPromQLData = async (
       data: markLines,
     },
     markArea: getSeriesMarkArea(),
-  zlevel: 1,
+    zlevel: 1,
   });
   options.series = options.series.flat();
 
