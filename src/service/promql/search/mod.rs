@@ -261,12 +261,12 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {}, took: {} ms",
                     &node.get_grpc_addr(),
                     req_need_wal,
-                    response.took,
                     scan_stats.files,
                     scan_stats.original_size,
+                    response.took,
                 );
                 Ok(response)
             }
