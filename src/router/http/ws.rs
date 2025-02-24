@@ -20,13 +20,38 @@ use actix_ws::Message;
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::{HeaderName, HeaderValue};
-use tokio::sync::oneshot;
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
 
-/// WebSocket proxy handler that manages two WebSocket connections:
-/// 1. Client<->Router (actix_ws)
-/// 2. Router<->Backend (tokio_tungstenite)
+/// WebSocket proxy handler that manages two WebSocket connections and message forwarding.
+///
+/// # Connections
+/// 1. Client<->Router: Using actix_ws
+///    - Handles client WebSocket connection
+///    - Processes client messages and forwards to backend
+///
+/// 2. Router<->Backend: Using tokio_tungstenite
+///    - Maintains connection to backend service
+///    - Forwards client messages and receives responses
+///
+/// # Message Flow
+/// ```text
+/// Client <-> (actix_ws) <-> Router <-> (tokio_tungstenite) <-> Backend
+///
+/// 1. Client to Backend:
+///    - Client sends message
+///    - Router receives via client_msg_stream.next()
+///    - Router converts format and forwards via backend_ws_sink.send()
+///
+/// 2. Backend to Client:
+///    - Backend sends message
+///    - Router receives via backend_ws_stream.next()
+///    - Router converts format and forwards via session.text/binary()
+/// ```
+///
+/// # Close Handling
+/// - Client initiated: Forward close to backend, wait for ack, then close client
+/// - Backend initiated: Forward close to client, then close backend connection
 pub async fn ws_proxy(
     req: HttpRequest,
     payload: web::Payload,
@@ -61,134 +86,88 @@ pub async fn ws_proxy(
         );
         actix_web::error::ErrorInternalServerError("Failed to connect to backend websocket service")
     })?;
-
-    // Split backend connection for bidirectional communication
     let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
 
-    // Channels for coordinating task shutdown
-    let (client_kill_tx, client_kill_rx) = oneshot::channel::<()>();
-    let (backend_kill_tx, backend_kill_rx) = oneshot::channel::<()>();
-
     // Task 1: Forward messages from Client to Backend
-    let client_to_backend = {
-        let mut client_kill_rx = client_kill_rx;
-        async move {
-            loop {
-                tokio::select! {
-                    Some(msg_result) = client_msg_stream.next() => {
-                        match msg_result {
-                            Ok(msg) => {
-                                let ws_msg = from_actix_message(msg);
-                                match ws_msg {
-                                    tungstenite::protocol::Message::Close(reason) => {
-                                        log::info!("[WS_PROXY] Client initiated close ");
-                                        let close_msg = tungstenite::protocol::Message::Close(reason.clone());
-                                        if let Err(e) = backend_ws_sink.send(close_msg).await {
-                                            log::error!("[WS_PROXY] Failed to forward close to backend: {}", e);
-                                        }
-                                        let _ = backend_kill_tx.send(());
-                                        break;
-                                    }
-                                    _ => {
-                                        if backend_ws_sink.send(ws_msg).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                }
+    let client_to_backend = async move {
+        while let Some(msg_result) = client_msg_stream.next().await {
+            match msg_result {
+                Ok(msg) => {
+                    let ws_msg = from_actix_message(msg);
+                    match ws_msg {
+                        tungstenite::protocol::Message::Close(reason) => {
+                            log::info!("[WS_PROXY] Client initiated close");
+                            // Forward close to backend
+                            let close_msg = tungstenite::protocol::Message::Close(reason.clone());
+                            if let Err(e) = backend_ws_sink.send(close_msg).await {
+                                log::error!("[WS_PROXY] Failed to forward close: {}", e);
                             }
-                            Err(e) => {
-                                log::error!("[WS_PROXY] Client error: {:?}", e);
+                            break;
+                        }
+                        _ => {
+                            if backend_ws_sink.send(ws_msg).await.is_err() {
                                 break;
                             }
                         }
                     }
-                    _ = &mut client_kill_rx => {
-                        log::info!("[WS_PROXY] Client task received shutdown signal");
-                        break;
-                    }
+                }
+                Err(e) => {
+                    log::error!("[WS_PROXY] Client error: {:?}", e);
+                    break;
                 }
             }
         }
     };
 
     // Task 2: Forward messages from Backend to Client
-    let backend_to_client = {
-        let mut backend_kill_rx = backend_kill_rx;
-        let mut closed_normally = false;
-        async move {
-            loop {
-                tokio::select! {
-                    Some(msg_result) = backend_ws_stream.next() => {
-                        match msg_result {
-                            Ok(msg) => {
-                                let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
-                                match ws_msg {
-                                    Message::Close(reason) => {
-                                        log::info!("[WS_PROXY] Backend initiated close: {:?}", reason);
-                                        // Send close to client
-                                        let _ = session.close(reason).await;
-                                        // Then signal client to shutdown
-                                        let _ = client_kill_tx.send(());
-                                        closed_normally = true;
-                                        break;
-                                    }
-                                    Message::Text(text) => {
-                                        if session.text(text).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                    Message::Binary(bin) => {
-                                        if session.binary(bin).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                    Message::Ping(ping) => {
-                                        if session.ping(&ping).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                    Message::Pong(pong) => {
-                                        if session.pong(&pong).await.is_err() {
-                                            break;
-                                        }
-                                    }
-                                    Message::Continuation(_) => {
-                                        log::warn!("[WS_PROXY] Unsupported message type from backend: {:?}", ws_msg);
-                                    }
-                                    Message::Nop => {
-                                        log::warn!("[WS_PROXY] Unsupported message type from backend: Nop");
-                                    }
-                                }
+    let backend_to_client = async move {
+        while let Some(msg_result) = backend_ws_stream.next().await {
+            match msg_result {
+                Ok(msg) => {
+                    let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
+                    match ws_msg {
+                        Message::Close(reason) => {
+                            log::info!("[WS_PROXY] Backend initiated close");
+                            if let Err(e) = session.close(reason).await {
+                                log::error!("[WS_PROXY] Failed to close client: {}", e);
                             }
-                            Err(e) => {
-                                log::error!("[WS_PROXY] Backend message error: {:?}", e);
+                            break;
+                        }
+                        Message::Text(text) => {
+                            if session.text(text).await.is_err() {
                                 break;
                             }
                         }
-                    }
-                    _ = &mut backend_kill_rx => {
-                        log::info!("[WS_PROXY] Backend task received shutdown signal");
-                        closed_normally = true;
-                        break;
+                        Message::Binary(bin) => {
+                            if session.binary(bin).await.is_err() {
+                                break;
+                            }
+                        }
+                        Message::Ping(ping) => {
+                            if session.ping(&ping).await.is_err() {
+                                break;
+                            }
+                        }
+                        Message::Pong(pong) => {
+                            if session.pong(&pong).await.is_err() {
+                                break;
+                            }
+                        }
+                        _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", ws_msg),
                     }
                 }
-            }
-
-            if !closed_normally {
-                log::warn!("[WS_PROXY] Backend connection closed unexpectedly");
-            } else {
-                log::info!("[WS_PROXY] Backend connection closed normally");
+                Err(e) => {
+                    log::error!("[WS_PROXY] Backend error: {:?}", e);
+                    break;
+                }
             }
         }
     };
 
-    // Spawn both tasks and wait for completion
-    let backend_handle = rt::spawn(backend_to_client);
-    let client_handle = rt::spawn(client_to_backend);
-
+    // Spawn tasks
     rt::spawn(async move {
-        let _ = tokio::join!(backend_handle, client_handle);
-        log::info!("[WS_PROXY] backend and client tasks completed");
+        let _ = tokio::join!(rt::spawn(client_to_backend), rt::spawn(backend_to_client));
+        log::info!("[WS_PROXY] WebSocket proxy completed");
     });
 
     Ok(response)
