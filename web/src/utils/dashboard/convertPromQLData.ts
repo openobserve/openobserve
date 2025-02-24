@@ -179,6 +179,21 @@ export const convertPromQLData = async (
     };
   };
 
+  const [min, max] = getMetricMinMaxValue(searchQueryData);
+  
+  const getFinalAxisValue = (
+    configValue: number | null | undefined,
+    dataValue: number,
+    isMin: boolean,
+  ) => {
+    if (configValue === null || configValue === undefined) {
+      return undefined;
+    }
+    return isMin
+      ? Math.min(configValue, dataValue)
+      : Math.max(configValue, dataValue);
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -320,6 +335,8 @@ export const convertPromQLData = async (
     },
     yAxis: {
       type: "value",
+      min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+      max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
         formatter: function (name: any) {
           return formatUnitValue(
@@ -433,6 +450,22 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                label: {
+                  show: panelSchema.config?.label_option?.position != null,
+                  position:
+                    panelSchema.config?.label_option?.position || "None",
+                  rotate: panelSchema.config?.label_option?.rotate || 0,
+                },
+                smooth:
+                  panelSchema.config?.line_interpolation === "smooth" ||
+                  panelSchema.config?.line_interpolation == null,
+                step: ["step-start", "step-end", "step-middle"].includes(
+                  panelSchema.config?.line_interpolation,
+                )
+                  ? // TODO: replace this with type integrations
+                    panelSchema.config.line_interpolation.replace("step-", "")
+                  : false,
+                showSymbol: panelSchema.config?.show_symbol ?? false,
                 zlevel: 2,
                 itemStyle: {
                   color: (() => {
@@ -723,7 +756,7 @@ export const convertPromQLData = async (
       data: markLines,
     },
     markArea: getSeriesMarkArea(),
-  zlevel: 1,
+    zlevel: 1,
   });
   options.series = options.series.flat();
 
@@ -874,8 +907,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
-        showSymbol: false,
         lineStyle: { width: 1.5 },
       };
     case "scatter":
@@ -907,9 +938,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
         areaStyle: {},
-        showSymbol: false,
         lineStyle: { width: 1.5 },
       };
     case "stacked":
@@ -921,10 +950,8 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area-stacked":
       return {
         type: "line",
-        smooth: true,
         stack: "Total",
         areaStyle: {},
-        showSymbol: false,
         emphasis: {
           focus: "series",
         },

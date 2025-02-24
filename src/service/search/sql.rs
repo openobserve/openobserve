@@ -25,7 +25,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -159,10 +159,10 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((cfg.common.column_timestamp.clone(), OrderBy::Desc));
+            order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
@@ -259,7 +259,7 @@ impl Sql {
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
         {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
@@ -340,13 +340,20 @@ fn generate_select_star_schema(
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
             let skip_original_column =
                 !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
-                    let columns = columns.get(&name);
+                    let mut columns = columns.get(&name).cloned();
+                    // filter columns by defined schema fields
+                    if !defined_schema_fields.is_empty() {
+                        let uds_columns = defined_schema_fields.iter().collect::<HashSet<_>>();
+                        if let Some(columns) = columns.as_mut() {
+                            columns.retain(|column| uds_columns.contains(column));
+                        }
+                    }
                     let fts_fields = get_stream_setting_fts_fields(&stream_settings);
                     generate_quick_mode_fields(
                         schema.schema(),
@@ -383,8 +390,8 @@ fn generate_user_defined_schema(
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(cfg.common.column_timestamp.to_string());
+    if !fields.contains(TIMESTAMP_COL_NAME) {
+        fields.insert(TIMESTAMP_COL_NAME.to_string());
     }
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
@@ -404,7 +411,7 @@ fn generate_user_defined_schema(
 
 fn generate_quick_mode_fields(
     schema: &Schema,
-    columns: Option<&HashSet<String>>,
+    columns: Option<HashSet<String>>,
     fts_fields: &[String],
     skip_original_column: bool,
 ) -> Vec<Arc<arrow_schema::Field>> {
@@ -444,17 +451,17 @@ fn generate_quick_mode_fields(
         .collect::<HashSet<_>>();
 
     // check _timestamp
-    if !fields_name.contains(&cfg.common.column_timestamp) {
-        if let Ok(field) = schema.field_with_name(&cfg.common.column_timestamp) {
+    if !fields_name.contains(TIMESTAMP_COL_NAME) {
+        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
-            fields_name.insert(cfg.common.column_timestamp.to_string());
+            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
         }
     }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(column) {
-                if let Ok(field) = schema.field_with_name(column) {
+            if !fields_name.contains(&column) {
+                if let Ok(field) = schema.field_with_name(&column) {
                     fields.push(Arc::new(field.clone()));
                     fields_name.insert(column.to_string());
                 }
@@ -494,8 +501,8 @@ fn generate_schema_fields(
     let mut columns = columns;
 
     // 1. add timestamp field
-    if !columns.contains(&get_config().common.column_timestamp) {
-        columns.insert(get_config().common.column_timestamp.clone());
+    if !columns.contains(TIMESTAMP_COL_NAME) {
+        columns.insert(TIMESTAMP_COL_NAME.to_string());
     }
 
     // 2. check _o2_id
@@ -1017,10 +1024,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::UnnamedExpr(expr) => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1028,10 +1032,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::ExprWithAlias { expr, alias: _ } => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1047,7 +1048,7 @@ impl VisitorMut for AddTimestampVisitor {
                 select.projection.insert(
                     0,
                     SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
-                        get_config().common.column_timestamp.clone(),
+                        TIMESTAMP_COL_NAME.to_string(),
                     ))),
                 );
             }
@@ -1673,8 +1674,7 @@ pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors
     if is_complex_query(&mut statement) {
         return Ok(sql.to_string());
     }
-    let mut visitor =
-        AddOrderingTermVisitor::new(get_config().common.column_timestamp.to_string(), is_asc);
+    let mut visitor = AddOrderingTermVisitor::new(TIMESTAMP_COL_NAME.to_string(), is_asc);
     statement.visit(&mut visitor);
     Ok(statement.to_string())
 }

@@ -16,7 +16,6 @@
 pub mod arrow;
 pub mod async_file;
 pub mod base64;
-pub mod cgroup;
 pub mod download_utils;
 pub mod file;
 pub mod flatten;
@@ -33,6 +32,7 @@ pub mod schema_ext;
 pub mod sort;
 pub mod sql;
 pub mod str;
+pub mod sysinfo;
 pub mod tantivy;
 pub mod time;
 pub mod util;

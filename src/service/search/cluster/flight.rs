@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
@@ -110,7 +110,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
         sql.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -131,7 +131,11 @@ pub async fn search(
     let node_group = req
         .search_event_type
         .as_ref()
-        .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
+        .map(|v| {
+            SearchEventType::try_from(v.as_str())
+                .ok()
+                .map(RoleGroup::from)
+        })
         .unwrap_or(None);
     let nodes = get_online_querier_nodes(trace_id, node_group).await?;
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -852,7 +856,7 @@ async fn get_inverted_index_file_lists(
     )
     .await?;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         sql.time_range,
         idx_file_list.len(),
         idx_scan_size,

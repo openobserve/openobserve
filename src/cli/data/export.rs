@@ -17,10 +17,7 @@ use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
 use async_trait::async_trait;
-use config::meta::{
-    search::{self},
-    stream::StreamType,
-};
+use config::{meta::search, TIMESTAMP_COL_NAME};
 
 use crate::{
     cli::data::{cli::Cli, Context},
@@ -38,13 +35,8 @@ impl Context for Export {
     async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
         let map = HashMap::from([("type".to_string(), c.stream_type)]);
         let query_map = Query(map);
+        let stream_type = get_stream_type_from_request(&query_map).unwrap_or_default();
 
-        let stream_type = match get_stream_type_from_request(&query_map) {
-            Ok(v) => v.unwrap_or(StreamType::Logs),
-            Err(_) => return Ok(false),
-        };
-
-        let cfg = config::get_config();
         let table = c.stream_name;
         let search_type = match get_search_type_from_request(&query_map) {
             Ok(v) => v,
@@ -56,7 +48,7 @@ impl Context for Export {
         let query = search::Query {
             sql: format!(
                 "select * from {} ORDER BY {} ASC",
-                table, cfg.common.column_timestamp
+                table, TIMESTAMP_COL_NAME
             ),
             from: 0,
             size: 100,
