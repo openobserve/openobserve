@@ -104,6 +104,7 @@ jobs:
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
             "pipelines.spec.js",
+            "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
             "dashboards/visualize.spec.js",

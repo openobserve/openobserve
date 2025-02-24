@@ -169,7 +169,9 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.locator('[data-test="menu-link-\/dashboards-item"]').click();
 
   await this.page.waitForSelector('[data-test="dashboard-add"]');
+  await this.page.waitForTimeout(2000);
   await this.page.locator('[data-test="dashboard-add"]').click();
+  await this.page.waitForTimeout(2000);
   await this.page.locator('[data-test="add-dashboard-name"]').fill("Customcharts");
   await this.page.locator('[data-test="dashboard-add-submit"]').click();
 
