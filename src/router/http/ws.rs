@@ -118,6 +118,8 @@ pub async fn ws_proxy(
                                 log::error!("[WS_PROXY] Failed to forward close: {}", e);
                             }
                             log::info!("[WS_PROXY] Client -> Router close completed");
+                            let _ = backend_ws_sink.close().await;
+                            log::info!("[WS_PROXY] Client -> Backend close completed");
                             break;
                         }
                         _ => {
