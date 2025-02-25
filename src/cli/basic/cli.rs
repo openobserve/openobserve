@@ -142,6 +142,12 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .action(clap::ArgAction::SetTrue)
                     .help("insert file list into db"),
             ]),
+            clap::Command::new("node").about("node command").subcommands([
+                clap::Command::new("offline").about("offline node"),
+                clap::Command::new("online").about("online node"),
+                clap::Command::new("flush").about("flush memtable to disk"),
+                clap::Command::new("list").about("list cached nodes"),
+            ]),
         ])
         .get_matches();
 
@@ -323,6 +329,26 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let prefix = command.get_one::<String>("prefix").unwrap();
             let insert = command.get_flag("insert");
             super::load::load_file_list_from_s3(prefix, insert).await?;
+        }
+        "node" => {
+            let command = command.subcommand();
+            match command {
+                Some(("offline", _)) => {
+                    super::http::node_offline().await?;
+                }
+                Some(("online", _)) => {
+                    super::http::node_online().await?;
+                }
+                Some(("flush", _)) => {
+                    super::http::node_flush().await?;
+                }
+                Some(("list", _)) => {
+                    super::http::node_list().await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+                }
+            }
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

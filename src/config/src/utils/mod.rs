@@ -23,6 +23,7 @@ pub mod hash;
 pub mod inverted_index;
 pub mod json;
 pub mod md5;
+pub mod size;
 pub mod parquet;
 pub mod prom_json_encoder;
 pub mod rand;
