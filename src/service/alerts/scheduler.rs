@@ -100,12 +100,21 @@ pub async fn run() -> Result<(), anyhow::Error> {
     for (i, trigger) in triggers.into_iter().enumerate() {
         let trace_id = format!("{}-{}", trace_id, i);
         let task = tokio::task::spawn(async move {
+            let key = format!("{}-{}/{}", trigger.module, trigger.org, trigger.module_key);
+            log::debug!(
+                "[SCHEDULER trace_id {trace_id}] start processing trigger: {}",
+                key
+            );
             if let Err(e) = handle_triggers(&trace_id, trigger).await {
                 log::error!(
                     "[SCHEDULER trace_id {trace_id}] Error handling trigger: {}",
                     e
                 );
             }
+            log::debug!(
+                "[SCHEDULER trace_id {trace_id}] finished processing trigger: {}",
+                key
+            );
         });
         tasks.push(task);
     }
