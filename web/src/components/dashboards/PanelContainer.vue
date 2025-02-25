@@ -582,9 +582,7 @@ export default defineComponent({
         currentUrl,
       );
 
-      const searchParams = Object.fromEntries(logsUrl.searchParams.entries());
-      const routerUrl = `/logs?${new URLSearchParams(searchParams).toString()}`;
-      window.open(routerUrl, "_blank");
+      window.open(logsUrl.toString(), "_blank");
     };
 
     //create a duplicate panel
