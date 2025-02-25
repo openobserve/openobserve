@@ -485,7 +485,7 @@ WHERE id IN ({});",
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
+        let res = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = retries + 1
 WHERE status = ? AND end_time <= ?
@@ -496,6 +496,10 @@ WHERE status = ? AND end_time <= ?
         .bind(now)
         .execute(&pool)
         .await?;
+        log::debug!(
+            "[SCHEDULER] watch_timeout for scheduler updated {} rows",
+            res.rows_affected()
+        );
         Ok(())
     }
 

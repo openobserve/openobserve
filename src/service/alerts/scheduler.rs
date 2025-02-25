@@ -17,6 +17,7 @@ use std::{collections::HashMap, str::FromStr, time::Instant};
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         alerts::FrequencyType,
@@ -140,6 +141,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
     let triggered_at = trigger.start_time.unwrap_or_default();
+    let source_node = LOCAL_NODE.name.clone();
 
     if is_realtime && is_silenced {
         log::debug!(
@@ -253,8 +255,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 success_response: None,
                 is_partial: None,
                 evaluation_took_in_secs: None,
+                source_node: Some(source_node.clone()),
             })
             .await;
+            log::info!(
+                "[SCHEDULER] alert {} skipped due to delay: {}",
+                &trigger.module_key,
+                delay
+            );
             (0, true)
         } else {
             (delay, false)
@@ -311,6 +319,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         is_partial: None,
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
+        source_node: Some(source_node),
     };
 
     let evaluation_took = Instant::now();
@@ -322,6 +331,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         let err = result.err().unwrap();
         trigger_data_stream.status = TriggerDataStatus::Failed;
         let err_string = err.to_string();
+        log::error!(
+            "[SCHEDULER] alert {} evaluation failed: {}",
+            &new_trigger.module_key,
+            err_string
+        );
         if err_string.starts_with("Partial") {
             trigger_data_stream.is_partial = Some(true);
         }
@@ -377,6 +391,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     let (ret, end_time) = result.unwrap();
+    log::debug!(
+        "[SCHEDULER] result of alert {} evaluation matched condition: {}",
+        &new_trigger.module_key,
+        ret.is_some(),
+    );
     if ret.is_some() {
         log::info!(
             "Alert conditions satisfied, org: {}, module_key: {}",
@@ -601,6 +620,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
         log::error!("Failed to update alert: {alert_name} after trigger: {e}");
     }
+
+    log::debug!(
+        "[SCHEDULER] publish_triggers_usage for alert: {}",
+        &trigger_data_stream.key
+    );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
 
@@ -712,6 +736,7 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         is_partial: None,
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
+        source_node: Some(LOCAL_NODE.name.clone()),
     };
 
     if trigger.retries >= max_retries {
@@ -779,6 +804,10 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
             result.err().unwrap()
         );
     }
+    log::debug!(
+        "[SCHEDULER] publish_triggers_usage for report: {}",
+        &trigger_data_stream.key
+    );
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
@@ -898,6 +927,7 @@ async fn handle_derived_stream_triggers(
             is_partial: None,
             delay_in_secs: None,
             evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
         };
 
         // evaluate trigger and configure trigger next run time
