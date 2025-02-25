@@ -17,17 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-query-routing-section "
-    class="full-width stream-routing-section "
+    class="full-width stream-routing-section"
     :class="[
       store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-      { 'fullscreen-mode': isFullscreenMode }
+      { 'fullscreen-mode': isFullscreenMode },
     ]"
   >
-
-
     <q-separator />
 
-    <div class="stream-routing-container q-px-md  ">
+    <div class="stream-routing-container q-px-md">
       <q-form ref="queryFormRef" @submit="saveQueryData">
         <div class="full-width">
           <scheduled-pipeline
@@ -52,13 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @delete:node="openDeleteDialog"
             @update:fullscreen="updateFullscreenMode"
             @update:stream_type="updateStreamType"
-
-            
             class="q-mt-sm"
           />
         </div>
-
- 
       </q-form>
     </div>
   </div>
@@ -392,16 +386,11 @@ const saveQueryData = async () => {
       timezone: formData.trigger_condition.timezone,
     },
   };
-  if(formData.query_condition.type == 'promql'){
-
-    if(queryPayload?.query_condition){
-     queryPayload.query_condition.search_event_type  = "";
-    }
-    if(queryPayload?.query_condition){
-       queryPayload.query_condition.sql = "";
+  if (formData.query_condition.type == "promql") {
+    if (queryPayload?.query_condition) {
+      queryPayload.query_condition.sql = "";
     }
     queryPayload.query_condition.promql_condition = getDefaultPromqlCondition();
-    
   }
   addNode(queryPayload);
   emit("cancel:hideform");
@@ -451,7 +440,7 @@ const removeVariable = (variable: any) => {
 };
 
 const validateSqlQuery = () => {
-  if(streamRoute.value.query_condition.type == 'promql'){
+  if (streamRoute.value.query_condition.type == "promql") {
     isValidSqlQuery.value = true;
     return;
   }
@@ -459,7 +448,6 @@ const validateSqlQuery = () => {
     sqlMode: true,
     streamName: streamRoute.value.name as string,
   });
-
 
   delete query.aggs;
 
@@ -499,8 +487,8 @@ const updateStreamType = (val: string) => {
 };
 const updateQueryType = (val: string) => {
   streamRoute.value.query_condition.type = val;
-  if(val == 'promql'){
-    streamRoute.value.query_condition.sql = '';
+  if (val == "promql") {
+    streamRoute.value.query_condition.sql = "";
   }
 };
 </script>
