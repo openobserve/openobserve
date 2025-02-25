@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{collections::HashMap, str::FromStr, time::Instant};
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
     cluster::LOCAL_NODE,
-    get_config,
+    get_config, ider,
     meta::{
         alerts::FrequencyType,
         dashboards::reports::ReportFrequencyType,
@@ -53,8 +53,10 @@ use crate::service::{
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    log::debug!("Pulling jobs from scheduler");
+    let trace_id = ider::generate();
+    log::debug!("[SCHEDULER trace_id {trace_id}] Pulling jobs from scheduler");
     let cfg = get_config();
+
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)
@@ -66,29 +68,66 @@ pub async fn run() -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    log::info!("Pulled {} jobs from scheduler", triggers.len());
+    log::info!(
+        "[SCHEDULER trace_id {trace_id}] Pulled {} jobs from scheduler",
+        triggers.len()
+    );
+
+    if !triggers.is_empty() {
+        let mut grouped_triggers: std::collections::HashMap<
+            infra::scheduler::TriggerModule,
+            Vec<&infra::scheduler::Trigger>,
+        > = HashMap::new();
+
+        // Group triggers by module
+        for trigger in &triggers {
+            grouped_triggers
+                .entry(trigger.module.clone())
+                .or_default()
+                .push(trigger);
+        }
+
+        // Print counts for each module
+        for (module, triggers) in grouped_triggers {
+            log::info!(
+                "[SCHEDULER trace_id {trace_id}] Pulled {:?}: {} jobs",
+                module,
+                triggers.len()
+            );
+        }
+    }
 
     let mut tasks = Vec::new();
-    for trigger in triggers {
+    for (i, trigger) in triggers.into_iter().enumerate() {
+        let trace_id = format!("{}-{}", trace_id, i);
         let task = tokio::task::spawn(async move {
-            if let Err(e) = handle_triggers(trigger).await {
-                log::error!("[SCHEDULER] Error handling trigger: {}", e);
+            if let Err(e) = handle_triggers(&trace_id, trigger).await {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Error handling trigger: {}",
+                    e
+                );
             }
         });
         tasks.push(task);
     }
     if let Err(e) = try_join_all(tasks).await {
-        log::error!("[SCHEDULER] Error handling triggers: {}", e);
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] Error handling triggers: {}",
+            e
+        );
     }
     Ok(())
 }
 
-pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+pub async fn handle_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
     match trigger.module {
-        db::scheduler::TriggerModule::Report => handle_report_triggers(trigger).await,
-        db::scheduler::TriggerModule::Alert => handle_alert_triggers(trigger).await,
+        db::scheduler::TriggerModule::Report => handle_report_triggers(trace_id, trigger).await,
+        db::scheduler::TriggerModule::Alert => handle_alert_triggers(trace_id, trigger).await,
         db::scheduler::TriggerModule::DerivedStream => {
-            handle_derived_stream_triggers(trigger).await
+            handle_derived_stream_triggers(trace_id, trigger).await
         }
     }
 }
@@ -107,10 +146,13 @@ fn get_max_considerable_delay(frequency: i64) -> i64 {
     std::cmp::min(max_delay, max_considerable_delay)
 }
 
-async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+async fn handle_alert_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
-        "Inside handle_alert_triggers: processing trigger: {}",
+        "[SCHEDULER trace_id {trace_id}] Inside handle_alert_triggers: processing trigger: {}",
         &trigger.module_key
     );
     let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
@@ -126,7 +168,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     if is_realtime && is_silenced {
         log::debug!(
-            "Realtime alert need wakeup, {}/{}",
+            "[SCHEDULER trace_id {trace_id}] Realtime alert need wakeup, {}/{}",
             org_id,
             &trigger.module_key
         );
@@ -189,7 +231,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         // It has been tried the maximum time, just update the
         // next_run_at to the next expected trigger time
         log::info!(
-            "This alert trigger: {}/{} has passed maximum retries, skipping to next run",
+            "[SCHEDULER trace_id {trace_id}] This alert trigger: {}/{} has passed maximum retries, skipping to next run",
             &new_trigger.org,
             &new_trigger.module_key
         );
@@ -253,7 +295,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             })
             .await;
             log::info!(
-                "[SCHEDULER] alert {} skipped due to delay: {}",
+                "[SCHEDULER trace_id {trace_id}] alert {} skipped due to delay: {}",
                 &trigger.module_key,
                 delay
             );
@@ -316,7 +358,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.status = TriggerDataStatus::Failed;
         let err_string = err.to_string();
         log::error!(
-            "[SCHEDULER] alert {} evaluation failed: {}",
+            "[SCHEDULER trace_id {trace_id}] alert {} evaluation failed: {}",
             &new_trigger.module_key,
             err_string
         );
@@ -336,7 +378,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     if let Err(e) =
                         db::alerts::alert::set_without_updating_trigger(&org_id, alert).await
                     {
-                        log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+                        log::error!("[SCHEDULER trace_id {trace_id}] Failed to update alert: {alert_name} after trigger: {e}");
                     }
                 }
             }
@@ -378,13 +420,13 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     let (ret, end_time) = result.unwrap();
     log::debug!(
-        "[SCHEDULER] result of alert {} evaluation matched condition: {}",
+        "[SCHEDULER trace_id {trace_id}] result of alert {} evaluation matched condition: {}",
         &new_trigger.module_key,
         ret.is_some(),
     );
     if ret.is_some() {
         log::info!(
-            "Alert conditions satisfied, org: {}, module_key: {}",
+            "[SCHEDULER trace_id {trace_id}] Alert conditions satisfied, org: {}, module_key: {}",
             &new_trigger.org,
             &new_trigger.module_key
         );
@@ -487,14 +529,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 let err_msg = err_msg.trim().to_owned();
                 if !err_msg.is_empty() {
                     log::error!(
-                        "Some notifications for alert {}/{} could not be sent: {err_msg}",
+                        "[SCHEDULER trace_id {trace_id}] Some notifications for alert {}/{} could not be sent: {err_msg}",
                         &new_trigger.org,
                         &new_trigger.module_key
                     );
                     trigger_data_stream.error = Some(err_msg);
                 } else {
                     log::info!(
-                        "Alert notification sent, org: {}, module_key: {}",
+                        "[SCHEDULER trace_id {trace_id}] Alert notification sent, org: {}, module_key: {}",
                         &new_trigger.org,
                         &new_trigger.module_key
                     );
@@ -513,7 +555,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             }
             Err(e) => {
                 log::error!(
-                    "Error sending alert notification: org: {}, module_key: {}",
+                    "[SCHEDULER trace_id {trace_id}] Error sending alert notification: org: {}, module_key: {}",
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
@@ -521,7 +563,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
                     log::debug!(
-                        "This alert trigger: {}/{} has reached maximum retries",
+                        "[SCHEDULER trace_id {trace_id}] This alert trigger: {}/{} has reached maximum retries",
                         &new_trigger.org,
                         &new_trigger.module_key
                     );
@@ -559,7 +601,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
     } else {
         log::info!(
-            "Alert conditions not satisfied, org: {}, module_key: {}",
+            "[SCHEDULER trace_id {trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
             &new_trigger.org,
             &new_trigger.module_key
         );
@@ -586,16 +628,23 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
+    log::debug!(
+        "[SCHEDULER trace_id {trace_id}] publish_triggers_usage for alert: {}",
+        &trigger_data_stream.key
+    );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
 }
 
-async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+async fn handle_report_triggers(
+    trace_id: &str,
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
-        "Inside handle_report_trigger,org: {}, module_key: {}",
+        "[SCHEDULER trace_id {trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
         &trigger.org,
         &trigger.module_key
     );
@@ -776,10 +825,11 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
 }
 
 async fn handle_derived_stream_triggers(
+    trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     log::debug!(
-        "Inside handle_derived_stream_triggers processing trigger: {}",
+        "[SCHEDULER trace_id {trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
     let (_, max_retries) = get_scheduler_max_retries();
@@ -794,7 +844,7 @@ async fn handle_derived_stream_triggers(
 
     let Ok(mut pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         log::warn!(
-            "Pipeline associated with trigger not found: {}/{}/{}/{}. Deleting this trigger",
+            "[SCHEDULER trace_id {trace_id}] Pipeline associated with trigger not found: {}/{}/{}/{}. Deleting this trigger",
             org_id,
             stream_type,
             pipeline_name,
@@ -802,7 +852,7 @@ async fn handle_derived_stream_triggers(
         );
         db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Err(anyhow::anyhow!(
-            "Pipeline associated with trigger not found: {}/{}/{}/{}",
+            "[SCHEDULER trace_id {trace_id}] Pipeline associated with trigger not found: {}/{}/{}/{}",
             org_id,
             stream_type,
             pipeline_name,
@@ -813,7 +863,9 @@ async fn handle_derived_stream_triggers(
     if !pipeline.enabled {
         // remove the trigger from scheduler. Trigger will be added back when the pipeline is
         // enabled again
-        log::info!("Pipeline associated with trigger not enabled. Removing trigger from Scheduler");
+        log::info!(
+            "[SCHEDULER trace_id {trace_id}] Pipeline associated with trigger not enabled. Removing trigger from Scheduler"
+        );
         db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Ok(());
     }
@@ -862,7 +914,7 @@ async fn handle_derived_stream_triggers(
 
     while end <= now {
         log::debug!(
-            "DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
+            "[SCHEDULER trace_id {trace_id}] DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
             start.unwrap_or_default(),
             end,
             now
@@ -902,7 +954,7 @@ async fn handle_derived_stream_triggers(
                     "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
                     e
                 );
-                log::error!("[Pipeline] org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}", pipeline.org, pipeline.name, e);
+                log::error!("[SCHEDULER trace_id {trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}", pipeline.org, pipeline.name, e);
 
                 // update TriggerData that's to be reported to _meta
                 trigger_data_stream.status = TriggerDataStatus::Failed;
@@ -934,7 +986,7 @@ async fn handle_derived_stream_triggers(
                 // ingest evaluation result into destination
                 if is_satisfied {
                     log::info!(
-                        "DerivedStream(org: {}/module_key: {}): query conditions satisfied. Result to be processed and ingested",
+                        "[SCHEDULER trace_id {trace_id}] DerivedStream(org: {}/module_key: {}): query conditions satisfied. Result to be processed and ingested",
                         new_trigger.org,
                         new_trigger.module_key
                     );
@@ -953,7 +1005,7 @@ async fn handle_derived_stream_triggers(
                     match ExecutablePipeline::new(&pipeline).await {
                         Err(e) => {
                             let err_msg = format!(
-                                "Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
+                                "[SCHEDULER trace_id {trace_id}] Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
                                 org_id, pipeline_name, e
                             );
                             log::error!("{err_msg}");
@@ -962,7 +1014,7 @@ async fn handle_derived_stream_triggers(
                         Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
                             Err(e) => {
                                 let err_msg = format!(
-                                    "Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
+                                    "[SCHEDULER trace_id {trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
                                     org_id, pipeline_name, e
                                 );
                                 log::error!("{err_msg}");
@@ -1009,14 +1061,14 @@ async fn handle_derived_stream_triggers(
                             match ingestion_service::ingest(req).await {
                                 Ok(resp) if resp.status_code == 200 => {
                                     log::info!(
-                                        "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
+                                        "[SCHEDULER trace_id {trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
                                     );
                                 }
                                 error => {
                                     let err =
                                         error.map_or_else(|e| e.to_string(), |resp| resp.message);
                                     log::error!(
-                                        "Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
+                                        "[SCHEDULER trace_id {trace_id}] Pipeline org/name({}/{}) failed to ingest processed results to destination {}/{}/{}, caused by {}",
                                         pipeline.org,
                                         pipeline.name,
                                         org_id,
@@ -1063,7 +1115,7 @@ async fn handle_derived_stream_triggers(
                     }
                 } else {
                     log::info!(
-                        "DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
+                        "[SCHEDULER trace_id {trace_id}] DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
                         &new_trigger.org,
                         &new_trigger.module_key
                     );
@@ -1117,7 +1169,7 @@ async fn handle_derived_stream_triggers(
             db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await
         {
             log::error!(
-                "[Pipeline]: error deleting trigger after pipeline {}/{} reached maximum retries:, {}", 
+                "[SCHEDULER trace_id {trace_id}] pipeline error deleting trigger after pipeline {}/{} reached maximum retries:, {}", 
                 &pipeline.org,
                 &pipeline.name,
                 e,
@@ -1126,12 +1178,12 @@ async fn handle_derived_stream_triggers(
 
         // 2. report a final pipeline error
         log::warn!(
-            "[Pipeline({}/{})]: DerivedStream trigger has reached maximum retries. Deleting the trigger and pausing the pipeline",
+            "[SCHEDULER trace_id {trace_id}] Pipeline({}/{})]: DerivedStream trigger has reached maximum retries. Deleting the trigger and pausing the pipeline",
             &pipeline.org,
             &pipeline.name
         );
         let err_msg = format!(
-            "DerivedStream has reached max retries of {max_retries}. Pipeline is being paused. Please fix reported errors before unpausing the pipeline."
+            "[SCHEDULER trace_id {trace_id}] DerivedStream has reached max retries of {max_retries}. Pipeline is being paused. Please fix reported errors before unpausing the pipeline."
         );
         let pipeline_error = PipelineError {
             pipeline_id: pipeline.id.to_string(),
@@ -1150,7 +1202,7 @@ async fn handle_derived_stream_triggers(
         pipeline.enabled = false;
         if let Err(e) = db::pipeline::update(&pipeline, None).await {
             log::error!(
-                "[Pipeline]: error pausing pipeline {}/{} after it's reached reached maximum retries:, {}", 
+                "[SCHEDULER trace_id {trace_id}] pipeline error pausing pipeline {}/{} after it's reached reached maximum retries:, {}", 
                 &pipeline.org,
                 &pipeline.name,
                 e,
@@ -1158,7 +1210,7 @@ async fn handle_derived_stream_triggers(
         }
     } else if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
         log::warn!(
-            "[Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
+            "[SCHEDULER trace_id {trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             &pipeline.org,
             &pipeline.name,
             e
