@@ -659,24 +659,21 @@ export const convertPromQLData = async (
               {
                 type: "custom",
                 silent: true,
-                data: [[0, 0]],
-                renderItem: function (params: any, api: any) {
-                  const value = formatUnitValue(unitValue);
-                  const fontSize = calculateOptimalFontSize(
-                    value,
-                    Math.min(params.coordSys.width, params.coordSys.height) * 2,
-                  );
-
+                coordinateSystem: "polar",
+                renderItem: function (params: any) {
                   return {
                     type: "text",
                     style: {
-                      text: value,
-                      fontSize: fontSize,
+                      text: formatUnitValue(unitValue),
+                      fontSize: calculateOptimalFontSize(
+                        formatUnitValue(unitValue),
+                        params.coordSys.cx * 2,
+                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
-                      x: params.coordSys.x + params.coordSys.width / 2,
-                      y: params.coordSys.y + params.coordSys.height / 2,
+                      x: params.coordSys.cx,
+                      y: params.coordSys.cy,
                       fill: store.state.theme === "dark" ? "#fff" : "#000",
                     },
                   };
@@ -684,37 +681,19 @@ export const convertPromQLData = async (
               },
             ];
 
-            // Set required options for metric chart
-            options.grid = [
-              {
-                top: "10%",
-                right: "10%",
-                bottom: "10%",
-                left: "10%",
-                containLabel: true,
-              },
-            ];
-
-            options.xAxis = [
-              {
-                type: "value",
-                show: false,
-                min: 0,
-                max: 1,
-              },
-            ];
-
-            options.yAxis = [
-              {
-                type: "value",
-                show: false,
-                min: 0,
-                max: 1,
-              },
-            ];
-
-            options.tooltip = { show: false };
-            options.legend = { show: false };
+            options.dataset = { source: [[]] };
+            options.tooltip = {
+              show: false,
+            };
+            options.angleAxis = {
+              show: false,
+            };
+            options.radiusAxis = {
+              show: false,
+            };
+            options.polar = {};
+            options.xAxis = [];
+            options.yAxis = [];
 
             return series;
           }
@@ -743,20 +722,38 @@ export const convertPromQLData = async (
     annotations?.value?.[0]?.start_time / 1000,
   ).toString();
 
-  options.series.push({
-    type: "line",
-    data: [[convertedTimeStampToDataFormat, null]],
-    markLine: {
-      itemStyle: {
-        color: "rgba(0, 191, 255, 0.5)",
+  // mark line and mark area will be added only for time series chart
+  // with specific chart type
+  if (
+    [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.type) &&
+    isTimeSeriesFlag &&
+    !panelSchema.config.trellis?.layout
+  ) {
+    options.series.push({
+      type: "line",
+      data: [[convertedTimeStampToDataFormat, null]],
+      markLine: {
+        itemStyle: {
+          color: "rgba(0, 191, 255, 0.5)",
+        },
+        silent: false,
+        animation: false,
+        data: markLines,
       },
-      silent: false,
-      animation: false,
-      data: markLines,
-    },
-    markArea: getSeriesMarkArea(),
-    zlevel: 1,
-  });
+      markArea: getSeriesMarkArea(),
+      zlevel: 1,
+    });
+  }
+
   options.series = options.series.flat();
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
