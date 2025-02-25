@@ -46,8 +46,7 @@ pub async fn query(
     };
     let response = serde_json::from_str::<config::meta::search::Response>(&body)?;
     if response.hits.is_empty() {
-        println!("no data found");
-        println!("took: {} ms", response.took);
+        println!("total: 0, took: {} ms", response.took);
         return Ok(());
     }
 
@@ -77,7 +76,7 @@ pub async fn query(
         table.add_row(Row::new(row));
     }
     table.printstd();
-    println!("took: {} ms", response.took);
+    println!("total: {}, took: {} ms", response.total, response.took);
     Ok(())
 }
 
