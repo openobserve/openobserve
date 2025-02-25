@@ -164,22 +164,13 @@ pub async fn ws_proxy(
                                 Message::Close(reason) => {
                                     log::info!("[WS_PROXY] Backend -> Router close");
 
+                                    let mut sink = backend_ws_sink2.lock().await;
                                     // 1. Forward close to client
                                     if let Err(e) = session.close(reason.clone()).await {
                                         log::error!("[WS_PROXY] Failed to close client: {}", e);
                                     }
 
-                                    // 2. Send acknowledgment to backend and close sink
-                                    let mut sink = backend_ws_sink2.lock().await;
-                                    let close_frame = reason.map(|r| tungstenite::protocol::CloseFrame {
-                                        code: u16::from(r.code).into(),
-                                        reason: r.description.unwrap_or_default().into(),
-                                    });
-                                    let close_msg = tungstenite::protocol::Message::Close(close_frame);
-                                    if let Err(e) = sink.send(close_msg).await {
-                                        log::error!("[WS_PROXY] Failed to send close ack: {}", e);
-                                    }
-                                    // Close sink after sending final message
+                                    // Close sink to backend
                                     if let Err(e) = sink.close().await {
                                         log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
                                     }
