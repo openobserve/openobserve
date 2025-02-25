@@ -522,7 +522,6 @@ export const convertPromQLData = async (
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
-
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
@@ -536,57 +535,28 @@ export const convertPromQLData = async (
             ...getPropsByChartTypeForSeries(panelSchema.type),
             min: panelSchema?.queries[index]?.config?.min || 0,
             max: panelSchema?.queries[index]?.config?.max || 100,
-
             //which grid will be used
             gridIndex: gaugeIndex - 1,
             // radius, progress and axisline width will be calculated based on grid width and height
-            radius: `${
-              Math.min(
-                gridDataForGauge.gridWidth,
-                gridDataForGauge.gridHeight,
-              ) /
-                2 -
-              5
-            }px`,
+            radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
             progress: {
               show: true,
-              width: `${
-                Math.min(
-                  gridDataForGauge.gridWidth,
-                  gridDataForGauge.gridHeight,
-                ) / 6
-              }`,
+              width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
             },
             axisLine: {
               lineStyle: {
-                width: `${
-                  Math.min(
-                    gridDataForGauge.gridWidth,
-                    gridDataForGauge.gridHeight,
-                  ) / 6
-                }`,
+                width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
               },
             },
             title: {
               fontSize: 10,
               offsetCenter: [0, "70%"],
-              // width: upto chart width
               width: `${gridDataForGauge.gridWidth}`,
               overflow: "truncate",
             },
-
-            // center of gauge
-            // x: left + width / 2,
-            // y: top + height / 2,
             center: [
-              `${
-                parseFloat(options.grid[gaugeIndex - 1].left) +
-                parseFloat(options.grid[gaugeIndex - 1].width) / 2
-              }%`,
-              `${
-                parseFloat(options.grid[gaugeIndex - 1].top) +
-                parseFloat(options.grid[gaugeIndex - 1].height) / 2
-              }%`,
+              `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
+              `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
             ],
             data: [
               {
@@ -628,6 +598,7 @@ export const convertPromQLData = async (
             },
           };
         });
+
         options.dataset = { source: [[]] };
         options.tooltip = {
           show: true,
@@ -637,7 +608,6 @@ export const convertPromQLData = async (
             fontSize: 12,
           },
           valueFormatter: (value: any) => {
-            // unit conversion
             return formatUnitValue(
               getUnitValue(
                 value,
@@ -654,6 +624,10 @@ export const convertPromQLData = async (
               : "rgba(255,255,255,1)",
           extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
         };
+
+        // Set coordinate system options
+        options.xAxis = [{ type: "value", show: false }];
+        options.yAxis = [{ type: "value", show: false }];
         options.angleAxis = {
           show: false,
         };
@@ -661,30 +635,31 @@ export const convertPromQLData = async (
           show: false,
         };
         options.polar = {};
-        options.xAxis = [];
-        options.yAxis = [];
         return series;
       }
       case "metric": {
-        // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
 
         switch (it?.resultType) {
           case "matrix": {
             // take first result
-            const series = [it?.result[0]]?.map((metric: any) => {
-              const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0],
-              );
-              // first value
-              const unitValue = getUnitValue(
-                values?.[0]?.[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
-              );
-              return {
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+            const metric = it?.result?.[0];
+
+            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const latestValue = values[values.length - 1]?.[1] ?? 0;
+
+            const unitValue = getUnitValue(
+              latestValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            );
+
+            const series = [
+              {
+                type: "custom",
+                silent: true,
+                coordinateSystem: "polar",
                 renderItem: function (params: any) {
                   return {
                     type: "text",
@@ -699,12 +674,13 @@ export const convertPromQLData = async (
                       verticalAlign: "middle",
                       x: params.coordSys.cx,
                       y: params.coordSys.cy,
-                      fill: store.state.theme == "dark" ? "#fff" : "#000",
+                      fill: store.state.theme === "dark" ? "#fff" : "#000",
                     },
                   };
                 },
-              };
-            });
+              },
+            ];
+
             options.dataset = { source: [[]] };
             options.tooltip = {
               show: false,
@@ -718,8 +694,10 @@ export const convertPromQLData = async (
             options.polar = {};
             options.xAxis = [];
             options.yAxis = [];
+
             return series;
           }
+
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
               const values = [metric.value];
@@ -744,20 +722,38 @@ export const convertPromQLData = async (
     annotations?.value?.[0]?.start_time / 1000,
   ).toString();
 
-  options.series.push({
-    type: "line",
-    data: [[convertedTimeStampToDataFormat, null]],
-    markLine: {
-      itemStyle: {
-        color: "rgba(0, 191, 255, 0.5)",
+  // mark line and mark area will be added only for time series chart
+  // with specific chart type
+  if (
+    [
+      "area",
+      "area-stacked",
+      "bar",
+      "h-bar",
+      "line",
+      "scatter",
+      "stacked",
+      "h-stacked",
+    ].includes(panelSchema.type) &&
+    isTimeSeriesFlag &&
+    !panelSchema.config.trellis?.layout
+  ) {
+    options.series.push({
+      type: "line",
+      data: [[convertedTimeStampToDataFormat, null]],
+      markLine: {
+        itemStyle: {
+          color: "rgba(0, 191, 255, 0.5)",
+        },
+        silent: false,
+        animation: false,
+        data: markLines,
       },
-      silent: false,
-      animation: false,
-      data: markLines,
-    },
-    markArea: getSeriesMarkArea(),
-    zlevel: 1,
-  });
+      markArea: getSeriesMarkArea(),
+      zlevel: 1,
+    });
+  }
+
   options.series = options.series.flat();
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
