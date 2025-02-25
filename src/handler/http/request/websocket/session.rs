@@ -347,12 +347,15 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
-        // sleep for the interval duration in milliseconds to avoid race condition
-        // between the close frame (control frame) and the data frame
-        let cfg = get_config();
-        let interval = cfg.websocket.close_frame_delay;
-        if interval > 0 {
-            tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+        #[cfg(feature = "enterprise")]
+        {
+            // sleep for the interval duration in milliseconds to avoid race condition
+            // between the close frame (control frame) and the data frame
+            let cfg = get_config();
+            let interval = cfg.websocket.close_frame_delay;
+            if interval > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
+            }
         }
 
         // Attempt to close the session
@@ -390,8 +393,7 @@ async fn handle_search_event(
     org_id: &str,
     user_id: &str,
     req_id: &str,
-    #[allow(unused_variables)] 
-    path: String,
+    #[allow(unused_variables)] path: String,
 ) {
     let (cancel_tx, mut cancel_rx) = mpsc::channel(1);
     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
