@@ -725,8 +725,11 @@ const useLogs = () => {
         );
 
         searchObj.data.stream.selectedStreamFields = streamData.schema;
-        
-        if(!searchObj.data.stream.selectedStreamFields || searchObj.data.stream.selectedStreamFields.length == 0) {
+
+        if (
+          !searchObj.data.stream.selectedStreamFields ||
+          searchObj.data.stream.selectedStreamFields.length == 0
+        ) {
           searchObj.data.stream.selectedStreamFields = [];
           searchObj.loading = false;
           return false;
@@ -2573,7 +2576,6 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
 
-
             // Reset cancel query on search error
             searchObj.data.isOperationCancelled = false;
 
@@ -4012,35 +4014,29 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-      
+
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
-      
+
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
       const unionquery = streams
-        .map((stream: string) => 
-          `SELECT [FIELD_LIST] FROM "${stream}"`
-        )
+        .map((stream: string) => `SELECT [FIELD_LIST] FROM "${stream}"`)
         .join(" UNION ");
 
-      const query = searchObj.meta.sqlMode ? (queryStr || unionquery) : "";
+      const query = searchObj.meta.sqlMode ? queryStr || unionquery : "";
 
       // Fetch all stream data in parallel
-      const streamDataPromises = streams.map((stream: string) => 
-        getStream(
-          stream,
-          searchObj.data.stream.streamType || "logs",
-          true
-        )
+      const streamDataPromises = streams.map((stream: string) =>
+        getStream(stream, searchObj.data.stream.streamType || "logs", true),
       );
 
       const streamDataResults = await Promise.all(streamDataPromises);
-      
+
       // Collect all schema fields
       const allStreamFields = streamDataResults
-        .filter(data => data?.schema)
-        .flatMap(data => data.schema);
+        .filter((data) => data?.schema)
+        .flatMap((data) => data.schema);
 
       // Update selectedStreamFields once
       searchObj.data.stream.selectedStreamFields = allStreamFields;
@@ -4051,21 +4047,29 @@ const useLogs = () => {
       }
 
       // Update selected fields if needed
-      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
+      const streamFieldNames = new Set(
+        allStreamFields.map((item) => item.name),
+      );
       if (searchObj.data.stream.selectedFields.length > 0) {
-        searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields
-          .filter(fieldName => streamFieldNames.has(fieldName));
+        searchObj.data.stream.selectedFields =
+          searchObj.data.stream.selectedFields.filter((fieldName) =>
+            streamFieldNames.has(fieldName),
+          );
       }
 
       // Update interesting fields list
-      searchObj.data.stream.interestingFieldList = searchObj.data.stream.interestingFieldList
-        .filter(fieldName => streamFieldNames.has(fieldName));
+      searchObj.data.stream.interestingFieldList =
+        searchObj.data.stream.interestingFieldList.filter((fieldName) =>
+          streamFieldNames.has(fieldName),
+        );
 
       // Replace field list in query
-      const fieldList = searchObj.meta.quickMode && searchObj.data.stream.interestingFieldList.length > 0
-        ? searchObj.data.stream.interestingFieldList.join(",")
-        : "*";
-      
+      const fieldList =
+        searchObj.meta.quickMode &&
+        searchObj.data.stream.interestingFieldList.length > 0
+          ? searchObj.data.stream.interestingFieldList.join(",")
+          : "*";
+
       const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
 
       // Update query related states
