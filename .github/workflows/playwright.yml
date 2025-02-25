@@ -38,7 +38,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
 
     steps:
       - name: Remove unused tools
@@ -88,7 +88,7 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
@@ -199,7 +199,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-16
+    runs-on: ubicloud-standard-8
     if: always()
 
     steps:
