@@ -187,6 +187,7 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
 ) -> Result<SendableRecordBatchStream> {
+    let start = std::time::Instant::now();
     let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
     let org_id = remote_scan_node.query_identifier.org_id.clone();
@@ -249,17 +250,26 @@ async fn get_remote_batch(
         .get_auth_token()
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid token".to_string()))?;
-    let channel = get_cached_channel(&node.get_grpc_addr())
-        .await
-        .map_err(|err| {
+    let channel = match get_cached_channel(&node.get_grpc_addr()).await {
+        Ok(channel) => channel,
+        Err(e) => {
             log::error!(
                 "[trace_id {}] flight->search: node: {}, connect err: {:?}",
                 trace_id.clone(),
                 &node.get_grpc_addr(),
-                err
+                e
             );
-            DataFusionError::Internal("connect search node error".to_string())
-        })?;
+            return Ok(get_empty_record_batch_stream(
+                trace_id,
+                schema,
+                node.get_grpc_addr(),
+                is_querier,
+                partial_err,
+                e,
+                start,
+            ));
+        }
+    };
 
     let mut client =
         FlightServiceClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
@@ -282,7 +292,6 @@ async fn get_remote_batch(
         is_querier,
     );
 
-    let start = std::time::Instant::now();
     let mut stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
