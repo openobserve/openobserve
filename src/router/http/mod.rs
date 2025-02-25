@@ -32,6 +32,7 @@ use actix_web::{
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
 mod ws;
+mod ws_v2;
 
 const QUERIER_ROUTES: [&str; 20] = [
     "/config",
