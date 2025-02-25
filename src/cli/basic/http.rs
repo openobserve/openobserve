@@ -13,11 +13,77 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use hashbrown::HashSet;
 use prettytable::{Cell, Row, Table};
+
+pub async fn query(
+    org: &str,
+    sql: &str,
+    time_range: &str,
+    limit: i64,
+) -> Result<(), anyhow::Error> {
+    let time_range = config::utils::time::parse_milliseconds(time_range)?;
+    let time_end = config::utils::time::now_micros();
+    let time_start = time_end - (time_range as i64 * 1000);
+    let query = config::meta::search::Query {
+        sql: sql.to_string(),
+        from: 0,
+        size: limit,
+        start_time: time_start,
+        end_time: time_end,
+        quick_mode: false,
+        ..Default::default()
+    };
+    let search_req = config::meta::search::Request {
+        query,
+        ..Default::default()
+    };
+    let url = format!("/api/{}/_search", org);
+    let body = serde_json::to_vec(&search_req)?;
+    let response = request(&url, Some(body), reqwest::Method::POST).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("query failed"));
+    };
+    let response = serde_json::from_str::<config::meta::search::Response>(&body)?;
+    if response.hits.is_empty() {
+        println!("no data found");
+        println!("took: {} ms", response.took);
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    let mut columns = Vec::new();
+    let mut columns_set = HashSet::new();
+    for hit in response.hits.iter() {
+        let hit = hit.as_object().unwrap();
+        for key in hit.keys() {
+            if columns_set.contains(key) {
+                continue;
+            }
+            columns_set.insert(key.to_string());
+            columns.push(key.to_string());
+        }
+    }
+    let headers = columns.iter().map(|c| Cell::new(c)).collect();
+    table.add_row(Row::new(headers));
+    for hit in response.hits {
+        let hit = hit.as_object().unwrap();
+        let mut row = Vec::new();
+        for column in columns.iter() {
+            row.push(Cell::new(
+                &hit.get(column).map_or("".to_string(), |v| v.to_string()),
+            ));
+        }
+        table.add_row(Row::new(row));
+    }
+    table.printstd();
+    println!("took: {} ms", response.took);
+    Ok(())
+}
 
 pub async fn node_offline() -> Result<(), anyhow::Error> {
     let url = "/node/enable?value=false";
-    let response = request(url, reqwest::Method::PUT).await?;
+    let response = request(url, None, reqwest::Method::PUT).await?;
     if response.is_some() {
         println!("node offline successfully");
     } else {
@@ -27,7 +93,7 @@ pub async fn node_offline() -> Result<(), anyhow::Error> {
 }
 pub async fn node_online() -> Result<(), anyhow::Error> {
     let url = "/node/enable?value=true";
-    let response = request(url, reqwest::Method::PUT).await?;
+    let response = request(url, None, reqwest::Method::PUT).await?;
     if response.is_some() {
         println!("node online successfully");
     } else {
@@ -38,7 +104,7 @@ pub async fn node_online() -> Result<(), anyhow::Error> {
 
 pub async fn node_flush() -> Result<(), anyhow::Error> {
     let url = "/node/flush";
-    let response = request(url, reqwest::Method::POST).await?;
+    let response = request(url, None, reqwest::Method::POST).await?;
     if response.is_some() {
         println!("node flush successfully");
     } else {
@@ -49,7 +115,7 @@ pub async fn node_flush() -> Result<(), anyhow::Error> {
 
 pub async fn node_list() -> Result<(), anyhow::Error> {
     let url = "/node/list";
-    let response = request(url, reqwest::Method::GET).await?;
+    let response = request(url, None, reqwest::Method::GET).await?;
     let Some(body) = response else {
         return Err(anyhow::anyhow!("node list failed"));
     };
@@ -90,7 +156,7 @@ pub async fn node_list() -> Result<(), anyhow::Error> {
 
 pub async fn node_list_with_metrics() -> Result<(), anyhow::Error> {
     let url = "/node/list";
-    let response = request(url, reqwest::Method::GET).await?;
+    let response = request(url, None, reqwest::Method::GET).await?;
     let Some(body) = response else {
         return Err(anyhow::anyhow!("node list failed"));
     };
@@ -182,22 +248,31 @@ pub async fn local_node_metrics() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn request(url: &str, method: reqwest::Method) -> Result<Option<String>, anyhow::Error> {
+async fn request(
+    url: &str,
+    body: Option<Vec<u8>>,
+    method: reqwest::Method,
+) -> Result<Option<String>, anyhow::Error> {
     let cfg = config::get_config();
     let client = reqwest::Client::new();
     let local = config::cluster::load_local_node();
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
-    let response = client
-        .request(method, url)
-        .basic_auth(user, Some(password))
-        .send()
-        .await?;
-    if response.status().is_success() {
-        let body = response.text().await?;
+    let mut response = client.request(method, url).basic_auth(user, Some(password));
+    if let Some(body) = body {
+        response = response.body(body);
+    }
+    let response = response.send().await?;
+    let status = response.status();
+    let body = response.text().await?;
+    if status.is_success() {
         Ok(Some(body))
     } else {
-        Ok(None)
+        Err(anyhow::anyhow!(
+            "request failed, status: {}, body: {}",
+            status,
+            body
+        ))
     }
 }

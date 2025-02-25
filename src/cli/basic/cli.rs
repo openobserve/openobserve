@@ -156,6 +156,30 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ]),
                 clap::Command::new("metrics").about("show local node metrics"),
             ]),
+            clap::Command::new("sql").about("query data").args([
+                clap::Arg::new("org") 
+                    .long("org")
+                    .required(false)
+                    .default_value("default")
+                    .help("org name"),
+                clap::Arg::new("execute")
+                    .short('e')
+                    .long("execute")
+                    .required(true)
+                    .help("execute sql"),
+                clap::Arg::new("time")
+                    .short('t')
+                    .long("time")
+                    .required(false)
+                    .default_value("15m")
+                    .help("time range, e.g. 15m, 1h, 1d, 1w, 1y"),
+                clap::Arg::new("limit")
+                    .short('l')
+                    .long("limit")
+                    .required(false)
+                    .default_value("10")
+                    .help("limit the number of results"),
+            ]),
         ])
         .get_matches();
 
@@ -365,6 +389,17 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     return Err(anyhow::anyhow!("unsupported sub command: {name}"));
                 }
             }
+        }
+        "sql" => {
+            let org = command.get_one::<String>("org").unwrap();
+            let sql = command.get_one::<String>("execute").unwrap();
+            let time = command.get_one::<String>("time").unwrap();
+            let limit = command.get_one::<String>("limit").unwrap();
+            let mut limit = limit.parse::<i64>().unwrap_or(10);
+            if !(1..=1000).contains(&limit) {
+                limit = 10;
+            }
+            super::http::query(org, sql, time, limit).await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
