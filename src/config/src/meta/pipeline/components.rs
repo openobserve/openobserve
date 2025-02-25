@@ -69,7 +69,11 @@ pub struct Node {
 
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.data == other.data && self.position == other.position
+        self.id == other.id
+            && self.data == other.data
+            && self.position == other.position
+            && self.meta == other.meta
+            && self.io_type == other.io_type
     }
 }
 

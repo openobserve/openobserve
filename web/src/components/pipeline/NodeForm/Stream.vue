@@ -210,7 +210,7 @@ const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 
-const appendData = ref((pipelineObj.currentSelectedNodeData?.meta as { append_data?: boolean })?.append_data || false);
+const appendData = ref((pipelineObj.currentSelectedNodeData?.meta as { append_data?: string })?.append_data == 'true' || false);
 
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
@@ -375,7 +375,7 @@ const saveStream = () => {
   };
 
   if(stream_type.value == 'enrichment_tables'){
-    streamNodeData.meta = { append_data: appendData.value };
+    streamNodeData.meta = { append_data: appendData.value.toString() };
   }
 
   if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
