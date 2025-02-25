@@ -436,10 +436,16 @@ impl Stream for FlightStream {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         if self.start.elapsed().as_secs() > self.timeout {
-            process_partial_err(
-                self.partial_err.clone(),
-                tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout"),
+            let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
+                self.trace_id,
+                self.node_addr,
+                self.is_querier,
+                self.start.elapsed().as_millis(),
+                e.to_string()
             );
+            process_partial_err(self.partial_err.clone(), e);
             return Poll::Ready(None);
         }
 
