@@ -75,8 +75,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     if !triggers.is_empty() {
         let mut grouped_triggers: std::collections::HashMap<
-            infra::scheduler::TriggerModule,
-            Vec<&infra::scheduler::Trigger>,
+            db::scheduler::TriggerModule,
+            Vec<&db::scheduler::Trigger>,
         > = HashMap::new();
 
         // Group triggers by module
