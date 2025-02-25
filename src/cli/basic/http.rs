@@ -64,8 +64,8 @@ pub async fn node_list() -> Result<(), anyhow::Error> {
         Cell::new("HTTP Address"),
         Cell::new("Status"),
         Cell::new("Scheduled"),
-        Cell::new("CPU Usage"),
-        Cell::new("Memory Usage"),
+        Cell::new("CPU"),
+        Cell::new("MEM"),
     ]));
 
     for node in nodes {
@@ -76,13 +76,107 @@ pub async fn node_list() -> Result<(), anyhow::Error> {
             Cell::new(&node.http_addr),
             Cell::new(&format!("{:?}", node.status)),
             Cell::new(&node.scheduled.to_string()),
-            Cell::new(&format!("{:.2}%", node.metrics.cpu_usage)),
-            Cell::new(&format!(
-                "{}",
-                config::utils::size::bytes_to_human_readable(node.metrics.memory_usage as f64)
-            )),
+            Cell::new(&node.metrics.cpu_total.to_string()),
+            Cell::new(
+                &config::utils::size::bytes_to_human_readable(node.metrics.memory_total as f64)
+                    .to_string(),
+            ),
         ]));
     }
+
+    table.printstd();
+    Ok(())
+}
+
+pub async fn node_list_with_metrics() -> Result<(), anyhow::Error> {
+    let url = "/node/list";
+    let response = request(url, reqwest::Method::GET).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node list failed"));
+    };
+    let mut nodes: Vec<config::meta::cluster::Node> = serde_json::from_str(&body)?;
+    nodes.sort_by_key(|node| node.id);
+
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("ID"),
+        Cell::new("UUID"),
+        Cell::new("Name"),
+        Cell::new("HTTP Address"),
+        Cell::new("Status"),
+        Cell::new("Scheduled"),
+        Cell::new("CPU"),
+        Cell::new("Usage"),
+        Cell::new("MEM"),
+        Cell::new("Usage"),
+        Cell::new("TCP Conns"),
+        Cell::new("Established"),
+        Cell::new("Close Wait"),
+        Cell::new("Time Wait"),
+    ]));
+
+    for node in nodes {
+        table.add_row(Row::new(vec![
+            Cell::new(&node.id.to_string()),
+            Cell::new(&node.uuid),
+            Cell::new(&node.name),
+            Cell::new(&node.http_addr),
+            Cell::new(&format!("{:?}", node.status)),
+            Cell::new(&node.scheduled.to_string()),
+            Cell::new(&node.metrics.cpu_total.to_string()),
+            Cell::new(&format!("{:.2}%", node.metrics.cpu_usage)),
+            Cell::new(
+                &config::utils::size::bytes_to_human_readable(node.metrics.memory_total as f64)
+                    .to_string(),
+            ),
+            Cell::new(
+                &config::utils::size::bytes_to_human_readable(node.metrics.memory_usage as f64)
+                    .to_string(),
+            ),
+            Cell::new(&node.metrics.tcp_conns.to_string()),
+            Cell::new(&node.metrics.tcp_conns_established.to_string()),
+            Cell::new(&node.metrics.tcp_conns_close_wait.to_string()),
+            Cell::new(&node.metrics.tcp_conns_time_wait.to_string()),
+        ]));
+    }
+
+    table.printstd();
+    Ok(())
+}
+
+pub async fn local_node_metrics() -> Result<(), anyhow::Error> {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+
+    // Create header row with all column names
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![
+        Cell::new("Name"),
+        Cell::new("CPU"),
+        Cell::new("Usage"),
+        Cell::new("MEM"),
+        Cell::new("Usage"),
+        Cell::new("TCP Conns"),
+        Cell::new("Established"),
+        Cell::new("Close Wait"),
+        Cell::new("Time Wait"),
+    ]));
+
+    // Create second row with all values
+    table.add_row(Row::new(vec![
+        Cell::new(&config::utils::sysinfo::os::get_hostname()),
+        Cell::new(&metrics.cpu_total.to_string()),
+        Cell::new(&format!("{:.2}%", metrics.cpu_usage)),
+        Cell::new(
+            &config::utils::size::bytes_to_human_readable(metrics.memory_total as f64).to_string(),
+        ),
+        Cell::new(
+            &config::utils::size::bytes_to_human_readable(metrics.memory_usage as f64).to_string(),
+        ),
+        Cell::new(&metrics.tcp_conns.to_string()),
+        Cell::new(&metrics.tcp_conns_established.to_string()),
+        Cell::new(&metrics.tcp_conns_close_wait.to_string()),
+        Cell::new(&metrics.tcp_conns_time_wait.to_string()),
+    ]));
 
     table.printstd();
     Ok(())

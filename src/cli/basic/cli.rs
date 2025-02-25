@@ -146,7 +146,15 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 clap::Command::new("offline").about("offline node"),
                 clap::Command::new("online").about("online node"),
                 clap::Command::new("flush").about("flush memtable to disk"),
-                clap::Command::new("list").about("list cached nodes"),
+                clap::Command::new("list").about("list cached nodes").args([
+                    clap::Arg::new("metrics")
+                        .short('m')
+                        .long("metrics")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("show node metrics"),
+                ]),
+                clap::Command::new("metrics").about("show local node metrics"),
             ]),
         ])
         .get_matches();
@@ -342,8 +350,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(("flush", _)) => {
                     super::http::node_flush().await?;
                 }
-                Some(("list", _)) => {
-                    super::http::node_list().await?;
+                Some(("list", args)) => {
+                    let metrics = args.get_flag("metrics");
+                    if metrics {
+                        super::http::node_list_with_metrics().await?;
+                    } else {
+                        super::http::node_list().await?;
+                    }
+                }
+                Some(("metrics", _)) => {
+                    super::http::local_node_metrics().await?;
                 }
                 _ => {
                     return Err(anyhow::anyhow!("unsupported sub command: {name}"));
