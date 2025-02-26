@@ -213,7 +213,7 @@ pub async fn local_node_metrics() -> Result<(), anyhow::Error> {
     let url = "/node/metrics";
     let response = request(url, None, reqwest::Method::GET).await?;
     let Some(body) = response else {
-        return Err(anyhow::anyhow!("node list failed"));
+        return Err(anyhow::anyhow!("node metrics failed"));
     };
     let metrics: config::utils::sysinfo::NodeMetrics = serde_json::from_str(&body)?;
 
