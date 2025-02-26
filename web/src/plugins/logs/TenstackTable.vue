@@ -277,7 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add-search-term="addSearchTerm"
                 @view-trace="
                   viewTrace(formattedRows[virtualRow.index]?.original)
+                
                 "
+                :useSearchObject="useSearchObject"
               />
             </td>
             <template v-else>
@@ -406,6 +408,11 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
+  useSearchObject:{
+    type: Boolean,
+    default: true,
+    required: false,
+  }
 });
 
 const { t } = useI18n();

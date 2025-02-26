@@ -918,12 +918,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-1"
                 />
                   <TenstackTable
-                  v-if="rows.length > 0 && tab == 'sql'"
+                    v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
                     v-show="expandState.output"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
+                    :useSearchObject="false"
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />
@@ -1059,6 +1060,10 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
+import useLogs from "@/composables/useLogs";
+
+
+
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 
@@ -1113,7 +1118,7 @@ const emits = defineEmits([
   "update:stream_type",
 ]);
 const {  pipelineObj } = useDragAndDrop();
-
+const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams ();
 
 const selectedStreamName = ref("");
@@ -1223,6 +1228,11 @@ watch(()=> splitterModel.value ,  (val)=>{
   if(val == 10){
    splitterModel.value = 0;
   }
+})
+
+watch(()=> selectedStreamName.value, (val)=>{
+  console.log(val, "selectedStreamName");
+  searchObj.data.stream.pipelineQueryStream = [val];
 })
 
 
