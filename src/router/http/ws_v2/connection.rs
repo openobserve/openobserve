@@ -17,20 +17,20 @@ pub trait Connection: Send + Sync {
     async fn disconnect(&self) -> WsResult<()>;
     async fn send_message(&self, message: Message) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
-    fn get_id(&self) -> &QuerierId;
+    fn get_name(&self) -> &QuerierName;
 }
 
 pub struct QuerierConnection {
-    id: QuerierId,
+    name: QuerierName,
     stream: Arc<Mutex<Option<WsStreamType>>>,
     url: String,
     last_active: std::sync::atomic::AtomicI64,
 }
 
 impl QuerierConnection {
-    pub async fn new(id: QuerierId, url: String) -> WsResult<Self> {
+    pub async fn new(name: QuerierName, url: String) -> WsResult<Self> {
         let conn = Self {
-            id,
+            name,
             stream: Arc::new(Mutex::new(None)),
             url,
             last_active: std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),
@@ -95,8 +95,8 @@ impl Connection for QuerierConnection {
         stream_guard.is_some()
     }
 
-    fn get_id(&self) -> &QuerierId {
-        &self.id
+    fn get_name(&self) -> &QuerierName {
+        &self.name
     }
 }
 

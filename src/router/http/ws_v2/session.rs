@@ -8,13 +8,13 @@ use super::{error::*, types::*};
 pub struct RouterSessionManager {
     sessions: DashMap<SessionId, SessionInfo>,
     client_sessions: DashMap<ClientId, HashSet<SessionId>>,
-    querier_mappings: DashMap<TraceId, QuerierId>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
     pub session_id: SessionId,
     pub client_id: ClientId,
+    pub querier_mappings: DashMap<TraceId, QuerierName>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub last_active: chrono::DateTime<chrono::Utc>,
 }
@@ -24,7 +24,6 @@ impl RouterSessionManager {
         Self {
             sessions: DashMap::new(),
             client_sessions: DashMap::new(),
-            querier_mappings: DashMap::new(),
         }
     }
 
@@ -35,6 +34,7 @@ impl RouterSessionManager {
         let session_info = SessionInfo {
             session_id: session_id.clone(),
             client_id: client_id.clone(),
+            querier_mappings: DashMap::new(),
             created_at: now,
             last_active: now,
         };
@@ -72,14 +72,29 @@ impl RouterSessionManager {
 
     pub async fn set_querier_for_trace(
         &self,
+        session_id: &SessionId,
         trace_id: TraceId,
-        querier_id: QuerierId,
+        querier_name: QuerierName,
     ) -> WsResult<()> {
-        self.querier_mappings.insert(trace_id, querier_id);
+        self.sessions
+            .get_mut(session_id)
+            .ok_or_else(|| WsError::SessionNotFound(session_id.clone()))?
+            .querier_mappings
+            .insert(trace_id, querier_name);
         Ok(())
     }
 
-    pub async fn get_querier_for_trace(&self, trace_id: &TraceId) -> Option<QuerierId> {
-        self.querier_mappings.get(trace_id).map(|q| q.clone())
+    pub async fn get_querier_for_trace(
+        &self,
+        session_id: &SessionId,
+        trace_id: &TraceId,
+    ) -> WsResult<Option<QuerierName>> {
+        Ok(self
+            .sessions
+            .get(session_id)
+            .ok_or_else(|| WsError::SessionNotFound(session_id.clone()))?
+            .querier_mappings
+            .get(trace_id)
+            .map(|q| q.clone()))
     }
 }
