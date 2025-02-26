@@ -82,6 +82,7 @@ export const usePanelDataLoader = (
 
   // Add cleanup function
   const cleanupSearchRetries = (traceId: string) => {
+    removeTraceId(traceId);
     if (searchRetriesCount.value[traceId]) {
       delete searchRetriesCount.value[traceId];
     }
@@ -769,6 +770,7 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
+      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
