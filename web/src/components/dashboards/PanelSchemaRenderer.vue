@@ -601,10 +601,8 @@ export default defineComponent({
               loading.value,
             );
 
-            if (panelData.value?.extras?.limitNumberOfSeriesWarningMessage) {
-              limitNumberOfSeriesWarningMessage.value =
-                panelData.value?.extras?.limitNumberOfSeriesWarningMessage;
-            }
+            limitNumberOfSeriesWarningMessage.value =
+              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
 
             errorDetail.value = "";
           } catch (error: any) {
