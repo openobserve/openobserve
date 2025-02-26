@@ -381,8 +381,6 @@ pub struct Config {
 pub struct WebSocket {
     #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
     pub enabled: bool,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 50)]
-    pub close_frame_delay: u64, // in milliseconds
     #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
     pub session_idle_timeout_secs: i64,
     #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]

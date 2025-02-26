@@ -347,14 +347,6 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
-        // sleep for the interval duration in milliseconds to avoid race condition
-        // between the close frame (control frame) and the data frame
-        let cfg = get_config();
-        let interval = cfg.websocket.close_frame_delay;
-        if interval > 0 {
-            tokio::time::sleep(std::time::Duration::from_millis(interval)).await;
-        }
-
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
