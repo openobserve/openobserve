@@ -259,9 +259,9 @@ export default {
       type: String,
       default: "sidebar",
     },
-    useSearchObject: {
-      type: Boolean,
-      default: true,
+    streamName: {
+      type: String,
+      default: "",
       required: false,
     },
   },
@@ -406,7 +406,7 @@ export default {
               query: {
                 query: {
                   start_time: props.value._timestamp - 10 * 60 * 1000,
-                  sql: `SELECT _original FROM "${props.useSearchObject ? searchObj.data.stream.selectedStream : searchObj.data.stream.pipelineQueryStream[0]}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                  sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
                   end_time: props.value._timestamp + 10 * 60 * 1000,
                   sql_mode: "full",
                   size: 1,

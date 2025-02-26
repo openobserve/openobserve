@@ -924,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
-                    :useSearchObject="false"
+                    :jsonpreviewStreamName="selectedStreamName"
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />

@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   viewTrace(formattedRows[virtualRow.index]?.original)
                 
                 "
-                :useSearchObject="useSearchObject"
+                :streamName="jsonpreviewStreamName"
               />
             </td>
             <template v-else>
@@ -408,9 +408,9 @@ const props = defineProps({
     type: Boolean,
     default: () => true,
   },
-  useSearchObject:{
-    type: Boolean,
-    default: true,
+  jsonpreviewStreamName:{
+    type: String,
+    default: "",
     required: false,
   }
 });
