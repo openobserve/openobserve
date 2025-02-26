@@ -683,8 +683,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
 
         match self.defined_schema_fields.as_ref() {
-            Some(fields) => {
+            Some(mut fields) => {
                 if !fields.is_empty() {
+                    fields.sort_unstable();
+                    fields.dedup();
                     state.serialize_field("defined_schema_fields", fields)?;
                 } else {
                     state.skip_field("defined_schema_fields")?;
@@ -773,13 +775,15 @@ impl From<&str> for StreamSettings {
 
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
-            let fields = value
+            let mut fields = value
                 .as_array()
                 .unwrap()
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
             if !fields.is_empty() {
+                fields.sort_unstable();
+                fields.dedup();
                 defined_schema_fields = Some(fields);
             }
         }
