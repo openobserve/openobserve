@@ -1853,11 +1853,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.limit.sql_db_connections_min == 0 {
-        cfg.limit.sql_db_connections_min = cpu_num as u32
+        cfg.limit.sql_db_connections_min = 2;
     }
 
     if cfg.limit.sql_db_connections_max == 0 {
-        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
+        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 4;
     }
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
