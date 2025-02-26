@@ -113,7 +113,8 @@ export const convertPromQLData = async (
 
   // Add warning if total number of series exceeds limit
   if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
-    extras.limitNumberOfSeriesWarningMessage = `Response contains over ${store.state?.zoConfig?.max_dashboard_series ?? 100} unique breakdown values. Only the top ${store.state?.zoConfig?.max_dashboard_series ?? 100} will be displayed.`;
+    extras.limitNumberOfSeriesWarningMessage =
+      "Limiting the displayed series to ensure optimal performance";
   }
 
   // flag to check if the data is time seriesc

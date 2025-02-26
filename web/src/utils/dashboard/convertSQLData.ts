@@ -265,7 +265,8 @@ export const convertSQLData = async (
       (!top_results &&
         allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
     ) {
-      extras.limitNumberOfSeriesWarningMessage = `Response contains over ${store.state?.zoConfig?.max_dashboard_series ?? 100} unique breakdown values. Only the top ${store.state?.zoConfig?.max_dashboard_series ?? 100} will be displayed.`;
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
     }
 
     const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
