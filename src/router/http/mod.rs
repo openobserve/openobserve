@@ -28,7 +28,7 @@ use actix_web::{
     http::{Error, Method},
     route, web,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -36,16 +36,22 @@ mod ws;
 mod ws_v2;
 
 // Initialize WsHandler global instance
-static WS_HANDLER: Lazy<Arc<ws_v2::WsHandler>> = Lazy::new(|| {
-    tokio::task::block_in_place(|| {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            ws_v2::init()
-                .await
-                .expect("Failed to initialize WebSocket v2 handler")
-        })
-    })
-});
+static WS_HANDLER: OnceCell<Arc<ws_v2::WsHandler>> = OnceCell::new();
+
+// Helper function to get or initialize the WsHandler
+async fn get_ws_handler() -> Arc<ws_v2::WsHandler> {
+    if let Some(handler) = WS_HANDLER.get() {
+        return handler.clone();
+    }
+
+    // Initialize if not already done
+    let handler = ws_v2::init().await.unwrap();
+
+    // This may fail if another thread initialized it first, which is fine
+    let _ = WS_HANDLER.set(handler.clone());
+
+    handler
+}
 
 const QUERIER_ROUTES: [&str; 20] = [
     "/config",
@@ -473,7 +479,11 @@ async fn proxy_ws(
             );
 
             // Use the WebSocket v2 handler
-            match WS_HANDLER.handle_connection(req, payload, client_id).await {
+            match get_ws_handler()
+                .await
+                .handle_connection(req, payload, client_id)
+                .await
+            {
                 Ok(response) => Ok(response),
                 Err(e) => {
                     log::error!("[WS_V2_ROUTER] failed: {}", e);
