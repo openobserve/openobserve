@@ -678,6 +678,7 @@ export const usePanelDataLoader = (
     const RECONNECT_DELAY = 1000; // 1 second
 
     removeRequestId(requestId);
+    removeTraceId(payload.traceId);
 
     if (response.code === 1001 || response.code === 1006) {
       const retryCount = searchRetriesCount.value[payload.traceId] || 0;
@@ -748,6 +749,7 @@ export const usePanelDataLoader = (
     response: any,
   ) => {
     removeRequestId(requestId);
+    removeTraceId(payload.traceId);
 
     cleanupSearchRetries(payload?.traceId);
 
@@ -769,6 +771,7 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
+      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
