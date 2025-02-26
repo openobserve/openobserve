@@ -210,7 +210,12 @@ pub async fn node_list_with_metrics() -> Result<(), anyhow::Error> {
 }
 
 pub async fn local_node_metrics() -> Result<(), anyhow::Error> {
-    let metrics = config::utils::sysinfo::get_node_metrics();
+    let url = "/node/metrics";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node list failed"));
+    };
+    let metrics: config::utils::sysinfo::NodeMetrics = serde_json::from_str(&body)?;
 
     // Create header row with all column names
     let mut table = Table::new();

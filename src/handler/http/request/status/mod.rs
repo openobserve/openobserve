@@ -802,3 +802,9 @@ async fn list_node() -> Result<HttpResponse, Error> {
     let nodes = cluster::get_cached_nodes(|_| true).await;
     Ok(MetaHttpResponse::json(nodes))
 }
+
+#[get("/metrics")]
+async fn node_metrics() -> Result<HttpResponse, Error> {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+    Ok(MetaHttpResponse::json(metrics))
+}

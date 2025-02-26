@@ -125,7 +125,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             .to_string();
         let file_columns = file_str.split('/').collect::<Vec<_>>();
         let stream_type = file_columns[file_columns.len() - 2];
-         let org_id = file_columns[file_columns.len() - 3];
+        let org_id = file_columns[file_columns.len() - 3];
         let idx: usize = file_columns[file_columns.len() - 4]
             .parse()
             .unwrap_or_default();
