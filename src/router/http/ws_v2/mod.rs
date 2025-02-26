@@ -22,16 +22,15 @@ pub async fn init() -> WsResult<Arc<WsHandler>> {
     let connection_pool = Arc::new(QuerierConnectionPool::new(config.clone()));
 
     let message_bus = Arc::new(RouterMessageBus::new(
-        session_manager.clone(),
+        session_manager,
         connection_pool.clone(),
     ));
 
-    let handler = Arc::new(WsHandler::new(session_manager, message_bus));
+    let handler = Arc::new(WsHandler::new(message_bus));
 
     // Start connection maintenance task
-    let pool = connection_pool.clone();
     tokio::spawn(async move {
-        pool.maintain_connections().await;
+        connection_pool.maintain_connections().await;
     });
 
     Ok(handler)

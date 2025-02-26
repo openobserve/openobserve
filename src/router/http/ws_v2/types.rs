@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
+use config::meta::websocket::SearchEventReq;
 use serde::{Deserialize, Serialize};
 
 use crate::handler::http::request::websocket::utils::{TimeOffset, WsClientEvents, WsServerEvents};
 
 pub type SessionId = String;
 pub type ClientId = String;
-pub type QuerierId = String;
+pub type QuerierName = String;
 pub type TraceId = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +21,7 @@ pub struct Message {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
-    Search,
+    Search(Box<SearchEventReq>),
     SearchResponse,
     #[cfg(feature = "enterprise")]
     Cancel,
@@ -45,15 +46,11 @@ impl Message {
         match event {
             WsClientEvents::Search(req) => {
                 let trace_id = req.trace_id.clone();
-                Self::new(
-                    trace_id,
-                    MessageType::Search,
-                    serde_json::to_value(&req).unwrap_or_default(),
-                )
+                let payload = serde_json::to_value(&req).unwrap_or_default();
+                Self::new(trace_id, MessageType::Search(req), payload)
             }
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { trace_id } => Self::new(
-                trace_id.clone(),
                 MessageType::Cancel,
                 serde_json::json!({"trace_id": trace_id}),
             ),

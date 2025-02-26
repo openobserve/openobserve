@@ -4,22 +4,15 @@ use actix_web::{web, Error, HttpRequest, HttpResponse};
 use futures_util::StreamExt;
 use serde_json::json;
 
-use super::{error::*, message::*, session::*, types::*};
+use super::{error::*, message::*, types::*};
 
 pub struct WsHandler {
-    session_manager: Arc<RouterSessionManager>,
     message_bus: Arc<RouterMessageBus>,
 }
 
 impl WsHandler {
-    pub fn new(
-        session_manager: Arc<RouterSessionManager>,
-        message_bus: Arc<RouterMessageBus>,
-    ) -> Self {
-        Self {
-            session_manager,
-            message_bus,
-        }
+    pub fn new(message_bus: Arc<RouterMessageBus>) -> Self {
+        Self { message_bus }
     }
 
     pub async fn handle_connection(
@@ -32,6 +25,7 @@ impl WsHandler {
 
         // Create session
         let session_info = self
+            .message_bus
             .session_manager
             .create_session(client_id)
             .await
@@ -86,6 +80,11 @@ impl WsHandler {
 
             // Cleanup
             message_bus.unregister_client(&session_id).await.ok();
+            message_bus
+                .session_manager
+                .remove_session(&session_id)
+                .await
+                .ok();
         });
 
         Ok(response)

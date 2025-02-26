@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
+use config::meta::cluster::RoleGroup;
 use dashmap::DashMap;
 use tokio::sync::mpsc;
 
 use super::{connection::Connection, error::*, pool::*, session::*, types::*};
 
 pub struct RouterMessageBus {
-    session_manager: Arc<RouterSessionManager>,
-    connection_pool: Arc<QuerierConnectionPool>,
-    client_channels: DashMap<SessionId, mpsc::Sender<Message>>,
+    pub session_manager: Arc<RouterSessionManager>,
+    pub connection_pool: Arc<QuerierConnectionPool>,
+    pub client_channels: DashMap<SessionId, mpsc::Sender<Message>>,
 }
 
 impl RouterMessageBus {
@@ -52,23 +53,28 @@ impl RouterMessageBus {
             .ok_or_else(|| WsError::SessionError("Session not found".into()))?;
 
         // Get or assign querier for this trace
-        let querier_id = if let Some(querier_id) = self
+        let querier_name = if let Some(querier_name) = self
             .session_manager
-            .get_querier_for_trace(&message.trace_id)
-            .await
+            .get_querier_for_trace(session_id, &message.trace_id)
+            .await?
         {
-            querier_id
+            querier_name
         } else {
+            let node_group = if let MessageType::Search(search_req) = &message.message_type {
+                Some(RoleGroup::from(search_req.search_type.clone()))
+            } else {
+                None
+            };
             // Use consistent hashing to select querier
-            let querier_id = self.select_querier(&message.trace_id).await?;
+            let querier_name = self.select_querier(&message.trace_id, node_group).await?;
             self.session_manager
-                .set_querier_for_trace(message.trace_id.clone(), querier_id.clone())
+                .set_querier_for_trace(session_id, message.trace_id.clone(), querier_name.clone())
                 .await?;
-            querier_id
+            querier_name
         };
 
         // Get connection to querier
-        let conn = self.connection_pool.get_connection(&querier_id).await?;
+        let conn = self.connection_pool.get_connection(&querier_name).await?;
 
         // Send message
         conn.send_message(message).await?;
@@ -93,21 +99,19 @@ impl RouterMessageBus {
         Ok(())
     }
 
-    async fn select_querier(&self, trace_id: &str) -> WsResult<QuerierId> {
+    async fn select_querier(
+        &self,
+        trace_id: &str,
+        node_group: Option<RoleGroup>,
+    ) -> WsResult<QuerierName> {
         use crate::common::infra::cluster;
 
-        // Get online querier nodes
-        let _nodes = cluster::get_cached_online_querier_nodes(Some(
-            config::meta::cluster::RoleGroup::Interactive,
-        ))
-        .await
-        .ok_or_else(|| WsError::QuerierNotAvailable("No queriers available".into()))?;
-
         // Use consistent hashing to select querier
+        // map all messages with the same trace_id to the same querier
         let node = cluster::get_node_from_consistent_hash(
             trace_id,
             &config::meta::cluster::Role::Querier,
-            None,
+            node_group,
         )
         .await
         .ok_or_else(|| WsError::QuerierNotAvailable("Failed to select querier".into()))?;
