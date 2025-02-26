@@ -228,7 +228,7 @@ pub async fn save_enrichment_data(
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();
-    log::warn!(
+    log::info!(
         "save enrichment data to: {}/{}/{} success with stats {:?}",
         org_id,
         table_name,
@@ -294,7 +294,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
-    log::warn!("deleted enrichment table  {stream_name}");
+    log::info!("deleted enrichment table  {stream_name}");
 }
 
 pub async fn extract_multipart(
