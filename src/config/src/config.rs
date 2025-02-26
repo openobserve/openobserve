@@ -55,6 +55,7 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
+pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
@@ -70,6 +71,7 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
+pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
 // Columns added to ingested records for _INTERNAL_ use only.
@@ -604,6 +606,7 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
+    pub is_local_storage: bool,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
     pub cluster_coordinator: String,
     #[env_config(name = "ZO_QUEUE_STORE", default = "")]
@@ -1709,6 +1712,8 @@ pub fn init() -> Config {
         cfg.common.node_role = "all".to_string();
         cfg.common.node_role_group = "".to_string();
     }
+    cfg.common.is_local_storage = cfg.common.local_mode
+        && (cfg.common.local_mode_storage == "disk" || cfg.common.local_mode_storage == "local");
 
     // check limit config
     if let Err(e) = check_limit_config(&mut cfg) {
@@ -1849,11 +1854,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.limit.sql_db_connections_min == 0 {
-        cfg.limit.sql_db_connections_min = cpu_num as u32
+        cfg.limit.sql_db_connections_min = MINIMUM_DB_CONNECTIONS;
     }
 
     if cfg.limit.sql_db_connections_max == 0 {
-        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
+        cfg.limit.sql_db_connections_max = cpu_num as u32 * 4;
     }
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
@@ -2233,6 +2238,15 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         .canonicalize()
         .unwrap();
     let cache_dir = cache_dir.to_str().unwrap();
+
+    // disable disk cache for local disk storage
+    if cfg.common.is_local_storage
+        && !cfg.common.result_cache_enabled
+        && !cfg.common.metrics_cache_enabled
+    {
+        cfg.disk_cache.enabled = false;
+    }
+
     let disks = sysinfo::disk::get_disk_usage();
     let disk = disks.iter().find(|d| cache_dir.starts_with(&d.mount_point));
     let (disk_total, disk_free) = match disk {
@@ -2481,9 +2495,7 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 #[inline]
 pub fn is_local_disk_storage() -> bool {
-    let cfg = get_config();
-    cfg.common.local_mode
-        && (cfg.common.local_mode_storage == "disk" || cfg.common.local_mode_storage == "local")
+    get_config().common.is_local_storage
 }
 
 #[inline]
