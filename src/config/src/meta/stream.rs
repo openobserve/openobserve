@@ -701,11 +701,12 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
 
         match self.defined_schema_fields.as_ref() {
-            Some(mut fields) => {
+            Some(fields) => {
                 if !fields.is_empty() {
+                    let mut fields = fields.clone();
                     fields.sort_unstable();
                     fields.dedup();
-                    state.serialize_field("defined_schema_fields", fields)?;
+                    state.serialize_field("defined_schema_fields", &fields)?;
                 } else {
                     state.skip_field("defined_schema_fields")?;
                 }
