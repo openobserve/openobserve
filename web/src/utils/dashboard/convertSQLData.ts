@@ -228,8 +228,10 @@ export const convertSQLData = async (
     // if top_results is enabled then use the top_results value
     // otherwise use the max_dashboard_series value
     const limitSeries = top_results
-      ? (Math.min(top_results, store.state?.zoConfig?.max_dashboard_series) ??
-        100)
+      ? (Math.min(
+          top_results,
+          store.state?.zoConfig?.max_dashboard_series ?? 100,
+        ) ?? 100)
       : (store.state?.zoConfig?.max_dashboard_series ?? 100);
 
     const innerDataArray = data[0];
@@ -260,7 +262,7 @@ export const convertSQLData = async (
     // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
     if (
       (top_results &&
-        top_results > store.state?.zoConfig?.max_dashboard_series &&
+        top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
         allKeys.length > top_results) ||
       (!top_results &&
         allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
