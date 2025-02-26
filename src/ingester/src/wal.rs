@@ -193,15 +193,11 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let latest_schema = infra::schema::get_cache(
-                org_id,
-                &entry.stream,
-                config::meta::stream::StreamType::Logs,
-            )
-            .await
-            .map_err(|e| Error::ExternalError {
-                source: Box::new(e),
-            })?;
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+                .await
+                .map_err(|e| Error::ExternalError {
+                    source: Box::new(e),
+                })?;
             entry.schema_key = latest_schema.hash_key().into();
             let infer_schema = Arc::new(infer_schema.cloned_from(latest_schema.schema()));
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
