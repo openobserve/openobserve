@@ -38,7 +38,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -76,7 +76,7 @@ jobs:
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
-        
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -95,8 +95,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-        testfilename:
-          [
+        testfilename: [
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -171,7 +170,7 @@ jobs:
       #   run: cat o2.log
 
       - name: Sanitize Test Filename
-        shell: bash 
+        shell: bash
         run: |
           # Assign the matrix variable to a Bash variable
           SANITIZED_FILENAME="${{ matrix.testfilename }}"
@@ -210,9 +209,9 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          pattern: playwright-coverage-* # Match all artifacts with this prefix
           path: merged-coverage
-          merge-multiple: true 
+          merge-multiple: true
 
       - name: Verify Downloaded Files
         run: ls -R merged-coverage # Check the structure and contents
