@@ -82,6 +82,7 @@ export const usePanelDataLoader = (
 
   // Add cleanup function
   const cleanupSearchRetries = (traceId: string) => {
+    removeTraceId(traceId);
     if (searchRetriesCount.value[traceId]) {
       delete searchRetriesCount.value[traceId];
     }
@@ -678,7 +679,6 @@ export const usePanelDataLoader = (
     const RECONNECT_DELAY = 1000; // 1 second
 
     removeRequestId(requestId);
-    removeTraceId(payload.traceId);
 
     if (response.code === 1001 || response.code === 1006) {
       const retryCount = searchRetriesCount.value[payload.traceId] || 0;
@@ -749,7 +749,6 @@ export const usePanelDataLoader = (
     response: any,
   ) => {
     removeRequestId(requestId);
-    removeTraceId(payload.traceId);
 
     cleanupSearchRetries(payload?.traceId);
 
