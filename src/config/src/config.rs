@@ -71,6 +71,7 @@ pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i32 = -999;
 
+pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
 pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 
 // Columns added to ingested records for _INTERNAL_ use only.
@@ -1853,11 +1854,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.limit.sql_db_connections_min == 0 {
-        cfg.limit.sql_db_connections_min = 2;
+        cfg.limit.sql_db_connections_min = MINIMUM_DB_CONNECTIONS;
     }
 
     if cfg.limit.sql_db_connections_max == 0 {
-        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 4;
+        cfg.limit.sql_db_connections_max = cpu_num as u32 * 4;
     }
     cfg.limit.sql_db_connections_max =
         max(REQUIRED_DB_CONNECTIONS, cfg.limit.sql_db_connections_max);
