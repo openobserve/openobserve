@@ -169,4 +169,25 @@ test.describe("Websocket for logs", () => {
         await logsPage.addRemoveInteresting();
     });
 
+    test("Websocket enabled histogram is disabled and run query, results appear and then user switches on Historgram, getting error", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.selectRunQuery();
+        await logsPage.toggleHistogram();
+        await logsPage.selectRunQuery();
+    
+        await logsPage.toggleHistogram();
+        
+        // Check that the error message is not visible
+        const errorHeading = page.getByRole('heading', { name: 'Error while fetching' });
+        await expect(errorHeading).not.toBeVisible();
+
+        // Ensure that the error details button is also not visible or disabled
+        const errorDetailsButton = page.locator('[data-test="logs-page-histogram-error-details-btn"]');
+        await expect(errorDetailsButton).not.toBeVisible();
+
+
+    });
+
 });
