@@ -99,10 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     position="right"
     full-height
     maximized
+    @keydown.stop
   >
     <div
       data-test="pipeline-nodes-list-dragable"
       class="stream-routing-dialog-container full-height"
+      @keydown.stop
+      tabindex="0"
     >
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
