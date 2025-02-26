@@ -178,8 +178,6 @@ test.describe("Websocket for logs", () => {
         await logsPage.selectRunQuery();
     
         await logsPage.toggleHistogram();
-
-        const errorDetails = await logsPage.getErrorDetails();
         
         // Check that the error message is not visible
         const errorHeading = page.getByRole('heading', { name: 'Error while fetching' });
