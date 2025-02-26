@@ -81,7 +81,7 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = service::alerts::scheduler::run().await {
-            log::error!("[ALERT MANAGER] run schedule jobs error: {}", e);
+            log::error!("[SCHEDULER] run schedule jobs error: {}", e);
         }
     }
 }
@@ -96,7 +96,7 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = infra::scheduler::clean_complete().await {
-            log::error!("[ALERT MANAGER] clean complete jobs error: {}", e);
+            log::error!("[SCHEDULER] clean complete jobs error: {}", e);
         }
     }
 }
@@ -111,7 +111,7 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = infra::scheduler::watch_timeout().await {
-            log::error!("[ALERT MANAGER] watch timeout jobs error: {}", e);
+            log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
         }
     }
 }

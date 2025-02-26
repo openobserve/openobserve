@@ -18,7 +18,7 @@ use std::{collections::HashMap, str::FromStr, time::Instant};
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
     cluster::LOCAL_NODE,
-    get_config, ider,
+    get_config,
     meta::{
         alerts::FrequencyType,
         dashboards::reports::ReportFrequencyType,
@@ -36,7 +36,6 @@ use config::{
     },
 };
 use cron::Schedule;
-use futures::future::try_join_all;
 use infra::scheduler::get_scheduler_max_retries;
 use proto::cluster_rpc;
 
@@ -51,82 +50,6 @@ use crate::service::{
     pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };
-
-pub async fn run() -> Result<(), anyhow::Error> {
-    let trace_id = ider::generate();
-    log::debug!("[SCHEDULER trace_id {trace_id}] Pulling jobs from scheduler");
-    let cfg = get_config();
-
-    // Scheduler pulls only those triggers that match the conditions-
-    // - trigger.next_run_at <= now
-    // - !(trigger.is_realtime && !trigger.is_silenced)
-    // - trigger.status == "Waiting"
-    let triggers = db::scheduler::pull(
-        cfg.limit.alert_schedule_concurrency,
-        cfg.limit.alert_schedule_timeout,
-        cfg.limit.report_schedule_timeout,
-    )
-    .await?;
-
-    log::info!(
-        "[SCHEDULER trace_id {trace_id}] Pulled {} jobs from scheduler",
-        triggers.len()
-    );
-
-    if !triggers.is_empty() {
-        let mut grouped_triggers: std::collections::HashMap<
-            db::scheduler::TriggerModule,
-            Vec<&db::scheduler::Trigger>,
-        > = HashMap::new();
-
-        // Group triggers by module
-        for trigger in &triggers {
-            grouped_triggers
-                .entry(trigger.module.clone())
-                .or_default()
-                .push(trigger);
-        }
-
-        // Print counts for each module
-        for (module, triggers) in grouped_triggers {
-            log::info!(
-                "[SCHEDULER trace_id {trace_id}] Pulled {:?}: {} jobs",
-                module,
-                triggers.len()
-            );
-        }
-    }
-
-    let mut tasks = Vec::new();
-    for (i, trigger) in triggers.into_iter().enumerate() {
-        let trace_id = format!("{}-{}", trace_id, i);
-        let task = tokio::task::spawn(async move {
-            let key = format!("{}-{}/{}", trigger.module, trigger.org, trigger.module_key);
-            log::debug!(
-                "[SCHEDULER trace_id {trace_id}] start processing trigger: {}",
-                key
-            );
-            if let Err(e) = handle_triggers(&trace_id, trigger).await {
-                log::error!(
-                    "[SCHEDULER trace_id {trace_id}] Error handling trigger: {}",
-                    e
-                );
-            }
-            log::debug!(
-                "[SCHEDULER trace_id {trace_id}] finished processing trigger: {}",
-                key
-            );
-        });
-        tasks.push(task);
-    }
-    if let Err(e) = try_join_all(tasks).await {
-        log::error!(
-            "[SCHEDULER trace_id {trace_id}] Error handling triggers: {}",
-            e
-        );
-    }
-    Ok(())
-}
 
 pub async fn handle_triggers(
     trace_id: &str,
