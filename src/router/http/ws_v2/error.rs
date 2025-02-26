@@ -9,6 +9,9 @@ pub enum WsError {
     #[error("Session error: {0}")]
     SessionError(String),
 
+    #[error("Session not found: {0}")]
+    SessionNotFound(String),
+
     #[error("Message error: {0}")]
     MessageError(String),
 
@@ -30,6 +33,7 @@ impl ResponseError for WsError {
         match self {
             WsError::ConnectionError(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::SessionError(_) => StatusCode::BAD_REQUEST,
+            WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
             WsError::MessageError(_) => StatusCode::BAD_REQUEST,
             WsError::QuerierNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::CircuitBreakerOpen(_) => StatusCode::SERVICE_UNAVAILABLE,
