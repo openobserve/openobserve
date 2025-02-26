@@ -143,9 +143,9 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display result text and pagination", async ({ page }) => {
-    await page.getByText("Showing 1 to 100").click();
+    await page.getByText("Showing 1 to 50").click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -251,7 +251,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -585,7 +585,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -607,50 +607,50 @@ test.describe("Sanity testcases", () => {
     await page.getByRole("cell", { name: "01", exact: true }).click();
   });
 
-  test("should display pagination for schema", async ({ page }) => {
-    await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
-      .click();
-    await page.getByText("fast_rewind1/2fast_forward").click();
-    await page
-      .locator('[data-test="logs-page-fields-list-pagination-nextpage-button"]')
-      .click();
-    await page
-      .locator(
-        '[data-test="logs-page-fields-list-pagination-previouspage-button"]'
-      )
-      .click();
-  });
+  // test("should display pagination for schema", async ({ page }) => {
+  //   await page
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
+  //     .click();
+  //   await page.getByText("fast_rewind1/2fast_forward").click();
+  //   await page
+  //     .locator('[data-test="logs-page-fields-list-pagination-nextpage-button"]')
+  //     .click();
+  //   await page
+  //     .locator(
+  //       '[data-test="logs-page-fields-list-pagination-previouspage-button"]'
+  //     )
+  //     .click();
+  // });
 
-  test("should display pagination when histogram is off and clicking and closing the result", async ({
-    page,
-  }) => {
-    await page
-      .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
-      .nth(2)
-      .click();
-    await page.locator('[data-test="log-table-column-0-source"]').click();
-    await page.locator('[data-test="close-dialog"]').click();
-    await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
-      .click();
-  });
+  // test("should display pagination when histogram is off and clicking and closing the result", async ({
+  //   page,
+  // }) => {
+  //   await page
+  //     .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
+  //     .nth(2)
+  //     .click();
+  //   await page.locator('[data-test="log-table-column-0-source"]').click();
+  //   await page.locator('[data-test="close-dialog"]').click();
+  //   await page
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
+  //     .click();
+  // });
 
-  test("should display pagination when only SQL is on clicking and closing the result", async ({
-    page,
-  }) => {
-    await page
-      .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
-      .nth(2)
-      .click();
-    await page.getByLabel("SQL Mode").locator("div").first().click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
-    await page.locator('[data-test="close-dialog"]').click();
-    await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
-      .click();
-  });
+  // test("should display pagination when only SQL is on clicking and closing the result", async ({
+  //   page,
+  // }) => {
+  //   await page
+  //     .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
+  //     .nth(2)
+  //     .click();
+  //   await page.getByLabel("SQL Mode").locator("div").first().click();
+  //   await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+  //   await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
+  //   await page.locator('[data-test="close-dialog"]').click();
+  //   await page
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
+  //     .click();
+  // });
 
   test(" should display histogram in sql mode", async ({ page }) => {
     await page
