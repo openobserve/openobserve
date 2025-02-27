@@ -131,6 +131,7 @@ pub mod sessions_cache_utils {
     }
 
     async fn cleanup_expired_sessions() {
+        log::info!("[WS_GC] Session cache len at start: {}", WS_SESSIONS.len());
         let expired: Vec<String> = WS_SESSIONS
             .iter()
             .filter(|entry| entry.value().is_expired())
