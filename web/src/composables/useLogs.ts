@@ -181,6 +181,7 @@ const defaultObject = {
       expandGroupRowsFieldCount: <any>{},
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
+      pipelineQueryStream: <any>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
