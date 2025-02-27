@@ -18,8 +18,6 @@ use config::{cluster::LOCAL_NODE, get_config};
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::time;
 
-use crate::service;
-
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_alert_manager() {
         return Ok(());
@@ -74,6 +72,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     crate::service::alerts::scheduler::run().await
 }
