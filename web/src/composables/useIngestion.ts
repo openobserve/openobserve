@@ -130,6 +130,23 @@ Access Key: [BASIC_PASSCODE]`;
   };
 
 
+  const databaseDocURLs = {
+    sqlServer: "https://short.openobserve.ai/database/sql-server",
+    postgres: "https://short.openobserve.ai/database/postgres",
+    mongoDB: "https://short.openobserve.ai/database/mongodb",
+    redis: "https://short.openobserve.ai/database/redis",
+    couchDB: "https://short.openobserve.ai/database/couchdb",
+    elasticsearch: "https://short.openobserve.ai/database/elasticsearch",
+    mySQL: "https://short.openobserve.ai/database/mysql",
+    sapHana: "https://short.openobserve.ai/database/sap-hana",
+    snowflake: "https://short.openobserve.ai/database/snowflake",
+    zookeeper: "https://short.openobserve.ai/database/zookeeper",
+    cassandra: "https://short.openobserve.ai/database/cassandra",
+    aerospike: "https://short.openobserve.ai/database/aerospike",
+    dynamoDB: "https://short.openobserve.ai/database/dynamodb",
+  };
+
+
   return {
     endpoint,
     databaseContent,
