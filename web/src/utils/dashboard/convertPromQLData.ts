@@ -89,6 +89,34 @@ export const convertPromQLData = async (
     return { options: null };
   }
 
+  // Initialize extras object
+  let extras: any = {};
+
+  // get the limit series from the config
+  let limitSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+
+  // get the total series
+  let totalSeries = 0;
+  searchQueryData.forEach((queryData: any) => {
+    totalSeries += queryData.result?.length || 0;
+  });
+
+  // Limit number of series to limitSeries
+  const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
+    const remainingSeries = queryData.result?.slice(0, limitSeries);
+    limitSeries = limitSeries - remainingSeries.length;
+    return {
+      ...queryData,
+      result: remainingSeries,
+    };
+  });
+
+  // Add warning if total number of series exceeds limit
+  if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
+    extras.limitNumberOfSeriesWarningMessage =
+      "Limiting the displayed series to ensure optimal performance";
+  }
+
   // flag to check if the data is time seriesc
   let isTimeSeriesFlag = true;
 
@@ -100,7 +128,7 @@ export const convertPromQLData = async (
   let xAxisData: any = new Set();
 
   // add all series timestamp
-  searchQueryData.forEach((queryData: any) =>
+  limitedSearchQueryData.forEach((queryData: any) =>
     queryData.result.forEach((result: any) =>
       result.values.forEach((value: any) => xAxisData.add(value[0])),
     ),
@@ -179,8 +207,8 @@ export const convertPromQLData = async (
     };
   };
 
-  const [min, max] = getMetricMinMaxValue(searchQueryData);
-  
+  const [min, max] = getMetricMinMaxValue(limitedSearchQueryData);
+
   const getFinalAxisValue = (
     configValue: number | null | undefined,
     dataValue: number,
@@ -389,7 +417,7 @@ export const convertPromQLData = async (
 
   if (panelSchema.type === "gauge") {
     // calculate total length of all metrics
-    searchQueryData.forEach((metric: any) => {
+    limitedSearchQueryData.forEach((metric: any) => {
       if (metric.result && Array.isArray(metric.result)) {
         totalLength += metric.result.length;
       }
@@ -419,10 +447,10 @@ export const convertPromQLData = async (
       panelSchema.config?.color?.mode,
     )
   ) {
-    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+    [chartMin, chartMax] = getMetricMinMaxValue(limitedSearchQueryData);
   }
 
-  options.series = searchQueryData.map((it: any, index: number) => {
+  options.series = limitedSearchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
       case "line":
@@ -813,7 +841,11 @@ export const convertPromQLData = async (
   // console.timeEnd("convertPromQLData");
   return {
     options,
-    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+    extras: {
+      ...extras,
+      panelId: panelSchema?.id,
+      isTimeSeries: isTimeSeriesFlag,
+    },
   };
 };
 
