@@ -327,9 +327,8 @@ async fn cache_files(
             scan_stats.querier_disk_cached_files += 1;
         }
     }
-    if files.len() as i64
-        == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files
-    {
+    let files_num = files.len() as i64;
+    if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
         return Ok(file_data::CacheType::None);
     }
@@ -379,7 +378,14 @@ async fn cache_files(
             }
         }
     });
-    Ok(cache_type)
+
+    // if cached file less than 50% of the total files, return None
+    if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
+    {
+        Ok(file_data::CacheType::None)
+    } else {
+        Ok(cache_type)
+    }
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
@@ -633,11 +639,21 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: no match found in index for file {}",
-                            query.trace_id,
-                            file_name
-                        );
+                        if hits_in_file > 0 {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                hits_in_file,
+                                file_name
+                            );
+                        } else {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: no match found in index for file {}",
+                                query.trace_id,
+                                file_name
+                            );
+                        }
                         file_list_map.remove(&file_name);
                     }
                 }

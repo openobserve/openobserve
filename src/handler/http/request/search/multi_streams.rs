@@ -21,14 +21,14 @@ use config::{
     get_config,
     meta::{
         function::VRLResultResolver,
-        search,
-        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
     metrics,
     utils::{base64, json},
+    TIMESTAMP_COL_NAME,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
@@ -135,12 +135,7 @@ pub async fn search_multi(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
@@ -592,7 +587,7 @@ pub async fn search_multi(
         };
     }
 
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -709,12 +704,7 @@ pub async fn _search_partition_multi(
         .unwrap_or("")
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -856,12 +846,7 @@ pub async fn around_multi(
     let stream_names = base64::decode_url(&stream_names)?;
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),

@@ -33,6 +33,7 @@ use config::{
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
     },
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
@@ -54,8 +55,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
-    tracing::info_span,
+    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
@@ -501,7 +501,7 @@ pub async fn search_multi(
         multi_res.hits
     };
     log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -578,7 +578,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
@@ -668,7 +668,7 @@ pub async fn search_partition(
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,
@@ -891,9 +891,10 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "Long"
         };
-        let search_type: Option<search::SearchEventType> = result
-            .search_type
-            .map(|s_event_type| search::SearchEventType::from_str(&s_event_type).unwrap());
+        let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
+            search::SearchEventType::try_from(s_event_type.as_str())
+                .unwrap_or(search::SearchEventType::UI)
+        });
         status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
