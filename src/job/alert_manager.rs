@@ -75,15 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.alert_schedule_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = service::alerts::scheduler::run().await {
-            log::error!("[SCHEDULER] run schedule jobs error: {}", e);
-        }
-    }
+    crate::service::alerts::scheduler::run().await
 }
 
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {

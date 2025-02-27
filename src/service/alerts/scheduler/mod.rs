@@ -21,9 +21,9 @@ use futures::future::try_join_all;
 use crate::service::db;
 
 pub mod handlers;
-pub mod queue;
+pub mod worker;
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run_old() -> Result<(), anyhow::Error> {
     let trace_id = ider::generate();
     log::debug!("[SCHEDULER trace_id {trace_id}] Pulling jobs from scheduler");
     let cfg = get_config();
@@ -77,12 +77,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 "[SCHEDULER trace_id {trace_id}] start processing trigger: {}",
                 key
             );
-            if let Err(e) = handle_triggers(&trace_id, trigger).await {
-                log::error!(
-                    "[SCHEDULER trace_id {trace_id}] Error handling trigger: {}",
-                    e
-                );
-            }
+            // if let Err(e) = handle_triggers(&trace_id, trigger).await {
+            //     log::error!(
+            //         "[SCHEDULER trace_id {trace_id}] Error handling trigger: {}",
+            //         e
+            //     );
+            // }
             log::debug!(
                 "[SCHEDULER trace_id {trace_id}] finished processing trigger: {}",
                 key
@@ -97,4 +97,22 @@ pub async fn run() -> Result<(), anyhow::Error> {
         );
     }
     Ok(())
+}
+
+// The main function that creates and runs the scheduler
+pub async fn run() -> Result<(), anyhow::Error> {
+    // Get configuration
+    let cfg = get_config();
+
+    // Create scheduler config
+    let scheduler_config = worker::SchedulerConfig {
+        alert_schedule_concurrency: cfg.limit.alert_schedule_concurrency as usize,
+        alert_schedule_timeout: cfg.limit.alert_schedule_timeout,
+        report_schedule_timeout: cfg.limit.report_schedule_timeout,
+        poll_interval_secs: cfg.limit.alert_schedule_interval as u64, // Can be configurable
+    };
+
+    // Create and run scheduler
+    let scheduler = worker::Scheduler::new(scheduler_config);
+    scheduler.run().await
 }

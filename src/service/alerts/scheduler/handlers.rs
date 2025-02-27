@@ -41,11 +41,11 @@ use proto::cluster_rpc;
 
 use crate::service::{
     alerts::{
-        alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
+        alert::{get_alert_start_end_time, get_by_name, get_row_column_map, AlertExt},
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
-    db,
+    db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
@@ -116,19 +116,18 @@ async fn handle_alert_triggers(
         return Ok(());
     }
 
-    let alert =
-        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
-            Some(alert) => alert,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "alert not found: {}/{}/{}/{}",
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    alert_name
-                ));
-            }
-        };
+    let alert = match get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
+        Some(alert) => alert,
+        None => {
+            return Err(anyhow::anyhow!(
+                "alert not found: {}/{}/{}/{}",
+                org_id,
+                stream_name,
+                stream_type,
+                alert_name
+            ));
+        }
+    };
     let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
@@ -304,12 +303,10 @@ async fn handle_alert_triggers(
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
                 if let Some(mut alert) =
-                    super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await?
+                    get_by_name(&org_id, stream_type, stream_name, alert_name).await?
                 {
                     alert.enabled = false;
-                    if let Err(e) =
-                        db::alerts::alert::set_without_updating_trigger(&org_id, alert).await
-                    {
+                    if let Err(e) = set_without_updating_trigger(&org_id, alert).await {
                         log::error!("[SCHEDULER trace_id {trace_id}] Failed to update alert: {alert_name} after trigger: {e}");
                     }
                 }
