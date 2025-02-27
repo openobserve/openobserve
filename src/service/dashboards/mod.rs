@@ -583,6 +583,10 @@ async fn filter_permitted_dashboards(
                 || permitted_objects
                     .as_ref()
                     .unwrap()
+                    .contains(&format!("dashboard:{dashboard_id}"))
+                || permitted_objects
+                    .as_ref()
+                    .unwrap()
                     .contains(&format!("dashboard:_all_{org_id}"))
         })
         .collect();
