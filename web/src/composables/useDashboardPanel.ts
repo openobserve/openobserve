@@ -2672,6 +2672,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         errors.push("Please enter your markdown code");
       }
     }
+    if (dashboardPanelData.data.type == 'custom_chart'){
+      if(dashboardPanelData.data.queries[0].query.trim() == ""){
+         errors.push("Please enter query for custom chart")
+      }
+    }
 
     if (promqlMode.value) {
       // 1. chart type: only line chart is supported
