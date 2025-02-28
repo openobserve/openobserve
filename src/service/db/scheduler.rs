@@ -62,7 +62,7 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 pub async fn update_trigger(trigger: Trigger) -> Result<()> {
     #[cfg(feature = "enterprise")]
     let trigger_clone = trigger.clone();
-    infra_scheduler::update_trigger(trigger).await?;
+    infra_scheduler::update_trigger(trigger, false).await?;
 
     // super cluster
     #[cfg(feature = "enterprise")]
