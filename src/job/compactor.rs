@@ -126,6 +126,10 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             }
         };
 
+        // reset all metrics
+        metrics::COMPACT_PENDING_JOBS.reset();
+
+        // set new metrics
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS

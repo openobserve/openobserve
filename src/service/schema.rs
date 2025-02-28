@@ -423,6 +423,11 @@ pub fn generate_schema_for_defined_schema_fields(
     for field in fields {
         if let Some(f) = schema.fields_map().get(field) {
             new_fields.push(schema.schema().fields()[*f].clone());
+        } else {
+            log::warn!(
+                "[FIELD_LOST] defined_schema_field {} is not in schema",
+                field
+            );
         }
     }
 
@@ -436,6 +441,7 @@ pub fn generate_schema_for_defined_schema_fields(
 }
 
 pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+    let cfg = get_config();
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
 
@@ -454,6 +460,14 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
             }
             Some(idx) => {
                 if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
+                    if item_name != &cfg.common.column_all
+                        && item_name != &cfg.common.column_timestamp
+                    {
+                        log::warn!(
+                            "[FIELD_LOST] field {} is not in defined_schema_fields",
+                            item_name
+                        );
+                    }
                     continue;
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
