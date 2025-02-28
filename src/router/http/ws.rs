@@ -23,6 +23,7 @@ use std::{
 
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
+use bytes::Bytes;
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::{HeaderName, HeaderValue};
@@ -31,14 +32,14 @@ use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
 
 pub struct WsProxySession {
-    session: actix_ws::Session,
+    session: Option<actix_ws::Session>,
     message_in_flight: AtomicBool,
 }
 
 impl WsProxySession {
     pub fn new(session: actix_ws::Session) -> Self {
         Self {
-            session,
+            session: Some(session),
             message_in_flight: AtomicBool::new(false),
         }
     }
@@ -53,12 +54,15 @@ impl WsProxySession {
                 Ordering::SeqCst,
             ) {
                 Ok(_) => {
-                    let result = self.session.text(text.into()).await;
-                    self.message_in_flight.store(false, Ordering::SeqCst);
-                    return result.map_err(|e| {
-                        log::error!("[WS_PROXY] Failed to send message: {:?}", e);
-                        actix_web::error::ErrorInternalServerError("Message send failed")
-                    });
+                    if let Some(ref mut session) = self.session {
+                        let result = session.text(text.into()).await;
+                        self.message_in_flight.store(false, Ordering::SeqCst);
+                        return result.map_err(|e| {
+                            log::error!("[WS_PROXY] Failed to send message: {:?}", e);
+                            actix_web::error::ErrorInternalServerError("Message send failed")
+                        });
+                    }
+                    return Err(actix_web::error::ErrorInternalServerError("Session closed"));
                 }
                 Err(_) => {
                     attempts += 1;
@@ -70,6 +74,63 @@ impl WsProxySession {
         }
         Err(actix_web::error::ErrorInternalServerError(
             "Failed to acquire message lock after retries",
+        ))
+    }
+
+    async fn binary(&mut self, bin: impl Into<Bytes>) -> Result<(), Error> {
+        if let Some(ref mut session) = self.session {
+            return session.binary(bin).await.map_err(|e| {
+                log::error!("[WS_PROXY] Failed to send binary: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Binary send failed")
+            });
+        }
+        Err(actix_web::error::ErrorInternalServerError("Session closed"))
+    }
+
+    async fn ping(&mut self, ping: &[u8]) -> Result<(), Error> {
+        if let Some(ref mut session) = self.session {
+            return session.ping(ping).await.map_err(|e| {
+                log::error!("[WS_PROXY] Failed to send ping: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Ping failed")
+            });
+        }
+        Err(actix_web::error::ErrorInternalServerError("Session closed"))
+    }
+
+    async fn pong(&mut self, pong: &[u8]) -> Result<(), Error> {
+        if let Some(ref mut session) = self.session {
+            return session.pong(pong).await.map_err(|e| {
+                log::error!("[WS_PROXY] Failed to send pong: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Pong failed")
+            });
+        }
+        Err(actix_web::error::ErrorInternalServerError("Session closed"))
+    }
+
+    async fn close(&mut self, reason: Option<actix_ws::CloseReason>) -> Result<(), Error> {
+        // Wait for any in-flight message to complete
+        let mut retries = 0;
+        while self.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
+            tokio::task::yield_now().await;
+            retries += 1;
+        }
+
+        if self.message_in_flight.load(Ordering::SeqCst) {
+            log::warn!(
+                "[WS_PROXY] Closing with message in flight after {} retries",
+                retries
+            );
+        }
+
+        // Now close the session
+        if let Some(session) = self.session.take() {
+            return session.close(reason).await.map_err(|e| {
+                log::error!("[WS_PROXY] Failed to close session: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Session close failed")
+            });
+        }
+        Err(actix_web::error::ErrorInternalServerError(
+            "Session already closed",
         ))
     }
 }
@@ -218,7 +279,7 @@ pub async fn ws_proxy(
                                     log::info!("[WS_PROXY] Backend -> Router close");
                                     let mut sink = backend_ws_sink2.lock().await;
 
-                                    if let Err(e) = proxy_session.session.close(reason.clone()).await {
+                                    if let Err(e) = proxy_session.close(reason.clone()).await {
                                         log::error!("[WS_PROXY] Failed to close client: {}", e);
                                     }
 
@@ -234,17 +295,17 @@ pub async fn ws_proxy(
                                     }
                                 }
                                 Message::Binary(bin) => {
-                                    if proxy_session.session.binary(bin).await.is_err() {
+                                    if proxy_session.binary(bin).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Ping(ping) => {
-                                    if proxy_session.session.ping(&ping).await.is_err() {
+                                    if proxy_session.ping(&ping).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Pong(pong) => {
-                                    if proxy_session.session.pong(&pong).await.is_err() {
+                                    if proxy_session.pong(&pong).await.is_err() {
                                         break;
                                     }
                                 }
