@@ -99,22 +99,6 @@ impl WsSession {
     /// Close the session with a reason
     pub async fn close(&mut self, reason: Option<CloseReason>) -> Result<(), actix_ws::Closed> {
         self.update_activity();
-
-        // Wait for any in-flight message to complete
-        let mut retries = 0;
-        while self.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
-            tokio::task::yield_now().await;
-            retries += 1;
-        }
-
-        if self.message_in_flight.load(Ordering::SeqCst) {
-            log::warn!(
-                "[WS_HANDLER] Closing session with message in flight after {} retries",
-                retries
-            );
-        }
-
-        // Now close the session
         if let Some(session) = self.inner.take() {
             session.close(reason).await
         } else {
@@ -395,6 +379,22 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
             );
         }
 
+        // Wait for any in-flight message to complete
+        let mut retries = 0;
+        while session.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
+            tokio::task::yield_now().await;
+            retries += 1;
+        }
+
+        if session.message_in_flight.load(Ordering::SeqCst) {
+            log::warn!(
+                "[WS_HANDLER]: req_id: {} Closing with message in flight after {} retries",
+                req_id,
+                retries
+            );
+        }
+
+        // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
                 "[WS_HANDLER]: req_id: {} Failed to close session gracefully: {:?}",

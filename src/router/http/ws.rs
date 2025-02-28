@@ -13,125 +13,118 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{str::FromStr, sync::Arc};
 
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
-use actix_ws::Message;
-use bytes::Bytes;
+use actix_ws::{CloseReason, Message};
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::{HeaderName, HeaderValue};
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
 
+#[derive(Debug)]
+pub enum WebSocketMessage {
+    Data(String),
+    Close(Option<CloseReason>),
+    Ping(Vec<u8>),
+    Pong(Vec<u8>),
+    Binary(Vec<u8>),
+}
+
 pub struct WsProxySession {
     session: Option<actix_ws::Session>,
-    message_in_flight: AtomicBool,
+    tx: mpsc::Sender<WebSocketMessage>,
+    rx: Option<mpsc::Receiver<WebSocketMessage>>,
+    shutdown: Option<oneshot::Sender<()>>,
 }
 
 impl WsProxySession {
     pub fn new(session: actix_ws::Session) -> Self {
+        let (tx, rx) = mpsc::channel(32);
+        let (shutdown_tx, _) = oneshot::channel();
+
         Self {
             session: Some(session),
-            message_in_flight: AtomicBool::new(false),
+            tx,
+            rx: Some(rx),
+            shutdown: Some(shutdown_tx),
         }
     }
 
-    async fn send_message(&mut self, text: impl Into<String>) -> Result<(), Error> {
-        let mut attempts = 0;
-        while attempts < 3 {
-            match self.message_in_flight.compare_exchange(
-                false,
-                true,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
-                Ok(_) => {
-                    if let Some(ref mut session) = self.session {
-                        let result = session.text(text.into()).await;
-                        self.message_in_flight.store(false, Ordering::SeqCst);
-                        return result.map_err(|e| {
-                            log::error!("[WS_PROXY] Failed to send message: {:?}", e);
-                            actix_web::error::ErrorInternalServerError("Message send failed")
-                        });
+    pub fn start(&mut self) -> Result<(), Error> {
+        let rx = self
+            .rx
+            .take()
+            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session already started"))?;
+
+        let session = self
+            .session
+            .take()
+            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session not available"))?;
+
+        let shutdown_rx = oneshot::channel().1;
+
+        tokio::spawn(async move {
+            Self::process_messages(rx, session, shutdown_rx).await;
+        });
+
+        Ok(())
+    }
+
+    async fn process_messages(
+        mut rx: mpsc::Receiver<WebSocketMessage>,
+        mut session: actix_ws::Session,
+        mut shutdown_rx: oneshot::Receiver<()>,
+    ) {
+        loop {
+            tokio::select! {
+                Some(msg) = rx.recv() => {
+                    let result = match msg {
+                        WebSocketMessage::Data(text) => session.text(text).await,
+                        WebSocketMessage::Close(reason) => {
+                            match session.close(reason).await {
+                                Ok(_) => {
+                                    break;
+                                }
+                                Err(e) => {
+                                    log::error!("[WS_PROXY] Failed to close session: {}", e);
+                                    break;
+                                }
+                            };
+                        },
+                        WebSocketMessage::Ping(bytes) => session.ping(&bytes).await,
+                        WebSocketMessage::Pong(bytes) => session.pong(&bytes).await,
+                        WebSocketMessage::Binary(data) => session.binary(data).await,
+                    };
+
+                    if result.is_err() {
+                        break;
                     }
-                    return Err(actix_web::error::ErrorInternalServerError("Session closed"));
                 }
-                Err(_) => {
-                    attempts += 1;
-                    if attempts < 3 {
-                        tokio::task::yield_now().await;
-                    }
+                _ = &mut shutdown_rx => {
+                    log::info!("[WS_PROXY] Shutting down message processor");
+                    break;
                 }
             }
         }
-        Err(actix_web::error::ErrorInternalServerError(
-            "Failed to acquire message lock after retries",
-        ))
     }
 
-    async fn binary(&mut self, bin: impl Into<Bytes>) -> Result<(), Error> {
-        if let Some(ref mut session) = self.session {
-            return session.binary(bin).await.map_err(|e| {
-                log::error!("[WS_PROXY] Failed to send binary: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Binary send failed")
-            });
-        }
-        Err(actix_web::error::ErrorInternalServerError("Session closed"))
+    pub async fn send_message(&self, msg: WebSocketMessage) -> Result<(), Error> {
+        self.tx.send(msg).await.map_err(|e| {
+            log::error!("[WS_PROXY] Failed to queue message: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Message queue full")
+        })
     }
+}
 
-    async fn ping(&mut self, ping: &[u8]) -> Result<(), Error> {
-        if let Some(ref mut session) = self.session {
-            return session.ping(ping).await.map_err(|e| {
-                log::error!("[WS_PROXY] Failed to send ping: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Ping failed")
-            });
+// When dropping WsProxySession, trigger shutdown
+impl Drop for WsProxySession {
+    fn drop(&mut self) {
+        if let Some(shutdown) = self.shutdown.take() {
+            let _ = shutdown.send(());
         }
-        Err(actix_web::error::ErrorInternalServerError("Session closed"))
-    }
-
-    async fn pong(&mut self, pong: &[u8]) -> Result<(), Error> {
-        if let Some(ref mut session) = self.session {
-            return session.pong(pong).await.map_err(|e| {
-                log::error!("[WS_PROXY] Failed to send pong: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Pong failed")
-            });
-        }
-        Err(actix_web::error::ErrorInternalServerError("Session closed"))
-    }
-
-    async fn close(&mut self, reason: Option<actix_ws::CloseReason>) -> Result<(), Error> {
-        // Wait for any in-flight message to complete
-        let mut retries = 0;
-        while self.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
-            tokio::task::yield_now().await;
-            retries += 1;
-        }
-
-        if self.message_in_flight.load(Ordering::SeqCst) {
-            log::warn!(
-                "[WS_PROXY] Closing with message in flight after {} retries",
-                retries
-            );
-        }
-
-        // Now close the session
-        if let Some(session) = self.session.take() {
-            return session.close(reason).await.map_err(|e| {
-                log::error!("[WS_PROXY] Failed to close session: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Session close failed")
-            });
-        }
-        Err(actix_web::error::ErrorInternalServerError(
-            "Session already closed",
-        ))
     }
 }
 
@@ -199,9 +192,8 @@ pub async fn ws_proxy(
 
     // Session 1: Client<->Router WebSocket connection
     let (response, session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
-
-    // Create WsProxySession for synchronized message handling
     let mut proxy_session = WsProxySession::new(session);
+    proxy_session.start()?;
 
     // Prepare backend connection request
     let ws_req = match convert_actix_to_tungstenite_request(&req, ws_base_url) {
@@ -243,8 +235,8 @@ pub async fn ws_proxy(
                     match ws_msg {
                         tungstenite::protocol::Message::Close(reason) => {
                             let mut sink = backend_ws_sink.lock().await;
-                            // Just send close frame, don't close sink yet
-                            let close_msg = tungstenite::protocol::Message::Close(reason.clone());
+                            // Send close frame through sink
+                            let close_msg = tungstenite::protocol::Message::Close(reason);
                             if let Err(e) = sink.send(close_msg).await {
                                 log::error!("[WS_PROXY] Failed to forward close: {}", e);
                             }
@@ -275,39 +267,40 @@ pub async fn ws_proxy(
                         Ok(msg) => {
                             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                             match ws_msg {
-                                Message::Close(reason) => {
-                                    log::info!("[WS_PROXY] Backend -> Router close");
-                                    let mut sink = backend_ws_sink2.lock().await;
-
-                                    if let Err(e) = proxy_session.close(reason.clone()).await {
-                                        log::error!("[WS_PROXY] Failed to close client: {}", e);
-                                    }
-
-                                    if let Err(e) = sink.close().await {
-                                        log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
-                                    }
-                                    break;
-                                }
                                 Message::Text(text) => {
-                                    if let Err(e) = proxy_session.send_message(text).await {
-                                        log::error!("[WS_PROXY] Failed to send text message: {}", e);
+                                    if proxy_session.send_message(WebSocketMessage::Data(text.to_string())).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Binary(bin) => {
-                                    if proxy_session.binary(bin).await.is_err() {
+                                    if proxy_session.send_message(WebSocketMessage::Binary(bin.to_vec())).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Ping(ping) => {
-                                    if proxy_session.ping(&ping).await.is_err() {
+                                    if proxy_session.send_message(WebSocketMessage::Ping(ping.to_vec())).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Pong(pong) => {
-                                    if proxy_session.pong(&pong).await.is_err() {
+                                    if proxy_session.send_message(WebSocketMessage::Pong(pong.to_vec())).await.is_err() {
                                         break;
                                     }
+                                }
+                                Message::Close(reason) => {
+                                    log::info!("[WS_PROXY] Backend -> Router close");
+
+                                    // First send close through the message queue
+                                    if let Err(e) = proxy_session.send_message(WebSocketMessage::Close(reason)).await {
+                                        log::error!("[WS_PROXY] Failed to queue close message: {}", e);
+                                    }
+
+                                    // Then close the backend sink
+                                    let mut sink = backend_ws_sink2.lock().await;
+                                    if let Err(e) = sink.close().await {
+                                        log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
+                                    }
+                                    break;
                                 }
                                 _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", ws_msg),
                             }
