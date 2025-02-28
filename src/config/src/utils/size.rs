@@ -13,6 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cli;
-mod http;
-mod load;
+/// Convert bytes to human readable format
+pub fn bytes_to_human_readable(bytes: f64) -> String {
+    let units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    let mut bytes = bytes;
+    let mut index = 0;
+
+    if bytes == 0.0 {
+        return "0 B".to_string();
+    }
+
+    while bytes >= 1024.0 && index < units.len() - 1 {
+        bytes /= 1024.0;
+        index += 1;
+    }
+
+    format!("{:.2} {}", bytes, units[index])
+}

@@ -76,7 +76,7 @@ jobs:
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
-        
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -88,15 +88,14 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
     strategy:
       matrix:
         browser: [chrome]
-        testfilename:
-          [
+        testfilename: [
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -125,6 +124,7 @@ jobs:
             "enrichment.spec.js",
             "sanity2.spec.js",
             "schemaload.spec.js",
+            "websocket.spec.js",
             # "remotepipeline.spec.js",
 
           ]
@@ -170,7 +170,7 @@ jobs:
       #   run: cat o2.log
 
       - name: Sanitize Test Filename
-        shell: bash 
+        shell: bash
         run: |
           # Assign the matrix variable to a Bash variable
           SANITIZED_FILENAME="${{ matrix.testfilename }}"
@@ -199,7 +199,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-16
+    runs-on: ubicloud-standard-8
     if: always()
 
     steps:
@@ -209,9 +209,9 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          pattern: playwright-coverage-* # Match all artifacts with this prefix
           path: merged-coverage
-          merge-multiple: true 
+          merge-multiple: true
 
       - name: Verify Downloaded Files
         run: ls -R merged-coverage # Check the structure and contents

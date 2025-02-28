@@ -643,11 +643,21 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: no match found in index for file {}",
-                            query.trace_id,
-                            file_name
-                        );
+                        if hits_in_file > 0 {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                hits_in_file,
+                                file_name
+                            );
+                        } else {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: no match found in index for file {}",
+                                query.trace_id,
+                                file_name
+                            );
+                        }
                         file_list_map.remove(&file_name);
                     }
                 }
