@@ -57,11 +57,6 @@ pub async fn ingest(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Time went backwards");
-    let seconds = now.as_secs() % 60; // Get current second in the minute
-
     // check system resource
     check_ingestion_allowed(org_id, None)?;
 
@@ -94,7 +89,7 @@ pub async fn ingest(
     let mut json_data_by_stream = HashMap::new();
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
-    let mut print_flatten = true;
+
     let mut json_parse_time = 0;
     let mut flatten_time = 0;
     let mut uds_time = 0;
@@ -102,12 +97,31 @@ pub async fn ingest(
     let mut format_stream_name_time = 0;
     let mut handle_timestamp_time = 0;
     let mut original_line = String::new();
+
+    let debug_log_stream = "wcnp_hermes";
+    let debug_log_stream_keyword = ["datapoints", "timezone"];
+    let debug_log_field = "event_log_datapoints_timezone";
+    let mut need_print_debug_log;
+    let mut debug_log_original_line;
+
     for line in reader.lines() {
         let line = line?;
         if line.is_empty() {
             continue;
         }
         original_line = line.to_string();
+
+        // TODO: remove the debug log
+        need_print_debug_log = false;
+        debug_log_original_line = String::new();
+        if stream_name == debug_log_stream
+            && debug_log_stream_keyword
+                .iter()
+                .all(|k| original_line.contains(k))
+        {
+            need_print_debug_log = true;
+            debug_log_original_line = original_line.clone();
+        }
 
         let _json_parse_start = std::time::Instant::now();
         let mut value: json::Value = json::from_slice(line.as_bytes())?;
@@ -232,12 +246,16 @@ pub async fn ingest(
                     .or_default();
                 inputs.add_input(value, doc_id.to_owned(), original_data);
             } else {
-                let _flatten_start = std::time::Instant::now();
                 // JSON Flattening
+                let _flatten_start = std::time::Instant::now();
                 value = flatten::flatten_with_level(value, cfg.limit.ingest_flatten_level)?;
                 flatten_time += _flatten_start.elapsed().as_millis();
-                if print_flatten && seconds == 30 {
-                    print_flatten = false;
+
+                if need_print_debug_log && value.get(debug_log_field).is_none() {
+                    log::warn!(
+                        "[FIELD_LOST] we lost the field after flatten, orgianl_line is: {}",
+                        debug_log_original_line
+                    );
                 }
 
                 // get json object
@@ -256,6 +274,13 @@ pub async fn ingest(
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
                 uds_time += _uds_start.elapsed().as_millis();
+
+                if need_print_debug_log && local_val.get(debug_log_field).is_none() {
+                    log::warn!(
+                        "[FIELD_LOST] we lost the field after refactor_map, orgianl_line is: {}",
+                        debug_log_original_line
+                    );
+                }
 
                 let _get_uds_and_original_start = std::time::Instant::now();
                 // add `_original` and '_record_id` if required by StreamSettings
@@ -347,6 +372,16 @@ pub async fn ingest(
     }
 
     // batch process records through pipeline
+    let need_check_pipeline_result = stream_pipeline_inputs.is_empty();
+    let debug_log_field_rows1 = stream_pipeline_inputs
+        .values()
+        .map(|r| {
+            r.get_records()
+                .iter()
+                .filter(|r| r.get(debug_log_field).is_some())
+                .count()
+        })
+        .sum::<usize>();
     for (stream_name, exec_pl_option) in stream_executable_pipelines {
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(&stream_name) else {
@@ -507,6 +542,22 @@ pub async fn ingest(
                 }
             }
         }
+    }
+
+    let debug_log_field_rows2 = json_data_by_stream
+        .values()
+        .map(|(v, _)| {
+            v.iter()
+                .filter(|(_, v)| v.get(debug_log_field).is_some())
+                .count()
+        })
+        .sum::<usize>();
+    if !need_check_pipeline_result && debug_log_field_rows1 != debug_log_field_rows2 {
+        log::warn!(
+            "[FIELD_LOST] we lost the field after pipeline, before: {}, after: {}",
+            debug_log_field_rows1,
+            debug_log_field_rows2,
+        );
     }
 
     let before_write_time = start.elapsed().as_millis();

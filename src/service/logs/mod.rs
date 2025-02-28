@@ -274,6 +274,12 @@ async fn write_logs(
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
 
+    let debug_log_field = "event_log_datapoints_timezone";
+    let debug_log_field_rows_before = json_data
+        .iter()
+        .filter(|(_, v)| v.get(debug_log_field).is_some())
+        .count();
+
     let _get_schema_start = std::time::Instant::now();
     let stream_schema = stream_schema_exists(
         org_id,
@@ -508,6 +514,46 @@ async fn write_logs(
         }
     }
 
+    let debug_log_field_rows_after = write_buf
+        .values()
+        .map(|v| {
+            v.records
+                .iter()
+                .filter(|r| r.get(debug_log_field).is_some())
+                .count()
+        })
+        .sum::<usize>();
+    if debug_log_field_rows_before != debug_log_field_rows_after {
+        log::warn!(
+            "[FIELD_LOST] we lost the field after validate, before: {}, after: {}",
+            debug_log_field_rows_before,
+            debug_log_field_rows_after
+        );
+    }
+
+    // TODO: remove, verify if each record has the field
+    for (_, v) in write_buf.iter() {
+        let num = v
+            .records
+            .iter()
+            .filter(|r| r.get(debug_log_field).is_some())
+            .count();
+        if num > 0
+            && !v
+                .schema
+                .as_ref()
+                .fields()
+                .iter()
+                .any(|f| f.name() == debug_log_field)
+        {
+            log::warn!(
+                "[FIELD_LOST] we lost the field after validate, num: {}, but schema has no field: {}",
+                num,
+                debug_log_field
+            );
+        }
+    }
+
     // write data to wal
     let _get_writer_start = std::time::Instant::now();
     let writer = ingester::get_writer(
@@ -553,9 +599,12 @@ pub fn refactor_map(
     original_map: Map<String, Value>,
     defined_schema_keys: &HashSet<String>,
 ) -> Map<String, Value> {
+    if defined_schema_keys.is_empty() {
+        return original_map;
+    }
+
     let mut new_map = Map::with_capacity(defined_schema_keys.len() + 2);
     let mut non_schema_map = Vec::with_capacity(1024); // 1KB
-
     let mut has_elements = false;
     non_schema_map.write_all(b"{").unwrap();
     for (key, value) in original_map {

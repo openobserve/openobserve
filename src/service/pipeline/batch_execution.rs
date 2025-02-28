@@ -400,6 +400,10 @@ impl ExecutablePipelineBulkInputs {
         self.originals.push(original_data);
     }
 
+    pub fn get_records(&self) -> &Vec<Value> {
+        &self.records
+    }
+
     pub fn into_parts(self) -> (Vec<Value>, Vec<Option<String>>, Vec<Option<String>>) {
         (self.records, self.doc_ids, self.originals)
     }
