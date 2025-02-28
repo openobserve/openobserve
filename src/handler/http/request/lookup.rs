@@ -57,14 +57,13 @@ pub async fn lookup_by_name(org_id: web::Path<String>, req: HttpRequest) -> impl
     };
     let lookup_params = query.0;
 
-    let mut _user_id: Option<&str> = None;
+    let Some(user_id) = req.headers().get("user_id").map(|v| v.to_str().unwrap()) else {
+        return MetaHttpResponse::forbidden("");
+    };
+
     let mut _list_resources_from_rbac: Option<Vec<String>> = None;
     #[cfg(feature = "enterprise")]
     {
-        let Ok(_user_id) = req.headers().get("user_id").map(|v| v.to_str()).transpose() else {
-            return MetaHttpResponse::forbidden("");
-        };
-
         let object_type = match lookup_params.resource {
             Resource::Pipeline => o2_openfga::meta::mapping::OFGA_MODELS
                 .get("pipelines")
@@ -73,7 +72,7 @@ pub async fn lookup_by_name(org_id: web::Path<String>, req: HttpRequest) -> impl
         };
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
-            _user_id.unwrap(),
+            user_id,
             "GET",
             object_type,
         )
@@ -109,7 +108,7 @@ pub async fn lookup_by_name(org_id: web::Path<String>, req: HttpRequest) -> impl
                     let stream_type_str = stream_type.to_string();
                     match crate::handler::http::auth::validator::list_objects_for_user(
                         &org_id,
-                        _user_id.unwrap(),
+                        user_id,
                         "GET",
                         o2_openfga::meta::mapping::OFGA_MODELS
                             .get(stream_type_str.as_str())
@@ -209,7 +208,7 @@ pub async fn lookup_by_name(org_id: web::Path<String>, req: HttpRequest) -> impl
                 title_pat: Some(lookup_params.key),
                 page_size_and_idx,
             };
-            let dashboards = match list_dashboards(list_params).await {
+            let dashboards = match list_dashboards(user_id, list_params).await {
                 Ok(dashboards) => dashboards
                     .into_iter()
                     .map(|(_, dashboard)| dashboard)
