@@ -36,25 +36,25 @@ pub enum WebSocketMessage {
 pub struct WsProxySession {
     session: Option<actix_ws::Session>,
     tx: mpsc::Sender<WebSocketMessage>,
-    rx: Option<mpsc::Receiver<WebSocketMessage>>,
+    rx: Option<(mpsc::Receiver<WebSocketMessage>, oneshot::Receiver<()>)>,
     shutdown: Option<oneshot::Sender<()>>,
 }
 
 impl WsProxySession {
     pub fn new(session: actix_ws::Session) -> Self {
         let (tx, rx) = mpsc::channel(32);
-        let (shutdown_tx, _) = oneshot::channel();
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         Self {
             session: Some(session),
             tx,
-            rx: Some(rx),
+            rx: Some((rx, shutdown_rx)),
             shutdown: Some(shutdown_tx),
         }
     }
 
     pub fn start(&mut self) -> Result<(), Error> {
-        let rx = self
+        let (rx, shutdown_rx) = self
             .rx
             .take()
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session already started"))?;
@@ -63,8 +63,6 @@ impl WsProxySession {
             .session
             .take()
             .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session not available"))?;
-
-        let shutdown_rx = oneshot::channel().1;
 
         tokio::spawn(async move {
             Self::process_messages(rx, session, shutdown_rx).await;
@@ -268,6 +266,7 @@ pub async fn ws_proxy(
                             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                             match ws_msg {
                                 Message::Text(text) => {
+                                    log::debug!("[WS_PROXY] Backend -> Router text: {}", text);
                                     if proxy_session.send_message(WebSocketMessage::Data(text.to_string())).await.is_err() {
                                         break;
                                     }
@@ -288,17 +287,31 @@ pub async fn ws_proxy(
                                     }
                                 }
                                 Message::Close(reason) => {
-                                    log::info!("[WS_PROXY] Backend -> Router close");
+                                    log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
+                                    let close_reason = reason;
 
-                                    // First send close through the message queue
-                                    if let Err(e) = proxy_session.send_message(WebSocketMessage::Close(reason)).await {
-                                        log::error!("[WS_PROXY] Failed to queue close message: {}", e);
+                                    // Process any pending messages in the queue first
+                                    while let Some(msg_result) = backend_ws_stream.next().await {
+                                        if let Ok(msg) = msg_result {
+                                            if let Message::Text(text) = from_tungstenite_msg_to_actix_msg(msg) {
+                                                log::debug!("[WS_PROXY] Backend -> Router (pending) text: {}", text);
+                                                if let Err(e) = proxy_session.send_message(WebSocketMessage::Data(text.to_string())).await {
+                                                    log::error!("[WS_PROXY] Failed to send pending message: {}", e);
+                                                    break;
+                                                }
+                                            }
+                                        }
                                     }
 
-                                    // Then close the backend sink
+                                    // Send close frame
+                                    if let Err(e) = proxy_session.send_message(WebSocketMessage::Close(close_reason)).await {
+                                        log::error!("[WS_PROXY] Failed to send close message: {}", e);
+                                    }
+
+                                    // Close backend sink
                                     let mut sink = backend_ws_sink2.lock().await;
                                     if let Err(e) = sink.close().await {
-                                        log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
+                                        log::error!("[WS_PROXY] Failed to close sink: {}", e);
                                     }
                                     break;
                                 }
