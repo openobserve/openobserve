@@ -326,7 +326,7 @@ async fn write_logs(
     if let Some(schema) = stream_schema_map.get(stream_name) {
         if stream_name == "wcnp_hermes" && !schema.contains_field(debug_log_field) {
             log::warn!(
-                "[FIELD_LOST] stream [{stream_name}] schemahas no field [{debug_log_field}]"
+                "[FIELD_LOST] stream [{stream_name}] schema has no field [{debug_log_field}]"
             );
         }
     }
