@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
@@ -23,6 +29,50 @@ use reqwest::header::{HeaderName, HeaderValue};
 use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
+
+pub struct WsProxySession {
+    session: actix_ws::Session,
+    message_in_flight: AtomicBool,
+}
+
+impl WsProxySession {
+    pub fn new(session: actix_ws::Session) -> Self {
+        Self {
+            session,
+            message_in_flight: AtomicBool::new(false),
+        }
+    }
+
+    async fn send_message(&mut self, text: impl Into<String>) -> Result<(), Error> {
+        let mut attempts = 0;
+        while attempts < 3 {
+            match self.message_in_flight.compare_exchange(
+                false,
+                true,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => {
+                    let result = self.session.text(text.into()).await;
+                    self.message_in_flight.store(false, Ordering::SeqCst);
+                    return result.map_err(|e| {
+                        log::error!("[WS_PROXY] Failed to send message: {:?}", e);
+                        actix_web::error::ErrorInternalServerError("Message send failed")
+                    });
+                }
+                Err(_) => {
+                    attempts += 1;
+                    if attempts < 3 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+            }
+        }
+        Err(actix_web::error::ErrorInternalServerError(
+            "Failed to acquire message lock after retries",
+        ))
+    }
+}
 
 /// WebSocket proxy that manages bidirectional communication using two concurrent tasks.
 ///
@@ -87,7 +137,10 @@ pub async fn ws_proxy(
     let node_role = cfg.common.node_role.clone();
 
     // Session 1: Client<->Router WebSocket connection
-    let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
+    let (response, session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
+
+    // Create WsProxySession for synchronized message handling
+    let mut proxy_session = WsProxySession::new(session);
 
     // Prepare backend connection request
     let ws_req = match convert_actix_to_tungstenite_request(&req, ws_base_url) {
@@ -163,36 +216,35 @@ pub async fn ws_proxy(
                             match ws_msg {
                                 Message::Close(reason) => {
                                     log::info!("[WS_PROXY] Backend -> Router close");
-
                                     let mut sink = backend_ws_sink2.lock().await;
-                                    // 1. Forward close to client
-                                    if let Err(e) = session.close(reason.clone()).await {
+
+                                    if let Err(e) = proxy_session.session.close(reason.clone()).await {
                                         log::error!("[WS_PROXY] Failed to close client: {}", e);
                                     }
 
-                                    // Close sink to backend
                                     if let Err(e) = sink.close().await {
                                         log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
                                     }
                                     break;
                                 }
                                 Message::Text(text) => {
-                                    if session.text(text).await.is_err() {
+                                    if let Err(e) = proxy_session.send_message(text).await {
+                                        log::error!("[WS_PROXY] Failed to send text message: {}", e);
                                         break;
                                     }
                                 }
                                 Message::Binary(bin) => {
-                                    if session.binary(bin).await.is_err() {
+                                    if proxy_session.session.binary(bin).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Ping(ping) => {
-                                    if session.ping(&ping).await.is_err() {
+                                    if proxy_session.session.ping(&ping).await.is_err() {
                                         break;
                                     }
                                 }
                                 Message::Pong(pong) => {
-                                    if session.pong(&pong).await.is_err() {
+                                    if proxy_session.session.pong(&pong).await.is_err() {
                                         break;
                                     }
                                 }
