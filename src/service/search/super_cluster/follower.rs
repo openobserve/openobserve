@@ -125,7 +125,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
         req.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -282,6 +282,7 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = req.use_inverted_index;
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -323,7 +324,7 @@ async fn get_inverted_index_file_lists(
             .await?;
 
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         req.time_range,
         idx_file_list.len(),
         idx_scan_size,

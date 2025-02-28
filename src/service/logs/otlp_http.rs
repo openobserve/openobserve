@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -309,7 +309,7 @@ pub async fn logs_json_handler(
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
-                            StreamType::Logs.to_string().as_str(),
+                            StreamType::Logs.as_str(),
                             &stream_name,
                             TS_PARSE_FAILED,
                         ])
@@ -322,7 +322,7 @@ pub async fn logs_json_handler(
                     continue;
                 }
                 local_val.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -412,7 +412,7 @@ pub async fn logs_json_handler(
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &stream_name,
                         TRANSFORM_FAILED,
                     ])
@@ -534,7 +534,7 @@ pub async fn logs_json_handler(
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -543,7 +543,7 @@ pub async fn logs_json_handler(
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .inc();
 

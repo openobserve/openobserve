@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -235,10 +236,10 @@ async fn get_file_list(
     };
 
     let stream_params = Arc::new(StreamParams::new(org_id, stream_name, StreamType::Metrics));
-    let mut files = Vec::new();
+    let mut files = Vec::with_capacity(results.len());
     for file in results {
         if match_source(stream_params.clone(), Some(time_range), filters, &file).await {
-            files.push(file.clone());
+            files.push(file);
         }
     }
     Ok(files)
@@ -297,19 +298,8 @@ async fn cache_parquet_files(
                 _ => None,
             };
             let ret = if let Some(e) = ret {
-                if e.to_string().to_lowercase().contains("not found")
-                    || e.to_string().to_lowercase().contains("data size is zero")
-                {
-                    // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
-                    if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
-                        log::error!("[trace_id {trace_id}] promql->search->storage: delete from file_list err: {}", e);
-                    }
-                    Some(file_name)
-                } else {
-                    log::error!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}", e);
-                    None
-                }
+                log::warn!("[trace_id {trace_id}] promql->search->storage: download file to cache err: {}, file: {}", e, file_name);
+                Some(file_name)
             } else {
                 None
             };
@@ -345,9 +335,8 @@ fn convert_matchers_to_index_condition(
     index_fields: &HashSet<String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
-    let cfg = get_config();
     for mat in matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
+        if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
             || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()

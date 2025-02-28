@@ -86,8 +86,8 @@ pub async fn get_streams(
 
     let filtered_indices = if let Some(s_type) = stream_type {
         let s_type = match s_type {
-            StreamType::EnrichmentTables => "enrichment_table".to_string(),
-            _ => s_type.to_string(),
+            StreamType::EnrichmentTables => "enrichment_table",
+            _ => s_type.as_str(),
         };
         match permitted_streams {
             Some(permitted_streams) => {
@@ -600,9 +600,6 @@ pub async fn delete_stream(
         STREAM_RECORD_ID_GENERATOR.remove(&key);
     }
 
-    // delete stream stats cache
-    stats::remove_stream_stats(org_id, stream_name, stream_type);
-
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
         return Ok(
@@ -632,7 +629,7 @@ pub async fn delete_stream(
 
     crate::common::utils::auth::remove_ownership(
         org_id,
-        &stream_type.to_string(),
+        stream_type.as_str(),
         Authz::new(stream_name),
     )
     .await;

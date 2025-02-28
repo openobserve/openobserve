@@ -1,12 +1,16 @@
 import { test, expect } from "./baseFixtures";
 import logData from "../../ui-testing/cypress/fixtures/log.json";
 import logsdata from "../../test-data/logs_data.json";
+import { LogsPage } from '../pages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-//  await page.getByText('Login as internal user').click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
   await page
@@ -49,18 +53,8 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page
-    .locator('[data-test="log-search-index-list-select-stream"]')
-    .click({ force: true });
-  await page
-    .locator("div.q-item")
-    .getByText(`${stream}`)
-    .first()
-    .click({ force: true });
-};
 test.describe("Logs UI testcases", () => {
+  let logsPage;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -88,6 +82,7 @@ test.describe("Logs UI testcases", () => {
   // });
   test.beforeEach(async ({ page }) => {
     await login(page);
+    logsPage = new LogsPage(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -96,7 +91,7 @@ test.describe("Logs UI testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -202,48 +197,6 @@ test.describe("Logs UI testcases", () => {
     await expect(page.locator(".q-notification__message")).toContainText(
       "Please provide valid view name"
     );
-  });
-
-  test("should allow alphanumeric name under saved view", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator("button")
-      .filter({ hasText: "savesaved_search" })
-      .click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-    await page
-      .locator('[data-test="saved-view-dialog-save-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click({ force: true });
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.waitForTimeout(3000);
-    await page.getByText("e2enewtest").click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
   });
 
   test("should display error when user directly clicks on OK without adding name", async ({

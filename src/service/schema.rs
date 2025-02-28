@@ -26,7 +26,7 @@ use config::{
     },
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
@@ -222,7 +222,27 @@ async fn handle_diff_schema(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    log::debug!("handle_diff_schema start");
+    log::debug!(
+        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts
+    );
+
+    // acquire a local_lock to ensure only one thread can update schema
+    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let local_lock = infra::local_lock::lock(&cache_key).await?;
+    let _guard = local_lock.lock().await;
+
+    // check if the schema has been updated by another thread
+    let read_cache = STREAM_SCHEMAS_LATEST.read().await;
+    if let Some(updated_schema) = read_cache.get(&cache_key) {
+        if let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
+            return Ok(None);
+        }
+    }
+    drop(read_cache);
 
     // first update thread cache
     if is_new {
@@ -290,7 +310,7 @@ async fn handle_diff_schema(
     if is_new {
         crate::common::utils::auth::set_ownership(
             org_id,
-            &stream_type.to_string(),
+            stream_type.as_str(),
             Authz::new(stream_name),
         )
         .await;
@@ -325,7 +345,7 @@ async fn handle_diff_schema(
         for field in final_schema.fields() {
             let field_name = field.name();
             // skip _timestamp and _all columns
-            if field_name == &cfg.common.column_timestamp || field_name == &cfg.common.column_all {
+            if field_name == TIMESTAMP_COL_NAME || field_name == &cfg.common.column_all {
                 continue;
             }
             uds_fields.insert(field_name.to_string());
@@ -360,7 +380,6 @@ async fn handle_diff_schema(
 
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
-    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
@@ -382,8 +401,14 @@ async fn handle_diff_schema(
     );
     stream_schema_map.insert(stream_name.to_string(), final_schema);
 
-    let elapsed = start.elapsed();
-    log::debug!("handle_diff_schema end, elapsed: {:?}", elapsed);
+    log::debug!(
+        "handle_diff_schema end for [{}/{}/{}] start_dt: {}, elapsed: {} ms",
+        org_id,
+        stream_type,
+        stream_name,
+        record_ts,
+        start.elapsed().as_millis()
+    );
 
     Ok(Some(SchemaEvolution {
         is_schema_changed: true,
@@ -403,10 +428,13 @@ pub fn generate_schema_for_defined_schema_fields(
     }
 
     let cfg = get_config();
-    let (o2_id_col, original_col) = (ID_COL_NAME.to_string(), ORIGINAL_DATA_COL_NAME.to_string());
-    let mut fields: HashSet<_> = fields.iter().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(&cfg.common.column_timestamp);
+    let timestamp_col = TIMESTAMP_COL_NAME.to_string();
+    let o2_id_col = ID_COL_NAME.to_string();
+    let original_col = ORIGINAL_DATA_COL_NAME.to_string();
+
+    let mut fields: HashSet<&String> = fields.iter().collect();
+    if !fields.contains(&timestamp_col) {
+        fields.insert(&timestamp_col);
     }
     if !fields.contains(&cfg.common.column_all) {
         fields.insert(&cfg.common.column_all);
@@ -419,6 +447,7 @@ pub fn generate_schema_for_defined_schema_fields(
             fields.insert(&original_col);
         }
     }
+
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {
         if let Some(f) = schema.fields_map().get(field) {
@@ -494,11 +523,11 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema = infra::schema::get_cache(org_id, stream_name, stream_type)
+            let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let db_schema = schema.schema().clone();
-            stream_schema_map.insert(stream_name.to_string(), schema);
+            let db_schema = schema_cache.schema().clone();
+            stream_schema_map.insert(stream_name.to_string(), schema_cache);
             db_schema
         }
     };

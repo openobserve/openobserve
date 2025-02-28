@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    DISTINCT_FIELDS,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
@@ -359,11 +359,15 @@ pub async fn handle_otlp_request(
                 let span_status_for_spanmetric = local_val.span_status.clone();
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
+                // add timestamp
+                value.as_object_mut().unwrap().insert(
+                    TIMESTAMP_COL_NAME.to_string(),
+                    json::Value::Number(timestamp.into()),
+                );
 
                 if executable_pipeline.is_some() {
                     stream_pipeline_inputs.add_input(
                         value,
-                        timestamp,
                         service_name.to_owned(),
                         span.name,
                         span_status_for_spanmetric,
@@ -377,24 +381,26 @@ pub async fn handle_otlp_request(
                     })?;
 
                     // get json object
-                    let mut record_val = match value.take() {
+                    let record_val = match value.take() {
                         json::Value::Object(mut v) => {
-                            // build span metrics item
-                            let sm = crate::job::metrics::TraceMetricsItem {
-                                organization: org_id.to_string(),
-                                traces_stream_name: traces_stream_name.clone(),
-                                service_name: service_name.clone(),
-                                span_name: v
-                                    .remove("o2_span_metrics_name")
-                                    .map_or(span.name.clone(), |name| {
-                                        name.as_str().unwrap().to_string()
-                                    }),
-                                span_status: span_status_for_spanmetric,
-                                span_kind: span.kind.to_string(),
-                                duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
-                                span_id: v["span_id"].to_string(),
-                            };
-                            span_metrics.push(sm);
+                            if cfg.common.traces_span_metrics_enabled {
+                                // build span metrics item
+                                let sm = crate::job::metrics::TraceMetricsItem {
+                                    organization: org_id.to_string(),
+                                    traces_stream_name: traces_stream_name.clone(),
+                                    service_name: service_name.clone(),
+                                    span_name: v
+                                        .remove("o2_span_metrics_name")
+                                        .map_or(span.name.clone(), |name| {
+                                            name.as_str().unwrap().to_string()
+                                        }),
+                                    span_status: span_status_for_spanmetric,
+                                    span_kind: span.kind.to_string(),
+                                    duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                    span_id: v["span_id"].to_string(),
+                                };
+                                span_metrics.push(sm);
+                            }
                             v
                         }
                         _ => {
@@ -411,11 +417,6 @@ pub async fn handle_otlp_request(
                         }
                     };
 
-                    // add timestamp
-                    record_val.insert(
-                        cfg.common.column_timestamp.clone(),
-                        json::Value::Number(timestamp.into()),
-                    );
                     let (ts_data, _) = json_data_by_stream
                         .entry(traces_stream_name.to_string())
                         .or_insert((Vec::new(), None));
@@ -429,7 +430,6 @@ pub async fn handle_otlp_request(
     if let Some(exec_pl) = &executable_pipeline {
         let (
             records,
-            timestamps,
             services,
             span_names,
             span_status_for_spanmetrics,
@@ -456,24 +456,26 @@ pub async fn handle_otlp_request(
 
                     for (idx, mut res) in stream_pl_results {
                         // get json object
-                        let mut record_val = match res.take() {
+                        let record_val = match res.take() {
                             json::Value::Object(mut v) => {
-                                // build span metrics item
-                                let sm = crate::job::metrics::TraceMetricsItem {
-                                    organization: org_id.to_string(),
-                                    traces_stream_name: stream_params.stream_name.to_string(),
-                                    service_name: services[idx].to_owned(),
-                                    span_name: v
-                                        .remove("o2_span_metrics_name")
-                                        .map_or(span_names[idx].to_owned(), |name| {
-                                            name.as_str().unwrap().to_string()
-                                        }),
-                                    span_status: span_status_for_spanmetrics[idx].to_owned(),
-                                    span_kind: span_kinds[idx].to_owned(),
-                                    duration: span_durations[idx], // milliseconds
-                                    span_id: v["span_id"].to_string(),
-                                };
-                                span_metrics.push(sm);
+                                if cfg.common.traces_span_metrics_enabled {
+                                    // build span metrics item
+                                    let sm = crate::job::metrics::TraceMetricsItem {
+                                        organization: org_id.to_string(),
+                                        traces_stream_name: stream_params.stream_name.to_string(),
+                                        service_name: services[idx].to_owned(),
+                                        span_name: v
+                                            .remove("o2_span_metrics_name")
+                                            .map_or(span_names[idx].to_owned(), |name| {
+                                                name.as_str().unwrap().to_string()
+                                            }),
+                                        span_status: span_status_for_spanmetrics[idx].to_owned(),
+                                        span_kind: span_kinds[idx].to_owned(),
+                                        duration: span_durations[idx], // milliseconds
+                                        span_id: v["span_id"].to_string(),
+                                    };
+                                    span_metrics.push(sm);
+                                }
                                 v
                             }
                             _ => {
@@ -489,12 +491,16 @@ pub async fn handle_otlp_request(
                             }
                         };
 
-                        // add timestamp
-                        let timestamp = timestamps[idx];
-                        record_val.insert(
-                            cfg.common.column_timestamp.clone(),
-                            json::Value::Number(timestamp.into()),
-                        );
+                        let Some(timestamp) = record_val
+                            .get(TIMESTAMP_COL_NAME)
+                            .and_then(|ts| ts.as_i64())
+                        else {
+                            log::error!(
+                                "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                            );
+                            partial_success.rejected_spans += 1;
+                            continue;
+                        };
                         let (ts_data, _) = json_data_by_stream
                             .entry(traces_stream_name.to_string())
                             .or_insert((Vec::new(), None));
@@ -543,7 +549,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -552,7 +558,7 @@ pub async fn handle_otlp_request(
             "200",
             org_id,
             &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -613,7 +619,7 @@ pub async fn ingest_json(
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     for mut value in json_values {
-        let timestamp = value[&cfg.common.column_timestamp].as_i64().unwrap_or(
+        let timestamp = value[TIMESTAMP_COL_NAME].as_i64().unwrap_or(
             value["start_time"]
                 .as_i64()
                 .map(|ts| ts / 1000)
@@ -652,7 +658,7 @@ pub async fn ingest_json(
 
         // add timestamp
         record_val.insert(
-            cfg.common.column_timestamp.clone(),
+            TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
         let (ts_data, _) = json_data_by_stream
@@ -689,7 +695,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -698,7 +704,7 @@ pub async fn ingest_json(
             "200",
             org_id,
             traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
+            StreamType::Traces.as_str(),
         ])
         .inc();
 
@@ -952,8 +958,7 @@ async fn write_traces(
     }
 
     // write data to wal
-    let writer =
-        ingester::get_writer(0, org_id, &StreamType::Traces.to_string(), stream_name).await;
+    let writer = ingester::get_writer(0, org_id, StreamType::Traces.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
@@ -961,7 +966,10 @@ async fn write_traces(
         !cfg.common.wal_fsync_disabled,
     )
     .await
-    .map_err(|e| Error::new(std::io::ErrorKind::Other, e))?;
+    .map_err(|e| {
+        log::error!("Error while writing traces: {}", e);
+        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    })?;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,6 @@ use anyhow::{anyhow, Result};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
-    get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
@@ -34,7 +33,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
-    SIZE_IN_MB,
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
@@ -119,7 +118,7 @@ pub fn apply_vrl_fn(
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &format!("{:?}", stream_name),
                         TRANSFORM_FAILED,
                     ])
@@ -136,7 +135,7 @@ pub fn apply_vrl_fn(
             metrics::INGEST_ERRORS
                 .with_label_values(&[
                     org_id,
-                    StreamType::Logs.to_string().as_str(),
+                    StreamType::Logs.as_str(),
                     &format!("{:?}", stream_name),
                     TRANSFORM_FAILED,
                 ])
@@ -499,9 +498,8 @@ pub async fn get_uds_and_original_data_streams(
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
     streams_need_original: &mut HashSet<String>,
 ) {
-    let cfg = get_config();
     for stream in streams {
-        if user_defined_schema_map.contains_key(&stream.stream_name.to_string()) {
+        if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
             continue;
         }
         let stream_settings =
@@ -514,8 +512,8 @@ pub async fn get_uds_and_original_data_streams(
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(&cfg.common.column_timestamp) {
-                    fields.insert(cfg.common.column_timestamp.to_string());
+                if !fields.contains(TIMESTAMP_COL_NAME) {
+                    fields.insert(TIMESTAMP_COL_NAME.to_string());
                 }
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }

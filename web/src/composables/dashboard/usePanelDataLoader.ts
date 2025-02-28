@@ -44,6 +44,7 @@ import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import { useAnnotations } from "./useAnnotations";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -77,8 +78,11 @@ export const usePanelDataLoader = (
 
   const searchRetriesCount = ref<{ [key: string]: number }>({});
 
+  const store = useStore();
+
   // Add cleanup function
   const cleanupSearchRetries = (traceId: string) => {
+    removeTraceId(traceId);
     if (searchRetriesCount.value[traceId]) {
       delete searchRetriesCount.value[traceId];
     }
@@ -90,6 +94,20 @@ export const usePanelDataLoader = (
     cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
+  const getFallbackOrderByCol = () => {
+    // from panelSchema, get first x axis field alias
+    if (panelSchema?.value?.queries?.[0]?.fields?.x) {
+      return panelSchema.value?.queries[0]?.fields?.x?.[0]?.alias ?? null;
+    }
+    return null;
+  };
+
+  const { refreshAnnotations } = useAnnotations(
+    store.state.selectedOrganization.identifier,
+    dashboardId?.value,
+    panelSchema.value.id,
+  );
+
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
     if (panelSchema?.value?.queries?.[0]?.fields?.x) {
@@ -129,6 +147,7 @@ export const usePanelDataLoader = (
     metadata: {
       queries: [] as any,
     },
+    annotations: [] as any,
     resultMetaData: [] as any,
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
@@ -187,8 +206,6 @@ export const usePanelDataLoader = (
       )
     : [];
   // let currentAdHocVariablesData: any = null;
-
-  const store = useStore();
 
   let abortController = new AbortController();
 
@@ -760,6 +777,7 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
+      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
@@ -783,7 +801,6 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-
       const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -918,6 +935,7 @@ export const usePanelDataLoader = (
                     query: query,
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
+                    step: panelSchema.value.config.step_value ?? "0",
                   }),
                 abortController.signal,
               );
@@ -933,6 +951,12 @@ export const usePanelDataLoader = (
           },
         );
 
+        // get annotations
+        const annotationList = await refreshAnnotations(
+          startISOTimestamp,
+          endISOTimestamp,
+        );
+
         // Wait for all query promises to resolve
         const queryResults: any = await Promise.all(queryPromises);
         state.loading = false;
@@ -940,6 +964,7 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: queryResults.map((it: any) => it?.metadata),
         };
+        state.annotations = annotationList || [];
 
         saveCurrentStateToCache();
       } else {
@@ -954,6 +979,8 @@ export const usePanelDataLoader = (
             queries: [],
           };
           state.resultMetaData = [];
+          state.annotations = [];
+          state.isOperationCancelled = false;
 
           // Call search API
 
@@ -1140,6 +1167,13 @@ export const usePanelDataLoader = (
                     );
                   }
 
+                  // get annotations
+                  const annotationList = await refreshAnnotations(
+                    startISOTimestamp,
+                    endISOTimestamp,
+                  );
+                  state.annotations = annotationList;
+
                   // need to break the loop, save the cache
                   saveCurrentStateToCache();
                 } finally {
@@ -1183,7 +1217,11 @@ export const usePanelDataLoader = (
               };
 
               state.metadata.queries[panelQueryIndex] = metadata;
-
+              const annotations = await refreshAnnotations(
+                Number(startISOTimestamp),
+                Number(endISOTimestamp),
+              );
+              state.annotations = annotations;
               if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,
@@ -1205,6 +1243,8 @@ export const usePanelDataLoader = (
                   abortControllerRef,
                 );
               }
+
+              saveCurrentStateToCache();
             }
           }
 
@@ -1519,7 +1559,6 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
-
       log("Variables Watcher: starting...");
 
       const newDependentVariablesData = getDependentVariablesData();
@@ -1897,6 +1936,7 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
+
     loadData(); // Loading the data
   });
 
@@ -1946,6 +1986,7 @@ export const usePanelDataLoader = (
       state.errorDetail = tempPanelCacheValue.errorDetail;
       state.metadata = tempPanelCacheValue.metadata;
       state.resultMetaData = tempPanelCacheValue.resultMetaData;
+      state.annotations = tempPanelCacheValue.annotations;
       state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
 
       // set that the cache is restored

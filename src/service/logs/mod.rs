@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -283,7 +283,17 @@ async fn write_logs(
     )
     .await;
 
-    let stream_settings = stream_schema.settings;
+    let schema = match stream_schema_map.get(stream_name) {
+        Some(schema) => schema.schema().clone(),
+        None => {
+            return Err(anyhow::anyhow!(
+                "Schema not found for stream: {}",
+                stream_name
+            ));
+        }
+    };
+    let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
@@ -384,7 +394,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -396,7 +406,7 @@ async fn write_logs(
                         metrics::INGEST_ERRORS
                             .with_label_values(&[
                                 org_id,
-                                StreamType::Logs.to_string().as_str(),
+                                StreamType::Logs.as_str(),
                                 stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
@@ -509,16 +519,8 @@ async fn write_logs(
     }
 
     // write data to wal
-    let _get_writer_start = std::time::Instant::now();
-    let writer = ingester::get_writer(
-        thread_id,
-        org_id,
-        &StreamType::Logs.to_string(),
-        stream_name,
-    )
-    .await;
-    let get_writer_time = _get_writer_start.elapsed().as_millis();
-    let _write_start = std::time::Instant::now();
+    let writer =
+        ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
     let req_stats = write_file(
         &writer,
         stream_name,
@@ -526,7 +528,6 @@ async fn write_logs(
         !cfg.common.wal_fsync_disabled,
     )
     .await?;
-    let write_time = _write_start.elapsed().as_millis();
 
     // send distinct_values
     let _write_distinct_start = std::time::Instant::now();

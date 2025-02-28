@@ -33,6 +33,7 @@ use config::{
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
     },
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
@@ -172,7 +173,7 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-
+    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
@@ -500,7 +501,7 @@ pub async fn search_multi(
         multi_res.hits
     };
     log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -577,7 +578,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)
@@ -660,13 +661,14 @@ pub async fn search_partition(
                 id: Utc::now().timestamp_micros(),
                 records,
                 original_size,
+                deleted: false,
             });
         }
     }
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,
@@ -1158,13 +1160,13 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
 // generate parquet file search schema
 pub fn generate_search_schema_diff(
     schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+    latest_schema_map: &HashMap<&String, &Arc<Field>>,
 ) -> HashMap<String, DataType> {
     // calculate the diff between latest schema and group schema
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+        if let Some(latest_field) = latest_schema_map.get(field.name()) {
             if field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }

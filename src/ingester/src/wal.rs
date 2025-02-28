@@ -50,7 +50,7 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     let cfg = config::get_config();
     // 1. get all .lock files
-    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join("logs");
+    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(crate::WAL_DIR_DEFAULT_PREFIX);
     // create wal dir if not exists
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
@@ -115,7 +115,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         return Ok(());
     }
     for wal_file in wal_files.iter() {
-        log::warn!("starting replay wal file: {:?}", wal_file);
+        log::warn!("replay wal file: {:?} starting...", wal_file);
         let file_str = wal_file
             .strip_prefix(&wal_dir)
             .unwrap()
@@ -193,15 +193,11 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let latest_schema = infra::schema::get_cache(
-                org_id,
-                &entry.stream,
-                config::meta::stream::StreamType::Logs,
-            )
-            .await
-            .map_err(|e| Error::ExternalError {
-                source: Box::new(e),
-            })?;
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+                .await
+                .map_err(|e| Error::ExternalError {
+                    source: Box::new(e),
+                })?;
             entry.schema_key = latest_schema.hash_key().into();
             let infer_schema = Arc::new(infer_schema.cloned_from(latest_schema.schema()));
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
@@ -230,7 +226,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
         log::warn!(
-            "replay wal file: {:?}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+            "replay wal file: {:?} done, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
             wal_path.to_string_lossy(),
             stat.json_size,
             stat.arrow_size,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use bytes::Bytes;
-use config::{
-    meta::{
-        alerts::alert::{Alert, ListAlertsParams},
-        folder::Folder,
-        stream::StreamType,
-    },
-    utils::json,
+use config::meta::{
+    alerts::alert::{Alert, ListAlertsParams},
+    folder::Folder,
+    stream::StreamType,
 };
 use infra::{
     cluster_coordinator::alerts as cluster,
@@ -84,7 +80,8 @@ pub async fn set(
             }
 
             let schedule_key = scheduler_key(stream_type, stream_name, &alert.name);
-            let trigger = db::scheduler::Trigger {
+            // Get the trigger from scheduler
+            let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
                 module_key: schedule_key.clone(),
                 next_run_at: chrono::Utc::now().timestamp_micros(),
@@ -101,27 +98,31 @@ pub async fn set(
                         Ok(())
                     }
                 }
-            } else if db::scheduler::exists(
-                org_id,
-                db::scheduler::TriggerModule::Alert,
-                &schedule_key,
-            )
-            .await
-            {
-                match db::scheduler::update_trigger(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
-                        Ok(())
-                    }
-                }
             } else {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
-                        Ok(())
+                match db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key)
+                    .await
+                {
+                    Ok(job) => {
+                        trigger.data = job.data;
+                        trigger.start_time = job.start_time;
+                        match db::scheduler::update_trigger(trigger).await {
+                            Ok(_) => Ok(()),
+                            Err(e) => {
+                                log::error!(
+                                    "Failed to update trigger for alert {schedule_key}: {}",
+                                    e
+                                );
+                                Ok(())
+                            }
+                        }
                     }
+                    Err(_) => match db::scheduler::push(trigger).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            Ok(())
+                        }
+                    },
                 }
             }
         }
@@ -185,7 +186,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
     let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
-    let trigger = db::scheduler::Trigger {
+    let mut trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
         next_run_at: chrono::Utc::now().timestamp_micros(),
@@ -194,10 +195,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         ..Default::default()
     };
 
-    if db::scheduler::exists(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await {
+    if let Ok(job) =
+        db::scheduler::get(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+    {
+        trigger.data = job.data;
+        trigger.start_time = job.start_time;
         let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
             log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
-            e
         });
     } else {
         let _ = db::scheduler::push(trigger).await.map_err(|e| {
@@ -327,32 +331,27 @@ async fn put_into_cache(
     stream_type: StreamType,
     stream_name: String,
     alert_name: String,
-    value: Option<Bytes>,
 ) -> Result<(), anyhow::Error> {
-    let item_value: Alert = if config::get_config().common.meta_store_external {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        match table::get_by_name(
-            client,
-            &org,
-            "default",
-            stream_type,
-            &stream_name,
-            &alert_name,
-        )
-        .await
-        {
-            Ok(Some(val)) => val.1,
-            Ok(None) => {
-                log::error!("Tried to get alert that does not exist in DB");
-                return Ok(());
-            }
-            Err(e) => {
-                log::error!("Error getting value: {}", e);
-                return Ok(());
-            }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let item_value: Alert = match table::get_by_name(
+        client,
+        &org,
+        "default",
+        stream_type,
+        &stream_name,
+        &alert_name,
+    )
+    .await
+    {
+        Ok(Some(val)) => val.1,
+        Ok(None) => {
+            log::error!("Tried to get alert that does not exist in DB");
+            return Ok(());
         }
-    } else {
-        json::from_slice(&value.unwrap()).unwrap()
+        Err(e) => {
+            log::error!("Error getting value: {}", e);
+            return Ok(());
+        }
     };
     let mut cacher = STREAM_ALERTS.write().await;
     let stream_key = cache_stream_key(&org, stream_type, &stream_name);

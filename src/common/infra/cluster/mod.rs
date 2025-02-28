@@ -28,7 +28,11 @@ use config::{
         cluster::{Node, NodeStatus, Role, RoleGroup},
         meta_store::MetaStore,
     },
-    utils::{hash::Sum64, json},
+    utils::{
+        hash::Sum64,
+        json,
+        sysinfo::{get_node_metrics, NodeMetrics},
+    },
     RwAHashMap, RwBTreeMap,
 };
 use infra::{
@@ -40,8 +44,6 @@ use once_cell::sync::Lazy;
 mod etcd;
 mod nats;
 
-const HEALTH_CHECK_FAILED_TIMES: usize = 3;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
@@ -67,7 +69,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.insert(hash, node.name.clone());
     }
@@ -243,7 +245,6 @@ pub async fn set_unschedulable() -> Result<()> {
     };
     Ok(())
 }
-
 pub async fn set_schedulable() -> Result<()> {
     let node_id = LOCAL_NODE.uuid.clone();
     if let Some(mut node) = get_node_by_uuid(&node_id).await {
@@ -304,10 +305,12 @@ async fn watch_node_list() -> Result<()> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
                 let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
-                    Some(v) => (v.broadcasted, item_value.eq(v)),
+                    Some(v) => (v.broadcasted, item_value.is_same(v)),
                     None => (false, false),
                 };
                 if exist {
+                    // update the node status metrics in local cache
+                    set_node_status_metrics(&item_value).await;
                     continue;
                 }
                 if item_value.status == NodeStatus::Offline {
@@ -417,13 +420,20 @@ async fn watch_node_list() -> Result<()> {
 
 async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let cfg = get_config();
+    if !cfg.health_check.enabled {
+        return Ok(());
+    }
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
             continue;
         }
         let url = format!("{}{}/healthz", node.http_addr, cfg.common.base_uri);
-        let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
+        let resp = client
+            .get(url)
+            .timeout(Duration::from_secs(cfg.health_check.timeout))
+            .send()
+            .await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!(
                 "[CLUSTER] node {}[{}] health check failed",
@@ -440,7 +450,7 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             let times = *entry;
             drop(w);
 
-            if times >= HEALTH_CHECK_FAILED_TIMES {
+            if times >= cfg.health_check.failed_times {
                 log::error!(
                     "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,
@@ -563,6 +573,45 @@ fn filter_nodes_with_group(
     Some(nodes)
 }
 
+// update the node status metrics in local cache
+async fn set_node_status_metrics(node: &Node) {
+    let mut w = NODES.write().await;
+    if let Some(v) = w.get_mut(node.uuid.as_str()) {
+        v.metrics = node.metrics.clone();
+    }
+}
+
+fn update_node_status_metrics() -> NodeMetrics {
+    let node_status = get_node_metrics();
+
+    config::metrics::NODE_CPU_TOTAL
+        .with_label_values(&[])
+        .set(node_status.cpu_total as i64);
+    config::metrics::NODE_CPU_USAGE
+        .with_label_values(&[])
+        .set(node_status.cpu_usage as i64);
+    config::metrics::NODE_MEMORY_TOTAL
+        .with_label_values(&[])
+        .set(node_status.memory_total as i64);
+    config::metrics::NODE_MEMORY_USAGE
+        .with_label_values(&[])
+        .set(node_status.memory_usage as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["total"])
+        .set(node_status.tcp_conns as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["established"])
+        .set(node_status.tcp_conns_established as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["close_wait"])
+        .set(node_status.tcp_conns_close_wait as i64);
+    config::metrics::NODE_TCP_CONNECTIONS
+        .with_label_values(&["time_wait"])
+        .set(node_status.tcp_conns_time_wait as i64);
+
+    node_status
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -582,10 +631,14 @@ mod tests {
         assert!(get_cached_online_query_nodes(None).await.is_some());
         assert!(get_cached_online_ingester_nodes().await.is_some());
         assert!(get_cached_online_querier_nodes(None).await.is_some());
-    }
 
-    #[tokio::test]
-    async fn test_consistent_hashing() {
+        // Reset the global state.
+        QUERIER_INTERACTIVE_CONSISTENT_HASH.write().await.clear();
+        QUERIER_BACKGROUND_CONSISTENT_HASH.write().await.clear();
+        COMPACTOR_CONSISTENT_HASH.write().await.clear();
+        FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await.clear();
+
+        // Test consistent hash logic.
         let node = load_local_node();
         for i in 0..10 {
             let node_q = Node {
@@ -620,13 +673,13 @@ mod tests {
 
         // gxhash hash
         let data = [
-            ["test", "node-q-4", "node-c-8"],
-            ["test1", "node-q-6", "node-c-2"],
-            ["test2", "node-q-2", "node-c-0"],
-            ["test3", "node-q-6", "node-c-3"],
-            ["test4", "node-q-1", "node-c-6"],
-            ["test5", "node-q-1", "node-c-0"],
-            ["test6", "node-q-2", "node-c-1"],
+            ["test", "node-q-2", "node-c-7"],
+            ["test1", "node-q-3", "node-c-0"],
+            ["test2", "node-q-6", "node-c-5"],
+            ["test3", "node-q-9", "node-c-9"],
+            ["test4", "node-q-2", "node-c-0"],
+            ["test5", "node-q-5", "node-c-8"],
+            ["test6", "node-q-5", "node-c-8"],
         ];
 
         remove_node_from_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;

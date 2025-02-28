@@ -61,8 +61,8 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
         }
-        // if meta_store_external is true, only send to querier
-        if cfg.common.meta_store_external && !node.is_querier() {
+        // only send to querier
+        if !node.is_querier() {
             continue;
         }
         if !node.is_querier() && !node.is_compactor() && !node.is_ingester() {

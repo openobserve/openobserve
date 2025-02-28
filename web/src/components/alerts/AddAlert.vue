@@ -349,26 +349,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                icon="refresh"
-                title="Refresh latest Destinations"
-                class="text-bold no-border"
-                no-caps
-                flat
-                dense
-                @click="$emit('refresh:destinations')"
-              />
+                  data-test="create-destination-btn"
+                  icon="refresh"
+                  title="Refresh latest Destinations"
+                  class="text-bold no-border"
+                  no-caps
+                  flat
+                  dense
+                  @click="$emit('refresh:destinations')"
+                />
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                label="Create Destination"
-                class="text-bold no-border"
-                color="secondary"
-                no-caps
-                @click="routeToCreateDestination"
-
-              />
+                  data-test="create-destination-btn"
+                  label="Create Destination"
+                  class="text-bold no-border"
+                  color="secondary"
+                  no-caps
+                  @click="routeToCreateDestination"
+                />
               </div>
             </div>
 
@@ -449,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :formData="formData"
             :query="previewQuery"
             :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :aggregationEnabled="isAggregationEnabled"
+            :isAggregationEnabled="isAggregationEnabled"
           />
         </div>
       </div>
@@ -495,6 +494,7 @@ import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import cronParser from "cron-parser";
 
 const defaultValue: any = () => {
   return {
@@ -746,11 +746,14 @@ export default defineComponent({
     watch(
       () => props.destinations.length, // Watch for length changes
       (newLength, oldLength) => {
-        formData.value.destinations  = formData.value.destinations.filter((destination : any) => {
-          return props.destinations.some((dest:any) => {
-            return dest.name === destination});
-        });
-      }
+        formData.value.destinations = formData.value.destinations.filter(
+          (destination: any) => {
+            return props.destinations.some((dest: any) => {
+              return dest.name === destination;
+            });
+          },
+        );
+      },
     );
 
     watch(
@@ -1144,6 +1147,28 @@ export default defineComponent({
         return false;
       }
 
+      if (input.trigger_condition.frequency_type === "cron") {
+        try {
+          cronParser.parseExpression(input.trigger_condition.cron);
+        } catch (err) {
+          console.log(err);
+          scheduledAlertRef.value.cronJobError = "Invalid cron expression!";
+          return;
+        }
+      }
+
+      scheduledAlertRef.value?.validateFrequency(input.trigger_condition);
+
+      if (scheduledAlertRef.value.cronJobError) {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: scheduledAlertRef.value.cronJobError,
+            timeout: 1500,
+          });
+        return false;
+      }
+
       return true;
     };
 
@@ -1177,7 +1202,7 @@ export default defineComponent({
           .search({
             org_identifier: store.state.selectedOrganization.identifier,
             query,
-            page_type: "logs",
+            page_type: formData.value.stream_type,
           })
           .then((res: any) => {
             sqlQueryErrorMsg.value = "";
@@ -1228,13 +1253,25 @@ export default defineComponent({
 
     const routeToCreateDestination = () => {
       const url = router.resolve({
-          name: "alertDestinations",
-          query: {
-            action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }).href;
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
       window.open(url, "_blank");
+    };
+
+    const HTTP_FORBIDDEN = 403;
+
+    const handleAlertError = (err: any) => {
+      if (err.response?.status !== HTTP_FORBIDDEN) {
+        console.log(err);
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.message || err.response?.data?.error,
+        });
+      }
     };
 
     return {
@@ -1302,6 +1339,7 @@ export default defineComponent({
       showTimezoneWarning,
       updateMultiTimeRange,
       routeToCreateDestination,
+      handleAlertError,
     };
   },
 
@@ -1310,6 +1348,13 @@ export default defineComponent({
     this.formData.ingest = ref(false);
     this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
     this.formData.is_real_time = this.formData.is_real_time.toString();
+
+    // Set default frequency to min_auto_refresh_interval
+    if (this.store.state?.zoConfig?.min_auto_refresh_interval)
+      this.formData.trigger_condition.frequency = Math.ceil(
+        this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 1,
+      );
+
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
       this.updateEditorContent(this.formData.stream_name);
@@ -1487,14 +1532,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if(err.response?.status != 403){
-                this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-                });
-              }
-              
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1526,14 +1564,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if(err.response?.status != 403){
-                this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-                });
-              }
-              
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Save Alert",

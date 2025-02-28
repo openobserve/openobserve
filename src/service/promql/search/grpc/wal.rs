@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ use arrow::record_batch::RecordBatch;
 use config::{
     get_config,
     meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -142,9 +143,9 @@ async fn get_wal_batches(
     let (start, end) = time_range;
     let mut df = match ctx.table(stream_name).await {
         Ok(df) => df.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));

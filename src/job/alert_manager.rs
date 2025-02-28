@@ -42,12 +42,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         let local_cluster_name = config::get_cluster_name();
-        let cluster_name =
+        let exist_cluster_name =
             o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
-        if !cluster_name.is_empty() && cluster_name != local_cluster_name {
+        if !exist_cluster_name.is_empty() && exist_cluster_name != local_cluster_name {
             let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list().await?;
-            if clusters.iter().any(|c| c.name == cluster_name) {
-                log::info!("[ALERT MANAGER] is running in cluster: {}", cluster_name);
+            if clusters.iter().any(|c| c.name == exist_cluster_name) {
+                log::info!(
+                    "[ALERT MANAGER] is running in cluster: {}",
+                    exist_cluster_name
+                );
                 return Ok(());
             }
         }

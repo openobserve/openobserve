@@ -54,6 +54,7 @@ use config::{
         tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
@@ -78,7 +79,10 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{datafusion::exec, tantivy::puffin_directory::writer::PuffinDirWriter},
+        search::{
+            datafusion::exec::{self, MergeParquetResult},
+            tantivy::puffin_directory::writer::PuffinDirWriter,
+        },
     },
 };
 
@@ -275,7 +279,7 @@ async fn prepare_files(
         columns.remove(4);
         let prefix = columns.join("/");
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(&file_key, parquet_meta, false));
+        partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
         // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
@@ -559,10 +563,10 @@ async fn move_files(
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .with_label_values(&[&org_id, stream_type.as_str()])
                 .sub(file.meta.compressed_size);
         }
 
@@ -707,6 +711,7 @@ async fn merge_files(
         tables,
         &bloom_filter_fields,
         &new_file_meta,
+        true,
     )
     .await;
 
@@ -728,6 +733,15 @@ async fn merge_files(
                 retain_file_list
             );
             return Err(e.into());
+        }
+    };
+
+    // ingester should not support multiple files
+    // multiple files is for downsampling that will be handled in compactor
+    let buf = match buf {
+        MergeParquetResult::Single(v) => v,
+        MergeParquetResult::Multiple { .. } => {
+            panic!("[INGESTER:JOB] merge_parquet_files error: multiple files");
         }
     };
 
@@ -778,6 +792,7 @@ async fn merge_files(
     }
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
@@ -839,6 +854,7 @@ pub(crate) async fn generate_index_on_ingester(
     }
 
     let cfg = get_config();
+    #[allow(deprecated)]
     let index_stream_name =
         if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -901,12 +917,13 @@ pub(crate) async fn generate_index_on_ingester(
 
         crate::common::utils::auth::set_ownership(
             org_id,
-            &StreamType::Index.to_string(),
+            StreamType::Index.as_str(),
             Authz::new(&index_stream_name),
         )
         .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
+        #[allow(deprecated)]
         if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
@@ -958,11 +975,7 @@ pub(crate) async fn generate_index_on_ingester(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for row in json_rows {
-        let timestamp: i64 = row
-            .get(&cfg.common.column_timestamp)
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let timestamp: i64 = row.get(TIMESTAMP_COL_NAME).unwrap().as_i64().unwrap();
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
@@ -983,13 +996,8 @@ pub(crate) async fn generate_index_on_ingester(
         hour_buf.records.push(Arc::new(record_val));
         hour_buf.records_size += record_size;
     }
-    let writer = ingester::get_writer(
-        0,
-        org_id,
-        &StreamType::Index.to_string(),
-        &index_stream_name,
-    )
-    .await;
+    let writer =
+        ingester::get_writer(0, org_id, StreamType::Index.as_str(), &index_stream_name).await;
     let _ = crate::service::ingestion::write_file(
         &writer,
         &index_stream_name,
@@ -1025,6 +1033,7 @@ pub(crate) async fn generate_index_on_compactor(
         return Ok(vec![]);
     }
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -1141,7 +1150,7 @@ async fn prepare_index_record_batches(
         .collect::<HashMap<_, _>>();
 
     let new_schema = Arc::new(Schema::new(vec![
-        Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
+        Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
         Field::new("min_ts", DataType::Int64, true),
         Field::new("max_ts", DataType::Int64, true),
         Field::new("field", DataType::Utf8, true),
@@ -1170,7 +1179,7 @@ async fn prepare_index_record_batches(
 
         // get _timestamp column
         let Some(time_data) = batch
-            .column_by_name(&cfg.common.column_timestamp)
+            .column_by_name(TIMESTAMP_COL_NAME)
             .unwrap()
             .as_any()
             .downcast_ref::<Int64Array>()
@@ -1199,6 +1208,7 @@ async fn prepare_index_record_batches(
             // split the column into terms
             let terms = (0..num_rows)
                 .flat_map(|i| {
+                    #[allow(deprecated)]
                     split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                         .into_iter()
                         .map(|s| (s, i))

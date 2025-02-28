@@ -25,7 +25,7 @@ use config::{
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -42,13 +42,16 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, Select,
-        SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut, VisitorMut,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
+        VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
 
+#[cfg(feature = "enterprise")]
+use super::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
 use super::{
     datafusion::udf::match_all_udf::{
         FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
@@ -156,10 +159,10 @@ impl Sql {
             && !column_visitor.has_agg_function
             && !column_visitor.is_distinct
         {
-            order_by.push((cfg.common.column_timestamp.clone(), OrderBy::Desc));
+            order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
         let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
         let use_inverted_index = column_visitor.use_inverted_index;
 
@@ -239,6 +242,7 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
+        #[allow(deprecated)]
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
@@ -255,7 +259,7 @@ impl Sql {
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
-            && order_by[0].0 == cfg.common.column_timestamp
+            && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
         {
             index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
@@ -386,8 +390,8 @@ fn generate_user_defined_schema(
 ) -> Arc<SchemaCache> {
     let cfg = get_config();
     let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(cfg.common.column_timestamp.to_string());
+    if !fields.contains(TIMESTAMP_COL_NAME) {
+        fields.insert(TIMESTAMP_COL_NAME.to_string());
     }
     if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
         fields.insert(cfg.common.column_all.to_string());
@@ -447,10 +451,10 @@ fn generate_quick_mode_fields(
         .collect::<HashSet<_>>();
 
     // check _timestamp
-    if !fields_name.contains(&cfg.common.column_timestamp) {
-        if let Ok(field) = schema.field_with_name(&cfg.common.column_timestamp) {
+    if !fields_name.contains(TIMESTAMP_COL_NAME) {
+        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
-            fields_name.insert(cfg.common.column_timestamp.to_string());
+            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
         }
     }
     // add the selected columns
@@ -497,8 +501,8 @@ fn generate_schema_fields(
     let mut columns = columns;
 
     // 1. add timestamp field
-    if !columns.contains(&get_config().common.column_timestamp) {
-        columns.insert(get_config().common.column_timestamp.clone());
+    if !columns.contains(TIMESTAMP_COL_NAME) {
+        columns.insert(TIMESTAMP_COL_NAME.to_string());
     }
 
     // 2. check _o2_id
@@ -1020,10 +1024,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::UnnamedExpr(expr) => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1031,10 +1032,7 @@ impl VisitorMut for AddTimestampVisitor {
                     SelectItem::ExprWithAlias { expr, alias: _ } => {
                         let mut visitor = FieldNameVisitor::new();
                         expr.visit(&mut visitor);
-                        if visitor
-                            .field_names
-                            .contains(&get_config().common.column_timestamp)
-                        {
+                        if visitor.field_names.contains(TIMESTAMP_COL_NAME) {
                             has_timestamp = true;
                             break;
                         }
@@ -1050,7 +1048,7 @@ impl VisitorMut for AddTimestampVisitor {
                 select.projection.insert(
                     0,
                     SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
-                        get_config().common.column_timestamp.clone(),
+                        TIMESTAMP_COL_NAME.to_string(),
                     ))),
                 );
             }
@@ -1580,6 +1578,137 @@ fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool 
     })
 }
 
+#[cfg(feature = "enterprise")]
+struct ExtractKeyNamesVisitor {
+    keys: Vec<String>,
+    error: Option<Error>,
+}
+
+#[cfg(feature = "enterprise")]
+impl ExtractKeyNamesVisitor {
+    fn new() -> Self {
+        Self {
+            keys: Vec::new(),
+            error: None,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl VisitorMut for ExtractKeyNamesVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(Function {
+            name: ObjectName(names),
+            args,
+            ..
+        }) = expr
+        {
+            // cipher functions will always be 1-part names
+            if names.len() != 1 {
+                return ControlFlow::Continue(());
+            }
+            let fname = names.first().unwrap();
+            if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
+                let list = match args {
+                    FunctionArguments::List(list) => list,
+                    _ => {
+                        self.error = Some(Error::Message(
+                            "invalid arguments to cipher function".to_string(),
+                        ));
+                        return ControlFlow::Continue(());
+                    }
+                };
+                if list.args.len() != 2 {
+                    self.error = Some(Error::Message(
+                        "invalid number of arguments to cipher function".to_string(),
+                    ));
+                    return ControlFlow::Continue(());
+                }
+                let arg = match &list.args[1] {
+                    FunctionArg::Named { arg, .. } => arg,
+                    FunctionArg::Unnamed(arg) => arg,
+                };
+                match arg {
+                    FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(s),
+                    )) => {
+                        self.keys.push(s.to_owned());
+                    }
+                    _ => {
+                        self.error = Some(Error::Message(
+                            "key name must be a static string in cipher function".to_string(),
+                        ));
+                        return ControlFlow::Continue(());
+                    }
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
+    let dialect = &PostgreSqlDialect {};
+    let mut statement = Parser::parse_sql(dialect, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    let mut visitor = ExtractKeyNamesVisitor::new();
+    statement.visit(&mut visitor);
+    if let Some(e) = visitor.error {
+        Err(e)
+    } else {
+        Ok(visitor.keys)
+    }
+}
+
+/// check if the sql is complex query, if not, add ordering term by timestamp
+pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors::Result<String> {
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor = AddOrderingTermVisitor::new(TIMESTAMP_COL_NAME.to_string(), is_asc);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddOrderingTermVisitor {
+    field: String,
+    is_asc: bool,
+}
+
+impl AddOrderingTermVisitor {
+    fn new(field: String, is_asc: bool) -> Self {
+        Self { field, is_asc }
+    }
+}
+
+impl VisitorMut for AddOrderingTermVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.order_by.is_none() {
+            query.order_by = Some(sqlparser::ast::OrderBy {
+                exprs: vec![OrderByExpr {
+                    expr: Expr::Identifier(Ident::new(self.field.clone())),
+                    asc: Some(self.is_asc),
+                    nulls_first: None,
+                    with_fill: None,
+                }],
+                interpolate: None,
+            });
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1826,6 +1955,44 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_asc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp ASC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_desc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, false).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp DESC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_aggregation() {
+        let sql = "SELECT COUNT(*) FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT COUNT(*) FROM logs");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_existing_order() {
+        let sql = "SELECT * FROM logs ORDER BY field1 DESC";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(sql, result);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_with_where() {
+        let sql = "SELECT * FROM logs WHERE field1 = 'value'";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(
+            result,
+            "SELECT * FROM logs WHERE field1 = 'value' ORDER BY _timestamp ASC"
+        );
     }
 
     #[test]

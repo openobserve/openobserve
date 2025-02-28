@@ -338,6 +338,7 @@ import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
+import actions from "@/services/action_scripts";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
@@ -350,9 +351,10 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
+import cipherKeysService from "@/services/cipher_keys";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/QueryEditor.vue"),
 );
 
 onBeforeMount(() => {
@@ -515,7 +517,7 @@ const getUsers = () => {
 const getResourceByName = (
   resources: Resource[],
   resourceName: string,
-  level: number = 0
+  level: number = 0,
 ): Resource | null | undefined => {
   for (let i = 0; i < resources.length; i++) {
     if (resources[i].resourceName === resourceName) return resources[i];
@@ -523,7 +525,7 @@ const getResourceByName = (
       const isFound = getResourceByName(
         resources[i].childs,
         resourceName,
-        level + 1
+        level + 1,
       );
       if (isFound) return isFound;
     }
@@ -550,7 +552,7 @@ const setDefaultPermissions = () => {
     if (resource.parent) {
       const parentResource = getResourceByName(
         permissionsState.permissions,
-        resource.parent
+        resource.parent,
       );
       if (parentResource) {
         parentResource.childs.push(resourcePermission as Resource);
@@ -564,7 +566,7 @@ const setDefaultPermissions = () => {
   });
 
   permissionsState.permissions = permissionsState.permissions.filter(
-    (resource) => !resource.parent
+    (resource) => !resource.parent,
   );
 };
 
@@ -584,7 +586,7 @@ const getResourcePermissions = () => {
         role_name: editingRole.value,
         org_identifier: store.state.selectedOrganization.identifier,
         resource: resource.key,
-      })
+      }),
     );
   });
 
@@ -674,7 +676,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
       if (!resourceMapper[resource]) {
         resourceMapper[resource] = getResourceByName(
           permissionsState.permissions,
-          resource
+          resource,
         ) as Resource;
       }
 
@@ -683,7 +685,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         if (!resourceMapper["dfolder"])
           resourceMapper["dfolder"] = getResourceByName(
             permissionsState.permissions,
-            "dfolder"
+            "dfolder",
           ) as Resource;
 
         await getResourceEntities(resourceMapper["dfolder"]);
@@ -691,7 +693,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         if (!resourceMapper[resource]) {
           resourceMapper[resource] = getResourceByName(
             permissionsState.permissions,
-            resource
+            resource,
           ) as Resource;
         }
       }
@@ -704,7 +706,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
       ) {
         resourceMapper[resourceMapper[resource].parent] = getResourceByName(
           permissionsState.permissions,
-          resourceMapper[resource].parent
+          resourceMapper[resource].parent,
         ) as Resource;
       }
 
@@ -717,7 +719,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
 
       if (resourceMapper[resource].parent)
         await getResourceEntities(
-          resourceMapper[resourceMapper[resource].parent]
+          resourceMapper[resourceMapper[resource].parent],
         );
 
       // This is just to handle dashboard permissions, need to fix this
@@ -725,7 +727,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         const [folderId, dashboardId] = entity.split("/");
 
         const dashResource = resourceMapper["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId
+          (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
       } else if (
@@ -735,7 +737,7 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         resource === "index"
       ) {
         const streamResource = resourceMapper["stream"].entities.find(
-          (e: Entity) => e.name === resource
+          (e: Entity) => e.name === resource,
         );
         await getResourceEntities(streamResource as Entity);
       } else {
@@ -876,7 +878,7 @@ const updateJsonInTable = () => {
   const permissions = JSON.parse(permissionsJsonValue.value);
 
   const permissionsHash = new Set(
-    permissions.map((p: any) => p.object + ":" + p.permission)
+    permissions.map((p: any) => p.object + ":" + p.permission),
   );
   let hash = "";
   let permission;
@@ -899,12 +901,12 @@ const updateJsonInTable = () => {
         const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId
+          (e: Entity) => e.name === folderId,
         ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
-            getPermissionHash(resource, permission.permission, entity)
+            getPermissionHash(resource, permission.permission, entity),
           );
       } else if (
         resource === "logs" ||
@@ -913,7 +915,7 @@ const updateJsonInTable = () => {
         resource === "index"
       ) {
         resourceDetails = resourceMapper.value["stream"].entities.find(
-          (e: Entity) => e.name === resource
+          (e: Entity) => e.name === resource,
         ) as Entity;
       }
 
@@ -921,7 +923,7 @@ const updateJsonInTable = () => {
         resourceDetails,
         resource,
         entity,
-        permission.permission
+        permission.permission,
       );
     }
   });
@@ -945,12 +947,12 @@ const updateJsonInTable = () => {
         const [folderId, dashboardId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId
+          (e: Entity) => e.name === folderId,
         ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
-            getPermissionHash(resource, permission.permission, entity)
+            getPermissionHash(resource, permission.permission, entity),
           );
       } else if (
         resource === "logs" ||
@@ -959,7 +961,7 @@ const updateJsonInTable = () => {
         resource === "index"
       ) {
         resourceDetails = resourceMapper.value["stream"].entities.find(
-          (e: Entity) => e.name === resource
+          (e: Entity) => e.name === resource,
         ) as Entity;
       }
 
@@ -967,7 +969,7 @@ const updateJsonInTable = () => {
         resourceDetails,
         resource,
         entity,
-        permission.permission
+        permission.permission,
       );
     }
   });
@@ -1016,7 +1018,7 @@ const updatePermissionVisibility = (
   permissions: (Resource | Entity)[],
   forceShow: boolean = false,
   level: number = 0,
-  relations: string[] = []
+  relations: string[] = [],
 ): void => {
   permissions.forEach((permission: Entity | Resource) => {
     // Check if any permission value is true
@@ -1027,7 +1029,7 @@ const updatePermissionVisibility = (
       parentRelations.push(permission.resourceName);
 
     const showResource = Object.values(permission.permission).some(
-      (permDetail) => permDetail.value
+      (permDetail) => permDetail.value,
     );
 
     let isResourceFiltered = true;
@@ -1063,7 +1065,7 @@ const updatePermissionVisibility = (
         heavyResourceEntities.value[permission.name] || [],
         permission.show,
         level + 1,
-        parentRelations
+        parentRelations,
       );
     } else {
       if (permission.entities?.length)
@@ -1071,7 +1073,7 @@ const updatePermissionVisibility = (
           permission.entities || [],
           permission.show,
           level + 1,
-          parentRelations
+          parentRelations,
         );
     }
 
@@ -1085,7 +1087,7 @@ const updatePermissionVisibility = (
     ) {
       filteredEntities =
         heavyResourceEntities.value[permission.name]?.filter(
-          (entity: any) => entity.show
+          (entity: any) => entity.show,
         ) || [];
     } else {
       filteredEntities =
@@ -1163,7 +1165,7 @@ const updatePermissionVisibility = (
 
 const filterRowsByResourceName = (
   rows: (Resource | Entity)[],
-  resourceName: string
+  resourceName: string,
 ) => {
   return rows.reduce(
     (filteredRows: (Resource | Entity)[], row: Resource | Entity) => {
@@ -1173,7 +1175,7 @@ const filterRowsByResourceName = (
         if (row.entities && row.entities.length) {
           row.entities = filterRowsByResourceName(
             row.entities,
-            resourceName
+            resourceName,
           ) as Entity[];
         }
         // Add the row to the filtered list
@@ -1182,7 +1184,7 @@ const filterRowsByResourceName = (
         // Even if the current row doesn't match, there might be nested rows that do
         const filteredEntities = filterRowsByResourceName(
           row.entities,
-          resourceName
+          resourceName,
         );
         // Only add the row if it has matching nested rows
         if (filteredEntities.length) {
@@ -1193,7 +1195,7 @@ const filterRowsByResourceName = (
       }
       return filteredRows;
     },
-    []
+    [],
   );
 };
 
@@ -1241,7 +1243,7 @@ const expandPermission = async (resource: any) => {
 const getPermissionHash = (
   resourceName: string,
   permission: string,
-  entity?: string
+  entity?: string,
 ) => {
   if (!entity) entity = "_all_" + store.state.selectedOrganization.identifier;
 
@@ -1278,6 +1280,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     metadata: getMetadataStreams,
     report: getReports,
     service_accounts: getServiceAccounts,
+    action_scripts: getActionScripts,
+    cipher_keys: getCipherKeys,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1317,7 +1321,7 @@ const getDashboards = async (resource: Entity | Resource) => {
     "",
     store.state.selectedOrganization.identifier,
     resource.name,
-    ""
+    "",
   );
 
   updateEntityEntities(
@@ -1325,11 +1329,11 @@ const getDashboards = async (resource: Entity | Resource) => {
     ["dashboardId"],
     [
       ...dashboards.data.dashboards.map(
-        (dash: any) => Object.values(dash).filter((dash) => dash)[0]
+        (dash: any) => Object.values(dash).filter((dash) => dash)[0],
       ),
     ],
     false,
-    "title"
+    "title",
   );
 
   return new Promise((resolve) => {
@@ -1349,14 +1353,14 @@ const getOrgs = async () => {
 
 const getSavedViews = async () => {
   const savedViews = await savedviewsService.get(
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
   updateResourceEntities(
     "savedviews",
     ["view_id"],
     [...savedViews.data.views],
     false,
-    "view_name"
+    "view_name",
   );
 
   return new Promise((resolve) => {
@@ -1366,11 +1370,11 @@ const getSavedViews = async () => {
 
 const getFolders = async () => {
   const folders: any = await dashboardService.list_Folders(
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   let isDefaultPresent = folders.data.list.find(
-    (folder: any) => folder.folderId === "default"
+    (folder: any) => folder.folderId === "default",
   );
 
   if (!isDefaultPresent) {
@@ -1383,7 +1387,7 @@ const getFolders = async () => {
     [...folders.data.list],
     true,
     "name",
-    "dashboard"
+    "dashboard",
   );
   return new Promise((resolve) => {
     resolve(true);
@@ -1415,7 +1419,7 @@ const getFunctions = async () => {
     "name",
     false,
     "",
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities("function", ["name"], [...functions.data.list]);
@@ -1452,7 +1456,7 @@ const getTemplates = async () => {
 
 const getPipelines = async () => {
   const pipelines = await pipelineService.getPipelines(
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities("pipeline", ["name"], [...pipelines.data.list]);
@@ -1469,7 +1473,7 @@ const getAlerts = async () => {
     "name",
     false,
     "",
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities("alert", ["name"], [...alerts.data.list]);
@@ -1529,6 +1533,18 @@ const getMetadataStreams = async (resource: Resource | Entity) => {
   });
 };
 
+const getActionScripts = async () => {
+  const actionScripts = await actions.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities("action_scripts", ["name"], [...actionScripts.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
 const getStreamsTypes = async () => {
   const streams = [
     { stream_type: "logs", name: "Logs" },
@@ -1544,7 +1560,7 @@ const getStreamsTypes = async () => {
       ["stream_type"],
       [stream],
       true,
-      "name"
+      "name",
     );
   });
 
@@ -1555,7 +1571,7 @@ const getStreamsTypes = async () => {
 
 const getReports = async () => {
   const reports = await reportService.list(
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities("report", ["name"], [...reports.data]);
@@ -1567,7 +1583,7 @@ const getReports = async () => {
 
 const getServiceAccounts = async () => {
   const accounts = await serviceAccountService.list(
-    store.state.selectedOrganization.identifier
+    store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities("service_accounts", ["email"], accounts.data.data);
@@ -1577,12 +1593,24 @@ const getServiceAccounts = async () => {
   });
 };
 
+const getCipherKeys = async () => {
+  const data: any = await cipherKeysService.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
 const updateEntityEntities = (
   entity: Entity | Resource,
   entityNameKeys: string[],
   data: any[],
   hasEntities: boolean = false,
-  displayNameKey?: string
+  displayNameKey?: string,
 ) => {
   if (!entity) return;
 
@@ -1608,8 +1636,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowAll",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: true,
         },
@@ -1618,8 +1646,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowGet",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: true,
         },
@@ -1628,8 +1656,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowDelete",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: true,
         },
@@ -1638,8 +1666,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowPut",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: true,
         },
@@ -1648,8 +1676,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowList",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: hasEntities,
         },
@@ -1658,8 +1686,8 @@ const updateEntityEntities = (
             getPermissionHash(
               entity.childName as string,
               "AllowPost",
-              entityName
-            )
+              entityName,
+            ),
           ),
           show: hasEntities,
         },
@@ -1693,11 +1721,11 @@ const updateResourceEntities = (
   data: any[],
   hasEntities: boolean = false,
   displayNameKey?: string,
-  childName?: string
+  childName?: string,
 ) => {
   const resource: Resource | null | undefined = getResourceByName(
     permissionsState.permissions,
-    resourceName
+    resourceName,
   );
 
   if (!resource) return;
@@ -1717,37 +1745,37 @@ const updateResourceEntities = (
       permission: {
         AllowAll: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowAll", entityName)
+            getPermissionHash(resourceName, "AllowAll", entityName),
           ),
           show: true,
         },
         AllowGet: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowGet", entityName)
+            getPermissionHash(resourceName, "AllowGet", entityName),
           ),
           show: true,
         },
         AllowDelete: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowDelete", entityName)
+            getPermissionHash(resourceName, "AllowDelete", entityName),
           ),
           show: true,
         },
         AllowPut: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowPut", entityName)
+            getPermissionHash(resourceName, "AllowPut", entityName),
           ),
           show: true,
         },
         AllowList: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowList", entityName)
+            getPermissionHash(resourceName, "AllowList", entityName),
           ),
           show: hasEntities,
         },
         AllowPost: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(resourceName, "AllowPost", entityName)
+            getPermissionHash(resourceName, "AllowPost", entityName),
           ),
           show: hasEntities,
         },
@@ -1771,11 +1799,11 @@ const updateResourceResource = (
   entityNameKeys: string[],
   data: any[],
   hasEntities: boolean = false,
-  displayNameKey?: string
+  displayNameKey?: string,
 ) => {
   const resource: Resource | null | undefined = getResourceByName(
     permissionsState.permissions,
-    parentResourceName
+    parentResourceName,
   );
 
   if (!resource) return;
@@ -1798,8 +1826,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowAll",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: true,
         },
@@ -1808,8 +1836,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowGet",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: true,
         },
@@ -1818,8 +1846,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowDelete",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: true,
         },
@@ -1828,8 +1856,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowPut",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: true,
         },
@@ -1838,8 +1866,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowList",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: hasEntities,
         },
@@ -1848,8 +1876,8 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowPost",
-              "_all_" + store.state.selectedOrganization.identifier
-            )
+              "_all_" + store.state.selectedOrganization.identifier,
+            ),
           ),
           show: hasEntities,
         },
@@ -1929,7 +1957,7 @@ const saveRole = () => {
       removedPermissions.value = {};
 
       roleUsers.value = roleUsers.value.filter(
-        (user) => !removedUsers.value.has(user)
+        (user) => !removedUsers.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
@@ -1941,7 +1969,7 @@ const saveRole = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
           type: "negative",
           message: `Error while updating role!`,
@@ -1963,7 +1991,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.label.toLowerCase().indexOf(value) > -1
+      (column: any) => column.label.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -1973,7 +2001,7 @@ const filterResourceOptions = (val: string, update: any) => {
   filteredResources.value = filterColumns(
     resourceOptions.value,
     val,
-    update
+    update,
   ) as any[];
 };
 
@@ -1986,13 +2014,13 @@ const updateEntityPermission = (
     | "AllowList"
     | "AllowGet"
     | "AllowDelete"
-    | "AllowPost"
+    | "AllowPost",
 ) => {
   if (resource?.entities)
     resource.entities.forEach((entity: Entity) => {
       if (entity.name === entityName) {
         entity.permission[permission].value = selectedPermissionsHash.value.has(
-          getPermissionHash(resourceName, permission, entityName)
+          getPermissionHash(resourceName, permission, entityName),
         );
       }
     });

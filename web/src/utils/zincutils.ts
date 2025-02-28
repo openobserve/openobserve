@@ -17,12 +17,13 @@ import config from "../aws-exports";
 import { ref } from "vue";
 import { DateTime } from "luxon";
 import { v4 as uuidv4 } from "uuid";
-import { useQuasar } from "quasar";
+import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
 import store from "../stores";
+import cronParser from "cron-parser";
 
 let moment: any;
 let momentInitialized = false;
@@ -511,7 +512,7 @@ export const formatSizeFromMB = (sizeInMB: string) => {
 };
 
 export const addCommasToNumber = (number: number) => {
-  if (number === null || number === undefined) return '0';
+  if (number === null || number === undefined) return "0";
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
@@ -993,3 +994,53 @@ export const isWebSocketEnabled = () => {
     return (window as any).use_web_socket;
   }
 };
+export const maxLengthCharValidation = (
+  val: string = "",
+  char_length: number = 50,
+) => {
+  return (
+    (val && val.length <= char_length) ||
+    `Maximum ${char_length} characters allowed`
+  );
+};
+
+export const validateUrl = (val: string) => {
+  try {
+    const url = new URL(val); // Built-in URL constructor
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (error) {
+    return "Please provide correct URL.";
+  }
+};
+
+export function convertUnixToQuasarFormat(unixMicroseconds: any) {
+  if (!unixMicroseconds) return "";
+  const unixSeconds = unixMicroseconds / 1e6;
+  const dateToFormat = new Date(unixSeconds * 1000);
+  const formattedDate = dateToFormat.toISOString();
+  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
+
+export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
+  // Parse the cron expression using cron-parser
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    // Get the first and second execution times
+    const firstExecution = interval.next();
+    const secondExecution = interval.next();
+
+    // Calculate the difference in milliseconds
+    return (secondExecution.getTime() - firstExecution.getTime()) / 1000;
+  } catch (err) {
+    throw new Error("Invalid cron expression");
+  }
+}
+
+export function isAboveMinRefreshInterval(
+  value: number,
+  config: { min_auto_refresh_interval?: string | number },
+) {
+  const minInterval = Number(config?.min_auto_refresh_interval) || 1;
+  return value >= minInterval;
+}

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ use config::{
     get_config,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map},
-    FxIndexMap,
+    FxIndexMap, TIMESTAMP_COL_NAME,
 };
 use infra::{
     errors::{Error, Result},
@@ -152,11 +152,7 @@ impl Metadata for DistinctValues {
         // distinct values will always have _timestamp and
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("count", DataType::Int64, false),
         ]))
     }
@@ -264,7 +260,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_write_partition_key(
@@ -290,7 +286,7 @@ impl Metadata for DistinctValues {
             let writer = ingester::get_writer(
                 0,
                 &org_id,
-                &StreamType::Metadata.to_string(),
+                StreamType::Metadata.as_str(),
                 &distinct_stream_name,
             )
             .await;
@@ -304,13 +300,13 @@ impl Metadata for DistinctValues {
 
             #[cfg(feature = "enterprise")]
             {
-                use o2_enterprise::enterprise::{
-                    common::infra::config::get_config as get_o2_config,
-                    openfga::authorizer::authz::set_ownership_if_not_exists,
+                use o2_openfga::{
+                    authorizer::authz::set_ownership_if_not_exists,
+                    config::get_config as get_openfga_config,
                 };
 
                 // set ownership only in the first time
-                if is_new && get_o2_config().openfga.enabled {
+                if is_new && get_openfga_config().enabled {
                     set_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, distinct_stream_name),

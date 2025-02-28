@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
@@ -155,6 +156,22 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             continue;
         }
 
+        // check timestamp
+        let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
+            None => chrono::Utc::now().timestamp_micros(),
+            Some(json::Value::Number(s)) => {
+                time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
+            }
+            Some(_) => {
+                return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+            }
+        };
+        // reset time
+        record.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+
         let record = json::Value::Object(record.to_owned());
 
         // ready to be buffered for downstream processing
@@ -238,7 +255,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
     }
 
-    let cfg = config::get_config();
     for (stream_name, json_data) in json_data_by_stream {
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
@@ -272,43 +288,33 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
             let record = record.as_object_mut().unwrap();
 
-            // check timestamp & value
-            let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
-                None => chrono::Utc::now().timestamp_micros(),
-                Some(json::Value::Number(s)) => {
-                    time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
-                }
-                Some(_) => {
-                    return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-                }
-            };
+            // check value
             let value: f64 = match record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))? {
                 json::Value::Number(s) => s.as_f64().unwrap(),
                 _ => {
                     return Err(anyhow::anyhow!("invalid value, need to be number"));
                 }
             };
-            // reset time & value
-            record.insert(
-                cfg.common.column_timestamp.clone(),
-                json::Value::Number(timestamp.into()),
-            );
+            // reset value
             record.insert(
                 VALUE_LABEL.to_string(),
                 json::Number::from_f64(value).unwrap().into(),
             );
+
+            let timestamp = record
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(|ts| ts.as_i64())
+                .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
+
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
             let hash = super::signature_without_labels(record, &get_exclude_labels());
-            record.insert(HASH_LABEL.to_string(), json::Value::String(hash.into()));
+            record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
             for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL
-                    || k == TYPE_LABEL
-                    || k == VALUE_LABEL
-                    || k == &cfg.common.column_timestamp
+                if k == NAME_LABEL || k == TYPE_LABEL || k == VALUE_LABEL || k == TIMESTAMP_COL_NAME
                 {
                     continue;
                 }
@@ -351,7 +357,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     .await?;
                     crate::common::utils::auth::set_ownership(
                         org_id,
-                        &StreamType::Metrics.to_string(),
+                        StreamType::Metrics.as_str(),
                         Authz::new(&stream_name),
                     )
                     .await;
@@ -440,7 +446,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metrics.to_string(), &stream_name).await;
+            ingester::get_writer(0, org_id, StreamType::Metrics.as_str(), &stream_name).await;
         // for performance issue, we will flush all when the app shutdown
         let fsync = false;
         let mut req_stats = write_file(&writer, &stream_name, stream_data, fsync).await?;
@@ -473,7 +479,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -482,7 +488,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "200",
             org_id,
             "",
-            &StreamType::Metrics.to_string(),
+            StreamType::Metrics.as_str(),
         ])
         .inc();
 

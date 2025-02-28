@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,9 @@ use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{get_config, get_instance_id, meta::search::SearchEventType};
+use crate::{
+    get_config, get_instance_id, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
+};
 
 pub trait NodeInfo: Debug + Send + Sync {
     fn get_grpc_addr(&self) -> String;
@@ -35,11 +37,13 @@ pub struct Node {
     #[serde(default)]
     pub role_group: RoleGroup,
     pub cpu_num: u64,
-    pub status: NodeStatus,
     #[serde(default)]
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
+    pub status: NodeStatus,
+    #[serde(default)]
+    pub metrics: NodeMetrics,
 }
 
 impl Node {
@@ -53,13 +57,30 @@ impl Node {
             role: vec![],
             role_group: RoleGroup::None,
             cpu_num: 0,
-            status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            status: NodeStatus::Prepare,
+            metrics: Default::default(),
         }
     }
+
+    pub fn is_same(&self, other: &Node) -> bool {
+        self.uuid == other.uuid
+            && self.name == other.name
+            && self.http_addr == other.http_addr
+            && self.grpc_addr == other.grpc_addr
+            && self.role == other.role
+            && self.role_group == other.role_group
+            && self.scheduled == other.scheduled
+            && self.broadcasted == other.broadcasted
+            && self.status == other.status
+    }
+
     pub fn is_single_node(&self) -> bool {
         self.role.len() == 1 && self.role.contains(&Role::All)
+    }
+    pub fn is_single_role(&self) -> bool {
+        self.role.len() == 1
     }
     pub fn is_router(&self) -> bool {
         self.role.contains(&Role::Router)
@@ -86,6 +107,15 @@ impl Node {
     }
     pub fn is_alert_manager(&self) -> bool {
         self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
+    }
+    pub fn is_script_server(&self) -> bool {
+        self.role.contains(&Role::ScriptServer) || self.role.contains(&Role::All)
+    }
+    pub fn is_standalone(&self) -> bool {
+        // standalone implies there is no external dependency required
+        // for this node. All role will always have DB dep.
+        // currently only script server has no external dep
+        !self.role.contains(&Role::All) && self.role.contains(&Role::ScriptServer)
     }
 }
 
@@ -142,6 +172,7 @@ pub enum Role {
     Router,
     AlertManager,
     FlattenCompactor,
+    ScriptServer,
 }
 
 impl FromStr for Role {
@@ -156,6 +187,7 @@ impl FromStr for Role {
             "router" => Ok(Role::Router),
             "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
+            "script_server" | "scriptserver" => Ok(Role::ScriptServer),
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -171,6 +203,7 @@ impl std::fmt::Display for Role {
             Role::Router => write!(f, "router"),
             Role::AlertManager => write!(f, "alert_manager"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
+            Role::ScriptServer => write!(f, "script_server"),
         }
     }
 }

@@ -110,7 +110,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
         sql.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -375,6 +375,7 @@ pub async fn run_datafusion(
         .collect::<HashMap<_, _>>();
 
     // check inverted index prefix search
+    #[allow(deprecated)]
     if sql.stream_type == StreamType::Index
         && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
@@ -399,7 +400,7 @@ pub async fn run_datafusion(
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
-        sql.index_optimize_mode,
+        sql.index_optimize_mode.clone(),
         false, // for super cluster
         context,
     );
@@ -829,6 +830,7 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -854,7 +856,7 @@ async fn get_inverted_index_file_lists(
     )
     .await?;
     log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         sql.time_range,
         idx_file_list.len(),
         idx_scan_size,
@@ -886,6 +888,7 @@ pub async fn get_inverted_index_file_list(
     let terms = match_terms
         .iter()
         .filter_map(|t| {
+            #[allow(deprecated)]
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
             if tokens.is_empty() {
                 None
@@ -900,6 +903,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<HashSet<String>>();
 
+    #[allow(deprecated)]
     let fts_condition = terms
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
@@ -909,6 +913,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<Vec<_>>()
         .join(" OR ");
+    #[allow(deprecated)]
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -950,6 +955,7 @@ pub async fn get_inverted_index_file_list(
         }
     };
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()

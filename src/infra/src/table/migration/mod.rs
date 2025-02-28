@@ -33,6 +33,17 @@ mod m20241222_085135_search_job_partitions;
 mod m20241222_085148_search_job_results;
 mod m20250109_092400_recreate_tables_with_ksuids;
 mod m20250113_144600_create_unique_folder_name_idx;
+mod m20250121_120000_create_cipher_table;
+mod m20250122_000001_create_table_action_scripts;
+mod m20250124_000001_create_timed_annotations_table;
+mod m20250124_000002_create_timed_annotation_panels_table;
+mod m20250125_102300_create_destinations_table;
+mod m20250125_115400_create_templates_table;
+mod m20250125_132500_populate_templates_table;
+mod m20250125_133700_populate_destinations_table;
+mod m20250125_153005_delete_metas_destinations;
+mod m20250125_172300_delete_metas_templates;
+mod m20250213_000001_add_dashboard_updated_at;
 
 pub struct Migrator;
 
@@ -57,6 +68,17 @@ impl MigratorTrait for Migrator {
             Box::new(m20241222_085148_search_job_results::Migration),
             Box::new(m20250109_092400_recreate_tables_with_ksuids::Migration),
             Box::new(m20250113_144600_create_unique_folder_name_idx::Migration),
+            Box::new(m20250121_120000_create_cipher_table::Migration),
+            Box::new(m20250122_000001_create_table_action_scripts::Migration),
+            Box::new(m20250124_000001_create_timed_annotations_table::Migration),
+            Box::new(m20250124_000002_create_timed_annotation_panels_table::Migration),
+            Box::new(m20250125_115400_create_templates_table::Migration),
+            Box::new(m20250125_132500_populate_templates_table::Migration),
+            Box::new(m20250125_172300_delete_metas_templates::Migration),
+            Box::new(m20250125_102300_create_destinations_table::Migration),
+            Box::new(m20250125_133700_populate_destinations_table::Migration),
+            Box::new(m20250125_153005_delete_metas_destinations::Migration),
+            Box::new(m20250213_000001_add_dashboard_updated_at::Migration),
         ]
     }
 }

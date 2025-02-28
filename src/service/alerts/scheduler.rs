@@ -27,6 +27,7 @@ use config::{
             usage::{TriggerData, TriggerDataStatus, TriggerDataType},
         },
         stream::{StreamParams, StreamType},
+        triggers::ScheduledTriggerData,
     },
     utils::{
         json,
@@ -45,7 +46,7 @@ use crate::service::{
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
-    db::{self, scheduler::ScheduledTriggerData},
+    db,
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
@@ -74,8 +75,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     if !triggers.is_empty() {
         let mut grouped_triggers: std::collections::HashMap<
-            infra::scheduler::TriggerModule,
-            Vec<&infra::scheduler::Trigger>,
+            db::scheduler::TriggerModule,
+            Vec<&db::scheduler::Trigger>,
         > = HashMap::new();
 
         // Group triggers by module
@@ -224,6 +225,17 @@ async fn handle_alert_triggers(
         return Ok(());
     }
 
+    let trigger_data: Result<ScheduledTriggerData, json::Error> = json::from_str(&trigger.data);
+    let mut trigger_data = if let Ok(trigger_data) = trigger_data {
+        trigger_data
+    } else {
+        ScheduledTriggerData {
+            period_end_time: None,
+            tolerance: 0,
+            last_satisfied_at: None,
+        }
+    };
+
     if trigger.retries >= max_retries {
         // It has been tried the maximum time, just update the
         // next_run_at to the next expected trigger time
@@ -247,7 +259,9 @@ async fn handle_alert_triggers(
                 .num_microseconds()
                 .unwrap();
         }
-        new_trigger.data = "".to_string();
+        // Keep the last_satisfied_at field
+        trigger_data.reset();
+        new_trigger.data = json::to_string(&trigger_data).unwrap();
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
@@ -297,16 +311,6 @@ async fn handle_alert_triggers(
             (0, true)
         } else {
             (delay, false)
-        }
-    };
-
-    let trigger_data: Result<ScheduledTriggerData, json::Error> = json::from_str(&trigger.data);
-    let mut trigger_data = if let Ok(trigger_data) = trigger_data {
-        trigger_data
-    } else {
-        ScheduledTriggerData {
-            period_end_time: None,
-            tolerance: 0,
         }
     };
 
@@ -403,7 +407,8 @@ async fn handle_alert_triggers(
                     .num_microseconds()
                     .unwrap();
             }
-            new_trigger.data = "".to_string();
+            trigger_data.reset();
+            new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
             db::scheduler::update_trigger(new_trigger).await?;
         } else {
@@ -414,6 +419,7 @@ async fn handle_alert_triggers(
                 &new_trigger.module_key,
                 db::scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
+                None,
             )
             .await?;
         }
@@ -498,11 +504,10 @@ async fn handle_alert_triggers(
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
-    let last_satisfied_at = if ret.is_some() {
-        Some(triggered_at)
-    } else {
-        None
-    };
+    if ret.is_some() {
+        trigger_data.last_satisfied_at = Some(triggered_at);
+    }
+
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
@@ -585,13 +590,15 @@ async fn handle_alert_triggers(
                     trigger_data_stream.next_run_at = new_trigger.next_run_at;
                     db::scheduler::update_trigger(new_trigger).await?;
                 } else {
-                    // Otherwise update its status only
+                    let trigger_data = json::to_string(&trigger_data).unwrap();
+                    // Otherwise update its status and data only
                     db::scheduler::update_status(
                         &new_trigger.org,
                         new_trigger.module,
                         &new_trigger.module_key,
                         db::scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
+                        Some(&trigger_data),
                     )
                     .await?;
                     trigger_data_stream.next_run_at = now;
@@ -628,28 +635,6 @@ async fn handle_alert_triggers(
         };
         trigger_data_stream.end_time = end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
-    }
-
-    // Check if the alert has been disabled in the mean time
-    let mut old_alert =
-        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
-            Some(alert) => alert,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "alert not found: {}/{}/{}/{}",
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    alert_name
-                ));
-            }
-        };
-    old_alert.last_triggered_at = Some(triggered_at);
-    if let Some(last_satisfied_at) = last_satisfied_at {
-        old_alert.last_satisfied_at = Some(last_satisfied_at);
-    }
-    if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
-        log::error!("Failed to update alert: {alert_name} after trigger: {e}");
     }
 
     log::debug!(
@@ -816,6 +801,7 @@ async fn handle_report_triggers(
                     &new_trigger.module_key,
                     db::scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
+                    None,
                 )
                 .await?;
             }
@@ -1067,6 +1053,12 @@ async fn handle_derived_stream_triggers(
                     // Ingest result into destination stream
                     if ingestion_error_msg.is_none() {
                         for (dest_stream, records) in json_data_by_stream {
+                            // need to get the metadata from the destination node with the same
+                            // stream_params since this is a scheduled
+                            // pipeline, only the destination node can be of stream node.
+                            let request_metadata = pipeline
+                                .get_metadata_by_stream_params(&dest_stream)
+                                .map(|meta| cluster_rpc::IngestRequestMetadata { data: meta });
                             let (org_id, stream_name, stream_type): (String, String, String) = {
                                 (
                                     dest_stream.org_id.into(),
@@ -1080,6 +1072,7 @@ async fn handle_derived_stream_triggers(
                                 stream_type: stream_type.clone(),
                                 data: Some(cluster_rpc::IngestionData::from(records)),
                                 ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                                metadata: request_metadata,
                             };
                             match ingestion_service::ingest(req).await {
                                 Ok(resp) if resp.status_code == 200 => {
@@ -1158,6 +1151,7 @@ async fn handle_derived_stream_triggers(
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
                     period_end_time: Some(start_time), // updated start_time as end_time
                     tolerance: 0,
+                    last_satisfied_at: None,
                 })
                 .unwrap();
             }

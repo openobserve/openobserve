@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
     mysql::{MySqlConnectOptions, MySqlPoolOptions},
-    ConnectOptions, MySql, Pool,
+    MySql, Pool,
 };
 use tokio::sync::{mpsc, OnceCell};
 
@@ -38,8 +38,7 @@ static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 fn connect() -> Pool<MySql> {
     let cfg = config::get_config();
     let db_opts = MySqlConnectOptions::from_str(&cfg.common.meta_mysql_dsn)
-        .expect("mysql connect options create failed")
-        .disable_statement_logging();
+        .expect("mysql connect options create failed");
 
     let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);

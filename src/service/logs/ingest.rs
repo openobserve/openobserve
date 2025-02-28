@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,14 +22,13 @@ use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
@@ -193,12 +192,47 @@ pub async fn ingest(
         };
 
         if executable_pipeline.is_some() {
-            // buffer the records and originals for pipeline batch processing
+            // handle record's timestamp fist in case record is sent to remote destination
+            if let Err(e) = handle_timestamp(&mut item, min_ts) {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.as_str(),
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                    ])
+                    .inc();
+                log_failed_record(log_ingestion_errors, &item, &e.to_string());
+                continue;
+            };
+            // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
         } else {
             // JSON Flattening
             let mut res = flatten::flatten_with_level(item, cfg.limit.ingest_flatten_level)?;
+
+            // handle timestamp
+            let timestamp = match handle_timestamp(&mut res, min_ts) {
+                Ok(ts) => ts,
+                Err(e) => {
+                    stream_status.status.failed += 1;
+                    stream_status.status.error = e.to_string();
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(log_ingestion_errors, &res, &e.to_string());
+                    continue;
+                }
+            };
+
             // get json object
             let mut local_val = match res.take() {
                 json::Value::Object(val) => val,
@@ -226,25 +260,6 @@ pub async fn ingest(
                 );
             }
 
-            // handle timestamp
-            let timestamp = match handle_timestamp(&mut local_val, min_ts) {
-                Ok(ts) => ts,
-                Err(e) => {
-                    stream_status.status.failed += 1;
-                    stream_status.status.error = e.to_string();
-                    metrics::INGEST_ERRORS
-                        .with_label_values(&[
-                            org_id,
-                            StreamType::Logs.to_string().as_str(),
-                            &stream_name,
-                            TS_PARSE_FAILED,
-                        ])
-                        .inc();
-                    log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
-                    continue;
-                }
-            };
-
             let (ts_data, fn_num) = json_data_by_stream
                 .entry(stream_name.clone())
                 .or_insert_with(|| (Vec::new(), None));
@@ -269,7 +284,7 @@ pub async fn ingest(
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
-                        StreamType::Logs.to_string().as_str(),
+                        StreamType::Logs.as_str(),
                         &stream_name,
                         TRANSFORM_FAILED,
                     ])
@@ -314,23 +329,22 @@ pub async fn ingest(
                             );
                         }
 
-                        // handle timestamp
-                        let timestamp = match handle_timestamp(&mut local_val, min_ts) {
-                            Ok(ts) => ts,
-                            Err(e) => {
-                                stream_status.status.failed += 1;
-                                stream_status.status.error = e.to_string();
-                                metrics::INGEST_ERRORS
-                                    .with_label_values(&[
-                                        org_id,
-                                        StreamType::Logs.to_string().as_str(),
-                                        &stream_name,
-                                        TS_PARSE_FAILED,
-                                    ])
-                                    .inc();
-                                log_failed_record(log_ingestion_errors, &local_val, &e.to_string());
-                                continue;
-                            }
+                        let Some(timestamp) =
+                            local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
+                        else {
+                            let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
+                            stream_status.status.failed += 1;
+                            stream_status.status.error = err.to_string();
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(log_ingestion_errors, &local_val, err);
+                            continue;
                         };
 
                         let (ts_data, fn_num) = json_data_by_stream
@@ -392,7 +406,7 @@ pub async fn ingest(
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -401,7 +415,7 @@ pub async fn ingest(
             metric_rpt_status_code,
             org_id,
             &stream_name,
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .inc();
 
@@ -411,13 +425,11 @@ pub async fn ingest(
     ))
 }
 
-pub fn handle_timestamp(
-    local_val: &mut json::Map<String, json::Value>,
-    min_ts: i64,
-) -> Result<i64, anyhow::Error> {
-    let cfg = get_config();
-    // handle timestamp
-    let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+pub fn handle_timestamp(value: &mut json::Value, min_ts: i64) -> Result<i64, anyhow::Error> {
+    let local_val = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
+    let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
             Ok(t) => t,
             Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
@@ -429,7 +441,7 @@ pub fn handle_timestamp(
         return Err(get_upto_discard_error());
     }
     local_val.insert(
-        cfg.common.column_timestamp.clone(),
+        TIMESTAMP_COL_NAME.to_string(),
         json::Value::Number(timestamp.into()),
     );
     Ok(timestamp)
@@ -634,10 +646,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                         local_val.insert("message".to_owned(), local_msg.into());
                     }
 
-                    local_val.insert(
-                        get_config().common.column_timestamp.clone(),
-                        event.timestamp.into(),
-                    );
+                    local_val.insert(TIMESTAMP_COL_NAME.to_string(), event.timestamp.into());
 
                     value = local_val.clone().into();
                     events.push(value);
@@ -675,10 +684,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     .insert("metric_dimensions".to_owned(), metric_dimensions.into());
                 local_parsed_metric_value.remove("dimensions");
 
-                local_parsed_metric_value.insert(
-                    get_config().common.column_timestamp.clone(),
-                    timestamp.into(),
-                );
+                local_parsed_metric_value.insert(TIMESTAMP_COL_NAME.to_string(), timestamp.into());
                 local_parsed_metric_value.remove("timestamp");
 
                 value = local_parsed_metric_value.clone().into();
@@ -782,7 +788,7 @@ fn construct_values_from_open_telemetry_v1_metric(
                         "region": resource_attributes.get("cloud.region").unwrap(),
                         "namespace": summary_attributes.get("Namespace").unwrap(),
                         "metric_name": summary_attributes.get("MetricName").unwrap(),
-                        get_config().common.column_timestamp.clone(): std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
+                        TIMESTAMP_COL_NAME: std::time::Duration::from_nanos(i_sum.time_unix_nano).as_millis(),
                         "unit": m.unit,
                         "count": i_sum.count,
                         "sum": i_sum.sum,

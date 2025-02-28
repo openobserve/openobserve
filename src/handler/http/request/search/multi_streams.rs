@@ -21,18 +21,20 @@ use config::{
     get_config,
     meta::{
         function::VRLResultResolver,
-        search,
-        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
     metrics,
     utils::{base64, json},
+    TIMESTAMP_COL_NAME,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::sql::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -45,10 +47,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    service::{
-        search::{self as SearchService, RESULT_ARRAY},
-        self_reporting::report_request_usage_stats,
-    },
+    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData
@@ -226,7 +225,7 @@ pub async fn search_multi(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+            use o2_openfga::meta::mapping::OFGA_MODELS;
 
             use crate::common::{
                 infra::config::USERS,
@@ -236,7 +235,7 @@ pub async fn search_multi(
             if !is_root_user(user_id) {
                 let user: meta::user::User =
                     USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
-                let stream_type_str = stream_type.to_string();
+                let stream_type_str = stream_type.as_str();
 
                 if !crate::handler::http::auth::validator::check_permissions(
                     user_id,
@@ -246,8 +245,8 @@ pub async fn search_multi(
                         o2_type: format!(
                             "{}:{}",
                             OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
+                                .get(stream_type_str)
+                                .map_or(stream_type_str, |model| model.key),
                             stream_name
                         ),
                         org_id: org_id.clone(),
@@ -262,7 +261,54 @@ pub async fn search_multi(
                     return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
                 }
             }
+
+            let keys_used = match get_cipher_key_names(&req.query.sql) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            e.to_string(),
+                        ),
+                    ));
+                }
+            };
+            if !keys_used.is_empty() {
+                log::info!("keys used : {:?}", keys_used);
+            }
             // Check permissions on stream ends
+            // Check permissions on keys
+            for key in keys_used {
+                if !is_root_user(user_id) {
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+
+                    if !crate::handler::http::auth::validator::check_permissions(
+                        user_id,
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get("cipher_keys")
+                                    .map_or("cipher_keys", |model| model.key),
+                                key
+                            ),
+                            org_id: org_id.clone(),
+                            bypass_check: false,
+                            parent_id: "".to_string(),
+                        },
+                        user.role,
+                        user.is_external,
+                    )
+                    .await
+                    {
+                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                    }
+                    // Check permissions on key ends
+                }
+            }
         }
 
         if !per_query_resp {
@@ -320,7 +366,7 @@ pub async fn search_multi(
                         "200",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -329,7 +375,7 @@ pub async fn search_multi(
                         "200",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 res.set_trace_id(trace_id);
@@ -414,7 +460,7 @@ pub async fn search_multi(
                         "500",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -423,7 +469,7 @@ pub async fn search_multi(
                         "500",
                         &org_id,
                         "",
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
 
@@ -448,9 +494,11 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+            input_fn = SearchService::RESULT_ARRAY
+                .replace(&input_fn, "")
+                .to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -539,7 +587,7 @@ pub async fn search_multi(
         };
     }
 
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -682,7 +730,7 @@ pub async fn _search_partition_multi(
                     "200",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -691,7 +739,7 @@ pub async fn _search_partition_multi(
                     "200",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             Ok(HttpResponse::Ok().json(res))
@@ -704,7 +752,7 @@ pub async fn _search_partition_multi(
                     "500",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .observe(time);
             metrics::HTTP_INCOMING_REQUESTS
@@ -713,7 +761,7 @@ pub async fn _search_partition_multi(
                     "500",
                     &org_id,
                     "",
-                    stream_type.to_string().as_str(),
+                    stream_type.as_str(),
                 ])
                 .inc();
             log::error!("search error: {:?}", err);
@@ -907,19 +955,21 @@ pub async fn around_multi(
             .dec();
 
         // search forward
+        let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, false)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: fw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_start_time,
                 end_time: around_key,
-                sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -947,7 +997,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -956,7 +1006,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
@@ -983,19 +1033,21 @@ pub async fn around_multi(
         };
 
         // search backward
+        let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, true)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: bw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_key,
                 end_time: around_end_time,
-                sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -1023,7 +1075,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .observe(time);
                 metrics::HTTP_INCOMING_REQUESTS
@@ -1032,7 +1084,7 @@ pub async fn around_multi(
                         "500",
                         &org_id,
                         &stream_names,
-                        stream_type.to_string().as_str(),
+                        stream_type.as_str(),
                     ])
                     .inc();
                 log::error!("multi search around error: {:?}", err);
@@ -1082,7 +1134,7 @@ pub async fn around_multi(
                 "200",
                 &org_id,
                 &stream_names,
-                stream_type.to_string().as_str(),
+                stream_type.as_str(),
             ])
             .observe(time);
         metrics::HTTP_INCOMING_REQUESTS
@@ -1091,7 +1143,7 @@ pub async fn around_multi(
                 "200",
                 &org_id,
                 &stream_names,
-                stream_type.to_string().as_str(),
+                stream_type.as_str(),
             ])
             .inc();
 

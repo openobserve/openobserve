@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,7 @@ pub async fn search(
     if schema_versions.is_empty() {
         return Ok((vec![], ScanStats::new()));
     }
-    let schema_latest_id = schema_versions.len() - 1;
+    let latest_schema_id = schema_versions.len() - 1;
 
     // get file list
     let mut files = file_list.to_vec();
@@ -123,6 +123,7 @@ pub async fn search(
 
     // check inverted index
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
     if use_inverted_index {
@@ -179,7 +180,7 @@ pub async fn search(
                 )));
             }
         };
-        files_group.insert(schema_latest_id, files);
+        files_group.insert(latest_schema_id, files);
     } else {
         scan_stats.files = files.len() as i64;
         for file in files.iter() {
@@ -203,7 +204,7 @@ pub async fn search(
                         file.meta.max_ts
                     );
                     // HACK: use the latest version if not found in schema versions
-                    schema_latest_id
+                    latest_schema_id
                 }
             };
             let group = files_group.entry(schema_ver_id).or_default();
@@ -228,24 +229,24 @@ pub async fn search(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, deleted_files) = cache_files(
+    let cache_type = cache_files(
         &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &mut scan_stats,
+        "parquet",
     )
     .instrument(enter_span.clone())
     .await?;
-    if !deleted_files.is_empty() {
-        // remove deleted files from files_group
-        for (_, g_files) in files_group.iter_mut() {
-            g_files.retain(|f| !deleted_files.contains(&f.key));
-        }
-    }
 
     scan_stats.idx_took = idx_took as i64;
     scan_stats.querier_files = scan_stats.files;
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!("downloading others into {:?} in background,", cache_type)
+    };
     log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
+        "[trace_id {}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -253,7 +254,6 @@ pub async fn search(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        cache_type,
         cache_start.elapsed().as_millis()
     );
 
@@ -265,15 +265,15 @@ pub async fn search(
     };
 
     // construct latest schema map
-    let schema_latest = Arc::new(
+    let latest_schema = Arc::new(
         schema
             .as_ref()
             .clone()
             .with_metadata(std::collections::HashMap::new()),
     );
-    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
-    for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field);
+    let mut latest_schema_map = HashMap::with_capacity(latest_schema.fields().len());
+    for field in latest_schema.fields() {
+        latest_schema_map.insert(field.name(), field);
     }
 
     let mut tables = Vec::new();
@@ -294,10 +294,10 @@ pub async fn search(
             target_partitions,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map);
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         let table = exec::create_parquet_table(
             &session,
-            schema_latest.clone(),
+            latest_schema.clone(),
             &files,
             diff_fields,
             sorted_by_time,
@@ -317,7 +317,23 @@ async fn cache_files(
     trace_id: &str,
     files: &[&str],
     scan_stats: &mut ScanStats,
-) -> Result<(file_data::CacheType, Vec<String>), Error> {
+    file_type: &str,
+) -> Result<file_data::CacheType, Error> {
+    // check how many files already cached
+    for file in files.iter() {
+        if file_data::memory::exist(file).await {
+            scan_stats.querier_memory_cached_files += 1;
+        } else if file_data::disk::exist(file).await {
+            scan_stats.querier_disk_cached_files += 1;
+        }
+    }
+    let files_num = files.len() as i64;
+    if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
+        // all files are cached
+        return Ok(file_data::CacheType::None);
+    }
+
+    // check cache size
     let cfg = get_config();
     let cache_type = if cfg.memory_cache.enabled
         && scan_stats.compressed_size < cfg.memory_cache.skip_size as i64
@@ -331,91 +347,110 @@ async fn cache_files(
         // if scan_compressed_size < ZO_DISK_CACHE_SKIP_SIZE, use disk cache
         file_data::CacheType::Disk
     } else {
-        // no cache
-        return Ok((file_data::CacheType::None, vec![]));
+        // no cache, the files are too big than cache size
+        return Ok(file_data::CacheType::None);
     };
 
+    let trace_id = trace_id.to_string();
+    let files = files.iter().map(|f| f.to_string()).collect_vec();
+    let file_type = file_type.to_string();
+    tokio::spawn(async move {
+        let start = std::time::Instant::now();
+        let files = files.iter().map(|f| f.as_str()).collect_vec();
+        match cache_files_inner(&trace_id, &files, cache_type).await {
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] search->storage: cache {} files in background error: {:?}",
+                    trace_id,
+                    file_type,
+                    e
+                );
+            }
+            Ok(cache_type) => {
+                log::info!(
+                    "[trace_id {}] search->storage: cache {} files in background into {:?} cache done, downloaded {} files, took: {} ms",
+                    trace_id,
+                    file_type,
+                    cache_type,
+                    files.len(),
+                    start.elapsed().as_millis()
+                );
+            }
+        }
+    });
+
+    // if cached file less than 50% of the total files, return None
+    if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
+    {
+        Ok(file_data::CacheType::None)
+    } else {
+        Ok(cache_type)
+    }
+}
+
+#[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
+async fn cache_files_inner(
+    trace_id: &str,
+    files: &[&str],
+    cache_type: file_data::CacheType,
+) -> Result<file_data::CacheType, Error> {
+    let cfg = get_config();
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     for file in files.iter() {
         let trace_id = trace_id.to_string();
         let file_name = file.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> =
-            tokio::task::spawn(async move {
-                let cfg = get_config();
-                let ret = match cache_type {
-                    file_data::CacheType::Memory => {
-                        let mut disk_exists = false;
-                        let mem_exists = file_data::memory::exist(&file_name).await;
-                        if !mem_exists && !cfg.memory_cache.skip_disk_check {
-                            // when skip_disk_check = false, need to check disk cache
-                            disk_exists = file_data::disk::exist(&file_name).await;
-                        }
-                        if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                            (
-                                file_data::memory::download(&trace_id, &file_name)
-                                    .await
-                                    .err(),
-                                false,
-                                false,
-                            )
-                        } else {
-                            (None, mem_exists, disk_exists)
-                        }
+        let task: tokio::task::JoinHandle<()> = tokio::task::spawn(async move {
+            let cfg = get_config();
+            let ret = match cache_type {
+                file_data::CacheType::Memory => {
+                    let mut disk_exists = false;
+                    let mem_exists = file_data::memory::exist(&file_name).await;
+                    if !mem_exists && !cfg.memory_cache.skip_disk_check {
+                        // when skip_disk_check = false, need to check disk cache
+                        disk_exists = file_data::disk::exist(&file_name).await;
                     }
-                    file_data::CacheType::Disk => {
-                        if !file_data::disk::exist(&file_name).await {
-                            (
-                                file_data::disk::download(&trace_id, &file_name).await.err(),
-                                false,
-                                false,
-                            )
-                        } else {
-                            (None, false, true)
-                        }
+                    if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
+                        file_data::memory::download(&trace_id, &file_name)
+                            .await
+                            .err()
+                    } else {
+                        None
                     }
-                    _ => (None, false, false),
-                };
-                // return file_name if download failed
-                let file_name = if let Some(e) = ret.0 {
-                    log::warn!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}",
-                        e
+                }
+                file_data::CacheType::Disk => {
+                    if !file_data::disk::exist(&file_name).await {
+                        file_data::disk::download(&trace_id, &file_name).await.err()
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            // return file_name if download failed
+            if let Some(e) = ret {
+                log::warn!(
+                        "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
+                        e,
+                        file_name
                     );
-                    Some(file_name)
-                } else {
-                    None
-                };
-                drop(permit);
-                (file_name, ret.1, ret.2)
-            });
+            }
+            drop(permit);
+        });
         tasks.push(task);
     }
 
-    let mut delete_files = Vec::new();
     for task in tasks {
-        match task.await {
-            Ok((file, mem_exists, disk_exists)) => {
-                if mem_exists {
-                    scan_stats.querier_memory_cached_files += 1;
-                } else if disk_exists {
-                    scan_stats.querier_disk_cached_files += 1;
-                }
-                if let Some(file) = file {
-                    delete_files.push(file);
-                }
-            }
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] search->storage: load file task err: {}",
-                    e
-                );
-            }
+        if let Err(e) = task.await {
+            log::error!(
+                "[trace_id {trace_id}] search->storage: load file task err: {}",
+                e
+            );
         }
     }
 
-    Ok((cache_type, delete_files))
+    Ok(cache_type)
 }
 
 /// Filter file list using inverted index
@@ -452,18 +487,24 @@ pub async fn filter_file_list_by_tantivy_index(
         })
         .collect_vec();
     scan_stats.querier_files = index_file_names.len() as i64;
-    let (cache_type, _) = cache_files(
+    let cache_type = cache_files(
         &query.trace_id,
         &index_file_names
             .iter()
             .map(|(ttv_file, _)| ttv_file.as_str())
             .collect_vec(),
         &mut scan_stats,
+        "index",
     )
     .await?;
 
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!("downloading others into {:?} in background,", cache_type)
+    };
     log::info!(
-        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done, took: {} ms",
+        "[trace_id {}] search->tantivy: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, {download_msg} took: {} ms",
         query.trace_id,
         query.org_id,
         query.stream_type,
@@ -471,10 +512,17 @@ pub async fn filter_file_list_by_tantivy_index(
         scan_stats.querier_files,
         scan_stats.querier_memory_cached_files,
         scan_stats.querier_disk_cached_files,
-        cache_type,
         start.elapsed().as_millis()
     );
 
+    // set target partitions based on cache type
+    let target_partitions = if cache_type == file_data::CacheType::None {
+        cfg.limit.query_thread_num
+    } else {
+        cfg.limit.cpu_num
+    };
+
+    let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
@@ -482,7 +530,7 @@ pub async fn filter_file_list_by_tantivy_index(
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
                 (
-                    group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num),
+                    group_files_by_time_range(index_parquet_files, target_partitions),
                     limit,
                 )
             } else {
@@ -526,7 +574,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
+        let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
         for i in 0..group_num {
             let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
                 if g.is_empty() {
@@ -541,13 +589,14 @@ pub async fn filter_file_list_by_tantivy_index(
             // Spawn a task for each file, wherein full text search and
             // secondary index search queries are executed
             let index_condition_clone = index_condition.clone();
+            let idx_optimize_rule_clone = idx_optimize_rule.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
                     index_condition_clone,
-                    idx_optimize_rule,
+                    idx_optimize_rule_clone,
                     &file,
                 )
                 .await;
@@ -590,11 +639,21 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: no match found in index for file {}",
-                            query.trace_id,
-                            file_name
-                        );
+                        if hits_in_file > 0 {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                hits_in_file,
+                                file_name
+                            );
+                        } else {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: no match found in index for file {}",
+                                query.trace_id,
+                                file_name
+                            );
+                        }
                         file_list_map.remove(&file_name);
                     }
                 }
@@ -616,12 +675,13 @@ pub async fn filter_file_list_by_tantivy_index(
     }
 
     log::info!(
-        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}",
+        "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, is_add_filter_back: {}, file_num: {}, took: {} ms",
         query.trace_id,
         index_condition,
         total_hits,
         is_add_filter_back,
-        file_list_map.len()
+        file_list_map.len(),
+        search_start.elapsed().as_millis()
     );
     file_list.extend(file_list_map.into_values());
     Ok((
@@ -752,8 +812,9 @@ async fn search_tantivy_index(
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+    let idx_optimize_rule_clone = idx_optimize_rule.clone();
     let matched_docs =
-        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
+        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
             (false, _) | (true, None) => tantivy_searcher
                 .search(&query, &tantivy::collector::DocSetCollector)
                 .map(|ret| (ret, 0)),

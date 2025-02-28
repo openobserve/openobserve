@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 
 use super::{ingestion_log_enabled, log_failed_record};
@@ -226,6 +226,61 @@ pub async fn ingest(
                 .unwrap()
                 .is_some()
             {
+                let Some(local_val) = value.as_object_mut() else {
+                    bulk_res.errors = true;
+                    metrics::INGEST_ERRORS
+                        .with_label_values(&[
+                            org_id,
+                            StreamType::Logs.as_str(),
+                            &stream_name,
+                            TS_PARSE_FAILED,
+                        ])
+                        .inc();
+                    log_failed_record(log_ingestion_errors, &value, TS_PARSE_FAILED);
+                    add_record_status(
+                        stream_name.clone(),
+                        &doc_id,
+                        action.clone(),
+                        Some(value),
+                        &mut bulk_res,
+                        Some(TS_PARSE_FAILED.to_string()),
+                        Some(TS_PARSE_FAILED.to_string()),
+                    );
+                    continue;
+                };
+                let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
+                    Some(v) => match parse_timestamp_micro_from_value(v) {
+                        Ok(t) => t,
+                        Err(_e) => {
+                            bulk_res.errors = true;
+                            metrics::INGEST_ERRORS
+                                .with_label_values(&[
+                                    org_id,
+                                    StreamType::Logs.as_str(),
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                ])
+                                .inc();
+                            log_failed_record(log_ingestion_errors, &local_val, TS_PARSE_FAILED);
+                            add_record_status(
+                                stream_name.clone(),
+                                &doc_id,
+                                action.clone(),
+                                Some(value),
+                                &mut bulk_res,
+                                Some(TS_PARSE_FAILED.to_string()),
+                                Some(TS_PARSE_FAILED.to_string()),
+                            );
+                            continue;
+                        }
+                    },
+                    None => Utc::now().timestamp_micros(),
+                };
+                local_val.insert(
+                    TIMESTAMP_COL_NAME.to_string(),
+                    json::Value::Number(timestamp.into()),
+                );
+
                 // current stream has pipeline. buff the record for batch processing later
                 let inputs = stream_pipeline_inputs
                     .entry(stream_name.clone())
@@ -278,7 +333,7 @@ pub async fn ingest(
 
                 let _handle_timestamp_start = std::time::Instant::now();
                 // handle timestamp
-                let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+                let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
                     Some(v) => match parse_timestamp_micro_from_value(v) {
                         Ok(t) => t,
                         Err(_e) => {
@@ -286,7 +341,7 @@ pub async fn ingest(
                             metrics::INGEST_ERRORS
                                 .with_label_values(&[
                                     org_id,
-                                    StreamType::Logs.to_string().as_str(),
+                                    StreamType::Logs.as_str(),
                                     &stream_name,
                                     TS_PARSE_FAILED,
                                 ])
@@ -314,7 +369,7 @@ pub async fn ingest(
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
-                            StreamType::Logs.to_string().as_str(),
+                            StreamType::Logs.as_str(),
                             &stream_name,
                             TS_PARSE_FAILED,
                         ])
@@ -332,7 +387,7 @@ pub async fn ingest(
                     continue;
                 }
                 local_val.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
                 handle_timestamp_time += _handle_timestamp_start.elapsed().as_millis();
@@ -369,7 +424,7 @@ pub async fn ingest(
                     metrics::INGEST_ERRORS
                         .with_label_values(&[
                             org_id,
-                            StreamType::Logs.to_string().as_str(),
+                            StreamType::Logs.as_str(),
                             &stream_name,
                             TRANSFORM_FAILED,
                         ])
@@ -433,38 +488,33 @@ pub async fn ingest(
                                 );
                             }
 
-                            // handle timestamp
-                            let timestamp = match local_val.get(&cfg.common.column_timestamp) {
-                                Some(v) => match parse_timestamp_micro_from_value(v) {
-                                    Ok(t) => t,
-                                    Err(_e) => {
-                                        bulk_res.errors = true;
-                                        metrics::INGEST_ERRORS
-                                            .with_label_values(&[
-                                                org_id,
-                                                StreamType::Logs.to_string().as_str(),
-                                                &stream_name,
-                                                TS_PARSE_FAILED,
-                                            ])
-                                            .inc();
-                                        log_failed_record(
-                                            log_ingestion_errors,
-                                            &local_val,
-                                            TS_PARSE_FAILED,
-                                        );
-                                        add_record_status(
-                                            stream_params.stream_name.to_string(),
-                                            &doc_ids[idx],
-                                            action.clone(),
-                                            Some(res),
-                                            &mut bulk_res,
-                                            Some(TS_PARSE_FAILED.to_string()),
-                                            Some(TS_PARSE_FAILED.to_string()),
-                                        );
-                                        continue;
-                                    }
-                                },
-                                None => Utc::now().timestamp_micros(),
+                            let Some(timestamp) =
+                                local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
+                            else {
+                                bulk_res.errors = true;
+                                metrics::INGEST_ERRORS
+                                    .with_label_values(&[
+                                        org_id,
+                                        StreamType::Logs.as_str(),
+                                        &stream_name,
+                                        TS_PARSE_FAILED,
+                                    ])
+                                    .inc();
+                                log_failed_record(
+                                    log_ingestion_errors,
+                                    &local_val,
+                                    TS_PARSE_FAILED,
+                                );
+                                add_record_status(
+                                    stream_params.stream_name.to_string(),
+                                    &doc_ids[idx],
+                                    action.clone(),
+                                    Some(res),
+                                    &mut bulk_res,
+                                    Some(TS_PARSE_FAILED.to_string()),
+                                    Some(TS_PARSE_FAILED.to_string()),
+                                );
+                                continue;
                             };
 
                             // check ingestion time
@@ -474,7 +524,7 @@ pub async fn ingest(
                                 metrics::INGEST_ERRORS
                                     .with_label_values(&[
                                         org_id,
-                                        StreamType::Logs.to_string().as_str(),
+                                        StreamType::Logs.as_str(),
                                         &stream_name,
                                         TS_PARSE_FAILED,
                                     ])
@@ -493,7 +543,7 @@ pub async fn ingest(
                                 continue;
                             }
                             local_val.insert(
-                                cfg.common.column_timestamp.clone(),
+                                TIMESTAMP_COL_NAME.to_string(),
                                 json::Value::Number(timestamp.into()),
                             );
 
@@ -555,7 +605,7 @@ pub async fn ingest(
             metric_rpt_status_code,
             org_id,
             "",
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
@@ -564,7 +614,7 @@ pub async fn ingest(
             metric_rpt_status_code,
             org_id,
             "",
-            StreamType::Logs.to_string().as_str(),
+            StreamType::Logs.as_str(),
         ])
         .inc();
 

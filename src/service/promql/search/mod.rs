@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -104,7 +104,7 @@ async fn search_in_cluster(
     log::info!(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
-        req.no_cache,
+        cache_disabled,
         start,end,step,query,
     );
 
@@ -261,12 +261,12 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
                     &node.get_grpc_addr(),
                     req_need_wal,
-                    response.took,
                     scan_stats.files,
                     scan_stats.original_size,
+                    response.took,
                 );
                 Ok(response)
             }
@@ -307,6 +307,12 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
+    // with cache maybe we only get the last point from original data, then the result_type will
+    // return as vector, but if the query is range query, the result_type should be matrix
+    if result_type == "vector" && original_start != end {
+        result_type = "matrix".to_string();
+    }
+
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
@@ -320,10 +326,10 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
-        op_start.elapsed().as_millis(),
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
+        op_start.elapsed().as_millis(),
     );
 
     let req_stats = RequestStats {
@@ -395,7 +401,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
                 .collect::<Vec<_>>();
             samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             (
-                sig.clone(),
+                sig,
                 RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples),
             )
         })
@@ -411,16 +417,18 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
     let mut merged_data = HashMap::new();
-    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::new();
+    let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric
             .iter()
             .map(|l| Arc::new(Label::from(l)))
             .collect();
-        let sample: Sample = ser.sample.as_ref().unwrap().into();
-        merged_data.insert(signature(&labels), sample);
-        merged_metrics.insert(signature(&labels), labels);
+        if let Some(sample) = ser.sample.as_ref() {
+            let sample: Sample = sample.into();
+            merged_data.insert(signature(&labels), sample);
+            merged_metrics.insert(signature(&labels), labels);
+        }
     }
     let merged_data = merged_data
         .into_iter()
@@ -472,9 +480,9 @@ fn merge_exemplars_query(series: &[cluster_rpc::Series]) -> Value {
     let merged_data = merged_data
         .into_iter()
         .map(|(sig, exemplars)| {
-            let mut exemplars: Vec<Exemplar> = exemplars
+            let mut exemplars: Vec<Arc<Exemplar>> = exemplars
                 .into_iter()
-                .map(|(_ts, v)| v.into())
+                .map(|(_ts, v)| Arc::new(v.into()))
                 .collect::<Vec<_>>();
             exemplars.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             RangeValue::new_with_exemplars(merged_metrics.get(&sig).unwrap().to_owned(), exemplars)

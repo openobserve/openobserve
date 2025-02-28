@@ -16,7 +16,7 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
@@ -28,6 +28,8 @@ use crate::{
 };
 
 mod alert_manager;
+#[cfg(feature = "enterprise")]
+mod cipher;
 mod compactor;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -93,7 +95,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { promql_self_consume::run().await });
     // Router doesn't need to initialize job
-    if LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
     }
 
@@ -126,10 +128,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::ofga::watch().await });
 
     #[cfg(feature = "enterprise")]
-    if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
         tokio::task::spawn(async move { db::session::watch().await });
     }
-    if !LOCAL_NODE.is_compactor() && !LOCAL_NODE.is_router() {
+    if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
         tokio::task::spawn(async move { db::enrichment_table::watch().await });
     }
 
@@ -203,13 +205,23 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });
+    // start pipeline data retention
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::pipeline::pipeline_job::run().await },
+    );
 
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::openfga::authorizer::authz::init_open_fga().await;
+    o2_openfga::authorizer::authz::init_open_fga().await;
+
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { cipher::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::keys::watch().await });
 
     // RBAC model
     #[cfg(feature = "enterprise")]
-    if get_o2_config().openfga.enabled {
+    if get_openfga_config().enabled {
         if let Err(e) = crate::common::infra::ofga::init().await {
             log::error!("OFGA init failed: {}", e);
         }

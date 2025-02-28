@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,6 @@
 
 use config::{meta::stream::StreamParams, utils::schema::format_stream_name};
 use infra::errors::Result;
-
 pub mod alerts;
 pub mod circuit_breaker;
 pub mod compact;

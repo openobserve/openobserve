@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ use config::{
     get_config,
     meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
+    TIMESTAMP_COL_NAME,
 };
 use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
@@ -64,11 +65,7 @@ pub struct TraceListItem {
 impl Metadata for TraceListIndex {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("stream_name", DataType::Utf8, false),
             Field::new("service_name", DataType::Utf8, false),
             Field::new("trace_id", DataType::Utf8, false),
@@ -122,7 +119,7 @@ impl Metadata for TraceListIndex {
         }
 
         let writer =
-            ingester::get_writer(0, org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
+            ingester::get_writer(0, org_id, StreamType::Metadata.as_str(), STREAM_NAME).await;
         _ = ingestion::write_file(
             &writer,
             STREAM_NAME,
@@ -133,13 +130,13 @@ impl Metadata for TraceListIndex {
 
         #[cfg(feature = "enterprise")]
         {
-            use o2_enterprise::enterprise::{
-                common::infra::config::get_config as get_o2_config,
-                openfga::authorizer::authz::set_ownership_if_not_exists,
+            use o2_openfga::{
+                authorizer::authz::set_ownership_if_not_exists,
+                config::get_config as get_openfga_config,
             };
 
             // set ownership only in the first time
-            if _is_new && get_o2_config().openfga.enabled {
+            if _is_new && get_openfga_config().enabled {
                 set_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
@@ -272,7 +269,7 @@ mod tests {
         let mut data = json::to_value(item).unwrap();
         let data = data.as_object_mut().unwrap();
         data.insert(
-            config::get_config().common.column_timestamp.clone(),
+            config::TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
         let hour_key = ingestion::get_write_partition_key(
@@ -294,13 +291,9 @@ mod tests {
         hour_buf.records.push(Arc::new(data));
         hour_buf.records_size += data_size;
 
-        let writer = ingester::get_writer(
-            0,
-            "openobserve",
-            &StreamType::Metadata.to_string(),
-            STREAM_NAME,
-        )
-        .await;
+        let writer =
+            ingester::get_writer(0, "openobserve", StreamType::Metadata.as_str(), STREAM_NAME)
+                .await;
         for (key, val) in buf.iter() {
             println!(
                 "key: {key} val: {:?} schema: {}, records_size: {}, records: {:?}",

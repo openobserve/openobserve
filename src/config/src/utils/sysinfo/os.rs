@@ -13,25 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+pub fn get_os_name() -> String {
+    sysinfo::System::name().unwrap_or("unknown".to_string())
+}
 
-use super::destinations::DestinationType;
+pub fn get_os_version() -> String {
+    sysinfo::System::os_version().unwrap_or("unknown".to_string())
+}
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct Template {
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub body: String,
-    #[serde(rename = "isDefault")]
-    #[serde(default)]
-    pub is_default: Option<bool>,
-    /// Indicates whether the body is
-    /// http or email body
-    #[serde(rename = "type")]
-    #[serde(default)]
-    pub template_type: DestinationType,
-    #[serde(default)]
-    pub title: String,
+pub fn get_hostname() -> String {
+    sysinfo::System::host_name().unwrap_or("unknown".to_string())
 }

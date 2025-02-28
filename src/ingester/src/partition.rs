@@ -142,8 +142,23 @@ impl Partition {
             if data.data.is_empty() {
                 continue;
             }
-            let chunk = data.data.chunks(2000);
-            for data in chunk.into_iter() {
+            let mut chunks = Vec::new();
+            let mut cur_batches = Vec::new();
+            let mut cur_num_rows = 0;
+            for data in data.data.iter() {
+                let num_rows = data.data.num_rows();
+                if cur_num_rows > 0 && cur_num_rows + num_rows > config::PARQUET_FILE_CHUNK_SIZE {
+                    chunks.push(std::mem::take(&mut cur_batches));
+                    cur_num_rows = 0;
+                } else {
+                    cur_num_rows += num_rows;
+                    cur_batches.push(data);
+                }
+            }
+            if !cur_batches.is_empty() {
+                chunks.push(std::mem::take(&mut cur_batches));
+            }
+            for data in chunks {
                 let mut file_meta = FileMeta::default();
                 data.iter().for_each(|r| {
                     file_meta.original_size += r.data_json_size as i64;
@@ -182,8 +197,13 @@ impl Partition {
                         .context(MergeRecordBatchSnafu)?;
 
                 let mut buf_parquet = Vec::new();
-                let mut writer =
-                    new_parquet_writer(&mut buf_parquet, &schema, &bloom_filter_fields, &file_meta);
+                let mut writer = new_parquet_writer(
+                    &mut buf_parquet,
+                    &schema,
+                    &bloom_filter_fields,
+                    &file_meta,
+                    true,
+                );
 
                 writer
                     .write(&batches)

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -79,6 +79,13 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date_range: Option<(String, String)>,
+    ) -> Result<Vec<(String, FileMeta)>>;
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
     async fn query_ids(
         &self,
@@ -116,6 +123,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
         pk_value: Option<(i64, i64)>,
+        deleted: bool,
     ) -> Result<Vec<(String, StreamStats)>>;
     async fn get_stream_stats(
         &self,
@@ -129,8 +137,12 @@ pub trait FileList: Sync + Send + 'static {
         stream_type: StreamType,
         stream_name: &str,
     ) -> Result<()>;
-    async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-        -> Result<()>;
+    async fn set_stream_stats(
+        &self,
+        org_id: &str,
+        streams: &[(String, StreamStats)],
+        pk_value: Option<(i64, i64)>,
+    ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,
@@ -152,7 +164,7 @@ pub trait FileList: Sync + Send + 'static {
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
-    async fn set_job_done(&self, id: i64) -> Result<()>;
+    async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
     async fn clean_done_jobs(&self, before_date: i64) -> Result<()>;
@@ -254,6 +266,19 @@ pub async fn query(
 }
 
 #[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_by_date")]
+pub async fn query_by_date(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: Option<(String, String)>,
+) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT
+        .query_by_date(org_id, stream_type, stream_name, date_range)
+        .await
+}
+
+#[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
 pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
     CLIENT.query_by_ids(ids).await
@@ -317,9 +342,10 @@ pub async fn stats(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
     pk_value: Option<(i64, i64)>,
+    deleted: bool,
 ) -> Result<Vec<(String, StreamStats)>> {
     CLIENT
-        .stats(org_id, stream_type, stream_name, pk_value)
+        .stats(org_id, stream_type, stream_name, pk_value, deleted)
         .await
 }
 
@@ -346,8 +372,12 @@ pub async fn del_stream_stats(
 }
 
 #[inline]
-pub async fn set_stream_stats(org_id: &str, streams: &[(String, StreamStats)]) -> Result<()> {
-    CLIENT.set_stream_stats(org_id, streams).await
+pub async fn set_stream_stats(
+    org_id: &str,
+    streams: &[(String, StreamStats)],
+    pk_value: Option<(i64, i64)>,
+) -> Result<()> {
+    CLIENT.set_stream_stats(org_id, streams, pk_value).await
 }
 
 #[inline]
@@ -403,8 +433,8 @@ pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
 }
 
 #[inline]
-pub async fn set_job_done(id: i64) -> Result<()> {
-    CLIENT.set_job_done(id).await
+pub async fn set_job_done(ids: &[i64]) -> Result<()> {
+    CLIENT.set_job_done(ids).await
 }
 
 #[inline]
@@ -425,7 +455,7 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = config::get_config();
-        if cfg.common.local_mode || !cfg.common.meta_store_external {
+        if cfg.common.local_mode {
             return;
         }
 
@@ -565,4 +595,6 @@ pub struct FileId {
     pub id: i64,
     pub records: i64,
     pub original_size: i64,
+    #[sqlx(default)]
+    pub deleted: bool,
 }

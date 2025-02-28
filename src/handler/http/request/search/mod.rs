@@ -28,13 +28,15 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::sql::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -55,9 +57,9 @@ use crate::{
     },
 };
 
-#[cfg(feature = "enterprise")]
-pub mod job;
 pub mod multi_streams;
+#[cfg(feature = "enterprise")]
+pub mod query_manager;
 pub mod saved_view;
 #[cfg(feature = "enterprise")]
 pub mod search_job;
@@ -256,6 +258,65 @@ pub async fn search(
             check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
         {
             return Ok(res);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let keys_used = match get_cipher_key_names(&req.query.sql) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        e.to_string(),
+                    ),
+                ));
+            }
+        };
+        if !keys_used.is_empty() {
+            log::info!("keys used : {:?}", keys_used);
+        }
+        for key in keys_used {
+            // Check permissions on keys
+            {
+                use o2_openfga::meta::mapping::OFGA_MODELS;
+
+                use crate::common::{
+                    infra::config::USERS,
+                    utils::auth::{is_root_user, AuthExtractor},
+                };
+
+                if !is_root_user(&user_id) {
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+
+                    if !crate::handler::http::auth::validator::check_permissions(
+                        &user_id,
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get("cipher_keys")
+                                    .map_or("cipher_keys", |model| model.key),
+                                key
+                            ),
+                            org_id: org_id.clone(),
+                            bypass_check: false,
+                            parent_id: "".to_string(),
+                        },
+                        user.role,
+                        user.is_external,
+                    )
+                    .await
+                    {
+                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                    }
+                    // Check permissions on key ends
+                }
+            }
         }
     }
 
@@ -459,19 +520,21 @@ pub async fn around(
             .unwrap();
 
     // search forward
+    let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: fw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_start_time,
             end_time: around_key,
-            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -513,19 +576,21 @@ pub async fn around(
     };
 
     // search backward
+    let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: bw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_key,
             end_time: around_end_time,
-            sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -672,6 +737,7 @@ pub async fn values(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -738,10 +804,7 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!(
-        "SELECT {} FROM \"{stream_name}\"",
-        cfg.common.column_timestamp
-    );
+    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -921,11 +984,11 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
@@ -1255,7 +1318,7 @@ pub async fn search_history(
 
     // Search
     let stream_name = USAGE_STREAM;
-    let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
+    let search_query_req = match req.to_query_req(stream_name) {
         Ok(r) => r,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));

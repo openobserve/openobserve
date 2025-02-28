@@ -13,7 +13,7 @@ import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPage.js";
 import { DataPage } from "../pages/dataPage.js";
 import { IamPage } from "../pages/iamPage.js";
-import { ManagementPage } from "../pages/managementPage .js";
+import { ManagementPage } from "../pages/managementPage.js";
 import { AboutPage } from "../pages/aboutPage.js";
 
 
@@ -40,7 +40,7 @@ test.describe("Change Organisation", () => {
         managementPage = new ManagementPage(page);
         aboutPage = new AboutPage(page);
         await loginPage.gotoLoginPage();
-        // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login();
         await ingestionPage.ingestion();
         await ingestionPage.ingestionMultiOrg();
@@ -306,20 +306,21 @@ test.describe("Change Organisation", () => {
 
     test("About Page default validation", async ({ page }) => {
 
-
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
         await aboutPage.aboutURLValidation();
     });
 
     test("About Page change organisation validation", async ({ page }) => {
-
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
         await page.waitForTimeout(5000);
        await aboutPage.aboutPageDefaultMultiOrg();
         await page.waitForTimeout(5000);
         await aboutPage.aboutPageURLValidation();
+        await aboutPage.clickHelpMenu();
         await aboutPage.gotoAboutPage();
-        await aboutPage.aboutPageURLValidation();
+        await aboutPage.aboutURLValidation();
 
     });
 

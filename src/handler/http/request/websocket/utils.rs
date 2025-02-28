@@ -32,7 +32,7 @@ pub mod enterprise_utils {
         user_id: &str,
         org_id: &str,
     ) -> Result<(), String> {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::{
             infra::config::USERS,
@@ -51,37 +51,35 @@ pub mod enterprise_utils {
             .clone();
 
         // If the user is external, check permissions
-        if user.is_external {
-            let stream_type_str = stream_type.to_string();
-            let o2_type = format!(
-                "{}:{}",
-                OFGA_MODELS
-                    .get(stream_type_str.as_str())
-                    .map_or(stream_type_str.as_str(), |model| model.key),
-                stream_name
-            );
+        let stream_type_str = stream_type.as_str();
+        let o2_type = format!(
+            "{}:{}",
+            OFGA_MODELS
+                .get(stream_type_str)
+                .map_or(stream_type_str, |model| model.key),
+            stream_name
+        );
 
-            let auth_extractor = AuthExtractor {
-                auth: "".to_string(),
-                method: "GET".to_string(),
-                o2_type,
-                org_id: org_id.to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-            };
+        let auth_extractor = AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type,
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+        };
 
-            let has_permission = crate::handler::http::auth::validator::check_permissions(
-                user_id,
-                auth_extractor,
-                user.role,
-                user.is_external,
-            )
-            .await;
+        let has_permission = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            auth_extractor,
+            user.role,
+            user.is_external,
+        )
+        .await;
 
-            if !has_permission {
-                return Err("Unauthorized Access".to_string());
-            }
-        }
+        if !has_permission {
+            return Err("Unauthorized Access".to_string());
+        };
 
         Ok(())
     }

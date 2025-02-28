@@ -147,7 +147,6 @@ async fn update_settings(
             )),
         );
     }
-
     let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
     let main_stream_res =
         stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
@@ -155,6 +154,7 @@ async fn update_settings(
 
     // sync the data retention to index stream
     if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
+        #[allow(deprecated)]
         let index_stream_name =
             if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
                 stream_name.to_string()
@@ -313,7 +313,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+        use o2_openfga::meta::mapping::OFGA_MODELS;
 
         let user_id = req.headers().get("user_id").unwrap();
         if let Some(s_type) = &stream_type {

@@ -444,3 +444,245 @@ export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
 
   return optimalFontSize; // Return the largest font size that fits
 };
+
+/**
+ * Validate the filters in the panel
+ * @param conditions the conditions array
+ * @param errors the array to push the errors to
+ */
+function validateConditions(conditions: any, errors: any) {
+  conditions.forEach((it: any) => {
+    if (it.filterType === "condition") {
+      // If the condition is a list, check if at least 1 item is selected
+      if (it.type == "list" && !it.values?.length) {
+        errors.push(
+          `Filter: ${it.column}: Select at least 1 item from the list`,
+        );
+      }
+
+      if (it.type == "condition") {
+        // Check if condition operator is selected
+        if (it.operator == null) {
+          errors.push(`Filter: ${it.column}: Operator selection required`);
+        }
+
+        // Check if condition value is required based on the operator
+        if (
+          !["Is Null", "Is Not Null"].includes(it.operator) &&
+          (it.value == null || it.value == "")
+        ) {
+          errors.push(`Filter: ${it.column}: Condition value required`);
+        }
+      }
+    } else if (it.filterType === "group") {
+      // Recursively validate the conditions in the group
+      validateConditions(it.conditions, errors);
+    }
+  });
+}
+
+export const validateSQLPanelFields = (
+  panelData: any,
+  queryIndex: number,
+  currentXLabel: any,
+  currentYLabel: any,
+  errors: string[],
+  isFieldsValidationRequired: boolean = true,
+) => {
+  // check if fields validation is required
+  if (isFieldsValidationRequired === false) {
+    return;
+  }
+
+  switch (panelData?.type) {
+    case "donut":
+    case "pie": {
+      if (
+        panelData?.queries[queryIndex].fields.y.length > 1 ||
+        panelData?.queries[queryIndex].fields.y.length == 0
+      ) {
+        errors.push("Add one value field for donut and pie charts");
+      }
+
+      if (
+        panelData?.queries[queryIndex].fields.x.length > 1 ||
+        panelData?.queries[queryIndex].fields.x.length == 0
+      ) {
+        errors.push("Add one label field for donut and pie charts");
+      }
+
+      break;
+    }
+    case "metric": {
+      if (
+        panelData.queries[queryIndex].fields.y.length > 1 ||
+        panelData.queries[queryIndex].fields.y.length == 0
+      ) {
+        errors.push("Add one value field for metric charts");
+      }
+
+      if (panelData.queries[queryIndex].fields.x.length) {
+        errors.push(`${currentXLabel} field is not allowed for Metric chart`);
+      }
+
+      break;
+    }
+    case "gauge": {
+      if (panelData.queries[queryIndex].fields.y.length != 1) {
+        errors.push("Add one value field for gauge chart");
+      }
+      // gauge can have zero or one label
+      if (
+        panelData.queries[queryIndex].fields.x.length != 1 &&
+        panelData.queries[queryIndex].fields.x.length != 0
+      ) {
+        errors.push(`Add one label field for gauge chart`);
+      }
+
+      break;
+    }
+    case "h-bar":
+    case "area":
+    case "line":
+    case "scatter":
+    case "bar": {
+      if (panelData.queries[queryIndex].fields.y.length < 1) {
+        errors.push("Add at least one field for the Y-Axis");
+      }
+
+      if (
+        panelData.queries[queryIndex].fields.x.length > 1 ||
+        panelData.queries[queryIndex].fields.x.length == 0
+      ) {
+        errors.push(`Add one fields for the X-Axis`);
+      }
+
+      break;
+    }
+    case "table": {
+      if (
+        panelData.queries[queryIndex].fields.y.length == 0 &&
+        panelData.queries[queryIndex].fields.x.length == 0
+      ) {
+        errors.push("Add at least one field on X-Axis or Y-Axis");
+      }
+
+      break;
+    }
+    case "heatmap": {
+      if (panelData.queries[queryIndex].fields.y.length == 0) {
+        errors.push("Add at least one field for the Y-Axis");
+      }
+
+      if (panelData.queries[queryIndex].fields.x.length == 0) {
+        errors.push(`Add one field for the X-Axis`);
+      }
+
+      if (panelData.queries[queryIndex].fields.z.length == 0) {
+        errors.push(`Add one field for the Z-Axis`);
+      }
+
+      break;
+    }
+    case "area-stacked":
+    case "stacked":
+    case "h-stacked": {
+      if (
+        panelData.queries[queryIndex].fields.y.length > 1 ||
+        panelData.queries[queryIndex].fields.y.length == 0
+      ) {
+        errors.push(
+          "Add exactly one field on Y-Axis for stacked and h-stacked charts",
+        );
+      }
+      if (
+        panelData.queries[queryIndex].fields.x.length != 1 ||
+        panelData.queries[queryIndex].fields.breakdown.length != 1
+      ) {
+        errors.push(
+          `Add exactly one fields on the X-Axis and breakdown for stacked, area-stacked and h-stacked charts`,
+        );
+      }
+
+      break;
+    }
+    case "geomap": {
+      if (panelData.queries[queryIndex].fields.latitude == null) {
+        errors.push("Add one field for the latitude");
+      }
+      if (panelData.queries[queryIndex].fields.longitude == null) {
+        errors.push("Add one field for the longitude");
+      }
+      break;
+    }
+
+    case "sankey": {
+      if (panelData.queries[queryIndex].fields.source == null) {
+        errors.push("Add one field for the source");
+      }
+      if (panelData.queries[queryIndex].fields.target == null) {
+        errors.push("Add one field for the target");
+      }
+      if (panelData.queries[queryIndex].fields.value == null) {
+        errors.push("Add one field for the value");
+      }
+      break;
+    }
+    case "maps": {
+      if (panelData.queries[queryIndex].fields.name == null) {
+        errors.push("Add one field for the name");
+      }
+      if (panelData.queries[queryIndex].fields.value_for_maps == null) {
+        errors.push("Add one field for the value");
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  // check if aggregation function is selected or not
+  if (panelData?.type && !(panelData?.type == "heatmap")) {
+    const aggregationFunctionError = panelData.queries[
+      queryIndex
+    ].fields.y.filter(
+      (it: any) =>
+        !it.isDerived &&
+        (it.aggregationFunction == null || it.aggregationFunction == ""),
+    );
+    if (
+      panelData.queries[queryIndex].fields.y.length &&
+      aggregationFunctionError.length
+    ) {
+      errors.push(
+        ...aggregationFunctionError.map(
+          (it: any) =>
+            `${currentYLabel}: ${it.column}: Aggregation function required`,
+        ),
+      );
+    }
+  }
+
+  // check if labels are there for y axis items
+  const labelError = panelData?.queries?.[queryIndex]?.fields?.y?.filter(
+    (it: any) => it?.label == null || it?.label == "",
+  );
+  if (
+    panelData?.queries?.[queryIndex]?.fields?.y?.length &&
+    labelError?.length
+  ) {
+    errors.push(
+      ...labelError.map(
+        (it: any) => `${currentYLabel}: ${it.column}: Label required`,
+      ),
+    );
+  }
+
+  if (panelData?.queries?.[queryIndex]?.fields?.filter?.conditions?.length) {
+    // Validate the top-level conditions
+    validateConditions(
+      panelData?.queries?.[queryIndex]?.fields?.filter?.conditions,
+      errors,
+    );
+  }
+};

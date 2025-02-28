@@ -67,6 +67,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
+async-walkdir.workspace = true
 awc = { version = "3.5", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -111,7 +112,6 @@ jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
 memchr.workspace = true
-memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
@@ -123,6 +123,7 @@ prometheus.workspace = true
 promql-parser = "0.4"
 prost.workspace = true
 proto.workspace = true
+prettytable-rs = "0.10.0"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
 rand.workspace = true
@@ -144,7 +145,6 @@ snap.workspace = true
 sqlparser.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
-sysinfo.workspace = true
 syslog_loose = "0.18.0"
 thiserror.workspace = true
 time.workspace = true
@@ -156,6 +156,7 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+tempfile.workspace = true
 uaparser = "0.6.1"
 url.workspace = true
 utoipa.workspace = true
@@ -167,12 +168,15 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+wal.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+zip.workspace = true
 futures-util = "0.3.31"
 tokio-tungstenite = "0.24.0"
+tokio-util = "0.7.13"
 pprof = { version = "0.14", features = [
     "flamegraph",
     "prost-codec",
@@ -210,9 +214,10 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
-actix-web-prometheus = { version = "0.1", features = ["process"] }
+actix-web-prometheus = "0.1"
 actix-tls = { version = "3.4", features = [
     "connect",
     "uri",
@@ -259,7 +264,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
-getrandom = "0.2.11"
+getrandom = "0.2.15"
 hashlink = "0.10"
 hashbrown = { version = "0.15", features = ["serde"] }
 hex = "0.4"
@@ -286,7 +291,7 @@ prometheus = "0.13"
 prost = "0.13.1"
 rand = "0.8"
 rayon = "1.10"
-regex = "1.7"
+regex = "1.11"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
@@ -324,7 +329,7 @@ sqlx = { version = "0.8.2", features = [
 ] }
 strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
-sysinfo = "0.29"
+sysinfo = "0.33"
 tantivy = { version = "0.22.0", features = ["quickwit"] }
 tempfile = "3"
 thiserror = "1.0"
@@ -369,3 +374,4 @@ utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://github.com/openobserve/vector", rev = "3d16e345232bb3cb9b104ee6461e9dd0b4c361da" }
 vrl = { version = "0.19.0", features = ["value", "compiler", "test"] }
 zstd = "0.13"
+zip = "2.2.2"

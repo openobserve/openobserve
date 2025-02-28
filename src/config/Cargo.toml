@@ -10,6 +10,7 @@ gxhash = ["dep:gxhash"]
 
 [dependencies]
 actix-web-prometheus.workspace = true
+aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
@@ -55,6 +56,7 @@ proto.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 rand.workspace = true
+sea-orm = "1.1.3"
 serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
