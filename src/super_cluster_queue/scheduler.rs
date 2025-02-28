@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
+use config::{meta::triggers::Trigger, utils::json};
 use infra::{
     errors::{Error, Result},
-    scheduler::{self, Trigger},
+    scheduler,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -63,7 +63,8 @@ async fn push(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
-    if let Err(e) = scheduler::update_trigger(trigger.clone()).await {
+    // Update trigger in super cluster with clone = true, so that it copies everything
+    if let Err(e) = scheduler::update_trigger(trigger.clone(), true).await {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to update scheduler: {}/{:?}/{}, error: {}",
             trigger.org,
@@ -84,6 +85,12 @@ async fn update_status(msg: Message) -> Result<()> {
         &trigger.module_key,
         trigger.status,
         trigger.retries,
+        // Only update trigger data if it is not empty
+        if trigger.data.is_empty() {
+            None
+        } else {
+            Some(&trigger.data)
+        },
     )
     .await
     {
