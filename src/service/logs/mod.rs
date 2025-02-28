@@ -299,6 +299,12 @@ async fn write_logs(
     }
     let get_schema_time = _get_schema_start.elapsed().as_millis();
 
+    if let Some(fields) = stream_settings.defined_schema_fields {
+        if stream_name == "wcnp_hermes" && !fields.contains(&debug_log_field.to_string()) {
+            log::warn!("[FIELD_LOST] stream [{stream_name}] UDS has no field [{debug_log_field}]");
+        }
+    }
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::service::ingestion::get_stream_alerts(
@@ -316,6 +322,14 @@ async fn write_logs(
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
     let mut evaluated_alerts = HashSet::new();
     // End get stream alert
+
+    if let Some(schema) = stream_schema_map.get(stream_name) {
+        if stream_name == "wcnp_hermes" && !schema.contains_field(debug_log_field) {
+            log::warn!(
+                "[FIELD_LOST] stream [{stream_name}] schemahas no field [{debug_log_field}]"
+            );
+        }
+    }
 
     // start check for schema
     let _check_schema_start = std::time::Instant::now();
