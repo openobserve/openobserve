@@ -162,7 +162,7 @@ pub async fn ws_proxy(
                             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                             match ws_msg {
                                 Message::Close(reason) => {
-                                    log::info!("[WS_PROXY] Backend -> Router close");
+                                    log::info!("[WS_PROXY] Backend -> Router close reason: {:?}", reason);
 
                                     let mut sink = backend_ws_sink2.lock().await;
                                     // 1. Forward close to client
@@ -177,6 +177,7 @@ pub async fn ws_proxy(
                                     break;
                                 }
                                 Message::Text(text) => {
+                                    log::debug!("[WS_PROXY] Backend -> Router text: {}", text);
                                     if session.text(text).await.is_err() {
                                         break;
                                     }
