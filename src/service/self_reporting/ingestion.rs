@@ -26,6 +26,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     utils::json,
+    META_ORG_ID,
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc;
@@ -181,7 +182,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             .map(|usage| json::to_value(usage).unwrap())
             .collect::<Vec<_>>();
         // report usage data
-        let usage_stream = StreamParams::new(&cfg.common.usage_org, USAGE_STREAM, StreamType::Logs);
+        let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
         if ingest_reporting_data(report_data, usage_stream)
             .await
             .is_err()

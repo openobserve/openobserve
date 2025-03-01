@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     utils::json,
+    META_ORG_ID,
 };
 use once_cell::sync::Lazy;
 use tokio::{
@@ -168,7 +169,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         } else {
             Vec::new()
         };
-        additional_reporting_orgs.push(&cfg.common.usage_org);
+        additional_reporting_orgs.push(META_ORG_ID);
         additional_reporting_orgs.dedup();
 
         let mut enqueued_on_failure = false;
@@ -191,9 +192,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                         .enqueue(ReportingData::Trigger(Box::new(trigger)))
                         .await
                     {
-                        log::error!(
-                    "[SELF-REPORTING] Error in pushing back un-ingested TriggerData to UsageQueue: {e}"
-                );
+                        log::error!("[SELF-REPORTING] Error in pushing back un-ingested TriggerData to UsageQueue: {e}");
                     }
                 }
             }
@@ -201,7 +200,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !errors.is_empty() {
-        let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
+        let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
             .await
             .is_err()
