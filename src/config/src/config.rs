@@ -2180,7 +2180,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
-    if mem_total - cfg.memory_cache.max_size <= 0 {
+    if cfg.memory_cache.max_size >= mem_total {
         return Err(anyhow::anyhow!(
             "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
         ));

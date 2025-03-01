@@ -169,7 +169,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         } else {
             Vec::new()
         };
-        additional_reporting_orgs.push(USAGE_QUEUE);
+        additional_reporting_orgs.push(META_ORG_ID);
         additional_reporting_orgs.dedup();
 
         let mut enqueued_on_failure = false;
