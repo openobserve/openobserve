@@ -31,7 +31,8 @@ mod templates;
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    PipelinesQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
+    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
+    TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -54,6 +55,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     };
     let alerts_queue = AlertsQueue {
         on_alert_msg: alerts::process,
+        on_scheduler_msg: scheduler::process,
+    };
+    let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
     };
     let search_jobs_queue = SearchJobsQueue {
@@ -89,6 +93,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(templates_queue),
         Box::new(destinations_queue),
         Box::new(action_scripts_queue),
+        Box::new(scheduler_queue),
     ];
 
     for queue in queues {
