@@ -45,6 +45,8 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+pub const META_ORG_ID: &str = "_meta";
+
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
@@ -762,8 +764,6 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
-    pub usage_org: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -1002,6 +1002,8 @@ pub struct Common {
         help = "allow minimum auto refresh interval in seconds"
     )] // in seconds
     pub min_auto_refresh_interval: u32,
+    #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
+    pub additional_reporting_orgs: String,
 }
 
 #[derive(EnvConfig)]
@@ -2177,6 +2179,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
+    }
+    if cfg.memory_cache.max_size >= mem_total {
+        return Err(anyhow::anyhow!(
+            "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
+        ));
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
         if cfg.common.local_mode {

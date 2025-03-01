@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use config::{
     meta::{cluster::get_internal_grpc_token, stream::StreamType},
     metrics::get_registry,
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
+    META_ORG_ID,
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
@@ -46,7 +47,7 @@ static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
 });
 
 async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<(), tonic::Status> {
-    let org = config.common.usage_org.as_str();
+    let org = META_ORG_ID;
     let req = IngestionRequest {
         org_id: org.to_owned(),
         stream_name: "".to_owned(),
@@ -75,7 +76,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let config = get_config();
-    let org = config.common.usage_org.as_str();
+    let org = META_ORG_ID;
 
     log::debug!(
         "self-metrics consumption enabled status : {}",

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, patch, post, put, web, HttpRequest, HttpResponse};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     folder::DEFAULT_FOLDER,
@@ -298,7 +298,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/enable")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/enable")]
 async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
     let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
@@ -336,7 +336,7 @@ async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> Htt
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/{alert_id}/trigger")]
+#[patch("/v2/{org_id}/alerts/{alert_id}/trigger")]
 async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
 
@@ -365,7 +365,7 @@ async fn trigger_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/v2/{org_id}/alerts/move")]
+#[patch("/v2/{org_id}/alerts/move")]
 async fn move_alerts(
     path: web::Path<String>,
     req_body: web::Json<MoveAlertsRequestBody>,

@@ -267,27 +267,47 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         Ok(())
     }
 
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
-WHERE org = ? AND module_key = ? AND module = ?;"#,
-        )
-        .bind(trigger.status)
-        .bind(trigger.retries)
-        .bind(trigger.next_run_at)
-        .bind(trigger.is_realtime)
-        .bind(trigger.is_silenced)
-        .bind(&trigger.data)
-        .bind(&trigger.org)
-        .bind(&trigger.module_key)
-        .bind(&trigger.module)
-        .execute(&pool)
-        .await?;
+
+        let query = if clone {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, start_time = ?, end_time = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.start_time)
+            .bind(trigger.end_time)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        } else {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?, data = ?
+    WHERE org = ? AND module_key = ? AND module = ?;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        };
+
+        query.execute(&pool).await?;
 
         // For now, only send realtime alert triggers
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {

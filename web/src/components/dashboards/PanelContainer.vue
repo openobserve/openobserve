@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-label
                   data-test="dashboard-move-to-logs-module"
                   class="q-pa-sm"
-                  >Move To Logs</q-item-label
+                  >Go To Logs</q-item-label
                 >
               </q-item-section>
             </q-item>

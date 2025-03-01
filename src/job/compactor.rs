@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,17 +18,17 @@ use std::sync::Arc;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{cluster::CompactionJobType, stream::FileKey},
+    meta::{
+        cluster::CompactionJobType,
+        stream::{FileKey, ALL_STREAM_TYPES},
+    },
     metrics,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::sync::{mpsc, Mutex};
 
-use crate::service::compact::{
-    self,
-    merge::{MergeBatch, MergeSender},
-};
+use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
@@ -40,7 +40,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(cfg.limit.file_merge_thread_num * 2);
+    let (tx, rx) = mpsc::channel::<(compact::merge::MergeSender, compact::merge::MergeBatch)>(
+        cfg.limit.file_merge_thread_num * 2,
+    );
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
     for thread_id in 0..cfg.limit.file_merge_thread_num {
@@ -133,6 +135,23 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             }
         };
 
+        // reset all metrics
+        let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+        for org in orgs {
+            for stream_type in ALL_STREAM_TYPES {
+                if metrics::COMPACT_PENDING_JOBS
+                    .with_label_values(&[org.as_str(), stream_type.as_str()])
+                    .get()
+                    > 0
+                {
+                    metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .set(0);
+                }
+            }
+        }
+
+        // set new metrics
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS
@@ -195,7 +214,9 @@ async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
 }
 
 /// Merge small files
-async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
+async fn run_merge(
+    tx: mpsc::Sender<(compact::merge::MergeSender, compact::merge::MergeBatch)>,
+) -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.interval + 2,

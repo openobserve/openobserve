@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ mod tests {
                 router::*,
             },
         },
-        service::{alerts::scheduler::handle_triggers, search::SEARCH_SERVER},
+        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};

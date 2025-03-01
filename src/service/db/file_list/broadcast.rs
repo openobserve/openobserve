@@ -19,7 +19,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{get_internal_grpc_token, Node, NodeStatus},
+        cluster::{get_internal_grpc_token, Node, NodeStatus, Role, RoleGroup},
         stream::FileKey,
     },
 };
@@ -50,8 +50,8 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
     } else {
         cluster::get_cached_nodes(|node| {
             node.scheduled
+                && (node.is_querier())
                 && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
-                && (node.is_querier() || node.is_compactor() || node.is_ingester())
         })
         .await
         .unwrap_or_default()
@@ -61,17 +61,30 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         if node.uuid.eq(&LOCAL_NODE.uuid) {
             continue;
         }
-        // only send to querier
-        if !node.is_querier() {
-            continue;
+        // filter items by consistent hash
+        let mut node_items = Vec::with_capacity(items.len());
+        for item in items.iter() {
+            if !node.is_querier() {
+                node_items.push(item.clone());
+            } else if let Some(node_name) = cluster::get_node_from_consistent_hash(
+                &item.key,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await
+            {
+                if node_name.eq(&node.name) {
+                    node_items.push(item.clone());
+                }
+            }
         }
-        if !node.is_querier() && !node.is_compactor() && !node.is_ingester() {
+        if node_items.is_empty() {
             continue;
         }
         let node_uuid = node.uuid.clone();
         let node_addr = node.grpc_addr.clone();
         if cfg.common.print_key_event {
-            items.iter().for_each(|item| {
+            node_items.iter().for_each(|item| {
                 log::info!(
                     "[broadcast] send event to node[{}]: file: {}, deleted: {}",
                     &node_addr,
@@ -99,7 +112,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
                 Arc::new(tx)
             });
             tokio::task::yield_now().await;
-            if let Err(e) = channel.clone().send(items.to_vec()) {
+            if let Err(e) = channel.clone().send(node_items.clone()) {
                 events.remove(&node_uuid);
                 log::error!(
                     "[broadcast] send event to node[{}] channel failed, {}, retrying...",
