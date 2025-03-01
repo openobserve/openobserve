@@ -28,7 +28,7 @@ use config::{
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{json, schema_ext::SchemaExt},
-    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -298,7 +298,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
         },
-        meta_org: cfg.common.usage_org.to_string(),
+        meta_org: META_ORG_ID.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,

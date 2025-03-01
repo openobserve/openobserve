@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     utils::json,
+    META_ORG_ID,
 };
 use once_cell::sync::Lazy;
 use tokio::{
@@ -163,11 +164,8 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !triggers.is_empty() {
-        let trigger_stream = StreamParams::new(
-            &cfg.common.usage_org,
-            TRIGGERS_USAGE_STREAM,
-            StreamType::Logs,
-        );
+        let trigger_stream =
+            StreamParams::new(META_ORG_ID, TRIGGERS_USAGE_STREAM, StreamType::Logs);
         // on error in ingesting usage data, push back the data
         if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
             .await
@@ -190,7 +188,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !errors.is_empty() {
-        let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
+        let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
             .await
             .is_err()

@@ -45,6 +45,8 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+pub const META_ORG_ID: &str = "_meta";
+
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
@@ -762,8 +764,6 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
-    pub usage_org: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
