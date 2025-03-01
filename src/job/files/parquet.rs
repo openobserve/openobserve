@@ -673,10 +673,12 @@ async fn merge_files(
     let mut shared_fields = HashSet::new();
     for file in files_with_size.iter() {
         let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
-        shared_fields.extend(file_schema.fields().iter().map(|f| f.name().to_string()));
+        shared_fields.extend(file_schema.fields().iter().cloned());
     }
     // use the shared fields to create a new schema and with empty metadata
-    let schema = Arc::new(latest_schema.retain(shared_fields));
+    let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    let schema = Arc::new(Schema::new(fields));
     let schema_key = schema.hash_key();
 
     // generate datafusion tables
