@@ -675,7 +675,7 @@ async fn merge_files(
     // we shouldn't use the latest schema, because there are too many fields, we need read schema
     // from files only get the fields what we need
     let mut shared_fields = HashSet::new();
-    for file in files_with_size.iter() {
+    for file in new_file_list.iter() {
         let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
         shared_fields.extend(file_schema.fields().iter().cloned());
     }
