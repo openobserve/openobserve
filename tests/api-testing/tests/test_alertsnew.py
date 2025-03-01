@@ -545,7 +545,7 @@ def test_put_alertnew_disable(create_session, base_url):
         print(f"Alert {alert_id} exists and is retrievable.")
     
     # Proceed to disable the alert
-        resp_alertnew_disable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
+        resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
         print(f"Disable Alert Response: {resp_alertnew_disable.text}")
         assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
         print(f"Successfully disabled alert {alert_id}")
@@ -603,7 +603,7 @@ def test_put_alertnew_enable(create_session, base_url):
 
 
     # Proceed to enable the alert
-        resp_alertnew_enable = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
+        resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
         print(f"Enable Alert Response: {resp_alertnew_enable.text}")
         assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
         print(f"Successfully enabled alert {alert_id}")
@@ -668,7 +668,7 @@ def test_put_alertnew_trigger(create_session, base_url, caplog):
         # Trigger the alert
         logger.info(f"Attempting to trigger alert with ID: {alert_id}")
 
-        resp_alertnew_trigger = session.put(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
+        resp_alertnew_trigger = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
 
     # Log response details for debugging
         print(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")

@@ -74,6 +74,9 @@ fn flatten_value(
         Value::Array(arr) => {
             flatten_array(arr, &parent_key, max_level, depth, flattened)?;
         }
+        Value::Null => {
+            // we don't need to store null values
+        }
         _ => {
             flattened.insert(parent_key, current);
         }

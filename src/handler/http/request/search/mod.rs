@@ -28,7 +28,7 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
+    DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME,
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
@@ -1353,7 +1353,7 @@ pub async fn search_history(
         .with_label_values(&[&org_id])
         .dec();
 
-    let history_org_id = &cfg.common.usage_org;
+    let history_org_id = META_ORG_ID;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,

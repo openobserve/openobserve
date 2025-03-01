@@ -27,8 +27,8 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
+    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait,
+    ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -493,6 +493,15 @@ async fn list_models<C: ConnectionTrait>(
     // Apply the optional folder_id filter.
     let query = if let Some(folder_id) = &params.folder_id {
         query.filter(folders::Column::FolderId.eq(folder_id))
+    } else {
+        query
+    };
+
+    // Apply the optional alert name substring filter.
+    let name_substring = params.name_substring.filter(|n| !n.is_empty());
+    let query = if let Some(name_substring) = name_substring {
+        let name_pattern = format!("%{}%", name_substring.to_lowercase());
+        query.filter(Expr::expr(Func::lower(Expr::col(alerts::Column::Name))).like(name_pattern))
     } else {
         query
     };
