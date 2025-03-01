@@ -668,14 +668,16 @@ async fn merge_files(
         latest_schema.clone()
     };
 
-    // read schema from parquet file, there files have the same schema because they are under the
-    // same prefix
-    let schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
-    let schema_key = schema
-        .as_ref()
-        .clone()
-        .with_metadata(Default::default())
-        .hash_key();
+    // we shouldn't use the latest schema, because there are too many fields, we need read schema
+    // from files only get the fields what we need
+    let mut shared_fields = HashSet::new();
+    for file in files_with_size.iter() {
+        let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
+        shared_fields.extend(file_schema.fields().iter().map(|f| f.name().to_string()));
+    }
+    // use the shared fields to create a new schema and with empty metadata
+    let schema = Arc::new(latest_schema.retain(shared_fields));
+    let schema_key = schema.hash_key();
 
     // generate datafusion tables
     let trace_id = config::ider::generate();
