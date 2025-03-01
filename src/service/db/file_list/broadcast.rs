@@ -66,17 +66,15 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         for item in items.iter() {
             if !node.is_querier() {
                 node_items.push(item.clone());
-            } else {
-                if let Some(node_name) = cluster::get_node_from_consistent_hash(
-                    &item.key,
-                    &Role::Querier,
-                    Some(RoleGroup::Interactive),
-                )
-                .await
-                {
-                    if node_name.eq(&node.name) {
-                        node_items.push(item.clone());
-                    }
+            } else if let Some(node_name) = cluster::get_node_from_consistent_hash(
+                &item.key,
+                &Role::Querier,
+                Some(RoleGroup::Interactive),
+            )
+            .await
+            {
+                if node_name.eq(&node.name) {
+                    node_items.push(item.clone());
                 }
             }
         }
