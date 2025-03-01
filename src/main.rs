@@ -29,7 +29,7 @@ use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpSe
 use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
-use config::get_config;
+use config::{get_config, utils::size::bytes_to_human_readable};
 use log::LevelFilter;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
@@ -189,17 +189,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
+        "System info: CPU cores {}, MEM total {}, Disk total {}, free {}",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
+        bytes_to_human_readable(cfg.limit.mem_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_free as f64),
     );
     log::info!(
-        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
-        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
+        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
+        bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
     // init script server
