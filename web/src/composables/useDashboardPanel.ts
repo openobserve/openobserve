@@ -2830,7 +2830,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
-      const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
+      const regex = new RegExp(`\\$(?:{${varName}}|${varName})(?!\\w)`, "g");
       return q.replace(regex, replacement);
     };
 
