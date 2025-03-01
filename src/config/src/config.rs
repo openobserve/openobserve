@@ -2178,6 +2178,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
     }
+    if mem_total - cfg.memory_cache.max_size <= 0 {
+        return Err(anyhow::anyhow!(
+            "memory_cache.max_size is large than total memory, please set a smaller value"
+        ));
+    }
     if cfg.memory_cache.datafusion_max_size == 0 {
         if cfg.common.local_mode {
             cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
