@@ -26,8 +26,8 @@ mod short_urls;
 
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait,
+    AlertsQueue, DashboardsQueue, FoldersQueue, MetaQueue, PipelinesQueue, SchedulerQueue,
+    SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -51,6 +51,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
     };
+    let scheduler_queue = SchedulerQueue {
+        on_scheduler_msg: scheduler::process,
+    };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,
     };
@@ -72,6 +75,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
         Box::new(folders_queue),
+        Box::new(scheduler_queue),
     ];
 
     for queue in queues {
