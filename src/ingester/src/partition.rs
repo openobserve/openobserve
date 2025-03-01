@@ -194,35 +194,9 @@ impl Partition {
                     })
                     .collect::<Vec<_>>();
 
-                let debug_log_field = "event_log_datapoints_timezone";
-                let debug_log_field_rows_before = batches
-                    .iter()
-                    .map(|b| {
-                        let row_nows = b.num_rows();
-                        b.column_by_name(debug_log_field)
-                            .map(|c| row_nows - c.null_count())
-                            .unwrap_or(0)
-                    })
-                    .sum::<usize>();
-
                 let (schema, batches) =
                     merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
                         .context(MergeRecordBatchSnafu)?;
-
-                let debug_log_field_rows_after = {
-                    let row_nows = batches.num_rows();
-                    batches
-                        .column_by_name(debug_log_field)
-                        .map(|c| row_nows - c.null_count())
-                        .unwrap_or(0)
-                };
-                if debug_log_field_rows_before != debug_log_field_rows_after {
-                    log::warn!(
-                        "[FIELD_LOST] we lost the field after persist, before: {}, after: {}",
-                        debug_log_field_rows_before,
-                        debug_log_field_rows_after
-                    );
-                }
 
                 let mut buf_parquet = Vec::new();
                 let mut writer =
