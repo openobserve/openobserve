@@ -80,7 +80,7 @@ impl OptimizerRule for AddTimestampRule {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{collections::HashMap, sync::Arc};
 
     use arrow::array::{Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
@@ -110,13 +110,25 @@ mod tests {
         Ok(test)
     }
 
-    fn create_table_with_name(name: &str) -> Result<LogicalPlan> {
+    fn create_table_with_name(name: &str, projection: Option<Vec<String>>) -> Result<LogicalPlan> {
         let schema = Schema::new(vec![
             Field::new("id", DataType::Int32, false),
             Field::new("name", DataType::Utf8, false),
             Field::new("_timestamp", DataType::Int64, false),
         ]);
-        let test = table_scan(Some(name), &schema, None)?.build()?;
+        let fields_map = schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(index, field)| (field.name(), index))
+            .collect::<HashMap<&String, usize>>();
+        let projection = projection.map(|fields| {
+            fields
+                .iter()
+                .map(|field| *fields_map.get(field).unwrap())
+                .collect::<Vec<usize>>()
+        });
+        let test = table_scan(Some(name), &schema, projection)?.build()?;
         Ok(test)
     }
 
@@ -186,7 +198,13 @@ mod tests {
         let table_scan = test_table()?;
         let plan = LogicalPlanBuilder::from(table_scan)
             .filter(and(
-                in_subquery(col("name"), Arc::new(create_table_with_name("sq")?)),
+                in_subquery(
+                    col("name"),
+                    Arc::new(create_table_with_name(
+                        "sq",
+                        Some(vec!["name".to_string()]),
+                    )?),
+                ),
                 and(
                     binary_expr(col("id"), Operator::Eq, lit(1_u32)),
                     binary_expr(col("id"), Operator::Lt, lit(30_u32)),
@@ -199,25 +217,16 @@ mod tests {
         \n  Filter: test.name IN (<subquery>) AND test.id = UInt32(1) AND test.id < UInt32(30)\
         \n    Subquery:\
         \n      Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
-        \n        TableScan: sq\
+        \n        TableScan: sq projection=[name]\
         \n    Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
         \n      TableScan: test";
-        // after DecorrelatePredicateSubquery, the plan look like below
-        // let expected = "Projection: test.name
-        // \n  Filter: test.id = UInt32(1) AND test.id < UInt32(30)
-        // \n    LeftSemi Join:  Filter: test.name = __correlated_sq_1.id
-        // \n      Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)
-        // \n        TableScan: test
-        // \n      SubqueryAlias: __correlated_sq_1
-        // \n        Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)
-        // \n          TableScan: sq";
         assert_optimized_plan_equal(plan, expected)
     }
 
     #[test]
     fn test_table_scan_with_join() -> Result<()> {
-        let left_table = create_table_with_name("left")?;
-        let right_table = create_table_with_name("right")?;
+        let left_table = create_table_with_name("left", None)?;
+        let right_table = create_table_with_name("right", None)?;
         let plan = LogicalPlanBuilder::from(left_table)
             .join(
                 right_table,
@@ -241,8 +250,8 @@ mod tests {
 
     #[test]
     fn test_table_scan_with_join_with_enrich() -> Result<()> {
-        let left_table = create_table_with_name("enrich.left")?;
-        let right_table = create_table_with_name("right")?;
+        let left_table = create_table_with_name("enrich.left", None)?;
+        let right_table = create_table_with_name("right", None)?;
         let plan = LogicalPlanBuilder::from(left_table)
             .join(
                 right_table,
