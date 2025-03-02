@@ -801,6 +801,12 @@ async fn handle_derived_stream_triggers(
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
+            org_id,
+            pipeline_name,
+            pipeline_id,
+        );
         db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Err(anyhow::anyhow!(
             "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
@@ -1111,6 +1117,12 @@ async fn handle_derived_stream_triggers(
                             .unwrap()
                             .num_microseconds()
                             .unwrap();
+                }
+
+                // If the trigger didn't fail, we need to reset the `retries` count.
+                // Only cumulative failures should be used to check with `max_retries`
+                if trigger_data_stream.status != TriggerDataStatus::Failed {
+                    new_trigger.retries = 0;
                 }
             }
             trigger_data_stream.next_run_at = new_trigger.next_run_at;

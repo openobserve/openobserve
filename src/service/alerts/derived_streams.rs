@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -107,8 +107,13 @@ pub async fn save(
     // test derived_stream
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
     let test_end_time = Utc::now().timestamp_micros();
+    let test_start_time = test_end_time
+        - chrono::Duration::try_seconds(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
     if let Err(e) = &derived_stream
-        .evaluate((None, test_end_time), &trigger_module_key)
+        .evaluate((Some(test_start_time), test_end_time), &trigger_module_key)
         .await
     {
         return Err(anyhow::anyhow!(
