@@ -266,9 +266,9 @@ impl ScalarUDFImpl for RegxpMatchToFields {
 
     fn return_type_from_args(&self, args: ReturnTypeArgs) -> Result<ReturnInfo> {
         if args.arg_types.len() != 2 {
-            return Err(DataFusionError::Execution(format!(
-                "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings"
-            )));
+            return Err(DataFusionError::Execution(
+                "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings".to_string()
+            ));
         }
         let regexp_pattern = match &args.scalar_arguments[1] {
             Some(ScalarValue::Utf8(Some(arg2))) => arg2.to_string().replace('"', ""),
