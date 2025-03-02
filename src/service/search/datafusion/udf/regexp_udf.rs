@@ -28,11 +28,11 @@ use datafusion::{
     error::{DataFusionError, Result},
     functions::regex::regexpmatch::regexp_match,
     logical_expr::{
-        ExprSchemable, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl, Signature,
-        TypeSignature::Exact, Volatility,
+        ReturnInfo, ReturnTypeArgs, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl,
+        Signature, TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
-    prelude::{Expr, create_udf},
+    prelude::create_udf,
     scalar::ScalarValue,
 };
 use once_cell::sync::Lazy;
@@ -261,27 +261,30 @@ impl ScalarUDFImpl for RegxpMatchToFields {
     }
 
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        unreachable!() // since return_type_from_exprs is implemented
+        unreachable!() // since return_type_from_args is implemented
     }
 
-    fn return_type_from_exprs(
-        &self,
-        args: &[Expr],
-        schema: &dyn datafusion::common::ExprSchema,
-        _args_types: &[DataType],
-    ) -> Result<DataType> {
-        let regexp_pattern = match &args[1] {
-            Expr::Literal(arg2) => arg2.to_string().replace('"', ""),
-            other => {
+    fn return_type_from_args(&self, args: ReturnTypeArgs) -> Result<ReturnInfo> {
+        if args.arg_types.len() != 2 {
+            return Err(DataFusionError::Execution(format!(
+                "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings"
+            )));
+        }
+        let regexp_pattern = match &args.scalar_arguments[1] {
+            Some(ScalarValue::Utf8(Some(arg2))) => arg2.to_string().replace('"', ""),
+            _ => {
                 return Err(DataFusionError::Execution(format!(
                     "The second argument for regexp_match_to_fields needs to be a string, but got {}",
-                    other.get_type(schema)?
+                    args.arg_types[1]
                 )));
             }
         };
-        let ret_type = &args[0].get_type(schema)?;
+        let ret_type = &args.arg_types[0];
         let fields = regex_pattern_to_fields(&regexp_pattern, ret_type)?;
-        Ok(DataType::Struct(Fields::from_iter(fields)))
+        Ok(ReturnInfo::new(
+            DataType::Struct(Fields::from_iter(fields)),
+            false,
+        ))
     }
 
     fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
