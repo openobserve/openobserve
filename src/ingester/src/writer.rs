@@ -325,44 +325,12 @@ impl Writer {
             .iter_mut()
             .map(|entry| entry.into_bytes())
             .collect::<Result<Vec<_>>>()?;
-
-        let debug_log_field = "event_log_datapoints_timezone";
-        let debug_log_field_rows_before = entries
-            .iter()
-            .map(|e| {
-                e.data
-                    .iter()
-                    .filter(|f| f.get(debug_log_field).is_some())
-                    .count()
-            })
-            .sum::<usize>();
-
         let batch_entries = entries
             .iter()
             .map(|entry| {
                 entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
             })
             .collect::<Result<Vec<_>>>()?;
-
-        let debug_log_field_rows_after = batch_entries
-            .iter()
-            .map(|entry| {
-                let row_nows = entry.data.num_rows();
-                entry
-                    .data
-                    .column_by_name(debug_log_field)
-                    .map(|c| row_nows - c.null_count())
-                    .unwrap_or(0)
-            })
-            .sum::<usize>();
-        if debug_log_field_rows_before != debug_log_field_rows_after {
-            log::warn!(
-                "[FIELD_LOST] we lost the field after writer.consume, before: {}, after: {}",
-                debug_log_field_rows_before,
-                debug_log_field_rows_after
-            );
-        }
-
         let (entries_json_size, entries_arrow_size) = batch_entries
             .iter()
             .map(|entry| (entry.data_json_size, entry.data_arrow_size))

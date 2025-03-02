@@ -462,6 +462,8 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
                 if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
                     if item_name != &cfg.common.column_all
                         && item_name != &cfg.common.column_timestamp
+                        && item_name != ID_COL_NAME
+                        && item_name != ORIGINAL_DATA_COL_NAME
                     {
                         log::warn!(
                             "[FIELD_LOST] field {} is not in defined_schema_fields",
