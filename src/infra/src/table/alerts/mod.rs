@@ -18,8 +18,8 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
-        alert::{Alert as MetaAlert, ListAlertsParams},
         QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
+        alert::{Alert as MetaAlert, ListAlertsParams},
     },
     folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
@@ -27,8 +27,8 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait,
-    ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 

@@ -23,8 +23,8 @@ use std::{
 use anyhow::Context;
 use arrow::{
     array::{
-        new_null_array, Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
-        Int64Builder, StringArray, StringBuilder,
+        Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
+        StringArray, StringBuilder, new_null_array,
     },
     datatypes::Field,
     record_batch::RecordBatch,
@@ -33,7 +33,8 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config,
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME, cluster, get_config,
     meta::{
         bitvec::BitVec,
         inverted_index::InvertedIndexFormat,
@@ -51,17 +52,15 @@ use config::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
     },
-    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
-    TIMESTAMP_COL_NAME,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::{
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings,
     },
     storage,
 };

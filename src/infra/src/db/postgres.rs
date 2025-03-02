@@ -24,10 +24,10 @@ use config::{
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
     Pool, Postgres,
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::{OnceCell, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;

@@ -14,24 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
+    META_ORG_ID,
     cluster::LOCAL_NODE,
     get_config,
     meta::{cluster::get_internal_grpc_token, stream::StreamType},
     metrics::get_registry,
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
-    META_ORG_ID,
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
-    ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType,
+    IngestionData, IngestionRequest, IngestionType, ingest_client::IngestClient,
 };
 use serde_json::Value;
 use tokio::time::{self, Duration};
 use tonic::{
+    Request,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    Request,
 };
 
 use crate::service::{self, grpc::get_ingester_channel};

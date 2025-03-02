@@ -19,15 +19,15 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{get_internal_grpc_token, Node, NodeStatus, Role, RoleGroup},
+        cluster::{Node, NodeStatus, Role, RoleGroup, get_internal_grpc_token},
         stream::FileKey,
     },
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
-use tokio::sync::{mpsc, RwLock};
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
+use tokio::sync::{RwLock, mpsc};
+use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
 use crate::{common::infra::cluster, service::grpc::get_cached_channel};
 

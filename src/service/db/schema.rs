@@ -29,8 +29,8 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
     schema::{
-        unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS,
-        STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
+        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache, unwrap_stream_settings,
     },
 };
 #[cfg(feature = "enterprise")]

@@ -24,12 +24,12 @@ use arrow_schema::{DataType, SortOptions};
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
     physical_plan::{
-        expressions::Column, DisplayAs, DisplayFormatType, Distribution, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, Distribution, ExecutionMode, ExecutionPlan, PlanProperties,
+        expressions::Column,
     },
 };
 use futures::{Stream, StreamExt};

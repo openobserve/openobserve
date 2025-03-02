@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use chrono::Utc;
 use config::get_config;
 use infra::{db::Event, table::short_urls};
@@ -203,7 +203,7 @@ mod cluster {
 mod super_cluster {
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
-    use super::{short_urls, SHORT_URL_KEY};
+    use super::{SHORT_URL_KEY, short_urls};
 
     /// Sends event to super cluster queue for a new short URL entry.
     pub async fn emit_put_event(

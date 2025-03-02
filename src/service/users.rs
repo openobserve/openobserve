@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_openfga::{

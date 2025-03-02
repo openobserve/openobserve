@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use config::meta::actions::action::ActionType;
 use o2_enterprise::enterprise::actions::action_deployer::ACTION_DEPLOYER;
 

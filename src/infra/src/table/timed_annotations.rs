@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,8 @@ use std::collections::HashMap;
 use chrono::Utc;
 use config::{ider, meta::timed_annotations::*};
 use sea_orm::{
-    prelude::Expr, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
-    TransactionTrait,
+    ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set, TransactionTrait,
+    prelude::Expr,
 };
 
 use super::{
@@ -30,7 +30,7 @@ use super::{
     get_lock,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
 
@@ -513,8 +513,8 @@ pub async fn add_many(
 }
 
 /// Helper function to insert a single `TimedAnnotation` record and its associated panels
-async fn insert_timed_annotation<'a>(
-    txn: &'a DatabaseTransaction,
+async fn insert_timed_annotation(
+    txn: &DatabaseTransaction,
     dashboard_id: &str,
     timed_annotation: TimedAnnotation,
     use_given_id: bool,

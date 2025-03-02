@@ -24,14 +24,13 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    get_config,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, RwAHashMap, get_config,
     meta::inverted_index::InvertedIndexTantivyMode,
     metrics,
     utils::{
         file::*,
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
     },
-    RwAHashMap, FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;

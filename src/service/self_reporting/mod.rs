@@ -17,17 +17,18 @@ use chrono::{DateTime, Datelike, Timelike};
 #[cfg(feature = "enterprise")]
 use config::META_ORG_ID;
 use config::{
+    SIZE_IN_MB,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         self_reporting::{
+            ReportingData,
             error::ErrorData,
             usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
-            ReportingData,
         },
         stream::StreamType,
     },
-    metrics, SIZE_IN_MB,
+    metrics,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;

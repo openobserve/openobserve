@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    pipeline::{components::PipelineSource, Pipeline},
+    pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
 use once_cell::sync::Lazy;

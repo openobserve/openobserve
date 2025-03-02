@@ -28,8 +28,8 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::EquivalenceProperties,
     physical_plan::{
-        memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        ExecutionPlanProperties, Partitioning, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, ExecutionPlanProperties,
+        Partitioning, PlanProperties, memory::MemoryStream,
     },
 };
 use futures::{Stream, StreamExt};

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,13 +20,12 @@ use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
 use super::{
-    get_scheduler_max_retries, Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY,
+    TRIGGERS_KEY, Trigger, TriggerId, TriggerModule, TriggerStatus, get_scheduler_max_retries,
 };
 use crate::{
     db::{
-        self,
-        mysql::{create_index, CLIENT},
-        IndexStatement,
+        self, IndexStatement,
+        mysql::{CLIENT, create_index},
     },
     errors::{DbError, Error, Result},
 };

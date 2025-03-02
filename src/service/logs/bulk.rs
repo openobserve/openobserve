@@ -22,14 +22,13 @@ use actix_web::web;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 
 use super::{ingestion_log_enabled, log_failed_record};

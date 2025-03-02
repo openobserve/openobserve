@@ -28,7 +28,7 @@ mod search_job;
 mod short_urls;
 mod templates;
 
-use config::cluster::{is_offline, LOCAL_NODE};
+use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
     PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait,

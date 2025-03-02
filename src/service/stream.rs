@@ -15,10 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{http, http::StatusCode, HttpResponse};
+use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
 use config::{
-    is_local_disk_storage,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, is_local_disk_storage,
     meta::{
         promql,
         stream::{
@@ -27,17 +27,17 @@ use config::{
         },
     },
     utils::{json, time::now_micros},
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
-        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
+        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, unwrap_partition_time_level,
+        unwrap_stream_settings,
     },
-    table::distinct_values::{check_field_use, DistinctFieldRecord, OriginType},
+    table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
 
 use crate::{

@@ -17,17 +17,17 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, utils::util::zero_or, FxIndexMap};
+use config::{FxIndexMap, cluster, utils::util::zero_or};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
+    Pool, Sqlite,
     sqlite::{
         SqliteConnectOptions, SqliteJournalMode, SqliteLockingMode, SqlitePoolOptions,
         SqliteSynchronous,
     },
-    Pool, Sqlite,
 };
-use tokio::sync::{mpsc, Mutex, OnceCell, RwLock};
+use tokio::sync::{Mutex, OnceCell, RwLock, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::{

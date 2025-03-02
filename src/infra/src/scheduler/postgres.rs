@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,12 +19,11 @@ use chrono::Duration;
 use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
-use super::{get_scheduler_max_retries, Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
-        self,
-        postgres::{create_index, CLIENT},
-        IndexStatement,
+        self, IndexStatement,
+        postgres::{CLIENT, create_index},
     },
     errors::{DbError, Error, Result},
 };

@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
-    common::{tree_node::Transformed, Result},
-    logical_expr::{and, col, lit, Expr, Filter, LogicalPlan},
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    common::{Result, tree_node::Transformed},
+    logical_expr::{Expr, Filter, LogicalPlan, and, col, lit},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 
 /// Optimization rule that add _timestamp constraint to table scan
@@ -94,10 +94,10 @@ mod tests {
             session_state::SessionStateBuilder,
         },
         logical_expr::{
-            and, binary_expr, col, in_subquery, lit, table_scan, JoinType, LogicalPlan,
-            LogicalPlanBuilder, Operator,
+            JoinType, LogicalPlan, LogicalPlanBuilder, Operator, and, binary_expr, col,
+            in_subquery, lit, table_scan,
         },
-        optimizer::{push_down_filter::PushDownFilter, Optimizer, OptimizerContext, OptimizerRule},
+        optimizer::{Optimizer, OptimizerContext, OptimizerRule, push_down_filter::PushDownFilter},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -269,21 +269,27 @@ mod tests {
     #[tokio::test]
     async fn test_real_sql_for_timestamp() {
         let sqls = [
-            ("select * from t order by _timestamp", vec![
-                "+------------+-------------+",
-                "| _timestamp | name        |",
-                "+------------+-------------+",
-                "| 2          | observe     |",
-                "| 3          | openobserve |",
-                "+------------+-------------+",
-            ]),
-            ("select name from t where name = 'openobserve'", vec![
-                "+-------------+",
-                "| name        |",
-                "+-------------+",
-                "| openobserve |",
-                "+-------------+",
-            ]),
+            (
+                "select * from t order by _timestamp",
+                vec![
+                    "+------------+-------------+",
+                    "| _timestamp | name        |",
+                    "+------------+-------------+",
+                    "| 2          | observe     |",
+                    "| 3          | openobserve |",
+                    "+------------+-------------+",
+                ],
+            ),
+            (
+                "select name from t where name = 'openobserve'",
+                vec![
+                    "+-------------+",
+                    "| name        |",
+                    "+-------------+",
+                    "| openobserve |",
+                    "+-------------+",
+                ],
+            ),
             (
                 "select t1._timestamp, t1.name from t as t1 join t as t2 on t1.name = t2.name order by t1._timestamp",
                 vec![

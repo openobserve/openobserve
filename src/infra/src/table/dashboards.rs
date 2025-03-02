@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,15 @@
 
 use config::meta::{
     dashboards::{
-        v1::Dashboard as DashboardV1, v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3,
-        v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
-        ListDashboardsParams,
+        Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
+        v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
+        v5::Dashboard as DashboardV5,
     },
     folder::{Folder, FolderType},
 };
 use sea_orm::{
-    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -34,7 +34,7 @@ use super::{
     folders::folder_type_into_i16,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors::{self, GetDashboardError},
 };
 
@@ -488,7 +488,7 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{entity::prelude::*, DatabaseBackend, MockDatabase, Transaction};
+    use sea_orm::{DatabaseBackend, MockDatabase, Transaction, entity::prelude::*};
 
     use super::*;
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,14 +23,14 @@ use std::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use tantivy::{
-    directory::{error::OpenReadError, Directory, FileHandle, OwnedBytes},
     HasLen,
+    directory::{Directory, FileHandle, OwnedBytes, error::OpenReadError},
 };
 
 use crate::service::search::tantivy::{
-    puffin::{reader::PuffinBytesReader, BlobMetadata},
+    puffin::{BlobMetadata, reader::PuffinBytesReader},
     puffin_directory::{
-        get_file_from_empty_puffin_dir_with_ext, EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID,
+        EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID, get_file_from_empty_puffin_dir_with_ext,
     },
 };
 

@@ -16,8 +16,8 @@
 use std::{
     cmp::min,
     sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     },
 };
 
@@ -29,7 +29,7 @@ use etcd_client::{
 };
 use hashbrown::HashMap;
 use tokio::{
-    sync::{mpsc, OnceCell},
+    sync::{OnceCell, mpsc},
     task::JoinHandle,
     time,
 };
@@ -401,7 +401,7 @@ impl super::Db for Etcd {
                 }
                 let start_dt = item_key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
+use actix_web::{Error, HttpRequest, HttpResponse, rt, web};
 use actix_ws::Message;
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};

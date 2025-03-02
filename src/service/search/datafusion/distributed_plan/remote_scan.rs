@@ -22,8 +22,8 @@ use std::{
 
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_client::FlightServiceClient, utils::flight_data_to_arrow_batch, FlightData,
-    Ticket,
+    FlightData, Ticket, flight_service_client::FlightServiceClient,
+    utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
@@ -35,8 +35,8 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, PlanProperties,
+        stream::RecordBatchStreamAdapter,
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
@@ -45,9 +45,9 @@ use parking_lot::Mutex;
 use prost::Message;
 use proto::cluster_rpc;
 use tonic::{
+    Streaming,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    Streaming,
 };
 
 use super::{

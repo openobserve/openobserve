@@ -20,13 +20,13 @@ use config::{
     get_config,
     meta::{
         cluster::CompactionJobType,
-        stream::{FileKey, ALL_STREAM_TYPES},
+        stream::{ALL_STREAM_TYPES, FileKey},
     },
     metrics,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use crate::service::compact;
 

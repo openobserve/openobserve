@@ -16,12 +16,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use tokio::{
-    sync::{mpsc, Mutex, Semaphore},
+    sync::{Mutex, Semaphore, mpsc},
     time,
 };
 
 use super::handlers::handle_triggers;
-use crate::service::db::scheduler::{pull as scheduler_pull, Trigger, TriggerModule};
+use crate::service::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
 
 #[derive(Debug, Clone)]
 pub struct ScheduledJob {

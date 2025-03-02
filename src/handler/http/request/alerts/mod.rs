@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{delete, get, patch, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, patch, post, put, web};
 use config::meta::{
     alerts::alert::Alert as MetaAlert,
     folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
 use hashbrown::HashMap;
-use infra::db::{connect_to_orm, ORM_CLIENT};
+use infra::db::{ORM_CLIENT, connect_to_orm};
 use svix_ksuid::Ksuid;
 
 use crate::{

@@ -17,12 +17,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
 use config::{
-    get_config,
+    BLOOM_FILTER_DEFAULT_FIELDS, RwAHashMap, RwHashMap, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, get_config,
     ider::SnowflakeIdGenerator,
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    RwAHashMap, RwHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
-    SQL_SECONDARY_INDEX_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use futures::{StreamExt, TryStreamExt};

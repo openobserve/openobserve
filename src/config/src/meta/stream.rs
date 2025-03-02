@@ -18,7 +18,7 @@ use std::{cmp::max, fmt::Display};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
 
 use super::bitvec::BitVec;
@@ -26,7 +26,7 @@ use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         json::{self, Map, Value},
     },
 };

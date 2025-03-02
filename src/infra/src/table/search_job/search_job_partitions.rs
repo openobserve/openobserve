@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
+    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
     prelude::Expr,
     sea_query::{LockType, SimpleExpr},
-    ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ use super::{
     common::{OperatorType, Value},
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors, orm_err,
 };
 

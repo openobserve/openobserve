@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,7 +36,7 @@ pub mod enterprise_utils {
 
         use crate::common::{
             infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         // Check if the user is a root user (has all permissions)
@@ -93,7 +93,7 @@ pub mod sessions_cache_utils {
     use super::search_registry_utils::SearchState;
     use crate::{
         common::infra::config::WS_SESSIONS,
-        handler::http::request::websocket::session::{WsSession, SEARCH_REGISTRY},
+        handler::http::request::websocket::session::{SEARCH_REGISTRY, WsSession},
     };
 
     pub async fn run_gc_ws_sessions() {
