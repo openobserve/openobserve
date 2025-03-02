@@ -25,13 +25,14 @@ use config::{
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
 use once_cell::sync::Lazy;
-use opentelemetry::{global, metrics::Histogram, KeyValue};
+use opentelemetry::{KeyValue, global, metrics::Histogram};
 use opentelemetry_sdk::{
+    Resource,
     metrics::{
-        new_view, reader::DefaultTemporalitySelector, Aggregation, Instrument, PeriodicReader,
-        SdkMeterProvider, Stream,
+        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, new_view,
+        reader::DefaultTemporalitySelector,
     },
-    runtime, Resource,
+    runtime,
 };
 use tokio::{sync::Mutex, time};
 

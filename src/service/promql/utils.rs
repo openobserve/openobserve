@@ -16,13 +16,13 @@
 use std::collections::HashSet;
 
 use config::{
-    meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
     TIMESTAMP_COL_NAME,
+    meta::promql::{BUCKET_LABEL, HASH_LABEL, VALUE_LABEL},
 };
 use datafusion::{
     arrow::datatypes::Schema,
     error::Result,
-    prelude::{col, lit, DataFrame},
+    prelude::{DataFrame, col, lit},
 };
 use promql_parser::label::{MatchOp, Matchers};
 

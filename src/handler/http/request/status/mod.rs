@@ -16,19 +16,19 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    cookie,
+    HttpRequest, HttpResponse, cookie,
     cookie::{Cookie, SameSite},
     get, head,
     http::header,
-    put, web, HttpRequest, HttpResponse,
+    put, web,
 };
 use arrow_schema::Schema;
 use config::{
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{json, schema_ext::SchemaExt},
-    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -43,7 +43,7 @@ use {
     crate::common::utils::{auth::extract_auth_str, jwt::verify_decode_token},
     crate::handler::http::auth::{
         jwt::process_token,
-        validator::{get_user_email_from_auth_str, ID_TOKEN_HEADER, PKCE_STATE_ORG},
+        validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
     config::{ider, utils::base64},
@@ -298,7 +298,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: cfg.rum.api_version.to_string(),
             insecure_http: cfg.rum.insecure_http,
         },
-        meta_org: cfg.common.usage_org.to_string(),
+        meta_org: META_ORG_ID.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
         user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,15 +16,14 @@
 use std::{io::Error, sync::Arc};
 
 use actix_web::{
-    cookie, delete, get,
+    HttpRequest, HttpResponse, cookie, delete, get,
     http::{self},
-    post, put, web, HttpRequest, HttpResponse,
+    post, put, web,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
-    get_config,
+    Config, get_config,
     utils::{base64, json},
-    Config,
 };
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -44,7 +43,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::{generate_presigned_url, UserEmail},
+        utils::auth::{UserEmail, generate_presigned_url},
     },
     service::users,
 };
@@ -674,7 +673,7 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{test, App};
+    use actix_web::{App, test};
     use actix_web_httpauth::headers::authorization::Basic;
 
     use super::*;

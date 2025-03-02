@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
@@ -38,7 +41,7 @@ use super::utils::search_registry_utils::SearchState;
 use crate::handler::http::request::websocket::utils::search_registry_utils;
 use crate::handler::http::request::websocket::{
     search,
-    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
+    utils::{WsClientEvents, WsServerEvents, sessions_cache_utils},
 };
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;
@@ -53,6 +56,7 @@ pub struct WsSession {
     last_activity_ts: i64,
     // Utc timestamp in microseconds
     created_ts: i64,
+    message_in_flight: AtomicBool,
 }
 
 impl WsSession {
@@ -62,6 +66,7 @@ impl WsSession {
             inner: Some(inner),
             last_activity_ts: now,
             created_ts: now,
+            message_in_flight: AtomicBool::new(false),
         }
     }
 
@@ -317,54 +322,86 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
     let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
         session
     } else {
-        log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
         return Err(Error::Message(format!(
             "[req_id {}] session not found",
             req_id
         )));
     };
 
-    log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
-    session.text(msg).await.map_err(|e| {
-        log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
-        Error::Message(e.to_string())
-    })
+    // Try to acquire the in-flight flag with retries
+    let mut attempts = 0;
+    while attempts < 3 {
+        match session.message_in_flight.compare_exchange(
+            false,
+            true,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => {
+                // Got the lock, proceed with send
+                log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
+                let result = session.text(msg).await.map_err(|e| {
+                    log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
+                    Error::Message(e.to_string())
+                });
+
+                // Reset the in-flight flag
+                session.message_in_flight.store(false, Ordering::SeqCst);
+                return result;
+            }
+            Err(_) => {
+                // Message in flight, wait a tiny bit and retry
+                attempts += 1;
+                if attempts < 3 {
+                    tokio::task::yield_now().await;
+                }
+            }
+        }
+    }
+
+    log::error!(
+        "[WS_HANDLER]: req_id: {} Failed to send message after retries",
+        req_id
+    );
+
+    Err(Error::Message(
+        "Failed to send message after retries".to_string(),
+    ))
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
     if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
-        let mut close_reason = close_reason;
-        if let Some(reason) = close_reason.as_mut() {
+        if let Some(reason) = close_reason.as_ref() {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
                 req_id,
                 reason
             );
-        } else {
-            log::info!(
-                "[WS_HANDLER]: req_id: {} Closing session with no specific reason",
-                req_id
+        }
+
+        // Wait for any in-flight message to complete
+        let mut retries = 0;
+        while session.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
+            tokio::task::yield_now().await;
+            retries += 1;
+        }
+
+        if session.message_in_flight.load(Ordering::SeqCst) {
+            log::warn!(
+                "[WS_HANDLER]: req_id: {} Closing with message in flight after {} retries",
+                req_id,
+                retries
             );
         }
 
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
-                "[WS_HANDLER]: req_id: {} Failed to close session gracefully. Connection may have been closed prematurely: {:?}",
+                "[WS_HANDLER]: req_id: {} Failed to close session gracefully: {:?}",
                 req_id,
                 e
             );
-        } else {
-            log::info!(
-                "[WS_HANDLER]: req_id: {} Close frame sent successfully. Waiting for acknowledgment...",
-                req_id
-            );
         }
-    } else {
-        log::error!(
-            "[WS_HANDLER]: req_id: {} Session not found during cleanup",
-            req_id
-        );
     }
 
     // Remove the session from the cache

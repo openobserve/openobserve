@@ -15,7 +15,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use arrow::array::{new_null_array, ArrayRef};
+use arrow::array::{ArrayRef, new_null_array};
 use config::{
     get_config,
     meta::{

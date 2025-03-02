@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,12 +19,11 @@ use chrono::Duration;
 use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
-use super::{get_scheduler_max_retries, Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
-        self,
-        postgres::{create_index, CLIENT},
-        IndexStatement,
+        self, IndexStatement,
+        postgres::{CLIENT, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -265,27 +264,46 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
-WHERE org = $7 AND module_key = $8 AND module = $9;"#,
-        )
-        .bind(trigger.status)
-        .bind(trigger.retries)
-        .bind(trigger.next_run_at)
-        .bind(trigger.is_realtime)
-        .bind(trigger.is_silenced)
-        .bind(&trigger.data)
-        .bind(&trigger.org)
-        .bind(&trigger.module_key)
-        .bind(&trigger.module)
-        .execute(&pool)
-        .await?;
+        let query = if clone {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, start_time = $2, end_time = $3, retries = $4, next_run_at = $5, is_realtime = $6, is_silenced = $7, data = $8
+    WHERE org = $9 AND module_key = $10 AND module = $11;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.start_time)
+            .bind(trigger.end_time)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        } else {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
+    WHERE org = $7 AND module_key = $8 AND module = $9;"#,
+            )
+            .bind(trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        };
+
+        query.execute(&pool).await?;
 
         // For now, only send realtime alert triggers
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {

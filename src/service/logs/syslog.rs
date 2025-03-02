@@ -18,18 +18,17 @@ use std::{
     net::SocketAddr,
 };
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use syslog_loose::{Message, ProcId, Protocol};
 

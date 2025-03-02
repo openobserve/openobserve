@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use arrow::array::{Array, ArrayRef, GenericStringBuilder, ListBuilder, OffsetSiz
 use arrow_schema::Field;
 use datafusion::{
     arrow::datatypes::DataType::{self, *},
-    common::{cast::as_generic_string_array, exec_err, ScalarValue},
+    common::{ScalarValue, cast::as_generic_string_array, exec_err},
     error::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, TypeSignature, Volatility},
 };

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,12 @@
 
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
-use config::{get_config, MMDB_CITY_FILE_NAME};
+use config::{MMDB_CITY_FILE_NAME, get_config};
 #[cfg(feature = "enterprise")]
 use maxminddb::geoip2::Enterprise;
 use maxminddb::{
-    geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
+    geoip2::{City, ConnectionType, Isp},
 };
 use serde::{Deserialize, Serialize};
 use vector_enrichment::{Case, Condition, IndexHandle, Table};

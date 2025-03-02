@@ -19,18 +19,18 @@ use arrow::array::{Array, Int64Array};
 use config::meta::{inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan, PlanProperties,
+        stream::RecordBatchStreamAdapter,
     },
 };
 
 use crate::service::search::{
-    grpc::{storage::filter_file_list_by_tantivy_index, QueryParams},
+    grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
     index::IndexCondition,
 };
 

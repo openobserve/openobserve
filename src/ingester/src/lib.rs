@@ -30,8 +30,8 @@ use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex};
-pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+use tokio::sync::{Mutex, mpsc};
+pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 

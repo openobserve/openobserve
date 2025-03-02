@@ -17,11 +17,12 @@ use std::{
     cmp::min,
     collections::HashMap,
     ops::Bound,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
 use config::{
+    RwAHashMap, RwBTreeMap,
     cluster::*,
     get_config,
     meta::{
@@ -31,12 +32,11 @@ use config::{
     utils::{
         hash::Sum64,
         json,
-        sysinfo::{get_node_metrics, NodeMetrics},
+        sysinfo::{NodeMetrics, get_node_metrics},
     },
-    RwAHashMap, RwBTreeMap,
 };
 use infra::{
-    db::{get_coordinator, Event},
+    db::{Event, get_coordinator},
     errors::Result,
 };
 use once_cell::sync::Lazy;

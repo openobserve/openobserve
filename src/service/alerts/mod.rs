@@ -18,7 +18,7 @@ use arrow_schema::DataType;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
-    ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -29,7 +29,6 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    TIMESTAMP_COL_NAME,
 };
 
 use super::promql;
@@ -610,12 +609,7 @@ async fn build_sql(
     if sql.is_empty() {
         sql = format!(
             "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            func_expr,
-            TIMESTAMP_COL_NAME,
-            TIMESTAMP_COL_NAME,
-            stream_name,
-            where_sql,
-            having_expr
+            func_expr, TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, stream_name, where_sql, having_expr
         );
     }
     Ok(sql)

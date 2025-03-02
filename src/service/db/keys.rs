@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -59,10 +59,18 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
                 match o2_enterprise::enterprise::super_cluster::queue::keys_put(entry.clone()).await
                 {
                     Ok(_) => {
-                        log::info!("successfully sent key add notification to super cluster queue for {}/{}", entry.org,entry.name);
+                        log::info!(
+                            "successfully sent key add notification to super cluster queue for {}/{}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key add notification to super cluster queue for {}/{} : {e}", entry.org,entry.name);
+                        log::error!(
+                            "error in sending cipher key add notification to super cluster queue for {}/{} : {e}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                 }
             }
@@ -96,11 +104,17 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
                 {
                     Ok(_) => {
                         log::info!(
-                            "successfully sent cipher key update notification to super cluster queue for {}/{}",entry.org,entry.name
+                            "successfully sent cipher key update notification to super cluster queue for {}/{}",
+                            entry.org,
+                            entry.name
                         );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key update notification to super cluster queue for {}/{} : {e}",entry.org,entry.name);
+                        log::error!(
+                            "error in sending cipher key update notification to super cluster queue for {}/{} : {e}",
+                            entry.org,
+                            entry.name
+                        );
                     }
                 }
             }
@@ -137,7 +151,9 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
                         );
                     }
                     Err(e) => {
-                        log::error!("error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}");
+                        log::error!(
+                            "error in sending cipher key delete notification to super cluster queue for {org}/{name} : {e}"
+                        );
                     }
                 }
             }

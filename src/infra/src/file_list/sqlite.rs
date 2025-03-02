@@ -23,7 +23,7 @@ use config::{
     },
     utils::{
         parquet::parse_file_key_columns,
-        time::{end_of_the_day, DAY_MICRO_SECS},
+        time::{DAY_MICRO_SECS, end_of_the_day},
     },
 };
 use hashbrown::HashMap;
@@ -31,8 +31,8 @@ use sqlx::{Executor, Pool, QueryBuilder, Row, Sqlite};
 
 use crate::{
     db::{
-        sqlite::{create_index, CLIENT_RO, CLIENT_RW},
         IndexStatement,
+        sqlite::{CLIENT_RO, CLIENT_RW, create_index},
     },
     errors::{Error, Result},
 };

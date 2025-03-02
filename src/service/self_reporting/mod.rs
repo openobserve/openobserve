@@ -14,18 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Datelike, Timelike};
+#[cfg(feature = "enterprise")]
+use config::META_ORG_ID;
 use config::{
+    SIZE_IN_MB,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         self_reporting::{
+            ReportingData,
             error::ErrorData,
             usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
-            ReportingData,
         },
         stream::StreamType,
     },
-    metrics, SIZE_IN_MB,
+    metrics,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
@@ -284,7 +287,7 @@ pub async fn run_audit_publish() {
         log::debug!("Audit ingestion loop running");
         audit_interval.tick().await;
         o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-            &get_config().common.usage_org,
+            META_ORG_ID,
             publish_audit,
         )
         .await;
@@ -293,12 +296,12 @@ pub async fn run_audit_publish() {
 
 #[cfg(feature = "enterprise")]
 pub async fn audit(msg: auditor::AuditMessage) {
-    auditor::audit(&get_config().common.usage_org, msg, publish_audit).await;
+    auditor::audit(META_ORG_ID, msg, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]
 pub async fn flush_audit() {
-    auditor::flush_audit(&get_config().common.usage_org, publish_audit).await;
+    auditor::flush_audit(META_ORG_ID, publish_audit).await;
 }
 
 #[cfg(feature = "enterprise")]

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -195,6 +195,9 @@ pub struct ListAlertsParams {
     /// The optional folder ID surrogate key with which to filter alerts.
     pub folder_id: Option<String>,
 
+    /// The optional case-insensitive alert name substring with which to filter alerts.
+    pub name_substring: Option<String>,
+
     /// The optional stream type and stream name with which to filter alerts.
     ///
     /// The stream name can only be provided if the stream type is also provide.
@@ -219,6 +222,7 @@ impl ListAlertsParams {
         Self {
             org_id: org_id.to_owned(),
             folder_id: None,
+            name_substring: None,
             stream_type_and_name: None,
             enabled: None,
             owner: None,
@@ -226,9 +230,15 @@ impl ListAlertsParams {
         }
     }
 
-    /// Filter dashboards by the given folder ID surrogate key.
+    /// Filter alerts by the given folder ID surrogate key.
     pub fn in_folder(mut self, folder_id: &str) -> Self {
         self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Filter alerts by the given case-insensitive name substring.
+    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
+        self.name_substring = Some(name_substring.to_string());
         self
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,8 +24,8 @@ use super::{cacher::get_results, sort_response};
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
         CachedQueryResponse,
+        result_utils::{get_ts_value, round_down_to_nearest_minute},
     },
 };
 

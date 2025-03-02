@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    get_config,
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT, get_config,
     meta::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
@@ -28,12 +28,11 @@ use config::{
     },
     metrics,
     utils::{inverted_index::split_token, json, time::BASE_TIME},
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
-    common::{tree_node::TreeNode, TableReference},
+    common::{TableReference, tree_node::TreeNode},
     error::DataFusionError,
-    physical_plan::{displayable, visit_execution_plan, ExecutionPlan},
+    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -44,17 +43,18 @@ use infra::{
 };
 use itertools::Itertools;
 use proto::cluster_rpc::{self, SearchQuery};
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
+        DATAFUSION_RUNTIME,
         datafusion::{
             distributed_plan::{
+                EmptyExecVisitor,
                 remote_scan::RemoteScanExec,
                 rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
-                EmptyExecVisitor,
             },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
@@ -64,7 +64,6 @@ use crate::{
         request::Request,
         sql::Sql,
         utils::{AsyncDefer, ScanStatsVisitor},
-        DATAFUSION_RUNTIME,
     },
 };
 
@@ -423,7 +422,9 @@ pub async fn run_datafusion(
 
     let mut visitor = EmptyExecVisitor::default();
     if physical_plan.visit(&mut visitor).is_err() {
-        log::error!("[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable");
+        log::error!(
+            "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
+        );
         return Err(Error::Message(
             "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
         ));

@@ -15,8 +15,8 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{get_config, meta::stream::StreamType, metrics, utils::json, TIMESTAMP_COL_NAME};
+use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
 use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -159,7 +159,7 @@ pub async fn get_latest_traces(
 
         use crate::common::{
             infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+            utils::auth::{AuthExtractor, is_root_user},
         };
         let user_id = in_req.headers().get("user_id").unwrap();
         if !is_root_user(user_id.to_str().unwrap()) {

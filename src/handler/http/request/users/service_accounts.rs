@@ -1,4 +1,19 @@
-use actix_web::{post, web, Error, HttpRequest, HttpResponse};
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use actix_web::{Error, HttpRequest, HttpResponse, post, web};
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 #[cfg(feature = "enterprise")]

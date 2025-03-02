@@ -17,10 +17,10 @@ use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
 use async_trait::async_trait;
-use config::{meta::search, TIMESTAMP_COL_NAME};
+use config::{TIMESTAMP_COL_NAME, meta::search};
 
 use crate::{
-    cli::data::{cli::Cli, Context},
+    cli::data::{Context, cli::Cli},
     common::utils::http::{
         get_search_event_context_from_request, get_search_type_from_request,
         get_stream_type_from_request,

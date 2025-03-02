@@ -21,16 +21,16 @@ use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::{
     fs,
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
 };
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::PersistStat,
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioMpscSendSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
