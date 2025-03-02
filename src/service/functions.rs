@@ -386,10 +386,7 @@ fn extract_num_args(func: &mut Transform) {
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
-    match db::functions::get(org_id, fn_name).await {
-        Ok(function) => Some(function),
-        Err(_) => None,
-    }
+    (db::functions::get(org_id, fn_name).await).ok()
 }
 
 #[cfg(test)]

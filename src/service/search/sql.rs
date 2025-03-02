@@ -1574,7 +1574,7 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
 fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool {
     schemas.values().any(|schema| {
         let stream_setting = unwrap_stream_settings(schema.schema());
-        stream_setting.map_or(false, |setting| setting.store_original_data)
+        stream_setting.is_some_and(|setting| setting.store_original_data)
     })
 }
 

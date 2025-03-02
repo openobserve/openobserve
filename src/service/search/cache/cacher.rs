@@ -743,9 +743,9 @@ fn calculate_deltas_multi(
 
     // Check if there is a gap at the end
     if current_end_time < end_time
-        && results.last().map_or(false, |last_meta| {
-            !last_meta.cached_response.hits.is_empty()
-        })
+        && results
+            .last()
+            .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
         deltas.push(QueryDelta {
             // Adding histogram interval to the current end time to ensure the next query

@@ -401,7 +401,7 @@ impl super::Db for Etcd {
                 }
                 let start_dt = item_key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();

@@ -910,7 +910,7 @@ async fn handle_derived_stream_triggers(
                 end = now + 1;
             }
             Ok((ret, next)) => {
-                let is_satisfied = ret.as_ref().map_or(false, |ret| !ret.is_empty());
+                let is_satisfied = ret.as_ref().is_some_and(|ret| !ret.is_empty());
 
                 // ingest evaluation result into destination
                 if is_satisfied {

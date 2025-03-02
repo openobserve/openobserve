@@ -942,7 +942,7 @@ fn repartition_sorted_groups(
         }
 
         // split max_group into odd and even groups
-        let group_cap = (max_group.len() + 1) / 2;
+        let group_cap = max_group.len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 

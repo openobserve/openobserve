@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,8 +73,7 @@ impl OptimizerRule for RewriteHistogram {
         if plan
             .expressions()
             .iter()
-            .map(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
-            .any(|x| x)
+            .any(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
         {
             let mut expr_rewriter = HistogramToDatebin::new(self.start_time, self.end_time);
 

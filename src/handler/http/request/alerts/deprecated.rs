@@ -146,10 +146,7 @@ async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest)
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
+        .and_then(|field| field.parse::<bool>().ok());
     let alert_filter = AlertListFilter {
         owner: user_filter,
         enabled: enabled_filter,
@@ -224,10 +221,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
     let user_filter = query.get("owner").map(|v| v.to_string());
     let enabled_filter = query
         .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
+        .and_then(|field| field.parse::<bool>().ok());
     let stream_type_filter = get_stream_type_from_request(&query);
     let stream_name_filter = query.get("stream_name").map(|v| v.as_str());
 

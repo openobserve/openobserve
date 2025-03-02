@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -513,8 +513,8 @@ pub async fn add_many(
 }
 
 /// Helper function to insert a single `TimedAnnotation` record and its associated panels
-async fn insert_timed_annotation<'a>(
-    txn: &'a DatabaseTransaction,
+async fn insert_timed_annotation(
+    txn: &DatabaseTransaction,
     dashboard_id: &str,
     timed_annotation: TimedAnnotation,
     use_given_id: bool,

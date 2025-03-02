@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -850,7 +850,7 @@ fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
 fn is_short_url_path(path_columns: &[&str]) -> bool {
     path_columns
         .get(1)
-        .map_or(false, |&segment| segment.to_lowercase() == "short")
+        .is_some_and(|&segment| segment.to_lowercase() == "short")
 }
 
 /// Handles authentication failure by logging the error and returning a redirect response.

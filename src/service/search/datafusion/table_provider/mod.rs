@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -218,8 +218,8 @@ impl NewListingTable {
     /// This method first checks if the statistics for the given file are already cached.
     /// If they are, it returns the cached statistics.
     /// If they are not, it infers the statistics from the file and stores them in the cache.
-    async fn do_collect_statistics<'a>(
-        &'a self,
+    async fn do_collect_statistics(
+        &self,
         ctx: &SessionState,
         store: &Arc<dyn ObjectStore>,
         part_file: &PartitionedFile,
@@ -449,7 +449,7 @@ fn repartition_sorted_groups(
         }
 
         // split max_group into odd and even groups
-        let group_cap = (max_group.len() + 1) / 2;
+        let group_cap = max_group.len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 

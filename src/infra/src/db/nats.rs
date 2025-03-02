@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -509,7 +509,7 @@ impl super::Db for NatsDb {
                 let key = key_decode(&k);
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();
@@ -529,7 +529,7 @@ impl super::Db for NatsDb {
             .map(|key| async move {
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();

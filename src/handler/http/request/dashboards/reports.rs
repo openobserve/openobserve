@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -126,10 +126,7 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
     let destination_less = query
         .get("cache")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
+        .and_then(|field| field.parse::<bool>().ok());
     let filters = ReportListFilters {
         folder,
         dashboard,
