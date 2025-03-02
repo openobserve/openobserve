@@ -6,7 +6,6 @@ COPY ./web /web/
 RUN npm install
 RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
-# FROM public.ecr.aws/docker/library/rust:bookworm as builder
 FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
 ARG AWS_DEFAULT_REGION
 ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI

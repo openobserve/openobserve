@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use aes_siv::{siv::Aes256Siv, KeyInit};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use aes_siv::{KeyInit, siv::Aes256Siv};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use config::get_config;
 use once_cell::sync::Lazy;
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{entity::cipher_keys::*, get_lock};
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
 

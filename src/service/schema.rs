@@ -17,19 +17,19 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{promql::METADATA_LABEL, stream::StreamType},
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST,
-    STREAM_SETTINGS,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
+    unwrap_stream_settings,
 };
 use serde_json::{Map, Value};
 
@@ -342,7 +342,7 @@ async fn handle_diff_schema(
         for field in final_schema.fields() {
             let field_name = field.name();
             // skip _timestamp and _all columns
-            if field_name == &cfg.common.column_timestamp || field_name == &cfg.common.column_all {
+            if field_name == TIMESTAMP_COL_NAME || field_name == &cfg.common.column_all {
                 continue;
             }
             uds_fields.insert(field_name.to_string());
@@ -425,10 +425,13 @@ pub fn generate_schema_for_defined_schema_fields(
     }
 
     let cfg = get_config();
-    let (o2_id_col, original_col) = (ID_COL_NAME.to_string(), ORIGINAL_DATA_COL_NAME.to_string());
-    let mut fields: HashSet<_> = fields.iter().collect();
-    if !fields.contains(&cfg.common.column_timestamp) {
-        fields.insert(&cfg.common.column_timestamp);
+    let timestamp_col = TIMESTAMP_COL_NAME.to_string();
+    let o2_id_col = ID_COL_NAME.to_string();
+    let original_col = ORIGINAL_DATA_COL_NAME.to_string();
+
+    let mut fields: HashSet<&String> = fields.iter().collect();
+    if !fields.contains(&timestamp_col) {
+        fields.insert(&timestamp_col);
     }
     if !fields.contains(&cfg.common.column_all) {
         fields.insert(&cfg.common.column_all);
@@ -441,6 +444,7 @@ pub fn generate_schema_for_defined_schema_fields(
             fields.insert(&original_col);
         }
     }
+
     let mut new_fields = Vec::with_capacity(fields.len());
     for field in fields {
         if let Some(f) = schema.fields_map().get(field) {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,8 +24,8 @@ use super::{cacher::get_results, sort_response};
 use crate::{
     common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
     service::search::cache::{
-        result_utils::{get_ts_value, round_down_to_nearest_minute},
         CachedQueryResponse,
+        result_utils::{get_ts_value, round_down_to_nearest_minute},
     },
 };
 
@@ -249,6 +249,21 @@ async fn recursive_process_multiple_metas(
     Ok(())
 }
 
+/// Cache selection strategies determine how to choose the best cached result when multiple caches
+/// exist:
+///
+/// 1. Overlap: Selects cache with maximum overlap with query time range Example: Query:
+///    10:00-10:30, Cache1: 10:00-10:15, Cache2: 10:10-10:25 Chooses Cache2 (15min overlap) over
+///    Cache1 (10min overlap)
+///
+/// 2. Duration: Selects cache with longest duration regardless of overlap Example: Query:
+///    10:00-10:30, Cache1: 09:00-10:00, Cache2: 09:30-10:30   Chooses Cache1 (1hr) over Cache2
+///    (30min)
+///
+/// 3. Both: Calculates what percentage of the cache duration overlaps with query Example: Query:
+///    10:00-11:00 Cache1: 10:00-10:30 (duration: 30min, overlap: 30min) = (30/30)*100 = 100%
+///    Cache2: 10:15-11:15 (duration: 60min, overlap: 45min) = (45/60)*100 = 75% Chooses Cache1
+///    because 100% of its duration is useful for the query
 fn select_cache_meta(
     meta: &ResultCacheMeta,
     req: &CacheQueryRequest,

@@ -22,10 +22,10 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup};
 use proto::cluster_rpc::{
-    search_server::Search, CancelQueryRequest, CancelQueryResponse, DeleteResultRequest,
-    DeleteResultResponse, GetResultRequest, GetResultResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
-    SearchResponse,
+    CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
+    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 

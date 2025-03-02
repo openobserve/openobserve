@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ use super::{
     get_lock,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors::{self, DbError, Error},
     table::entity::action_scripts::{Column, Entity},
 };
@@ -192,9 +192,13 @@ pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, error
     Ok(records)
 }
 
-pub async fn contains(id: &str) -> Result<bool, errors::Error> {
+pub async fn contains(id: &str, org_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
+    let record = Entity::find()
+        .filter(Column::Id.eq(id))
+        .filter(Column::OrgId.eq(org_id))
+        .one(client)
+        .await?;
 
     Ok(record.is_some())
 }

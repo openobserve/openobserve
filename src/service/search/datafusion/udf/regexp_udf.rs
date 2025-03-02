@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,8 @@ use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
         array::{
-            as_large_list_array, as_list_array, as_string_array, Array, ArrayData, ArrayRef,
-            BooleanArray, StringArray, StructArray,
+            Array, ArrayData, ArrayRef, BooleanArray, StringArray, StructArray,
+            as_large_list_array, as_list_array, as_string_array,
         },
         datatypes::DataType,
     },
@@ -32,7 +32,7 @@ use datafusion::{
         TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
-    prelude::{create_udf, Expr},
+    prelude::{Expr, create_udf},
     scalar::ScalarValue,
 };
 use once_cell::sync::Lazy;

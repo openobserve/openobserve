@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,12 +20,12 @@ use bytes::Bytes;
 use config::metrics;
 use futures::stream::BoxStream;
 use object_store::{
-    limit::LimitStore, local::LocalFileSystem, path::Path, Error, GetOptions, GetResult,
-    ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload,
-    PutResult, Result,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    local::LocalFileSystem, path::Path,
 };
 
-use crate::storage::{format_key, CONCURRENT_REQUESTS};
+use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,

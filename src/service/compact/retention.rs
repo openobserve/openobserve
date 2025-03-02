@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamType, TimeRange},
-    utils::time::{hour_micros, BASE_TIME},
+    utils::time::{BASE_TIME, hour_micros},
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
 use itertools::Itertools;

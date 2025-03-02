@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http::StatusCode, post, web};
 use config::{
     get_config,
     meta::{
@@ -70,10 +70,7 @@ pub async fn submit_job(
         .to_string();
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
@@ -285,7 +282,7 @@ pub async fn delete_job(
     // 1. cancel the query
     match cancel_job_inner(&org_id, &job_id, &user_id).await {
         Ok(res) if res.status() != StatusCode::OK && res.status() != StatusCode::BAD_REQUEST => {
-            return Ok(res)
+            return Ok(res);
         }
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         _ => {}

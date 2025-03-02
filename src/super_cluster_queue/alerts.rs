@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors::Result,
     table,
 };
@@ -46,7 +46,13 @@ pub(crate) async fn process_msg(msg: AlertMessage) -> Result<()> {
             alert,
         } => {
             log::debug!("Creating alert: {:?}", alert);
-            let alert = table::alerts::create(conn, &org_id, &folder_id, alert, true).await?;
+            if table::alerts::get_by_id(conn, &org_id, alert.id.expect("alert id cannot be none"))
+                .await?
+                .is_some()
+            {
+                return Ok(());
+            }
+            table::alerts::create(conn, &org_id, &folder_id, alert.clone(), true).await?;
             infra::cluster_coordinator::alerts::emit_put_event(&org_id, &alert).await?;
         }
         AlertMessage::Update {

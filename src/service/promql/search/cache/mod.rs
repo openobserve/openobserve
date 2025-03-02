@@ -16,15 +16,15 @@
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 
 use config::{
     get_config,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         time::{now, now_micros, second_micros},
     },
 };
@@ -155,28 +155,38 @@ pub async fn get(
 
     let mut new_start = start;
     for series in resp.series.iter_mut() {
-        // filter the samples, remove the samples over end
+        // filter the samples, remove the samples over time range
+        let value_n = series.samples.len();
+        let mut first_i = 0;
+        while first_i < value_n && series.samples[first_i].time < start {
+            first_i += 1;
+        }
+        if first_i > 0 {
+            series.samples.drain(0..first_i);
+        }
         let value_n = series.samples.len();
         let mut last_i = value_n;
-        for i in 0..last_i {
-            if series.samples[i].time > end {
-                last_i = i;
-                break;
-            }
+        while last_i > 0 && series.samples[last_i - 1].time > end {
+            last_i -= 1;
         }
         if last_i < value_n {
             series.samples.drain(last_i..);
         }
 
-        // filter the exemplars, remove the exemplars over end
+        // filter the exemplars, remove the exemplars over time range
         if let Some(exemplars) = series.exemplars.as_mut() {
             let value_n = exemplars.exemplars.len();
+            let mut first_i = 0;
+            while first_i < value_n && exemplars.exemplars[first_i].time < start {
+                first_i += 1;
+            }
+            if first_i > 0 {
+                exemplars.exemplars.drain(0..first_i);
+            }
+            let value_n = exemplars.exemplars.len();
             let mut last_i = value_n;
-            for i in (0..last_i).rev() {
-                if exemplars.exemplars[i].time < end {
-                    last_i = i;
-                    break;
-                }
+            while last_i > 0 && exemplars.exemplars[last_i - 1].time > end {
+                last_i -= 1;
             }
             if last_i < value_n {
                 exemplars.exemplars.drain(last_i..);
@@ -398,7 +408,7 @@ fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
         return None;
     }
-    let item_key = key.split('/').last().unwrap_or("");
+    let item_key = key.split('/').next_back().unwrap_or("");
     let parts = item_key.split('_').collect::<Vec<_>>();
     if parts.len() != 4 {
         return None;

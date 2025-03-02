@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,14 +18,14 @@ use std::sync::Arc;
 use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
         Result, TableReference,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     physical_expr::LexOrdering,
     physical_plan::{
+        ExecutionPlan, ExecutionPlanProperties, Partitioning,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
-        ExecutionPlan, ExecutionPlanProperties, Partitioning,
     },
 };
 use hashbrown::HashMap;

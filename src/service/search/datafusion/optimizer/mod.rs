@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
 use datafusion::optimizer::{
-    common_subexpr_eliminate::CommonSubexprEliminate,
+    OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
     eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
     eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
@@ -32,7 +32,7 @@ use datafusion::optimizer::{
     push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
     scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
     single_distinct_to_groupby::SingleDistinctToGroupBy,
-    unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
+    unwrap_cast_in_comparison::UnwrapCastInComparison,
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
@@ -111,11 +111,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // *********** custom rules ***********
     rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
     if let Some(limit) = limit {
-        rules.push(Arc::new(AddSortAndLimitRule::new(
-            limit,
-            offset,
-            sql.order_by.first().cloned(),
-        )));
+        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
     #[cfg(feature = "enterprise")]

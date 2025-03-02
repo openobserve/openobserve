@@ -18,7 +18,8 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
-    get_config, is_local_disk_storage,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL, get_config,
+    is_local_disk_storage,
     meta::{
         bitvec::BitVec,
         inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
@@ -28,10 +29,9 @@ use config::{
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
@@ -55,7 +55,7 @@ use crate::service::{
             caching_directory::CachingDirectory,
             convert_puffin_file_to_tantivy_dir,
             footer_cache::FooterCache,
-            reader::{warm_up_terms, PuffinDirReader},
+            reader::{PuffinDirReader, warm_up_terms},
             reader_cache,
         },
     },
@@ -123,6 +123,7 @@ pub async fn search(
 
     // check inverted index
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
     if use_inverted_index {
@@ -326,9 +327,8 @@ async fn cache_files(
             scan_stats.querier_disk_cached_files += 1;
         }
     }
-    if files.len() as i64
-        == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files
-    {
+    let files_num = files.len() as i64;
+    if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
         return Ok(file_data::CacheType::None);
     }
@@ -378,7 +378,14 @@ async fn cache_files(
             }
         }
     });
-    Ok(cache_type)
+
+    // if cached file less than 50% of the total files, return None
+    if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
+    {
+        Ok(file_data::CacheType::None)
+    } else {
+        Ok(cache_type)
+    }
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
@@ -424,10 +431,10 @@ async fn cache_files_inner(
             // return file_name if download failed
             if let Some(e) = ret {
                 log::warn!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
-                        e,
-                        file_name
-                    );
+                    "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
+                    e,
+                    file_name
+                );
             }
             drop(permit);
         });
@@ -632,11 +639,21 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                     } else {
                         // if the bitmap is empty then we remove the file from the list
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: no match found in index for file {}",
-                            query.trace_id,
-                            file_name
-                        );
+                        if hits_in_file > 0 {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                hits_in_file,
+                                file_name
+                            );
+                        } else {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: no match found in index for file {}",
+                                query.trace_id,
+                                file_name
+                            );
+                        }
                         file_list_map.remove(&file_name);
                     }
                 }
@@ -925,7 +942,7 @@ fn repartition_sorted_groups(
         }
 
         // split max_group into odd and even groups
-        let group_cap = (max_group.len() + 1) / 2;
+        let group_cap = max_group.len().div_ceil(2);
         let mut odd_group = Vec::with_capacity(group_cap);
         let mut even_group = Vec::with_capacity(group_cap);
 

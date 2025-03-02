@@ -1,16 +1,31 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::{
     fmt::{self, Debug, Formatter},
     sync::Arc,
 };
 
-use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
+use config::{INDEX_FIELD_NAME_FOR_ALL, utils::tantivy::tokenizer::o2_collect_tokens};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
     },
     scalar::ScalarValue,
 };
@@ -18,9 +33,9 @@ use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
+    Term,
     query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
     schema::{Field, IndexRecordOption, Schema},
-    Term,
 };
 
 use super::{

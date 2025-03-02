@@ -16,31 +16,30 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, metrics,
-    utils::hash::{gxhash, Sum64},
-    MEM_TABLE_INDIVIDUAL_STREAMS,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    utils::hash::{Sum64, gxhash},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use wal::Writer as WalWriter;
 
 use crate::{
+    ReadRecordBatchEntry, WriterSignal,
     entry::Entry,
     errors::*,
-    immutable::{Immutable, IMMUTABLES},
+    immutable::{IMMUTABLES, Immutable},
     memtable::MemTable,
     rwmap::RwMap,
-    ReadRecordBatchEntry, WriterSignal,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
@@ -493,9 +492,10 @@ impl Writer {
     /// Check if the wal file size is over the threshold or the file is too old
     fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
         let cfg = get_config();
-        let (compressed_size, _uncompressed_size) = written_size;
+        let (compressed_size, uncompressed_size) = written_size;
         compressed_size > wal::FILE_TYPE_IDENTIFIER_LEN
             && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
+                || uncompressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
                         .unwrap()

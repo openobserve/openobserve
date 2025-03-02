@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -82,7 +82,7 @@ pub async fn save(
                 .query_condition
                 .promql
                 .as_ref()
-                .map_or(false, |promql| promql.is_empty())
+                .is_some_and(|promql| promql.is_empty())
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(

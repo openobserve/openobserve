@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,14 +22,13 @@ use actix_web::web;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
 
 use super::{ingestion_log_enabled, log_failed_record};
@@ -227,7 +226,7 @@ pub async fn ingest(
                     );
                     continue;
                 };
-                let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+                let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
                     Some(v) => match parse_timestamp_micro_from_value(v) {
                         Ok(t) => t,
                         Err(_e) => {
@@ -256,7 +255,7 @@ pub async fn ingest(
                     None => Utc::now().timestamp_micros(),
                 };
                 local_val.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -302,7 +301,7 @@ pub async fn ingest(
                 }
 
                 // handle timestamp
-                let timestamp = match local_val.get(&cfg.common.column_timestamp) {
+                let timestamp = match local_val.get(TIMESTAMP_COL_NAME) {
                     Some(v) => match parse_timestamp_micro_from_value(v) {
                         Ok(t) => t,
                         Err(_e) => {
@@ -356,7 +355,7 @@ pub async fn ingest(
                     continue;
                 }
                 local_val.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -456,9 +455,8 @@ pub async fn ingest(
                                 );
                             }
 
-                            let Some(timestamp) = local_val
-                                .get(&cfg.common.column_timestamp)
-                                .and_then(|ts| ts.as_i64())
+                            let Some(timestamp) =
+                                local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
                             else {
                                 bulk_res.errors = true;
                                 metrics::INGEST_ERRORS
@@ -512,7 +510,7 @@ pub async fn ingest(
                                 continue;
                             }
                             local_val.insert(
-                                cfg.common.column_timestamp.clone(),
+                                TIMESTAMP_COL_NAME.to_string(),
                                 json::Value::Number(timestamp.into()),
                             );
 

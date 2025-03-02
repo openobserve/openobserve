@@ -15,7 +15,7 @@
 
 use datafusion::error::Result;
 
-use crate::service::promql::value::{extrapolated_rate, ExtrapolationKind, RangeValue, Value};
+use crate::service::promql::value::{ExtrapolationKind, RangeValue, Value, extrapolated_rate};
 
 pub(crate) fn delta(data: Value) -> Result<Value> {
     super::eval_idelta(data, "delta", exec, false)

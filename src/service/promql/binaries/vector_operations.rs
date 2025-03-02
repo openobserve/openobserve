@@ -20,12 +20,12 @@ use std::{
 
 use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
+use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 
 use crate::service::promql::{
     binaries::scalar_binary_operations,
-    value::{signature, InstantValue, Label, LabelsExt, Sample, Value},
+    value::{InstantValue, Label, LabelsExt, Sample, Value, signature},
 };
 
 // DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric

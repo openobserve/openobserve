@@ -18,8 +18,8 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
-    get_config,
-    meta::promql::{HashLabelValue, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    TIMESTAMP_COL_NAME,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
     utils::json,
 };
 use datafusion::{
@@ -29,26 +29,26 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, DataFrame, SessionContext},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
-use futures::{future::try_join_all, TryStreamExt};
+use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
-        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
-        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
+        AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
+        LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
+        VectorMatchCardinality, VectorSelector, token,
     },
 };
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    utils::{apply_label_selector, apply_matchers},
     PromqlContext,
+    utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
 };
 
 pub struct Engine {
@@ -529,7 +529,10 @@ impl Engine {
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
+                log::error!(
+                    "[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}",
+                    self.trace_id
+                );
                 data_loaded.insert(table_name.to_string());
                 return Err(e);
             }
@@ -678,7 +681,7 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] load data done for stream: {}, took: {}ms",
+            "[trace_id: {}] load data done for stream: {}, took: {} ms",
             self.trace_id,
             table_name,
             start_time.elapsed().as_millis()
@@ -1120,9 +1123,9 @@ async fn selector_load_data_from_datafusion(
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v.filter(
-            col(&cfg.common.column_timestamp)
+            col(TIMESTAMP_COL_NAME)
                 .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
             return Ok(HashMap::default());
@@ -1142,7 +1145,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp
+            if name == TIMESTAMP_COL_NAME
                 || name == VALUE_LABEL
                 || name == EXEMPLARS_LABEL
                 || name == NAME_LABEL
@@ -1166,7 +1169,7 @@ async fn selector_load_data_from_datafusion(
         .clone()
         .aggregate(
             vec![col(HASH_LABEL)],
-            vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
+            vec![max(col(TIMESTAMP_COL_NAME)).alias(TIMESTAMP_COL_NAME)],
         )?
         .sort(vec![col(HASH_LABEL).sort(true, true)])?
         .limit(0, Some(max_series))?
@@ -1180,7 +1183,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1201,7 +1204,7 @@ async fn selector_load_data_from_datafusion(
                 .iter()
                 .flat_map(|batch| {
                     let ts = batch
-                        .column_by_name(&cfg.common.column_timestamp)
+                        .column_by_name(TIMESTAMP_COL_NAME)
                         .unwrap()
                         .as_any()
                         .downcast_ref::<Int64Array>()
@@ -1230,7 +1233,7 @@ async fn selector_load_data_from_datafusion(
     // get series
     let series = df_group
         .clone()
-        .filter(col(&cfg.common.column_timestamp).in_list(timestamp_values, false))?
+        .filter(col(TIMESTAMP_COL_NAME).in_list(timestamp_values, false))?
         .select(label_cols)?
         .collect()
         .await?;
@@ -1340,9 +1343,8 @@ async fn load_samples_from_datafusion(
     df: DataFrame,
 ) -> Result<()> {
     let start_time = std::time::Instant::now();
-    let cfg = get_config();
     let streams = df
-        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
+        .select_columns(&[TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL])?
         .execute_stream_partitioned()
         .await?;
 
@@ -1357,12 +1359,11 @@ async fn load_samples_from_datafusion(
         let mut series = metrics.clone();
         let task: tokio::task::JoinHandle<Result<HashMap<HashLabelValue, RangeValue>>> =
             tokio::task::spawn(async move {
-                let cfg = get_config();
                 loop {
                     match stream.try_next().await {
                         Ok(Some(batch)) => {
                             let time_values = batch
-                                .column_by_name(&cfg.common.column_timestamp)
+                                .column_by_name(TIMESTAMP_COL_NAME)
                                 .unwrap()
                                 .as_any()
                                 .downcast_ref::<Int64Array>()

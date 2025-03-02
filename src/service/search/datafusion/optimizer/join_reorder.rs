@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,14 +17,14 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TransformedResult, TreeNode},
         Result,
+        tree_node::{Transformed, TransformedResult, TreeNode},
     },
     config::ConfigOptions,
-    physical_optimizer::{join_selection::swap_hash_join, PhysicalOptimizerRule},
+    physical_optimizer::{PhysicalOptimizerRule, join_selection::swap_hash_join},
     physical_plan::{
-        aggregates::AggregateExec, joins::HashJoinExec, visit_execution_plan, ExecutionPlan,
-        ExecutionPlanVisitor,
+        ExecutionPlan, ExecutionPlanVisitor, aggregates::AggregateExec, joins::HashJoinExec,
+        visit_execution_plan,
     },
 };
 

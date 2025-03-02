@@ -17,13 +17,12 @@ use config::{
     get_config,
     meta::{
         search::{
-            Response, SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
-            PARTIAL_ERROR_RESPONSE_MESSAGE,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse,
         },
-        sql::{resolve_stream_names, OrderBy},
-        websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
+        sql::{OrderBy, resolve_stream_names},
+        websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
-    utils::base64,
 };
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
@@ -43,7 +42,7 @@ use crate::{
     },
     handler::http::request::websocket::{
         session::send_message,
-        utils::{search_registry_utils, TimeOffset, WsServerEvents},
+        utils::{TimeOffset, WsServerEvents, search_registry_utils},
     },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
@@ -297,47 +296,27 @@ pub async fn handle_search_request(
     Ok(())
 }
 
-async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
+async fn do_search(
+    req: &SearchEventReq,
+    org_id: &str,
+    user_id: &str,
+    use_cache: bool,
+) -> Result<Response, Error> {
     let span = tracing::info_span!(
         "src::handler::http::request::websocket::search::do_search",
         trace_id = %req.trace_id,
         org_id = %org_id,
     );
 
-    // while using search directly
-    // decode the vrl i.e. query_fn
     let mut req = req.clone();
-    if let Some(ref vrl) = req.payload.query.query_fn {
-        match base64::decode_url(vrl) {
-            Ok(vrl) => {
-                let vrl = vrl.trim().to_owned();
-                if !vrl.is_empty() && !vrl.ends_with('.') {
-                    let vrl = format!("{vrl}\n.");
-                    req.payload.query.query_fn = Some(vrl);
-                } else if vrl.is_empty() || vrl.eq(".") {
-                    // In case the vrl contains only ".", no need to save it
-                    req.payload.query.query_fn = None;
-                } else {
-                    req.payload.query.query_fn = Some(vrl);
-                }
-            }
-            Err(e) => {
-                log::error!(
-                    "[WS_SEARCH] trace_id: {}, Error decoding vrl: {:?}",
-                    req.trace_id,
-                    e
-                );
-                return Err(Error::Message(e.to_string()));
-            }
-        }
-    }
-
-    let res = SearchService::search(
+    req.payload.use_cache = Some(use_cache);
+    let res = SearchService::cache::search(
         &req.trace_id,
         org_id,
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
+        "".to_string(),
     )
     .instrument(span)
     .await;
@@ -575,15 +554,14 @@ async fn process_delta(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if search_registry_utils::is_cancelled(&trace_id) {
-            log::info!(
-                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
-                trace_id
-            );
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-                "Search cancel detected for trace_id: {}",
-                trace_id
-            ))));
+        if let Some(is_cancelled) = search_registry_utils::is_cancelled(&trace_id) {
+            if is_cancelled {
+                // Search is cancelled, stop processing
+                return Ok(());
+            }
+        } else {
+            // Search not found in registry, stop processing
+            return Ok(());
         }
 
         let mut req = req.clone();
@@ -594,7 +572,8 @@ async fn process_delta(
             req.payload.query.size -= *curr_res_size;
         }
 
-        let mut search_res = do_search(&req, org_id, user_id).await?;
+        // use cache for delta search
+        let mut search_res = do_search(&req, org_id, user_id, true).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -747,16 +726,24 @@ async fn send_cached_responses(
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
 ) -> Result<(), Error> {
-    if search_registry_utils::is_cancelled(trace_id) {
-        log::info!(
-            "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
-            trace_id
-        );
+    if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id) {
+        if is_cancelled {
+            log::info!(
+                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
+                trace_id
+            );
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                "Search cancel detected for trace_id: {}",
+                trace_id
+            ))));
+        };
+    } else {
+        // Search not found in registry, stop processing
         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
             "Search cancel detected for trace_id: {}",
             trace_id
         ))));
-    };
+    }
 
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
@@ -875,15 +862,17 @@ async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if search_registry_utils::is_cancelled(trace_id) {
-            log::info!(
-                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
-                trace_id
-            );
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
-                "Search cancel detected for trace_id: {}",
-                trace_id
-            ))));
+        if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id) {
+            if is_cancelled {
+                log::info!(
+                    "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
+                    trace_id
+                );
+                return Ok(());
+            }
+        } else {
+            // Search not found in registry, stop processing
+            return Ok(());
         }
 
         let mut req = req.clone();
@@ -894,7 +883,8 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        let mut search_res = do_search(&req, org_id, user_id).await?;
+        // do not use cache for partitioned search without cache
+        let mut search_res = do_search(&req, org_id, user_id, false).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
@@ -1025,11 +1015,11 @@ async fn write_results_to_cache(
     }
 
     log::info!(
-            "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
-            c_resp.trace_id,
-            c_resp.file_path,
-            accumulated_results.len()
-        );
+        "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+        c_resp.trace_id,
+        c_resp.file_path,
+        accumulated_results.len()
+    );
 
     let cfg = get_config();
     let mut cached_responses = Vec::new();

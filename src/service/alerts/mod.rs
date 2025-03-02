@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use arrow_schema::DataType;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -343,10 +343,10 @@ impl QueryConditionExt for QueryCondition {
                     size,
                     start_time: start_time.unwrap(),
                     end_time,
-                    sort_by: None,
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
+                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: if self.vrl_function.is_some() {
                         match base64::decode_url(self.vrl_function.as_ref().unwrap()) {
@@ -591,15 +591,14 @@ async fn build_sql(
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
-    let cfg = get_config();
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
                 "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
                 func_expr,
-                cfg.common.column_timestamp,
-                cfg.common.column_timestamp,
+                TIMESTAMP_COL_NAME,
+                TIMESTAMP_COL_NAME,
                 stream_name,
                 where_sql,
                 group.join(", "),
@@ -610,12 +609,7 @@ async fn build_sql(
     if sql.is_empty() {
         sql = format!(
             "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            func_expr,
-            cfg.common.column_timestamp,
-            cfg.common.column_timestamp,
-            stream_name,
-            where_sql,
-            having_expr
+            func_expr, TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, stream_name, where_sql, having_expr
         );
     }
     Ok(sql)
