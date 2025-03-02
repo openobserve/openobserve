@@ -163,7 +163,7 @@ pub async fn ws_proxy(
                             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                             match ws_msg {
                                 Message::Text(text) => {
-                                    log::debug!("[WS_PROXY] Backend -> Router text: {}", text);
+                                    log::info!("[WS_PROXY] Backend -> Router text: {}", text);
                                     // Validate JSON before forwarding
                                     if let Ok(_) = serde_json::from_str::<serde_json::Value>(&text) {
                                         if session.text(text).await.is_err() {
