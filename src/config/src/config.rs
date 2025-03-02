@@ -1154,7 +1154,7 @@ pub struct Limit {
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
     pub derived_stream_schedule_interval: i64,
-    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
+    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 20)]
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_PAUSE_ALERT_AFTER_RETRIES", default = false)]
     pub pause_alerts_on_retries: bool,
