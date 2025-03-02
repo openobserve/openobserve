@@ -20,6 +20,7 @@ use actix_ws::Message;
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::{HeaderName, HeaderValue};
+use serde_json;
 use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite};
 use url::Url;
@@ -161,26 +162,29 @@ pub async fn ws_proxy(
                         Ok(msg) => {
                             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
                             match ws_msg {
+                                Message::Text(text) => {
+                                    log::debug!("[WS_PROXY] Backend -> Router text: {}", text);
+                                    // Validate JSON before forwarding
+                                    if let Ok(_) = serde_json::from_str::<serde_json::Value>(&text) {
+                                        if session.text(text).await.is_err() {
+                                            break;
+                                        }
+                                    } else {
+                                        log::error!("[WS_PROXY] Received malformed JSON: {}", text);
+                                    }
+                                }
                                 Message::Close(reason) => {
-                                    log::info!("[WS_PROXY] Backend -> Router close reason: {:?}", reason);
-
-                                    let mut sink = backend_ws_sink2.lock().await;
-                                    // 1. Forward close to client
+                                    log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
+                                    // Forward close to client
                                     if let Err(e) = session.close(reason.clone()).await {
                                         log::error!("[WS_PROXY] Failed to close client: {}", e);
                                     }
-
-                                    // Close sink to backend
+                                    // Close backend sink
+                                    let mut sink = backend_ws_sink2.lock().await;
                                     if let Err(e) = sink.close().await {
                                         log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
                                     }
                                     break;
-                                }
-                                Message::Text(text) => {
-                                    log::debug!("[WS_PROXY] Backend -> Router text: {}", text);
-                                    if session.text(text).await.is_err() {
-                                        break;
-                                    }
                                 }
                                 Message::Binary(bin) => {
                                     if session.binary(bin).await.is_err() {
