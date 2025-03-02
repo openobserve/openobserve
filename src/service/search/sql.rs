@@ -43,7 +43,7 @@ use sqlparser::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
         Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
-        VisitorMut,
+        VisitorMut, helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -893,6 +893,7 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
                         expr,
                         pattern,
                         escape_char: _,
+                        any: _,
                     } = e
                     {
                         match expr.as_ref() {
@@ -1258,7 +1259,7 @@ impl VisitorMut for ComplexQueryVisitor {
                 }
             }
             // check select * from table
-            Expr::Wildcard => self.is_complex = true,
+            Expr::Wildcard(_) => self.is_complex = true,
             _ => {}
         }
         if self.is_complex {
@@ -1361,6 +1362,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         null_treatment: None,
                         over: None,
                         within_group: vec![],
+                        uses_odbc_syntax: false,
                     }),
                     alias: Ident::new("zo_sql_num"),
                 }];
@@ -1369,8 +1371,10 @@ impl VisitorMut for TrackTotalHitsVisitor {
             }
             SetExpr::SetOperation { .. } => {
                 let select = Box::new(SetExpr::Select(Box::new(Select {
+                    select_token: AttachedToken::empty(),
                     distinct: None,
                     top: None,
+                    top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
                             name: ObjectName(vec![Ident::new("count")]),
@@ -1384,6 +1388,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                             null_treatment: None,
                             over: None,
                             within_group: vec![],
+                            uses_odbc_syntax: false,
                         }),
                         alias: Ident::new("zo_sql_num"),
                     }],
@@ -1448,6 +1453,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
         Expr::Identifier(Ident {
             value,
             quote_style: _,
+            span: _,
         }) => index_fields.contains(value),
         Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
         Expr::BinaryOp { left, op, right } => match op {
@@ -1469,6 +1475,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             expr,
             pattern: _,
             escape_char: _,
+            any: _,
         } => checking_inverted_index_inner(index_fields, expr),
         Expr::Function(f) => {
             let f = f.name.to_string().to_lowercase();
@@ -1628,6 +1635,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 let arg = match &list.args[1] {
                     FunctionArg::Named { arg, .. } => arg,
                     FunctionArg::Unnamed(arg) => arg,
+                    FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
                     FunctionArgExpr::Expr(Expr::Value(
