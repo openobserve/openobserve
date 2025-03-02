@@ -300,8 +300,8 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             .collect::<Result<Vec<_>>>()?;
 
         let result = match &args_array[0].data_type() {
-            DataType::Utf8 => regexp_match::<i32>(&args_array)?,
-            DataType::LargeUtf8 => regexp_match::<i64>(&args_array)?,
+            DataType::Utf8 => regexp_match(&args_array)?,
+            DataType::LargeUtf8 => regexp_match(&args_array)?,
             other => {
                 return Err(DataFusionError::Execution(format!(
                     "Unsupported data type {other:?} for function regexp_match"

@@ -30,7 +30,7 @@ use config::{
     metrics,
     utils::{flatten, json},
 };
-use syslog_loose::{Message, ProcId, Protocol};
+use syslog_loose::{Message, ProcId, Protocol, Variant};
 
 use super::{
     bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
@@ -120,7 +120,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let mut json_data_by_stream = HashMap::new();
 
     // parse msg to json::Value
-    let parsed_msg = syslog_loose::parse_message(msg);
+    let parsed_msg = syslog_loose::parse_message(msg, Variant::Either);
     let mut value = message_to_value(parsed_msg);
 
     // store a copy of original data before it's modified, when

@@ -15,7 +15,7 @@
 
 use chrono::DateTime;
 use datafusion::{
-    catalog_common::resolve_table_references,
+    catalog::resolve_table_references,
     sql::{TableReference, parser::DFParser},
 };
 use regex::Regex;
