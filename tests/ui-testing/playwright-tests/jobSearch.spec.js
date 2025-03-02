@@ -46,7 +46,9 @@ test.describe("Job Search for schedule query", () => {
         await logsPage.searchSchedulerCreate();
         await logsPage.searchSchedulerSubmit();
         await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
-
+        await page.waitForTimeout(10000);
+        await logsPage.clickJobID();
+        await page.waitForTimeout(10000);
 
     });
 

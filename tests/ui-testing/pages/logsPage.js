@@ -526,13 +526,13 @@ async clickJobID () {
       
       // Click the cancel button
       await this.page.locator(cancelBtnSelector).click();
-      
+      await this.page.waitForTimeout(2000);
       // Click the confirm button
       await this.page.locator('[data-test="confirm-button"]').click();
-      
+      await this.page.waitForTimeout(2000);
       // Click the restart button
       await this.page.locator(restartBtnSelector).click();
-      
+      await this.page.waitForTimeout(2000);
       // Continue with your automation steps...
     }
   )
