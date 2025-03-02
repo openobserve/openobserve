@@ -502,7 +502,7 @@ async clickJobID () {
   const headers = {
     "Authorization": `Basic ${basicAuthCredentials}`,
     "Content-Type": "application/json",
-  };
+  }
 
   // Intercept the network request and capture the response
   await this.page.route(
@@ -578,6 +578,85 @@ async selectIndexStreamDefault() {
   await this.page.waitForTimeout(3000);
   await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
 
+}
+
+async submitSearchJob() {
+  const orgId = process.env["ORGNAME"];
+  const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
+  const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+  
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  }
+ // Get current time and one minute ago
+ const now = Date.now(); // Current time in milliseconds
+ const oneMinuteAgo = now - 60 * 1000; // One minute ago in milliseconds
+
+// Define the request body
+const requestBody = {
+    query: {
+        sql: 'SELECT * FROM "e2e_automate"',
+        start_time: now, // Current time
+        end_time: oneMinuteAgo, // One minute ago
+        from: 0,
+        size: 1000,
+        quick_mode: false,
+        sql_mode: 'full',
+    },
+};
+
+  // Make the POST request
+  const response = await this.page.request.post(url, {
+      data: requestBody, // Add any necessary payload here
+      headers: headers,
+  });
+
+  // Check if the response status is 200
+  if (response.status() === 200) {
+      const responseBody = await response.json();
+      return this.extractJobId(responseBody.message);
+  } else {
+      throw new Error(`Failed to submit job. Status: ${response.status()}`);
+  }
+}
+
+extractJobId(message) {
+  // Use a regex to extract the Job ID from the message
+  const jobIdMatch = message.match(/\[Job_Id: (.+?)\]/);
+  return jobIdMatch ? jobIdMatch[1] : null;
+}
+
+async getTraceIdByJobId(jobId) {
+  const orgId = process.env["ORGNAME"];
+  const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
+  const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+  
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  }
+ 
+  // Make the GET request
+  const response = await this.page.request.get(url, {
+      headers: headers,
+  });
+
+  // Check if the response status is 200
+  if (response.status() === 200) {
+      const responseBody = await response.json();
+      const job = responseBody.find(job => job.id === jobId);
+      if (job) {
+          console.log(`Trace ID for job ID ${jobId}: ${job.trace_id}`);
+          return job.trace_id; // Return the trace_id if needed
+      } else {
+          console.error(`Job with ID ${jobId} not found.`);
+          return null;
+      }
+  } else {
+      const errorMessage = await response.text();
+      throw new Error(`Failed to fetch jobs. Status: ${response.status()}, Message: ${errorMessage}`);
+  }
 }
 
 

@@ -47,6 +47,21 @@ test.describe("Job Search for schedule query", () => {
         await logsPage.searchSchedulerSubmit();
         await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/logs?action=search_scheduler&org_identifier=default&type=search_scheduler_list");
         await page.waitForTimeout(10000);
+
+        // await logsPage.submitSearchJob();
+        // await page.waitForTimeout(10000);
+        // Submit the search job
+        const jobId = await logsPage.submitSearchJob();
+
+    // Print the Job ID
+        console.log(`Job ID: ${jobId}`);
+
+    // Optionally, add assertions to verify the Job ID
+        expect(jobId).not.toBeNull();
+
+        const traceId = await logsPage.getTraceIdByJobId(jobId);
+        console.log(`Trace ID: ${traceId}`);    
+        
         await logsPage.clickJobID();
         await page.waitForTimeout(10000);
 
