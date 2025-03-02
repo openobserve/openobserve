@@ -18,11 +18,11 @@ use config::{
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
 };
 use infra::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     table,
 };
 

@@ -15,11 +15,11 @@
 
 use std::fmt::Debug;
 
-use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
-use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
 use config::utils::json;
-use futures::future::{ready, Ready};
+use futures::future::{Ready, ready};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "enterprise")]

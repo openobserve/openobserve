@@ -16,15 +16,15 @@
 use std::{
     collections::VecDeque,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 
 use config::{
     get_config,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         time::{now, now_micros, second_micros},
     },
 };

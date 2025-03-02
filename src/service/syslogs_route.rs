@@ -15,7 +15,7 @@
 
 use std::io;
 
-use actix_web::{http::StatusCode, HttpResponse};
+use actix_web::{HttpResponse, http::StatusCode};
 use config::ider;
 use ipnetwork::IpNetwork;
 

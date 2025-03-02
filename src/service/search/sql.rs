@@ -18,22 +18,21 @@ use std::{ops::ControlFlow, sync::Arc};
 use arrow_schema::FieldRef;
 use chrono::Duration;
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
-        sql::{resolve_stream_names_with_type, OrderBy, Sql as MetaSql, TableReferenceExt},
+        sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
+        SchemaCache, get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings,
     },
 };
 use once_cell::sync::Lazy;
@@ -57,7 +56,7 @@ use super::{
         FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
         MATCH_ALL_UDF_NAME,
     },
-    index::{get_index_condition_from_expr, IndexCondition},
+    index::{IndexCondition, get_index_condition_from_expr},
     request::Request,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
@@ -2048,7 +2047,7 @@ mod tests {
         assert!(convert_histogram_interval_to_seconds("1 months").is_err()); // months is not supported
         assert!(convert_histogram_interval_to_seconds("1 year").is_err()); // year is not supported
         assert!(convert_histogram_interval_to_seconds("1 years").is_err()); // years is not
-                                                                            // supported
+        // supported
     }
 
     #[test]

@@ -16,12 +16,12 @@
 use datafusion::{
     self,
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Column, Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
-    logical_expr::{expr::ScalarFunction, utils::disjunction, Expr, Like, LogicalPlan},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{Expr, Like, LogicalPlan, expr::ScalarFunction, utils::disjunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
@@ -216,22 +216,28 @@ mod tests {
     #[tokio::test]
     async fn test_rewrite_match() {
         let sqls = [
-            ("select * from t where match_all('open')", vec![
-                "+------------+-------------+-------------+",
-                "| _timestamp | name        | log         |",
-                "+------------+-------------+-------------+",
-                "| 1          | open        | o2          |",
-                "| 3          | openobserve | openobserve |",
-                "+------------+-------------+-------------+",
-            ]),
-            ("select _timestamp from t where match_all('open')", vec![
-                "+------------+",
-                "| _timestamp |",
-                "+------------+",
-                "| 1          |",
-                "| 3          |",
-                "+------------+",
-            ]),
+            (
+                "select * from t where match_all('open')",
+                vec![
+                    "+------------+-------------+-------------+",
+                    "| _timestamp | name        | log         |",
+                    "+------------+-------------+-------------+",
+                    "| 1          | open        | o2          |",
+                    "| 3          | openobserve | openobserve |",
+                    "+------------+-------------+-------------+",
+                ],
+            ),
+            (
+                "select _timestamp from t where match_all('open')",
+                vec![
+                    "+------------+",
+                    "| _timestamp |",
+                    "+------------+",
+                    "| 1          |",
+                    "| 3          |",
+                    "+------------+",
+                ],
+            ),
             (
                 "select _timestamp from t where match_all_raw_ignore_case('observe')",
                 vec![

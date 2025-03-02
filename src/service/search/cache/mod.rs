@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -26,7 +26,6 @@ use config::{
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
-    TIMESTAMP_COL_NAME,
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},

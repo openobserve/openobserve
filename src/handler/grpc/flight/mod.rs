@@ -21,12 +21,12 @@ use std::{
 
 use arrow::{
     array::RecordBatch,
-    ipc::{writer::IpcWriteOptions, CompressionType},
+    ipc::{CompressionType, writer::IpcWriteOptions},
 };
 use arrow_flight::{
-    encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+    encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
 };
 use arrow_schema::Schema;
 use config::{meta::search::ScanStats, metrics};
@@ -35,7 +35,7 @@ use datafusion::{
     execution::SendableRecordBatchStream,
     physical_plan::{displayable, execute_stream},
 };
-use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;

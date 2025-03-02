@@ -16,7 +16,7 @@
 use core::result::Result::Ok;
 use std::collections::HashMap;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::{
     meta::{
         alerts::alert::{Alert, AlertListFilter},

@@ -18,7 +18,8 @@ use std::{collections::HashSet, sync::Arc};
 use anyhow::Context;
 use arrow_schema::Schema;
 use config::{
-    get_config, is_local_disk_storage,
+    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL, get_config,
+    is_local_disk_storage,
     meta::{
         bitvec::BitVec,
         inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
@@ -28,10 +29,9 @@ use config::{
     utils::{
         file::is_exists,
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
     },
-    FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER, INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
@@ -55,7 +55,7 @@ use crate::service::{
             caching_directory::CachingDirectory,
             convert_puffin_file_to_tantivy_dir,
             footer_cache::FooterCache,
-            reader::{warm_up_terms, PuffinDirReader},
+            reader::{PuffinDirReader, warm_up_terms},
             reader_cache,
         },
     },
@@ -431,10 +431,10 @@ async fn cache_files_inner(
             // return file_name if download failed
             if let Some(e) = ret {
                 log::warn!(
-                        "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
-                        e,
-                        file_name
-                    );
+                    "[trace_id {trace_id}] search->storage: download file to cache err: {}, file: {}",
+                    e,
+                    file_name
+                );
             }
             drop(permit);
         });

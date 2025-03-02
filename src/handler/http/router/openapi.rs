@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, meta::stream::StreamType};
-use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
+use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
 
 use crate::{common::meta, handler::http::request};
 

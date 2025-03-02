@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{prelude::*, Error};
+use std::io::{Error, prelude::*};
 
-use actix_multipart::form::{bytes::Bytes, MultipartForm};
-use actix_web::{post, web, HttpResponse};
+use actix_multipart::form::{MultipartForm, bytes::Bytes};
+use actix_web::{HttpResponse, post, web};
 use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};

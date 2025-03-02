@@ -1,6 +1,6 @@
 [package]
 description = "OpenObserve is an observability platform that allows you to capture, search, and analyze your logs, metrics, and traces."
-edition = "2021"
+edition = "2024"
 homepage = "https://openobserve.ai/"
 keywords = [
     "search",
@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.14.3"
+version = "0.14.5"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -204,7 +204,7 @@ resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0"
 
 [workspace.dependencies]

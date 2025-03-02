@@ -31,9 +31,9 @@ use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Partition {

@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
 use config::meta::dashboards::reports::{Report, ReportListFilters};
 
 use crate::{

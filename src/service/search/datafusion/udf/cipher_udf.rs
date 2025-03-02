@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -81,7 +81,7 @@ fn decrypt() -> ScalarFunctionImplementation {
                         "second argument to decrypt must be a key-name string".to_string(),
                     ),
                     None,
-                ))
+                ));
             }
         };
 
@@ -131,7 +131,9 @@ fn decrypt() -> ScalarFunctionImplementation {
             .collect::<StringArray>();
 
         if let Some(e) = last_error {
-            log::info!("encountered some errors while decrypting, total count {err_count}, last error : {e}");
+            log::info!(
+                "encountered some errors while decrypting, total count {err_count}, last error : {e}"
+            );
         }
 
         Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
@@ -158,7 +160,7 @@ fn encrypt() -> ScalarFunctionImplementation {
                         "second argument to encrypt must be a key-name string".to_string(),
                     ),
                     None,
-                ))
+                ));
             }
         };
 
@@ -208,7 +210,9 @@ fn encrypt() -> ScalarFunctionImplementation {
             .collect::<StringArray>();
 
         if let Some(e) = last_error {
-            log::info!("encountered some errors while decrypting, total count {err_count}, last error : {e}");
+            log::info!(
+                "encountered some errors while decrypting, total count {err_count}, last error : {e}"
+            );
         }
 
         Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))

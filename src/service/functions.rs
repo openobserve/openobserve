@@ -16,8 +16,8 @@
 use std::io::Error;
 
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use config::{
     meta::{
@@ -109,7 +109,7 @@ pub async fn test_run_function(
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
-            )))
+            )));
         }
     };
 
@@ -436,9 +436,11 @@ mod tests {
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

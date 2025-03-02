@@ -18,8 +18,8 @@ use std::collections::HashMap;
 use chrono::Utc;
 use config::{ider, meta::timed_annotations::*};
 use sea_orm::{
-    prelude::Expr, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
-    TransactionTrait,
+    ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set, TransactionTrait,
+    prelude::Expr,
 };
 
 use super::{
@@ -30,7 +30,7 @@ use super::{
     get_lock,
 };
 use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
 

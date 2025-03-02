@@ -20,16 +20,15 @@ use std::{
 
 use arrow::record_batch::RecordBatch;
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
-    TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::Schema,
     datasource::MemTable,
     error::{DataFusionError, Result},
     physical_plan::visit_execution_plan,
-    prelude::{col, lit, SessionContext},
+    prelude::{SessionContext, col, lit},
 };
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};

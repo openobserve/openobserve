@@ -17,13 +17,12 @@ use std::{str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    get_config,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
-    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -65,7 +64,7 @@ use super::{
     optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
-    table_provider::{uniontable::NewUnionTable, NewListingTable},
+    table_provider::{NewListingTable, uniontable::NewUnionTable},
     udf::transform_udf::get_all_transform,
 };
 use crate::service::{

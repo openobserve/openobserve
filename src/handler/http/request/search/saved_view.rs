@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, put, web};
 
 use crate::{
     common::{
@@ -229,7 +229,7 @@ pub async fn update_view(
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{test, App};
+    use actix_web::{App, test};
 
     use super::*;
 

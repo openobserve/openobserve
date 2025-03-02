@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,7 @@ use super::utils::search_registry_utils::SearchState;
 use crate::handler::http::request::websocket::utils::search_registry_utils;
 use crate::handler::http::request::websocket::{
     search,
-    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
+    utils::{WsClientEvents, WsServerEvents, sessions_cache_utils},
 };
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;

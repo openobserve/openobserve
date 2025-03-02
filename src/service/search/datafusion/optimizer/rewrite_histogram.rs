@@ -18,16 +18,16 @@ use std::sync::Arc;
 use arrow_schema::{DataType, IntervalUnit};
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
     functions::datetime::{
         date_bin::DateBinFunc,
         to_timestamp::{ToTimestampFunc, ToTimestampMicrosFunc},
     },
-    logical_expr::{cast, expr::ScalarFunction, Expr, LogicalPlan, ScalarUDF},
-    optimizer::{optimizer::ApplyOrder, utils::NamePreserver, OptimizerConfig, OptimizerRule},
+    logical_expr::{Expr, LogicalPlan, ScalarUDF, cast, expr::ScalarFunction},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 

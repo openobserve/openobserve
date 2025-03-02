@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use config::{
+    META_ORG_ID,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::SearchEventType,
         self_reporting::{
-            usage::{AggregatedData, GroupKey, UsageData, UsageEvent, USAGE_STREAM},
             ReportingData,
+            usage::{AggregatedData, GroupKey, USAGE_STREAM, UsageData, UsageEvent},
         },
         stream::{StreamParams, StreamType},
     },
     utils::json,
-    META_ORG_ID,
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc;

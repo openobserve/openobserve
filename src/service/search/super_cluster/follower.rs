@@ -25,7 +25,7 @@ use config::{
     utils::time::BASE_TIME,
 };
 use datafusion::{
-    common::{tree_node::TreeNode, TableReference},
+    common::{TableReference, tree_node::TreeNode},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
@@ -45,11 +45,11 @@ use crate::service::search::{
     },
     datafusion::{
         distributed_plan::{
+            NewEmptyExecVisitor,
             codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
             empty_exec::NewEmptyExec,
             node::{RemoteScanNode, SearchInfos},
             remote_scan::RemoteScanExec,
-            NewEmptyExecVisitor,
         },
         exec::{prepare_datafusion_context, register_udf},
     },

@@ -16,21 +16,20 @@
 use std::sync::Arc;
 
 use config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         self_reporting::{
-            error::ErrorData,
-            usage::{TriggerData, ERROR_STREAM, TRIGGERS_USAGE_STREAM},
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+            error::ErrorData,
+            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
     },
     utils::json,
-    META_ORG_ID,
 };
 use once_cell::sync::Lazy;
 use tokio::{
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
     time,
 };
 
@@ -192,7 +191,9 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                         .enqueue(ReportingData::Trigger(Box::new(trigger)))
                         .await
                     {
-                        log::error!("[SELF-REPORTING] Error in pushing back un-ingested TriggerData to UsageQueue: {e}");
+                        log::error!(
+                            "[SELF-REPORTING] Error in pushing back un-ingested TriggerData to UsageQueue: {e}"
+                        );
                     }
                 }
             }

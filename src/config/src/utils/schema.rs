@@ -27,8 +27,8 @@ use serde_json::{Map, Value};
 
 use super::str::find;
 use crate::{
-    meta::{promql::HASH_LABEL, stream::StreamType},
     FxIndexMap, TIMESTAMP_COL_NAME,
+    meta::{promql::HASH_LABEL, stream::StreamType},
 };
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;

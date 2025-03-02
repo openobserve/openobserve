@@ -37,25 +37,25 @@ use async_trait::async_trait;
 use config::get_config;
 use datafusion::{
     catalog::Session,
-    common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
+    common::{Result, Statistics, ToDFSchema, plan_err, project_schema},
     datasource::{
-        get_statistics_with_limit,
+        TableProvider, get_statistics_with_limit,
         listing::{ListingOptions, ListingTableConfig, ListingTableUrl, PartitionedFile},
         physical_plan::FileScanConfig,
-        TableProvider,
     },
     error::DataFusionError,
     execution::{
         cache::{cache_manager::FileStatisticsCache, cache_unit::DefaultFileStatisticsCache},
         context::SessionState,
     },
-    logical_expr::{utils::conjunction, Expr, SortExpr, TableProviderFilterPushDown, TableType},
-    physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
-    physical_plan::{empty::EmptyExec, ExecutionPlan},
+    logical_expr::{Expr, SortExpr, TableProviderFilterPushDown, TableType, utils::conjunction},
+    physical_expr::{LexOrdering, PhysicalSortExpr, create_physical_expr, expressions},
+    physical_plan::{ExecutionPlan, empty::EmptyExec},
 };
 use futures::{
+    StreamExt,
     future::{self, try_join_all},
-    stream, StreamExt,
+    stream,
 };
 use hashbrown::HashMap;
 use helpers::*;

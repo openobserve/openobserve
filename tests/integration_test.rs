@@ -18,15 +18,15 @@ mod tests {
     use core::time;
     use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
-    use actix_web::{http::header::ContentType, test, web, App};
+    use actix_web::{App, http::header::ContentType, test, web};
     use arrow_flight::flight_service_server::FlightServiceServer;
     use bytes::{Bytes, BytesMut};
     use chrono::{Duration, Utc};
     use config::{
         get_config,
         meta::{
-            alerts::{alert::Alert, Operator, QueryCondition, TriggerCondition},
-            dashboards::{v1, Dashboard},
+            alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
+            dashboards::{Dashboard, v1},
             triggers::Trigger,
         },
         utils::json,
@@ -48,7 +48,7 @@ mod tests {
     static START: Once = Once::new();
 
     fn setup() -> (&'static str, &'static str) {
-        START.call_once(|| {
+        START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
             env::set_var("ZO_LOCAL_MODE", "true");
@@ -1558,9 +1558,11 @@ mod tests {
         // Optionally, deserialize and check the response body
         let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
-        assert!(destinations
-            .iter()
-            .any(|d| d.destination_type == DestinationType::Sns));
+        assert!(
+            destinations
+                .iter()
+                .any(|d| d.destination_type == DestinationType::Sns)
+        );
     }
 
     async fn e2e_update_sns_alert_destination() {

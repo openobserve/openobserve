@@ -15,13 +15,13 @@
 
 use std::{
     sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     },
     time::Duration,
 };
 
-use async_nats::{jetstream, Client, ServerAddr};
+use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{
@@ -35,7 +35,7 @@ use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
-    sync::{mpsc, Mutex, OnceCell},
+    sync::{Mutex, OnceCell, mpsc},
     task::JoinHandle,
 };
 

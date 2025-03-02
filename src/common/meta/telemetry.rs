@@ -16,14 +16,14 @@
 use std::collections::HashMap;
 
 use config::{
+    SIZE_IN_MB, TELEMETRY_CLIENT,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     utils::{json, sysinfo},
-    SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
 use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
-use segment::{message::Track, Client, Message};
+use segment::{Client, Message, message::Track};
 
 use crate::common::infra::{cluster::get_cached_online_nodes, config::*};
 

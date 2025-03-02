@@ -16,8 +16,8 @@
 use std::{
     cmp::min,
     sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     },
 };
 
@@ -29,7 +29,7 @@ use etcd_client::{
 };
 use hashbrown::HashMap;
 use tokio::{
-    sync::{mpsc, OnceCell},
+    sync::{OnceCell, mpsc},
     task::JoinHandle,
     time,
 };

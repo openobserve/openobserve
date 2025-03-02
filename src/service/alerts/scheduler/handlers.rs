@@ -41,7 +41,7 @@ use proto::cluster_rpc;
 
 use crate::service::{
     alerts::{
-        alert::{get_alert_start_end_time, get_by_name, get_row_column_map, AlertExt},
+        alert::{AlertExt, get_alert_start_end_time, get_by_name, get_row_column_map},
         derived_streams::DerivedStreamExt,
     },
     dashboards::reports::SendReport,
@@ -307,7 +307,9 @@ async fn handle_alert_triggers(
                 {
                     alert.enabled = false;
                     if let Err(e) = set_without_updating_trigger(&org_id, alert).await {
-                        log::error!("[SCHEDULER trace_id {trace_id}] Failed to update alert: {alert_name} after trigger: {e}");
+                        log::error!(
+                            "[SCHEDULER trace_id {trace_id}] Failed to update alert: {alert_name} after trigger: {e}"
+                        );
                     }
                 }
             }
@@ -883,7 +885,12 @@ async fn handle_derived_stream_triggers(
                     "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
                     e
                 );
-                log::error!("[SCHEDULER trace_id {trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}", pipeline.org, pipeline.name, e);
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}",
+                    pipeline.org,
+                    pipeline.name,
+                    e
+                );
 
                 // update TriggerData that's to be reported to _meta
                 trigger_data_stream.status = TriggerDataStatus::Failed;
@@ -1105,7 +1112,7 @@ async fn handle_derived_stream_triggers(
             db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await
         {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] pipeline error deleting trigger after pipeline {}/{} reached maximum retries:, {}", 
+                "[SCHEDULER trace_id {trace_id}] pipeline error deleting trigger after pipeline {}/{} reached maximum retries:, {}",
                 &pipeline.org,
                 &pipeline.name,
                 e,
@@ -1138,7 +1145,7 @@ async fn handle_derived_stream_triggers(
         pipeline.enabled = false;
         if let Err(e) = db::pipeline::update(&pipeline, None).await {
             log::error!(
-                "[SCHEDULER trace_id {trace_id}] pipeline error pausing pipeline {}/{} after it's reached reached maximum retries:, {}", 
+                "[SCHEDULER trace_id {trace_id}] pipeline error pausing pipeline {}/{} after it's reached reached maximum retries:, {}",
                 &pipeline.org,
                 &pipeline.name,
                 e,

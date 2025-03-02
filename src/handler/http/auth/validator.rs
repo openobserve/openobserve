@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{
+    Error,
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
-    http::{header, Method},
-    web, Error,
+    http::{Method, header},
+    web,
 };
 use config::{get_config, utils::base64};
 #[cfg(feature = "enterprise")]
@@ -35,7 +36,7 @@ use crate::{
             },
         },
         utils::{
-            auth::{get_hash, is_root_user, AuthExtractor},
+            auth::{AuthExtractor, get_hash, is_root_user},
             redirect_response::RedirectResponseBuilder,
         },
     },
