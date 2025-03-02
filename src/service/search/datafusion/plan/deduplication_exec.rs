@@ -28,9 +28,9 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
     physical_plan::{
+        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         expressions::Column,
-        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
     },
 };
 use futures::{Stream, StreamExt};

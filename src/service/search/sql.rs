@@ -40,10 +40,10 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{
     ast::{
-        helpers::attached_token::AttachedToken, BinaryOperator, DuplicateTreatment, Expr, Function,
-        FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments, GroupByExpr, Ident,
-        ObjectName, Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins,
-        VisitMut, VisitorMut,
+        BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
+        VisitorMut, helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,

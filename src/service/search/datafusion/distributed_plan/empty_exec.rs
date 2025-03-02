@@ -23,11 +23,10 @@ use datafusion::{
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        common,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
         execution_plan::{Boundedness, EmissionType},
         expressions::Column,
         memory::MemoryStream,
-        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
     },
     prelude::Expr,
 };
