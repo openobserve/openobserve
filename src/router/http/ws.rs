@@ -354,7 +354,7 @@ pub fn convert_actix_to_tungstenite_request(
 /// Add this helper function
 fn log_frame_details(prefix: &str, text: &str, is_close: bool) {
     // 7b is '{' in JSON
-    log::debug!(
+    log::info!(
         "[WS_FRAME] {} Length: {}, First 50 bytes: {}, Is close: {}",
         prefix,
         text.len(),
