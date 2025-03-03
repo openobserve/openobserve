@@ -58,6 +58,29 @@ const useIngestion = () => {
     dynamoDB: "https://short.openobserve.ai/database/dynamodb",
   };
 
+  const securityContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const securityDocURLs = {
+    falco: "https://short.openobserve.ai/security/falco",
+    osquery: "https://short.openobserve.ai/security/osquery",
+    okta: "https://short.openobserve.ai/security/okta",
+    jumpcloud: "https://short.openobserve.ai/security/jumpcloud",
+    openvpn: "https://short.openobserve.ai/security/openvpn",
+    office365: "https://short.openobserve.ai/security/office365",
+    googleworkspace: "https://short.openobserve.ai/security/google-workspace",
+  };
+
+  const devopsContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const devopsDocURLs = {
+    jenkins: "https://short.openobserve.ai/devops/jenkins",
+    ansible: "https://short.openobserve.ai/devops/ansible",
+    terraform: "https://short.openobserve.ai/devops/terraform",
+    github: "https://short.openobserve.ai/devops/github-actions",
+  };
+
 
   const databaseDocURLs = {
     sqlServer: "https://short.openobserve.ai/database/sql-server",
@@ -80,6 +103,10 @@ const useIngestion = () => {
     endpoint,
     databaseContent,
     databaseDocURLs,
+    securityContent,
+    securityDocURLs,
+    devopsContent,
+    devopsDocURLs,
   };
 };
 

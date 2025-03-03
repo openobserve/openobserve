@@ -116,6 +116,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.databaseLabel')"
         content-class="tab_content"
       />
+
+      <q-route-tab
+        name="security"
+        :to="{
+          name: 'security',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.securityLabel')"
+        content-class="tab_content"
+      />
+
+      <q-route-tab
+        name="devops"
+        :to="{
+          name: 'devops',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.devopsLabel')"
+        content-class="tab_content"
+      />
     </q-tabs>
     <q-separator class="separator" />
     <router-view

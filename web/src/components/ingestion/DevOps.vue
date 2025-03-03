@@ -75,7 +75,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "DatabasePage",
+  name: "DevOpsPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -94,12 +94,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("sqlserver");
+    const ingestTabType = ref("jenkins");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "databases") {
+      if (router.currentRoute.value.name === "devops") {
         router.push({
-          name: "sqlserver",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -109,9 +109,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "databases") {
+      if (router.currentRoute.value.name === "devops") {
         router.push({
-          name: "sqlserver",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -122,146 +122,47 @@ export default defineComponent({
 
     const databaseTabs = [
       {
-        name: "sqlserver",
+        name: "jenkins",
         to: {
-          name: "sqlserver",
+          name: "jenkins",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "SQL Server",
+        label: "Jenkins",
         contentClass: "tab_content",
       },
       {
-        name: "postgres",
+        name: "ansible",
         to: {
-          name: "postgres",
+          name: "ansible",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Postgres",
+        label: "Ansible",
         contentClass: "tab_content",
       },
       {
-        name: "mongodb",
+        name: "terraform",
         to: {
-          name: "mongodb",
+          name: "terraform",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "MongoDB",
+        label: "Terraform",
         contentClass: "tab_content",
       },
       {
-        name: "redis",
+        name: "github-actions",
         to: {
-          name: "redis",
+          name: "github-actions",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Redis",
-        contentClass: "tab_content",
-      },
-      {
-        name: "couchdb",
-        to: {
-          name: "couchdb",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "CouchDB",
-        contentClass: "tab_content",
-      },
-      {
-        name: "elasticsearch",
-        to: {
-          name: "elasticsearch",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Elasticsearch",
-        contentClass: "tab_content",
-      },
-      {
-        name: "mysql",
-        to: {
-          name: "mysql",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "MySQL",
-        contentClass: "tab_content",
-      },
-      {
-        name: "saphana",
-        to: {
-          name: "saphana",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "SAP HANA",
-        contentClass: "tab_content",
-      },
-      {
-        name: "snowflake",
-        to: {
-          name: "snowflake",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Snowflake",
-        contentClass: "tab_content",
-      },
-      {
-        name: "zookeeper",
-        to: {
-          name: "zookeeper",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Zookeeper",
-        contentClass: "tab_content",
-      },
-      {
-        name: "cassandra",
-        to: {
-          name: "cassandra",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Cassandra",
-        contentClass: "tab_content",
-      },
-      {
-        name: "aerospike",
-        to: {
-          name: "aerospike",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Aerospike",
-        contentClass: "tab_content",
-      },
-      {
-        name: "dynamodb",
-        to: {
-          name: "dynamodb",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "DynamoDB",
+        label: "GitHub Actions",
         contentClass: "tab_content",
       }
     ];
