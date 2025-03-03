@@ -133,10 +133,7 @@ const alerts = {
   },
   update_by_alert_id: (
     org_identifier: string,
-    stream_name: string,
-    stream_type: string,
     data: any,
-    folder_id: string
   ) => { 
     return http().put(
       `/api/v2/${org_identifier}/alerts/${data.id}`,

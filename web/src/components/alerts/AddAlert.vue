@@ -547,6 +547,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
+    folder_id : "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -1513,15 +1514,11 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
-          payload.folder_id = this.router.currentRoute.value.query.folder;
+          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
           callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            
-            payload.stream_name,
-            payload.stream_type,
             payload,
-            this.router.currentRoute.value.query.folder
-          );
+            );
           callAlert
             .then((res: { data: any }) => {
               this.formData = { ...defaultValue };
