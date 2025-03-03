@@ -17,24 +17,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
+
   <div
     data-test="alert-list-page"
     class="q-pa-none flex"
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
+  <div v-if="!showAddAlertDialog" class="flex justify-between full-width q-px-md q-pt-md">
+      <div class="q-table__title" data-test="alerts-list-title">
+            {{ t("alerts.header") }}
+          </div>
+          <q-input
+            data-test="alert-list-search-input"
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alerts.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
+          <q-btn
+            data-test="alert-list-add-alert-btn"
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :disable="!destinations.length"
+            :title="!destinations.length ? t('alerts.noDestinations') : ''"
+            :label="t(`alerts.add`)"
+            @click="showAddUpdateFn({})"
+          />
+  </div>
     <div v-if="!showAddAlertDialog" class="full-width alert-list-table">
-      <q-table
-        data-test="alert-list-table"
-        ref="qTable"
-        :rows="alertsRows"
-        :columns="columns"
-        row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        style="width: 100%"
+      <q-splitter
+      v-model="splitterModel"
+      unit="px"
+      :limits="[200, 500]"
+      style="height: calc(100vh - 112px)"
+      data-test="alert-list-splitter"
+    >
+      <template #before>
+        <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
+      </template>
+      <template #after>
+        <q-table
+          v-model:selected="selected"
+          :selected-rows-label="getSelectedString"
+          selection="multiple"
+          data-test="alert-list-table"
+          ref="qTable"
+          :rows="alertsRows"
+          :columns="columns"
+          row-key="alert_id"
+          :pagination="pagination"
+          :filter="filterQuery"
+          :filter-method="filterData"
+          style="width: 100%"
       >
+      <template #header-selection="scope">
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+      </template>
+      <template #body-selection="scope">
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+      </template>
         <template #no-data>
           <div
             v-if="!templates.length || !destinations.length"
@@ -128,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               :title="t('alerts.edit')"
-              @click="showAddUpdateFn(props)"
+              @click="editAlert(props.row)"
             ></q-btn>
             <q-btn
               icon="content_copy"
@@ -140,6 +190,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               @click.stop="duplicateAlert(props.row)"
+              :data-test="`alert-list-${props.row.name}-clone-alert`"
+            ></q-btn>
+            <q-btn
+              :icon="outlinedDriveFileMove"
+              :title="t('alerts.move')"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="moveAlertToAnotherFolder(props.row)"
               :data-test="`alert-list-${props.row.name}-clone-alert`"
             ></q-btn>
             <q-btn
@@ -167,33 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top="scope">
-          <div class="q-table__title" data-test="alerts-list-title">
-            {{ t("alerts.header") }}
-          </div>
-          <q-input
-            data-test="alert-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-btn
-            data-test="alert-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :disable="!destinations.length"
-            :title="!destinations.length ? t('alerts.noDestinations') : ''"
-            :label="t(`alerts.add`)"
-            @click="showAddUpdateFn({})"
-          />
+
 
           <QTablePagination
             :scope="scope"
@@ -206,6 +242,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #bottom="scope">
+          <div class="bottom-btn">
+            
+          <q-btn
+            v-if="selected.length > 0"
+            class="flex items-center move-btn"
+            color="secondary"
+            icon="folder"
+            :label="'Move Across Folders'"
+            @click="moveMultipleAlerts"
+          />
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -213,8 +259,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
         </template>
       </q-table>
+      </template>
+    </q-splitter>
     </div>
     <template v-else>
       <AddAlert
@@ -229,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete alert?"
-      @update:ok="deleteAlert"
+      @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
@@ -306,6 +355,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-card-section>
         </q-card>
       </q-dialog>
+      <q-dialog
+          v-model="showMoveAlertDialog"
+          position="right"
+          full-height
+          maximized
+          data-test="dashboard-move-to-another-folder-dialog"
+        >
+          <MoveAcrossFolders
+            :activeFolderId="activeFolderToMove"
+            :moduleId="selectedAlertToMove"
+            type="alerts"
+            @updated="updateAcrossFolders"
+          />
+        </q-dialog>
     </template>
   </div>
 </template>
@@ -318,6 +381,7 @@ import {
   onActivated,
   watch,
   defineAsyncComponent,
+  onMounted,
 } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
@@ -344,7 +408,12 @@ import {
   outlinedDelete,
   outlinedPause,
   outlinedPlayArrow,
+  outlinedDriveFileMove,
 } from "@quasar/extras/material-icons-outlined";
+
+import FolderList from "../common/sidebar/FolderList.vue";
+
+import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -356,6 +425,8 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
+    FolderList,
+    MoveAcrossFolders,
   },
   emits: [
     "updated:fields",
@@ -370,13 +441,13 @@ export default defineComponent({
     const alerts: Ref<Alert[]> = ref([]);
     const alertsRows: Ref<AlertListItem[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
-    const toBeClonedAlert: Ref<Alert | {}> = ref({});
+    const toBeClonedAlert: Ref<any> = ref({});
     const showAddAlertDialog: any = ref(false);
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
-    const splitterModel = ref(220);
+    const splitterModel = ref(200);
     const showForm = ref(false);
     const indexOptions = ref([]);
     const schemaList = ref([]);
@@ -387,20 +458,15 @@ export default defineComponent({
     const { getStreams } = useStreams();
 
     const toBeCloneAlertName = ref("");
-    const toBeCloneUUID = ref("");
+    const toBeClonedID = ref("");
     const toBeClonestreamType = ref("");
     const toBeClonestreamName = ref("");
     const streamTypes = ref(["logs", "metrics", "traces"]);
     const streamNames: Ref<string[]> = ref([]);
     const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
-    const folders = ref([
-      {
-        name: "folder1",
-      },
-      {
-        name: "folder2",
-      },
-    ]);
+    const activeFolderId = ref("default");
+    const showMoveAlertDialog = ref(false);
+    const activeFolderToMove = ref("default");
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -461,6 +527,8 @@ export default defineComponent({
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
+    const selected: Ref<any> = ref([]);
+    const selectedAlertToMove: Ref<any> = ref({});
     const getAlerts = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -477,7 +545,6 @@ export default defineComponent({
         )
         .then((res) => {
           var counter = 1;
-          resultTotal.value = res.data.list.length;
           alerts.value = res.data.list.map((alert: any) => {
             return {
               ...alert,
@@ -502,6 +569,7 @@ export default defineComponent({
             }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
+              alert_id: data.alert_id,
               name: data.name,
               alert_type: data.is_real_time ? "Real Time" : "Scheduled",
               stream_name: data.stream_name ? data.stream_name : "--",
@@ -543,11 +611,130 @@ export default defineComponent({
           });
         });
     };
+    const getAlertsByFolderId = async (store: any, folderId: any) => {
+        try {
+          if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
+            await getAlertsFn(store, folderId);
+          }
+          else{
+            alertsRows.value = store.state.organizationData.allAlertsListByFolderId[folderId];
+
+          }
+          resultTotal.value = alertsRows.value.length;
+        } catch (error) {
+          throw error;
+        }
+    };
+    const getAlertsFn = async (store: any, folderId: string) => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading alerts...",
+      });
+      alertsService
+        .listByFolderId(
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier,
+          folderId
+        )
+        .then((res) => {
+          var counter = 1;
+          resultTotal.value = res.data.list.length;
+          alerts.value = res.data.list.map((alert: any) => {
+            return {
+              ...alert,
+              uuid: getUUID(),
+            };
+          });
+          alertsRows.value = alerts.value.map((data: any) => {
+            let conditions = "--";
+            if (data.condition.conditions?.length) {
+              conditions = data.condition.conditions
+                .map((condition: any) => {
+                  return `${condition.column} ${condition.operator} ${condition.value}`;
+                })
+                .join(" AND ");
+            } else if (data.condition.sql) {
+              conditions = data.condition.sql;
+            } else if (data.condition.promql) {
+              conditions = data.condition.promql;
+            }
+            if (conditions.length > 50) {
+              conditions = conditions.substring(0, 32) + "...";
+            }
+            return {
+              "#": counter <= 9 ? `0${counter++}` : counter++,
+              alert_id: data.alert_id,
+              name: data.name,
+              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
+              stream_name: data.stream_name ? data.stream_name : "--",
+              stream_type: data.stream_type,
+              enabled: data.enabled,
+              conditions: conditions,
+              description: data.description,
+              uuid: data.uuid,
+              owner: data.owner,
+              last_triggered_at: convertUnixToQuasarFormat(
+                data.last_triggered_at
+              ),
+              last_satisfied_at: convertUnixToQuasarFormat(
+                data.last_satisfied_at
+              ),
+            };
+          });
+          alertsRows.value.forEach((alert: AlertListItem) => {
+            alertStateLoadingMap.value[alert.uuid as string] = false;
+          });
+          store.dispatch("setAllAlertsListByFolderId", {
+            ...store.state.organizationData.allAlertsListByFolderId,
+            [folderId]: alertsRows.value
+          });
+          console.log("alertsRows.value", store.state.organizationData.allAlertsListByFolderId['default']);
+          if (router.currentRoute.value.query.action == "add") {
+            showAddUpdateFn({ row: undefined });
+          }
+          if (router.currentRoute.value.query.action == "update") {
+            const alertId = router.currentRoute.value.query.alert_id as string;
+            showAddUpdateFn({
+              row: getAlertById(alertId),
+            });
+          }
+          dismiss();
+        })
+        .catch((e) => {
+          console.error(e);
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: "Error while pulling alerts.",
+            timeout: 2000,
+          });
+        });
+    };
     const getAlertByName = (name: string) => {
       return alerts.value.find((alert) => alert.name === name);
     };
+
+    const getAlertById = async (id: string) => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading alert...",
+      });
+       try {
+        const res = await alertsService.get_by_alert_id(store.state.selectedOrganization.identifier, id);
+        dismiss();
+        return res.data;
+       } catch (error) {
+        dismiss();
+        throw error;
+       }
+    };
     if (!alerts.value.length) {
-      getAlerts();
+      // getAlerts();
+      getAlertsByFolderId(store, activeFolderId.value);
     }
     onBeforeMount(async () => {
       await getTemplates();
@@ -560,6 +747,29 @@ export default defineComponent({
         if (!action) showAddAlertDialog.value = false;
       }
     );
+    onMounted (async () => {
+      if (
+        router.currentRoute.value.query.folder &&
+        store.state.organizationData.foldersByType.find(
+          (it: any) => it.folderId === router.currentRoute.value.query.folder,
+        )
+      ) {
+        activeFolderId.value = router.currentRoute.value.query.folder as string;
+      } else {
+        activeFolderId.value = "default";
+      }
+    });
+    watch(()=> activeFolderId.value, async (newVal)=>{
+      await  getAlertsByFolderId(store,newVal);
+      router.push({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+        },
+      });
+
+    })
     const getDestinations = async () => {
       destinationService
         .list({
@@ -629,26 +839,22 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
 
-    const duplicateAlert = (row: any) => {
-      toBeCloneUUID.value = row.uuid;
+    const duplicateAlert = async (row: any) => {
+      toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
       toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
-
+      toBeClonestreamType.value = ""
       showForm.value = true;
+      toBeClonedAlert.value = await getAlertById(row.alert_id);
     };
     const submitForm = async () => {
-      const alertToBeCloned = alerts.value.find(
-        (alert) => alert.uuid === toBeCloneUUID.value
-      ) as Alert;
-
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
       });
 
-      if (!alertToBeCloned) {
+      if (!toBeClonedAlert.value) {
         $q.notify({
           type: "negative",
           message: "Alert not found",
@@ -674,17 +880,16 @@ export default defineComponent({
       }
       isSubmitting.value = true;
 
-      alertToBeCloned.name = toBeCloneAlertName.value;
-      alertToBeCloned.stream_name = toBeClonestreamName.value;
-      alertToBeCloned.stream_type = toBeClonestreamType.value;
+      toBeClonedAlert.value.name = toBeCloneAlertName.value;
+      toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
+      toBeClonedAlert.value.stream_type = toBeClonestreamType.value;
+      toBeClonedAlert.value.folder_id = activeFolderId.value;
 
       try {
         alertsService
-          .create(
+          .create_by_alert_id(
             store.state.selectedOrganization.identifier,
-            alertToBeCloned.stream_name,
-            alertToBeCloned.stream_type,
-            alertToBeCloned
+            toBeClonedAlert.value
           )
           .then((res) => {
             dismiss();
@@ -695,7 +900,8 @@ export default defineComponent({
                 timeout: 2000,
               });
               showForm.value = false;
-              getAlerts();
+              // getAlerts();
+              getAlertsFn(store, activeFolderId.value);
             } else {
               $q.notify({
                 type: "negative",
@@ -731,13 +937,7 @@ export default defineComponent({
       }
     };
     const showAddUpdateFn = (props: any) => {
-      formData.value = alerts.value.find(
-        (alert: any) => alert.uuid === props.row?.uuid
-      ) as Alert;
-      //use this comment for testing multi_time_range shifts
-      // if( formData.value){
-      //   formData.value.query_condition.multi_time_range = [{offSet:"30m"}];
-      // }
+      formData.value = props.row;
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -747,6 +947,7 @@ export default defineComponent({
           query: {
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
+            folder: activeFolderId.value,
           },
         });
       } else {
@@ -757,7 +958,9 @@ export default defineComponent({
           query: {
             action: "update",
             name: props.row.name,
+            alert_id: props.row.alert_id,
             org_identifier: store.state.selectedOrganization.identifier,
+            folder: activeFolderId.value,
           },
         });
       }
@@ -772,7 +975,8 @@ export default defineComponent({
       }
     };
     const refreshList = () => {
-      getAlerts();
+      // getAlerts();
+      getAlertsFn(store, activeFolderId.value);
       hideForm();
     };
     const hideForm = () => {
@@ -781,6 +985,7 @@ export default defineComponent({
         name: "alertList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
         },
       });
     };
@@ -799,7 +1004,51 @@ export default defineComponent({
               message: res.data.message,
               timeout: 2000,
             });
-            getAlerts();
+            // getAlerts();
+            getAlertsByFolderId(store, activeFolderId.value);
+          } else {
+            $q.notify({
+              type: "negative",
+              message: res.data.message,
+              timeout: 2000,
+            });
+          }
+        })
+        .catch((err) => {
+          if(err.response?.status == 403){
+            return;
+          }
+          $q.notify({
+            type: "negative",
+            message: err?.data?.message || "Error while deleting alert.",
+            timeout: 2000,
+          });
+        });
+      if (config.enableAnalytics == "true") {
+        segment.track("Button Click", {
+          button: "Delete Alert",
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          alert_name: selectedDelete.value.name,
+          page: "Alerts",
+        });
+      }
+    };
+    const deleteAlertByAlertId = () => {
+      alertsService
+        .delete_by_alert_id(
+          store.state.selectedOrganization.identifier,
+          selectedDelete.value.alert_id
+        )
+        .then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              type: "positive",
+              message: res.data.message,
+              timeout: 2000,
+            });
+            // getAlerts();
+            getAlertsFn(store, activeFolderId.value);
           } else {
             $q.notify({
               type: "negative",
@@ -887,21 +1136,17 @@ export default defineComponent({
 
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
-      const alert: Alert = alerts.value.find(
-        (alert) => alert.uuid === row.uuid
-      ) as Alert;
+      
       alertsService
-        .toggleState(
+        .toggle_state_by_alert_id(
           store.state.selectedOrganization.identifier,
-          alert.stream_name,
-          alert.name,
-          !alert?.enabled,
-          alert.stream_type
+          row.alert_id,
+          !row?.enabled
         )
-        .then(() => {
-          alert.enabled = !alert.enabled;
+        .then((res: any) => {
+          const isEnabled = res.data.enabled;
           alertsRows.value.forEach((alert) => {
-            alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
+            alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
         })
         .finally(() => {
@@ -923,6 +1168,46 @@ export default defineComponent({
 
       await getDestinations();
 
+    }
+
+    const updateActiveFolderId = (newVal: any) => {
+      activeFolderId.value = newVal;
+    }
+
+    const editAlert = async (row: any) => {
+      const selectedAlert = await getAlertById(row.alert_id);
+      console.log("selectedAlert", selectedAlert);
+      showAddUpdateFn({ row: selectedAlert });
+    }
+
+    const moveAlertToAnotherFolder = (row: any) => {
+      showMoveAlertDialog.value = true;
+      selectedAlertToMove.value = row.alert_id;
+      activeFolderToMove.value = activeFolderId.value;
+    }
+
+    const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
+      
+      await getAlertsFn(store, activeFolderId);
+      await getAlertsFn(store, selectedFolderId);
+      showMoveAlertDialog.value = false;
+    }
+
+    const getSelectedString = () => {
+      return selected.value.length === 0
+        ? ""
+        : `${selected.value.length} record${
+            selected.value.length > 1 ? "s" : ""
+          } selected`;
+    };
+
+    const moveMultipleAlerts = () => {
+      showMoveAlertDialog.value = true;
+      const selectedAlerts = selected.value.map((alert: any) => {
+        return  alert.alert_id;
+      });
+      selectedAlertToMove.value = selectedAlerts;
+      activeFolderToMove.value = activeFolderId.value;
     }
 
     return {
@@ -955,7 +1240,7 @@ export default defineComponent({
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
-      toBeCloneUUID,
+      toBeClonedID,
       toBeClonestreamType,
       toBeClonestreamName,
       streamTypes,
@@ -1002,7 +1287,6 @@ export default defineComponent({
       activeTab,
       destinations,
       verifyOrganizationStatus,
-      folders,
       splitterModel,
       outlinedPause,
       outlinedPlayArrow,
@@ -1012,12 +1296,37 @@ export default defineComponent({
       templates,
       routeTo,
       refreshDestination,
+      updateActiveFolderId,
+      activeFolderId,
+      editAlert,
+      deleteAlertByAlertId,
+      showMoveAlertDialog,
+      outlinedDriveFileMove,
+      selectedAlertToMove,
+      moveAlertToAnotherFolder,
+      activeFolderToMove,
+      updateAcrossFolders,
+      selected,
+      getSelectedString,
+      moveMultipleAlerts
     };
   },
 });
 </script>
 
 <style lang="scss">
+.bottom-btn {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+
+}
+
+.move-btn {
+  width: 20vw;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;

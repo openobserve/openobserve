@@ -1513,11 +1513,14 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
-          callAlert = alertsService.update(
+          payload.folder_id = this.router.currentRoute.value.query.folder;
+          callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
+            
             payload.stream_name,
             payload.stream_type,
             payload,
+            this.router.currentRoute.value.query.folder
           );
           callAlert
             .then((res: { data: any }) => {
@@ -1544,10 +1547,10 @@ export default defineComponent({
           });
           return;
         } else {
-          callAlert = alertsService.create(
+
+          payload.folder_id = this.router.currentRoute.value.query.folder;
+          callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
             payload,
           );
 
