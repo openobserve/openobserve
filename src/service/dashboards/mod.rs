@@ -429,7 +429,7 @@ pub async fn move_dashboard(
         .await?
         .ok_or(DashboardError::DashboardNotFound)?;
     let hash = dashboard.hash.clone();
-    let _ = put(
+    let _updated_dashboard = put(
         org_id,
         dashboard_id,
         &curr_folder.folder_id,
@@ -446,7 +446,7 @@ pub async fn move_dashboard(
                 org_id,
                 &curr_folder.folder_id,
                 Some(to_folder),
-                dashboard,
+                _updated_dashboard,
             )
             .await;
         }
@@ -461,7 +461,7 @@ pub async fn move_dashboard(
             remove_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
-                from_folder,
+                &curr_folder.folder_id,
                 &get_ofga_type("folders"),
             )
             .await;
