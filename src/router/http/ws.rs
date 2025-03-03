@@ -132,13 +132,9 @@ impl WsProxySession {
         let client_session = self.client_session.clone();
         let msg_stream = Arc::clone(&self.msg_stream);
 
-        // Create a channel for coordinating cleanup
-        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-
         // Task 1: Client -> Router
         let client_to_backend = {
             let backend_stream = Arc::clone(&backend_stream);
-            let tx = tx.clone();
             async move {
                 let mut msg_stream = msg_stream.lock().await;
                 while let Some(Ok(msg)) = msg_stream.next().await {
@@ -160,8 +156,6 @@ impl WsProxySession {
                         }
                     }
                 }
-                // Signal completion
-                let _ = tx.send(()).await;
                 log::info!("[WS_PROXY] Client->Backend task completed");
             }
         };
@@ -169,7 +163,6 @@ impl WsProxySession {
         // Task 2: Router -> Backend
         let backend_to_client = {
             let mut session = client_session.clone();
-            let tx = tx;
             async move {
                 while let Some(Ok(msg)) = {
                     let mut stream = backend_stream.lock().await;
@@ -232,18 +225,12 @@ impl WsProxySession {
                         _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", msg),
                     }
                 }
-                // Signal completion
-                let _ = tx.send(()).await;
                 log::info!("[WS_PROXY] Backend->Client task completed");
             }
         };
 
         // Wait for both tasks to complete
         let tasks = tokio::join!(rt::spawn(client_to_backend), rt::spawn(backend_to_client));
-
-        // Wait for both tasks to signal completion
-        let _ = rx.recv().await;
-        let _ = rx.recv().await;
 
         let elapsed = start_time.elapsed();
         log::info!("[WS_PROXY] Full session completed in {:?}", elapsed);
