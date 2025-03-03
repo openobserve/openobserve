@@ -349,10 +349,6 @@ async fn handle_alert_triggers(
         return Err(err);
     }
 
-    // let (ret, end_time) = {
-    //     let res = result.unwrap();
-    //     res.
-    // };
     let trigger_results = result.unwrap();
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
