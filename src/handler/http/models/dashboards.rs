@@ -113,6 +113,16 @@ pub struct MoveDashboardRequestBody {
     pub to: String,
 }
 
+/// HTTP request body for `MoveDashboards` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct MoveDashboardsRequestBody {
+    /// IDs of the dashboards to move.
+    pub dashboard_ids: Vec<String>,
+
+    /// Indicates the folder to which dashboard should be moved.
+    pub dst_folder_id: String,
+}
+
 /// Version-specific dashboard details and hash.
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

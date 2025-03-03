@@ -21,6 +21,7 @@ use config::{
         stream::{DistinctField, StreamType},
     },
 };
+use futures::future::join_all;
 use hashbrown::HashMap;
 use infra::table::{
     self,
@@ -418,41 +419,32 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
 pub async fn move_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    from_folder: &str,
     to_folder: &str,
 ) -> Result<(), DashboardError> {
-    if from_folder.is_empty() || to_folder.is_empty() {
-        return Err(DashboardError::MoveMissingFolderParam);
-    };
-
-    let Some(dashboard) =
-        table::dashboards::get_from_folder(org_id, from_folder, dashboard_id).await?
-    else {
-        return Err(DashboardError::DashboardNotFound);
-    };
-
-    // make sure the destination folder exists
     if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
-    // update the dashboard so that it's parent folder is the destination folder
-    put(
+    let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
+    let hash = dashboard.hash.clone();
+    let _ = put(
         org_id,
         dashboard_id,
-        from_folder,
+        &curr_folder.folder_id,
         Some(to_folder),
-        dashboard.clone(),
-        Some(&dashboard.hash),
+        dashboard,
+        Some(&hash),
     )
     .await?;
-    // OFGA ownership
+
     #[cfg(feature = "enterprise")]
     {
         if get_o2_config().super_cluster.enabled {
             let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put_v2(
                 org_id,
-                from_folder,
+                &curr_folder.folder_id,
                 Some(to_folder),
                 dashboard,
             )
@@ -475,6 +467,28 @@ pub async fn move_dashboard(
             .await;
         }
     }
+
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn move_dashboards(
+    org_id: &str,
+    dashboard_ids: &[String],
+    to_folder: &str,
+) -> Result<(), DashboardError> {
+    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
+        return Err(DashboardError::MoveDestinationFolderNotFound);
+    };
+
+    let futs = dashboard_ids
+        .into_iter()
+        .map(|d_id| move_dashboard(org_id, d_id, to_folder));
+    let _ = join_all(futs)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
