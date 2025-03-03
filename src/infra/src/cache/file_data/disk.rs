@@ -181,9 +181,7 @@ impl FileData {
         // write file into local disk
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        dbg!(&file_path);
-        dbg!(&data);
-        dbg!(put_file_contents(&file_path, &data))?;
+        put_file_contents(&file_path, &data)?;
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {

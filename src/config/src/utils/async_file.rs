@@ -74,8 +74,6 @@ pub async fn put_file_contents(
     path: impl AsRef<Path>,
     contents: &[u8],
 ) -> Result<(), std::io::Error> {
-    use tokio::io::BufWriter;
-
     let Some(path) = path.as_ref().to_str() else {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -87,10 +85,8 @@ pub async fn put_file_contents(
     let temp_file = format!("{}.tmp", path);
 
     // Write to temporary file first
-    let file_handle = File::create(&temp_file).await?;
-    let mut writer = BufWriter::new(file_handle);
-    writer.write_all(contents).await?;
-    writer.flush().await?;
+    let mut file_handle = File::create(&temp_file).await?;
+    file_handle.write_all(contents).await?;
 
     // Atomically rename the temp file to the target file
     // This ensures we either have the old file or the new file, never a partially written file
