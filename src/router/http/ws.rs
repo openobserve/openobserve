@@ -16,7 +16,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
-use actix_ws::Message;
+use actix_ws::{CloseCode, CloseReason, Message};
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use hex;
@@ -169,16 +169,30 @@ pub async fn ws_proxy(
                         }
                         Message::Close(reason) => {
                             log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
-                            if let Some(r) = &reason {
-                                log_frame_details(
-                                    "Sending Close Frame ->",
-                                    &r.description.clone().unwrap_or_default(),
-                                    true,
-                                );
-                            }
-                            if let Err(e) = session.close(reason.clone()).await {
+
+                            // Debug incoming close frame
+                            debug_ws_message(
+                                "Received from backend",
+                                &Message::Close(reason.clone()),
+                            );
+
+                            // Create clean close
+                            let clean_close = CloseReason {
+                                code: reason.as_ref().map(|r| r.code).unwrap_or(CloseCode::Normal),
+                                // Skip description to avoid frame mixing
+                                description: None,
+                            };
+
+                            // Debug outgoing close frame
+                            debug_ws_message(
+                                "Sending to client",
+                                &Message::Close(Some(clean_close.clone())),
+                            );
+
+                            if let Err(e) = session.close(Some(clean_close)).await {
                                 log::error!("[WS_PROXY] Failed to close client: {}", e);
                             }
+
                             // Close backend sink
                             let mut sink = backend_ws_sink2.lock().await;
                             if let Err(e) = sink.close().await {
@@ -354,11 +368,39 @@ pub fn convert_actix_to_tungstenite_request(
 /// Add this helper function
 fn log_frame_details(prefix: &str, text: &str, is_close: bool) {
     // 7b is '{' in JSON
-    log::info!(
+    log::debug!(
         "[WS_FRAME] {} Length: {}, First 50 bytes: {}, Is close: {}",
         prefix,
         text.len(),
         hex::encode(&text.as_bytes()[..std::cmp::min(50, text.len())]),
         is_close
     );
+}
+
+// Add helper function to debug frame details
+fn debug_ws_message(prefix: &str, msg: &Message) {
+    match msg {
+        Message::Text(text) => {
+            log::debug!(
+                "[WS_PROXY] {} Text frame: len={}, content_start='{}'",
+                prefix,
+                text.len(),
+                &text[..text.len().min(50)]
+            );
+        }
+        Message::Close(reason) => {
+            if let Some(r) = reason {
+                log::debug!(
+                    "[WS_PROXY] {} Close frame: code={:?}, desc={:?}, desc_len={}",
+                    prefix,
+                    r.code,
+                    r.description,
+                    r.description.as_ref().map(|d| d.len()).unwrap_or(0)
+                );
+            } else {
+                log::debug!("[WS_PROXY] {} Close frame: no reason", prefix);
+            }
+        }
+        _ => log::debug!("[WS_PROXY] {} Other frame type: {:?}", prefix, msg),
+    }
 }
