@@ -78,7 +78,7 @@ Access Key: [BASIC_PASSCODE]`;
     jenkins: "https://short.openobserve.ai/devops/jenkins",
     ansible: "https://short.openobserve.ai/devops/ansible",
     terraform: "https://short.openobserve.ai/devops/terraform",
-    github: "https://short.openobserve.ai/devops/github-actions",
+    githubactions: "https://short.openobserve.ai/devops/github-actions",
   };
 
 
