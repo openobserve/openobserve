@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -26,7 +26,6 @@ use config::{
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
-    TIMESTAMP_COL_NAME,
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -446,10 +445,8 @@ pub fn merge_response(
         && !search_response.is_empty()
         && search_response
             .first()
-            .map_or(true, |res| res.hits.is_empty())
-        && search_response
-            .last()
-            .map_or(true, |res| res.hits.is_empty())
+            .is_none_or(|res| res.hits.is_empty())
+        && search_response.last().is_none_or(|res| res.hits.is_empty())
     {
         for res in search_response {
             cache_response.total += res.total;

@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::sync::{
-    atomic::{AtomicI64, AtomicU64, Ordering},
     Arc, LazyLock,
+    atomic::{AtomicI64, AtomicU64, Ordering},
 };
 
 use chrono::Utc;

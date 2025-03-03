@@ -15,20 +15,19 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{SearchEventType, SearchHistoryHitResponse},
-        self_reporting::usage::{RequestStats, UsageType, USAGE_STREAM},
+        self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
@@ -284,7 +283,7 @@ pub async fn search(
 
                 use crate::common::{
                     infra::config::USERS,
-                    utils::auth::{is_root_user, AuthExtractor},
+                    utils::auth::{AuthExtractor, is_root_user},
                 };
 
                 if !is_root_user(&user_id) {
@@ -453,11 +452,7 @@ pub async fn around(
                     .await
                     .iter()
                     .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-                if uses_fn {
-                    sql
-                } else {
-                    default_sql
-                }
+                if uses_fn { sql } else { default_sql }
             }
         },
     };
@@ -1353,7 +1348,7 @@ pub async fn search_history(
         .with_label_values(&[&org_id])
         .dec();
 
-    let history_org_id = &cfg.common.usage_org;
+    let history_org_id = META_ORG_ID;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,

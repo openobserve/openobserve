@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -94,7 +94,9 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
         )
         .await
         {
-            log::error!("[Destination] error triggering super cluster event to add destination to cache: {e}");
+            log::error!(
+                "[Destination] error triggering super cluster event to add destination to cache: {e}"
+            );
         }
     }
 
@@ -122,7 +124,9 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         )
         .await
         {
-            log::error!("[Destination] error triggering super cluster event to remove destination from cache: {e}");
+            log::error!(
+                "[Destination] error triggering super cluster event to remove destination from cache: {e}"
+            );
         }
     }
 

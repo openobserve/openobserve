@@ -35,7 +35,7 @@ use rayon::slice::ParallelSliceMut;
 
 use super::Value;
 use crate::service::{
-    promql::{name_visitor, value, PromqlContext, TableProvider, DEFAULT_LOOKBACK},
+    promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor, value},
     search,
 };
 
@@ -161,7 +161,7 @@ pub async fn search(
             let resp = search_inner(&req).await?;
             log::info!(
                 "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
-                 start_time.elapsed().as_millis()
+                start_time.elapsed().as_millis()
             );
             results.push(resp);
         }

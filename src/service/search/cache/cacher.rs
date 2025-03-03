@@ -16,10 +16,9 @@
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
     utils::{file::scan_files, json},
-    TIMESTAMP_COL_NAME,
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -31,10 +30,10 @@ use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
     service::search::{
         cache::{
-            result_utils::{get_ts_value, round_down_to_nearest_minute},
             MultiCachedQueryResponse,
+            result_utils::{get_ts_value, round_down_to_nearest_minute},
         },
-        sql::{generate_histogram_interval, Sql, RE_HISTOGRAM, RE_SELECT_FROM},
+        sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
     },
 };
 
@@ -743,9 +742,9 @@ fn calculate_deltas_multi(
 
     // Check if there is a gap at the end
     if current_end_time < end_time
-        && results.last().map_or(false, |last_meta| {
-            !last_meta.cached_response.hits.is_empty()
-        })
+        && results
+            .last()
+            .is_some_and(|last_meta| !last_meta.cached_response.hits.is_empty())
     {
         deltas.push(QueryDelta {
             // Adding histogram interval to the current end time to ensure the next query

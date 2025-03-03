@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use config::{
     get_config,
-    meta::stream::{FileKey, PartitionTimeLevel, ALL_STREAM_TYPES},
+    meta::stream::{ALL_STREAM_TYPES, FileKey, PartitionTimeLevel},
     utils::time::BASE_TIME,
 };
 use infra::file_list as infra_file_list;

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error, str::FromStr};
 
 use actix_multipart::Multipart;
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use bytes::Bytes;
 use config::meta::actions::action::{Action, ExecutionDetailsType, UpdateActionDetailsRequest};
 use futures::{StreamExt, TryStreamExt};
@@ -34,7 +34,7 @@ use svix_ksuid::Ksuid;
 use crate::{
     common::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{check_permissions, remove_ownership, set_ownership, UserEmail},
+        utils::auth::{UserEmail, check_permissions, remove_ownership, set_ownership},
     },
     handler::http::models::action::{GetActionDetailsResponse, GetActionInfoResponse},
     service::organization::get_passcode,
@@ -304,7 +304,7 @@ pub async fn upload_zipped_action(
                         Err(_) => {
                             return Ok(
                                 HttpResponse::BadRequest().body("Failed to read description field")
-                            )
+                            );
                         }
                     }
                 }
@@ -340,7 +340,7 @@ pub async fn upload_zipped_action(
                         Err(_) => {
                             return Ok(
                                 HttpResponse::BadRequest().body("Failed to read filename field")
-                            )
+                            );
                         }
                     }
                 }
@@ -363,7 +363,7 @@ pub async fn upload_zipped_action(
                     match chunk {
                         Ok(bytes) => name.extend_from_slice(&bytes),
                         Err(_) => {
-                            return Ok(HttpResponse::BadRequest().body("Failed to read name field"))
+                            return Ok(HttpResponse::BadRequest().body("Failed to read name field"));
                         }
                     }
                 }
@@ -386,7 +386,7 @@ pub async fn upload_zipped_action(
                         Ok(bytes) => details.extend_from_slice(&bytes),
                         Err(_) => {
                             return Ok(HttpResponse::BadRequest()
-                                .body("Failed to read execution_details field"))
+                                .body("Failed to read execution_details field"));
                         }
                     }
                 }
@@ -414,7 +414,7 @@ pub async fn upload_zipped_action(
                         Err(_) => {
                             return Ok(
                                 HttpResponse::BadRequest().body("Failed to read cron_expr field")
-                            )
+                            );
                         }
                     }
                 }
@@ -433,7 +433,7 @@ pub async fn upload_zipped_action(
                         Ok(bytes) => env_vars.extend_from_slice(&bytes),
                         Err(_) => {
                             return Ok(HttpResponse::BadRequest()
-                                .body("Failed to read environment_variables field"))
+                                .body("Failed to read environment_variables field"));
                         }
                     }
                 }
@@ -461,7 +461,9 @@ pub async fn upload_zipped_action(
                     match chunk {
                         Ok(bytes) => owner.extend_from_slice(&bytes),
                         Err(_) => {
-                            return Ok(HttpResponse::BadRequest().body("Failed to read owner field"))
+                            return Ok(
+                                HttpResponse::BadRequest().body("Failed to read owner field")
+                            );
                         }
                     }
                 }
@@ -480,7 +482,7 @@ pub async fn upload_zipped_action(
                     match chunk {
                         Ok(bytes) => id.extend_from_slice(&bytes),
                         Err(_) => {
-                            return Ok(HttpResponse::BadRequest().body("Failed to read id field"))
+                            return Ok(HttpResponse::BadRequest().body("Failed to read id field"));
                         }
                     }
                 }
@@ -503,7 +505,7 @@ pub async fn upload_zipped_action(
                         Ok(bytes) => service_account.extend_from_slice(&bytes),
                         Err(_) => {
                             return Ok(HttpResponse::BadRequest()
-                                .body("Failed to read service_account field"))
+                                .body("Failed to read service_account field"));
                         }
                     }
                 }

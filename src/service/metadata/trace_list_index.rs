@@ -17,17 +17,16 @@ use std::{
     collections::HashMap,
     hash::Hash,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
-    TIMESTAMP_COL_NAME,
 };
 use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
@@ -239,8 +238,8 @@ mod tests {
         service::{
             ingestion,
             metadata::{
-                trace_list_index::{TraceListIndex, TraceListItem, STREAM_NAME},
                 Metadata, MetadataItem,
+                trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
             },
         },
     };

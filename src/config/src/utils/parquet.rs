@@ -25,8 +25,8 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{
-        arrow_reader::ArrowReaderMetadata, async_reader::ParquetRecordBatchStream,
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
+        async_reader::ParquetRecordBatchStream,
     },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},

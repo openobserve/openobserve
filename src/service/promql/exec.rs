@@ -26,8 +26,8 @@ use tokio::sync::{Mutex, RwLock, Semaphore};
 
 use super::Engine;
 use crate::service::promql::{
-    micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
-    DEFAULT_LOOKBACK,
+    DEFAULT_LOOKBACK, TableProvider, micros, micros_since_epoch,
+    selector_visitor::MetricSelectorVisitor, value::*,
 };
 
 #[derive(Clone)]

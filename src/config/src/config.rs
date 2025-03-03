@@ -15,20 +15,20 @@
 
 use std::{cmp::max, collections::BTreeMap, path::Path, sync::Arc, time::Duration};
 
-use aes_siv::{siv::Aes256Siv, KeyInit};
+use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv_override;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use lettre::{
+    AsyncSmtpTransport, Tokio1Executor,
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
 
@@ -44,6 +44,8 @@ pub type RwHashSet<K> = dashmap::DashSet<K, ahash::RandomState>;
 pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
+
+pub const META_ORG_ID: &str = "_meta";
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
@@ -762,8 +764,6 @@ pub struct Common {
     pub print_key_sql: bool,
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
-    #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
-    pub usage_org: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
@@ -1002,6 +1002,8 @@ pub struct Common {
         help = "allow minimum auto refresh interval in seconds"
     )] // in seconds
     pub min_auto_refresh_interval: u32,
+    #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
+    pub additional_reporting_orgs: String,
 }
 
 #[derive(EnvConfig)]
@@ -2043,7 +2045,9 @@ fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             || cfg.grpc.tls_cert_path.is_empty()
             || cfg.grpc.tls_key_path.is_empty())
     {
-        return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+        return Err(anyhow::anyhow!(
+            "ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"
+        ));
     }
     Ok(())
 }
@@ -2177,6 +2181,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
     } else {
         cfg.memory_cache.gc_size *= 1024 * 1024;
+    }
+    if cfg.memory_cache.max_size >= mem_total {
+        return Err(anyhow::anyhow!(
+            "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
+        ));
     }
     if cfg.memory_cache.datafusion_max_size == 0 {
         if cfg.common.local_mode {
@@ -2442,7 +2451,7 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     cfg.s3.provider = cfg.s3.provider.to_lowercase();
     if cfg.s3.provider.eq("swift") {
-        std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
+        unsafe { std::env::set_var("AWS_EC2_METADATA_DISABLED", "true") };
     }
 
     if cfg.s3.keepalive_timeout == 0 {

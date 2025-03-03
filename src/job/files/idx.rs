@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,18 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    make_builder, Array, ArrayBuilder, BinaryArray, BinaryBuilder, BooleanArray, BooleanBuilder,
-    Int64Array, Int64Builder, RecordBatch, StringArray, StringBuilder,
+    Array, ArrayBuilder, BinaryArray, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
+    Int64Builder, RecordBatch, StringArray, StringBuilder, make_builder,
 };
 use arrow_schema::{DataType, Schema};
 use config::{
-    ider,
+    FILE_EXT_PARQUET, ider,
     meta::stream::{FileMeta, StreamPartition, StreamPartitionType, StreamType},
     utils::{
         parquet::new_parquet_writer,
-        record_batch_ext::{concat_batches, RecordBatchExt},
+        record_batch_ext::{RecordBatchExt, concat_batches},
         schema::format_partition_key,
     },
-    FILE_EXT_PARQUET,
 };
 use hashbrown::HashMap;
 use infra::storage;

@@ -15,19 +15,18 @@
 
 use std::collections::{HashMap, HashSet};
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -430,8 +429,8 @@ mod tests {
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{
-            any_value::Value::{IntValue, StringValue},
             AnyValue, InstrumentationScope, KeyValue,
+            any_value::Value::{IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };

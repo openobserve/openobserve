@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use config::utils::json;
 use opentelemetry_proto::tonic::{
-    common::v1::{any_value::Value, AnyValue},
+    common::v1::{AnyValue, any_value::Value},
     metrics::v1::{exemplar, number_data_point},
 };
 

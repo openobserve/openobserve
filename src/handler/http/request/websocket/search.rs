@@ -17,11 +17,11 @@ use config::{
     get_config,
     meta::{
         search::{
-            Response, SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
-            PARTIAL_ERROR_RESPONSE_MESSAGE,
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse,
         },
-        sql::{resolve_stream_names, OrderBy},
-        websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
+        sql::{OrderBy, resolve_stream_names},
+        websocket::{MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE, SearchEventReq, SearchResultType},
     },
 };
 use infra::errors::{Error, ErrorCodes};
@@ -42,7 +42,7 @@ use crate::{
     },
     handler::http::request::websocket::{
         session::send_message,
-        utils::{search_registry_utils, TimeOffset, WsServerEvents},
+        utils::{TimeOffset, WsServerEvents, search_registry_utils},
     },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
@@ -1015,11 +1015,11 @@ async fn write_results_to_cache(
     }
 
     log::info!(
-            "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
-            c_resp.trace_id,
-            c_resp.file_path,
-            accumulated_results.len()
-        );
+        "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+        c_resp.trace_id,
+        c_resp.file_path,
+        accumulated_results.len()
+    );
 
     let cfg = get_config();
     let mut cached_responses = Vec::new();

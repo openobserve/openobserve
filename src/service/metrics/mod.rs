@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{Metadata, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
-    utils::hash::{gxhash, Sum64},
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
+    utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;

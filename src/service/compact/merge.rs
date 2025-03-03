@@ -21,6 +21,7 @@ use arrow_schema::{DataType, Field};
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, ider, is_local_disk_storage,
     meta::{
@@ -37,23 +38,21 @@ use config::{
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
     },
-    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
     dist_lock, file_list as infra_file_list,
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
         get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
-        SchemaCache,
     },
     storage,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 use tokio::{
-    sync::{mpsc, Semaphore},
+    sync::{Semaphore, mpsc},
     task::JoinHandle,
 };
 
@@ -64,8 +63,8 @@ use crate::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
         search::{
-            datafusion::exec::{self, MergeParquetResult},
             DATAFUSION_RUNTIME,
+            datafusion::exec::{self, MergeParquetResult},
         },
         stream,
     },
@@ -1018,7 +1017,10 @@ pub async fn merge_files(
                 retain_file_list.len(),
                 new_file_keys,
                 new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
-                new_file_metas.iter().map(|m| m.compressed_size).sum::<i64>(),
+                new_file_metas
+                    .iter()
+                    .map(|m| m.compressed_size)
+                    .sum::<i64>(),
                 start.elapsed().as_millis(),
             );
         }

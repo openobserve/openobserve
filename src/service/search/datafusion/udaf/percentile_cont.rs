@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use std::{fmt::Formatter, sync::Arc};
 
 use arrow::array::{
-    Array, AsArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch,
-    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    Array, AsArray, Float32Array, Int8Array, Int16Array, Int32Array, Int64Array, RecordBatch,
+    UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow_schema::{Field, Schema};
 use datafusion::{
@@ -25,12 +25,12 @@ use datafusion::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{downcast_value, internal_err, not_impl_err, plan_err, DataFusionError},
+    common::{DataFusionError, downcast_value, internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
+        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
         function::{AccumulatorArgs, StateFieldsArgs},
         utils::format_state_name,
-        Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
     },
     physical_plan::PhysicalExpr,
     scalar::ScalarValue,

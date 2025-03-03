@@ -15,11 +15,11 @@
 
 use datafusion::{
     common::{
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
         Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
     },
     logical_expr::LogicalPlan,
-    optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
+    optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder},
 };
 
 use super::utils::AddSortAndLimit;

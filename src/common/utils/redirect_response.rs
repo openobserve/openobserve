@@ -16,8 +16,8 @@
 use std::{collections::HashMap, fmt};
 
 use actix_web::{
-    http::header::{ContentType, LOCATION},
     HttpResponse, ResponseError,
+    http::header::{ContentType, LOCATION},
 };
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
@@ -134,7 +134,7 @@ impl Default for RedirectResponseBuilder {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{http::header::LOCATION, HttpResponse};
+    use actix_web::{HttpResponse, http::header::LOCATION};
 
     use super::*;
 

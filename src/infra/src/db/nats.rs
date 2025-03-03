@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,13 +15,13 @@
 
 use std::{
     sync::{
-        atomic::{AtomicU8, Ordering},
         Arc,
+        atomic::{AtomicU8, Ordering},
     },
     time::Duration,
 };
 
-use async_nats::{jetstream, Client, ServerAddr};
+use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{
@@ -35,7 +35,7 @@ use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
-    sync::{mpsc, Mutex, OnceCell},
+    sync::{Mutex, OnceCell, mpsc},
     task::JoinHandle,
 };
 
@@ -509,7 +509,7 @@ impl super::Db for NatsDb {
                 let key = key_decode(&k);
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();
@@ -529,7 +529,7 @@ impl super::Db for NatsDb {
             .map(|key| async move {
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();

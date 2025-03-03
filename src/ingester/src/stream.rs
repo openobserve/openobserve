@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,10 +19,10 @@ use arrow_schema::Schema;
 use config::utils::schema_ext::SchemaExt;
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
     partition::Partition,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Stream {

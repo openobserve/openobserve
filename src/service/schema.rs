@@ -17,19 +17,19 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{promql::METADATA_LABEL, stream::StreamType},
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST,
-    STREAM_SETTINGS,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
+    unwrap_stream_settings,
 };
 use serde_json::{Map, Value};
 

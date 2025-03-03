@@ -28,8 +28,10 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::EquivalenceProperties,
     physical_plan::{
-        memory::MemoryStream, DisplayAs, DisplayFormatType, ExecutionMode, ExecutionPlan,
-        ExecutionPlanProperties, Partitioning, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        memory::MemoryStream,
     },
 };
 use futures::{Stream, StreamExt};
@@ -111,7 +113,8 @@ impl StreamingAggsExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }

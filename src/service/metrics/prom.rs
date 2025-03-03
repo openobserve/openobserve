@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::web;
 use chrono::{TimeZone, Utc};
 use config::{
+    FxIndexMap, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -28,14 +29,13 @@ use config::{
     },
     metrics,
     utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
-    FxIndexMap, TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, update_setting, SchemaCache},
+    schema::{SchemaCache, unwrap_partition_time_level, update_setting},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -49,7 +49,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
         metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},

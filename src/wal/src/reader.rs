@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,9 +22,9 @@ use std::{
 
 use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
-use snafu::{ensure, ResultExt};
+use snafu::{ResultExt, ensure};
 
-use crate::{errors::*, FileHeader, ReadFrom};
+use crate::{FileHeader, ReadFrom, errors::*};
 
 pub struct Reader<R> {
     path: PathBuf,

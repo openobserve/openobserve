@@ -16,16 +16,16 @@
 use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
 
 use config::{
-    utils::{json, sort::sort_float},
     FxIndexMap,
+    utils::{json, sort::sort_float},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{
+    Deserialize, Serialize,
     de::{Deserializer, SeqAccess, Visitor},
     ser::{SerializeSeq, SerializeStruct, Serializer},
-    Deserialize, Serialize,
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels

@@ -24,7 +24,7 @@ use config::{
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use opentelemetry::global;
-use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
+use proto::cluster_rpc::{EmptyResponse, FileList, event_server::Event};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 

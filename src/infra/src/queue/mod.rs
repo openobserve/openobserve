@@ -18,7 +18,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::meta::meta_store::MetaStore;
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::{OnceCell, mpsc};
 
 use crate::errors::{Error, Result};
 
