@@ -23,8 +23,8 @@ use std::{
 use anyhow::Context;
 use arrow::{
     array::{
-        new_null_array, Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array,
-        Int64Builder, StringArray, StringBuilder,
+        Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
+        StringArray, StringBuilder, new_null_array,
     },
     datatypes::Field,
     record_batch::RecordBatch,
@@ -33,7 +33,8 @@ use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
-    cluster, get_config,
+    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME, cluster, get_config,
     meta::{
         bitvec::BitVec,
         inverted_index::InvertedIndexFormat,
@@ -51,17 +52,15 @@ use config::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
-        tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
+        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
     },
-    FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
-    TIMESTAMP_COL_NAME,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
 use infra::{
     schema::{
-        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, unwrap_stream_settings, SchemaCache,
+        SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, unwrap_stream_settings,
     },
     storage,
 };
@@ -672,14 +671,18 @@ async fn merge_files(
         latest_schema.clone()
     };
 
-    // read schema from parquet file, there files have the same schema because they are under the
-    // same prefix
-    let schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
-    let schema_key = schema
-        .as_ref()
-        .clone()
-        .with_metadata(Default::default())
-        .hash_key();
+    // we shouldn't use the latest schema, because there are too many fields, we need read schema
+    // from files only get the fields what we need
+    let mut shared_fields = HashSet::new();
+    for file in new_file_list.iter() {
+        let file_schema = read_schema_from_file(&(&wal_dir.join(&file.key)).into()).await?;
+        shared_fields.extend(file_schema.fields().iter().cloned());
+    }
+    // use the shared fields to create a new schema and with empty metadata
+    let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    let schema = Arc::new(Schema::new(fields));
+    let schema_key = schema.hash_key();
 
     // generate datafusion tables
     let trace_id = config::ider::generate();

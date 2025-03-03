@@ -1,23 +1,23 @@
 use chromiumoxide::{
+    Page,
     browser::{Browser, BrowserConfig},
     cdp::browser_protocol::page::PrintToPdfParams,
-    detection::{default_executable, DetectionOptions},
+    detection::{DetectionOptions, default_executable},
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
-    Page,
 };
 use config::get_config;
 use futures::StreamExt;
 use lettre::{
-    message::{header::ContentType, MultiPart, SinglePart},
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    message::{MultiPart, SinglePart, header::ContentType},
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use crate::models::{self, ReportType};
 

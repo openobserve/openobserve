@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,6 +40,7 @@ pub struct ListAlertsResponseBodyItem {
     pub owner: Option<String>,
     pub description: Option<String>,
     pub condition: QueryCondition,
+    pub enabled: bool,
     pub last_triggered_at: Option<i64>,
     pub last_satisfied_at: Option<i64>,
 }
@@ -95,6 +96,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
             condition: alert.query_condition.into(),
+            enabled: alert.enabled,
             last_triggered_at,
             last_satisfied_at,
         })

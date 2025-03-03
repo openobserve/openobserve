@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{dev::ServiceRequest, Error};
+use actix_web::{Error, dev::ServiceRequest};
 #[cfg(feature = "enterprise")]
 use actix_web::{
     error::ErrorUnauthorized,
-    http::{header, Method},
+    http::{Method, header},
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};

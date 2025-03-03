@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,9 +20,8 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    get_config, metrics,
-    utils::hash::{gxhash, Sum64},
-    RwHashMap,
+    RwHashMap, get_config, metrics,
+    utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;

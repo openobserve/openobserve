@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@ use config::meta::{
 };
 use infra::errors::Error;
 use sqlparser::{
-    ast::{visit_statements_mut, Expr, FunctionArguments, Statement},
+    ast::{Expr, FunctionArguments, Statement, visit_statements_mut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -77,7 +77,7 @@ pub(crate) fn update_histogram_interval_in_query(
         .unwrap();
 
     visit_statements_mut(&mut statement, |stmt| {
-        if let Statement::Query(ref mut query) = stmt {
+        if let Statement::Query(query) = stmt {
             if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
                 for projection in &mut select.projection {
                     match projection {

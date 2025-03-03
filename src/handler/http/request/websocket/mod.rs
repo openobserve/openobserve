@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ pub mod session;
 pub mod sort;
 pub mod utils;
 
-use actix_web::{get, web, Error, HttpRequest, HttpResponse};
+use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::get_config;
 use session::WsSession;
 use utils::sessions_cache_utils;

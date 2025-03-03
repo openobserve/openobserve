@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use config::{
+    META_ORG_ID,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         search::SearchEventType,
         self_reporting::{
-            usage::{AggregatedData, GroupKey, UsageData, UsageEvent, USAGE_STREAM},
             ReportingData,
+            usage::{AggregatedData, GroupKey, USAGE_STREAM, UsageData, UsageEvent},
         },
         stream::{StreamParams, StreamType},
     },
@@ -181,7 +182,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             .map(|usage| json::to_value(usage).unwrap())
             .collect::<Vec<_>>();
         // report usage data
-        let usage_stream = StreamParams::new(&cfg.common.usage_org, USAGE_STREAM, StreamType::Logs);
+        let usage_stream = StreamParams::new(META_ORG_ID, USAGE_STREAM, StreamType::Logs);
         if ingest_reporting_data(report_data, usage_stream)
             .await
             .is_err()

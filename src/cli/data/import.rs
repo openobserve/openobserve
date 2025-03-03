@@ -20,7 +20,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::{
-    cli::data::{cli::Cli, Context},
+    cli::data::{Context, cli::Cli},
     common::meta::ingestion::IngestionRequest,
     service::logs,
 };

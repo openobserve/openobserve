@@ -18,14 +18,14 @@ use std::{
     sync::Arc,
 };
 
-use config::{utils::tantivy::tokenizer::o2_collect_tokens, INDEX_FIELD_NAME_FOR_ALL};
+use config::{INDEX_FIELD_NAME_FOR_ALL, utils::tantivy::tokenizer::o2_collect_tokens};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
         PhysicalExpr,
+        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
     },
     scalar::ScalarValue,
 };
@@ -33,9 +33,9 @@ use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
+    Term,
     query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
     schema::{Field, IndexRecordOption, Schema},
-    Term,
 };
 
 use super::{

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use config::{
     ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
 };

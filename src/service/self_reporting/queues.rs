@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,12 @@
 use std::sync::Arc;
 
 use config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         self_reporting::{
-            error::ErrorData,
-            usage::{TriggerData, ERROR_STREAM, TRIGGERS_USAGE_STREAM},
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+            error::ErrorData,
+            usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
     },
@@ -29,7 +29,7 @@ use config::{
 };
 use once_cell::sync::Lazy;
 use tokio::{
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
     time,
 };
 
@@ -163,34 +163,45 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     if !triggers.is_empty() {
-        let trigger_stream = StreamParams::new(
-            &cfg.common.usage_org,
-            TRIGGERS_USAGE_STREAM,
-            StreamType::Logs,
-        );
-        // on error in ingesting usage data, push back the data
-        if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
-            .await
-            .is_err()
-            && &cfg.common.usage_reporting_mode != "both"
-        {
-            // on error in ingesting usage data, push back the data
-            for trigger_json in triggers {
-                let trigger: TriggerData = json::from_value(trigger_json).unwrap();
-                if let Err(e) = USAGE_QUEUE
-                    .enqueue(ReportingData::Trigger(Box::new(trigger)))
-                    .await
-                {
-                    log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested UsageData to UsageQueue: {e}"
-                    );
+        let mut additional_reporting_orgs = if !cfg.common.additional_reporting_orgs.is_empty() {
+            cfg.common.additional_reporting_orgs.split(",").collect()
+        } else {
+            Vec::new()
+        };
+        additional_reporting_orgs.push(META_ORG_ID);
+        additional_reporting_orgs.dedup();
+
+        let mut enqueued_on_failure = false;
+
+        for org in additional_reporting_orgs {
+            let trigger_stream = StreamParams::new(org, TRIGGERS_USAGE_STREAM, StreamType::Logs);
+
+            if super::ingestion::ingest_reporting_data(triggers.clone(), trigger_stream)
+                .await
+                .is_err()
+                && &cfg.common.usage_reporting_mode != "both"
+                && !enqueued_on_failure
+            {
+                // Only enqueue once on first failure , this brings risk that it may be duplicated
+                enqueued_on_failure = true;
+
+                for trigger_json in triggers.clone() {
+                    let trigger: TriggerData = json::from_value(trigger_json).unwrap();
+                    if let Err(e) = USAGE_QUEUE
+                        .enqueue(ReportingData::Trigger(Box::new(trigger)))
+                        .await
+                    {
+                        log::error!(
+                            "[SELF-REPORTING] Error in pushing back un-ingested TriggerData to UsageQueue: {e}"
+                        );
+                    }
                 }
             }
         }
     }
 
     if !errors.is_empty() {
-        let error_stream = StreamParams::new(&cfg.common.usage_org, ERROR_STREAM, StreamType::Logs);
+        let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
             .await
             .is_err()

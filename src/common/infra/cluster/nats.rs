@@ -23,7 +23,7 @@ use config::{
     utils::json,
 };
 use infra::{
-    db::{get_coordinator, NEED_WATCH},
+    db::{NEED_WATCH, get_coordinator},
     dist_lock,
     errors::{Error, Result},
 };

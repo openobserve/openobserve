@@ -4,7 +4,7 @@ on:
       - "v*.*.*"
 name: Release
 env:
-  RUST_TOOLCHAIN: nightly-2024-10-24
+  RUST_TOOLCHAIN: nightly-2025-03-02
 jobs:
   build:
     name: Build binary

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,16 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    entity::prelude::*,
-    sea_query::{Alias, DynIden},
     ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, FromQueryResult, Order,
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
+    entity::prelude::*,
+    sea_query::{Alias, DynIden},
 };
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
-    db::{connect_to_orm, mysql, postgres, sqlite, IndexStatement, ORM_CLIENT},
+    db::{IndexStatement, ORM_CLIENT, connect_to_orm, mysql, postgres, sqlite},
     errors::{self, DbError, Error},
 };
 

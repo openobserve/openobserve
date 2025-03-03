@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,8 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -26,10 +26,10 @@ use config::metrics;
 use hashbrown::HashMap;
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
     stream::Stream,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) struct MemTable {

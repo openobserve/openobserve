@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@
 
 use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_server::MetricsService, ExportMetricsServiceRequest,
-    ExportMetricsServiceResponse,
+    ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_server::MetricsService,
 };
 use tonic::{Response, Status};
 

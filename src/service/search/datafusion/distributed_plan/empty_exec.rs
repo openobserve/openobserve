@@ -19,12 +19,14 @@ use arrow_schema::SortOptions;
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        common, expressions::Column, memory::MemoryStream, DisplayAs, DisplayFormatType,
-        ExecutionMode, ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
+        memory::MemoryStream,
     },
     prelude::Expr,
 };
@@ -116,7 +118,8 @@ impl NewEmptyExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 

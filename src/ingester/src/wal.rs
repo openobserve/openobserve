@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::{BufRead, BufReader},
     path::PathBuf,
     sync::Arc,
@@ -249,11 +249,7 @@ async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<P
                     .extension()
                     .and_then(|s| s.to_str())
                     .unwrap_or_default();
-                if path_ext == ext {
-                    Some(path)
-                } else {
-                    None
-                }
+                if path_ext == ext { Some(path) } else { None }
             } else {
                 None
             }
