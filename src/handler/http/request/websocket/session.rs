@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
-};
+use std::time::Duration;
 
 use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
@@ -56,7 +53,6 @@ pub struct WsSession {
     last_activity_ts: i64,
     // Utc timestamp in microseconds
     created_ts: i64,
-    message_in_flight: AtomicBool,
 }
 
 impl WsSession {
@@ -66,7 +62,6 @@ impl WsSession {
             inner: Some(inner),
             last_activity_ts: now,
             created_ts: now,
-            message_in_flight: AtomicBool::new(false),
         }
     }
 
@@ -241,7 +236,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("trace_id {} Search canceled", trace_id)),
+                        description: None,
                     });
 
                     #[cfg(feature = "enterprise")]
@@ -288,7 +283,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, response.to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("id {} benchmark completed", id)),
+                        description: None,
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
@@ -305,7 +300,7 @@ pub async fn handle_text_message(
             let _ = send_message(req_id, err_res.to_json().to_string()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
-                description: Some(format!("req_id {} Request Error", req_id)),
+                description: None,
             });
             let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
                 session
@@ -328,45 +323,12 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
         )));
     };
 
-    // Try to acquire the in-flight flag with retries
-    let mut attempts = 0;
-    while attempts < 3 {
-        match session.message_in_flight.compare_exchange(
-            false,
-            true,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            Ok(_) => {
-                // Got the lock, proceed with send
-                log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
-                let result = session.text(msg).await.map_err(|e| {
-                    log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
-                    Error::Message(e.to_string())
-                });
+    log::debug!("[WS_HANDLER]: req_id: {} sending message: {}", req_id, msg);
 
-                // Reset the in-flight flag
-                session.message_in_flight.store(false, Ordering::SeqCst);
-                return result;
-            }
-            Err(_) => {
-                // Message in flight, wait a tiny bit and retry
-                attempts += 1;
-                if attempts < 3 {
-                    tokio::task::yield_now().await;
-                }
-            }
-        }
-    }
-
-    log::error!(
-        "[WS_HANDLER]: req_id: {} Failed to send message after retries",
-        req_id
-    );
-
-    Err(Error::Message(
-        "Failed to send message after retries".to_string(),
-    ))
+    session.text(msg).await.map_err(|e| {
+        log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
+        Error::Message(e.to_string())
+    })
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
@@ -376,21 +338,6 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
                 req_id,
                 reason
-            );
-        }
-
-        // Wait for any in-flight message to complete
-        let mut retries = 0;
-        while session.message_in_flight.load(Ordering::SeqCst) && retries < 3 {
-            tokio::task::yield_now().await;
-            retries += 1;
-        }
-
-        if session.message_in_flight.load(Ordering::SeqCst) {
-            log::warn!(
-                "[WS_HANDLER]: req_id: {} Closing with message in flight after {} retries",
-                req_id,
-                retries
             );
         }
 
@@ -472,7 +419,7 @@ async fn handle_search_event(
 
                         let close_reason = CloseReason {
                             code: CloseCode::Normal,
-                            description: Some(format!("trace_id {} Search completed", trace_id_for_task)),
+                            description: None,
                         };
 
                         // Add audit before closing
@@ -586,7 +533,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     // Close with error
     let close_reason = CloseReason {
         code: CloseCode::Error,
-        description: Some(format!("trace_id {} Search Error", trace_id)),
+        description: None,
     };
 
     // Update registry state
