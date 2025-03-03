@@ -18,6 +18,7 @@ use std::{str::FromStr, sync::Arc};
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use actix_ws::{CloseCode, CloseReason, Message, Session};
 use config::get_config;
+use futures::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use hex;
 use reqwest::header::{HeaderName, HeaderValue};
@@ -83,8 +84,12 @@ use url::Url;
 /// Represents a WebSocket proxy session between client and backend
 struct WsProxySession {
     client_session: Session,
-    backend_stream: Arc<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>,
     msg_stream: Arc<Mutex<actix_ws::MessageStream>>,
+    c2r_sink:
+        Arc<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>>,
+    r2q_sink:
+        Arc<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>>,
+    r2q_stream: Arc<Mutex<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>>,
 }
 
 impl WsProxySession {
@@ -114,12 +119,24 @@ impl WsProxySession {
             "[WS_PROXY] Node Role:{} Client -> Router -> Backend connection established",
             node_role
         );
+        // Split the stream and wrap sink in Arc<Mutex>
+        let (backend_ws_sink, backend_ws_stream) = backend_stream.split();
+        // Create a new sink for task 1
+        let backend_ws_sink: Arc<
+            Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>,
+        > = Arc::new(Mutex::new(backend_ws_sink));
+        // Create a new sink for task 2
+        let backend_ws_sink2: Arc<
+            Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>,
+        > = backend_ws_sink.clone();
 
         Ok((
             Self {
                 client_session,
-                backend_stream: Arc::new(Mutex::new(backend_stream)),
                 msg_stream: Arc::new(Mutex::new(client_msg_stream)),
+                c2r_sink: backend_ws_sink,
+                r2q_sink: backend_ws_sink2,
+                r2q_stream: Arc::new(Mutex::new(backend_ws_stream)),
             },
             response,
         ))
@@ -128,29 +145,31 @@ impl WsProxySession {
     /// Start proxying messages between client and backend
     async fn start(self) {
         let start_time = std::time::Instant::now();
-        let backend_stream = Arc::clone(&self.backend_stream);
+
         let client_session = self.client_session.clone();
         let msg_stream = Arc::clone(&self.msg_stream);
+        let r2q_stream = Arc::clone(&self.r2q_stream);
+        let c2r_sink = Arc::clone(&self.c2r_sink);
+        let r2q_sink = Arc::clone(&self.r2q_sink);
 
         // Task 1: Client -> Router
         let client_to_backend = {
-            let backend_stream = Arc::clone(&backend_stream);
             async move {
                 let mut msg_stream = msg_stream.lock().await;
                 while let Some(Ok(msg)) = msg_stream.next().await {
                     let ws_msg = from_actix_message(msg);
                     match ws_msg {
                         tungstenite::protocol::Message::Close(reason) => {
-                            let mut stream = backend_stream.lock().await;
+                            let mut sink = c2r_sink.lock().await;
                             let close_msg = tungstenite::protocol::Message::Close(reason.clone());
-                            if let Err(e) = stream.send(close_msg).await {
+                            if let Err(e) = sink.send(close_msg).await {
                                 log::error!("[WS_PROXY] Failed to forward close: {}", e);
                             }
                             break;
                         }
-                        msg => {
-                            let mut stream = backend_stream.lock().await;
-                            if stream.send(msg).await.is_err() {
+                        _ => {
+                            let mut sink = c2r_sink.lock().await;
+                            if sink.send(ws_msg).await.is_err() {
                                 break;
                             }
                         }
@@ -164,65 +183,82 @@ impl WsProxySession {
         let backend_to_client = {
             let mut session = client_session.clone();
             async move {
-                while let Some(Ok(msg)) = {
-                    let mut stream = backend_stream.lock().await;
-                    stream.next().await
-                } {
-                    let msg = from_tungstenite_msg_to_actix_msg(msg);
-                    match msg {
-                        Message::Text(text) => {
-                            log_frame_details("Sending Text Frame ->", &text, false);
-                            if let Err(e) = session.text(text).await {
-                                log::error!("[WS_PROXY] Failed to send message: {}", e);
-                                break;
+                while let Some(msg_result) = r2q_stream.lock().await.next().await {
+                    match msg_result {
+                        Ok(msg) => {
+                            let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
+                            match ws_msg {
+                                Message::Text(text) => {
+                                    log_frame_details("Sending Text Frame ->", &text, false);
+                                    if let Err(e) = session.text(text).await {
+                                        log::error!("[WS_PROXY] Failed to send message: {}", e);
+                                        break;
+                                    }
+                                }
+                                Message::Close(reason) => {
+                                    log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
+
+                                    // Debug incoming close frame
+                                    debug_ws_message(
+                                        "Received from backend",
+                                        &Message::Close(reason.clone()),
+                                    );
+
+                                    // Create clean close
+                                    let clean_close = CloseReason {
+                                        code: reason
+                                            .as_ref()
+                                            .map(|r| r.code)
+                                            .unwrap_or(CloseCode::Normal),
+                                        // Skip description to avoid frame mixing
+                                        description: None,
+                                    };
+
+                                    // Debug outgoing close frame
+                                    debug_ws_message(
+                                        "Sending to client",
+                                        &Message::Close(Some(clean_close.clone())),
+                                    );
+
+                                    // First close client
+                                    if let Err(e) = session.close(Some(clean_close)).await {
+                                        log::error!("[WS_PROXY] Failed to close client: {}", e);
+                                    }
+
+                                    // Close backend sink
+                                    let mut sink = r2q_sink.lock().await;
+                                    if let Err(e) = sink.close().await {
+                                        log::error!(
+                                            "[WS_PROXY] Failed to close backend sink: {}",
+                                            e
+                                        );
+                                    }
+                                    break;
+                                }
+                                Message::Binary(bin) => {
+                                    if session.binary(bin).await.is_err() {
+                                        break;
+                                    }
+                                }
+                                Message::Ping(ping) => {
+                                    if session.ping(&ping).await.is_err() {
+                                        break;
+                                    }
+                                }
+                                Message::Pong(pong) => {
+                                    if session.pong(&pong).await.is_err() {
+                                        break;
+                                    }
+                                }
+                                _ => {
+                                    log::warn!("[WS_PROXY] Unsupported message type: {:?}", ws_msg)
+                                }
                             }
                         }
-                        Message::Close(reason) => {
-                            log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
-
-                            // Debug incoming close frame
-                            debug_ws_message(
-                                "Received from backend",
-                                &Message::Close(reason.clone()),
-                            );
-
-                            // Create clean close
-                            let clean_close = CloseReason {
-                                code: reason.as_ref().map(|r| r.code).unwrap_or(CloseCode::Normal),
-                                // Skip description to avoid frame mixing
-                                description: None,
-                            };
-
-                            // Debug outgoing close frame
-                            debug_ws_message(
-                                "Sending to client",
-                                &Message::Close(Some(clean_close.clone())),
-                            );
-
-                            // First close client
-                            if let Err(e) = session.close(Some(clean_close)).await {
-                                log::error!("[WS_PROXY] Failed to close client: {}", e);
-                            }
-
-                            // Don't try to close backend - it's already closing
+                        Err(e) => {
+                            log::error!("[WS_PROXY] Backend error: {:?}", e);
                             break;
                         }
-                        Message::Binary(bin) => {
-                            if session.binary(bin).await.is_err() {
-                                break;
-                            }
-                        }
-                        Message::Ping(ping) => {
-                            if session.ping(&ping).await.is_err() {
-                                break;
-                            }
-                        }
-                        Message::Pong(pong) => {
-                            if session.pong(&pong).await.is_err() {
-                                break;
-                            }
-                        }
-                        _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", msg),
                     }
                 }
                 log::info!("[WS_PROXY] Backend->Client task completed");
@@ -428,9 +464,6 @@ pub async fn ws_proxy(
     ws_base_url: &str,
 ) -> Result<HttpResponse, Error> {
     let (session, response) = WsProxySession::new(req, payload, ws_base_url).await?;
-
-    // Spawn the session handling after returning response
     rt::spawn(session.start());
-
     Ok(response)
 }
