@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, intrinsics::needs_drop, str::FromStr, time::Instant};
+use std::{collections::HashMap str::FromStr, time::Instant};
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
@@ -766,7 +766,7 @@ async fn handle_derived_stream_triggers(
         "[SCHEDULER trace_id {trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
-    let max_retries = get_config().limit.scheduler_pipeline_max_retries;
+    let (_, max_retries) = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
