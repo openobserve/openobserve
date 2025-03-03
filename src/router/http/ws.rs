@@ -15,10 +15,11 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use actix_web::{Error, HttpRequest, HttpResponse, rt, web};
-use actix_ws::Message;
+use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
+use actix_ws::{CloseCode, CloseReason, Message};
 use config::get_config;
 use futures_util::{SinkExt, StreamExt};
+use hex;
 use reqwest::header::{HeaderName, HeaderValue};
 use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite};
@@ -154,58 +155,74 @@ pub async fn ws_proxy(
 
     // Task 2: Backend to Client
     let backend_to_client = async move {
-        tokio::select! {
-            _ = async {
-                while let Some(msg_result) = backend_ws_stream.next().await {
-                    match msg_result {
-                        Ok(msg) => {
-                            let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
-                            match ws_msg {
-                                Message::Close(reason) => {
-                                    log::info!("[WS_PROXY] Backend -> Router close");
-
-                                    let mut sink = backend_ws_sink2.lock().await;
-                                    // 1. Forward close to client
-                                    if let Err(e) = session.close(reason.clone()).await {
-                                        log::error!("[WS_PROXY] Failed to close client: {}", e);
-                                    }
-
-                                    // Close sink to backend
-                                    if let Err(e) = sink.close().await {
-                                        log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
-                                    }
-                                    break;
-                                }
-                                Message::Text(text) => {
-                                    if session.text(text).await.is_err() {
-                                        break;
-                                    }
-                                }
-                                Message::Binary(bin) => {
-                                    if session.binary(bin).await.is_err() {
-                                        break;
-                                    }
-                                }
-                                Message::Ping(ping) => {
-                                    if session.ping(&ping).await.is_err() {
-                                        break;
-                                    }
-                                }
-                                Message::Pong(pong) => {
-                                    if session.pong(&pong).await.is_err() {
-                                        break;
-                                    }
-                                }
-                                _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", ws_msg),
+        while let Some(msg_result) = backend_ws_stream.next().await {
+            match msg_result {
+                Ok(msg) => {
+                    let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
+                    match ws_msg {
+                        Message::Text(text) => {
+                            log_frame_details("Sending Text Frame ->", &text, false);
+                            if let Err(e) = session.text(text).await {
+                                log::error!("[WS_PROXY] Failed to send message: {}", e);
+                                break;
                             }
                         }
-                        Err(e) => {
-                            log::error!("[WS_PROXY] Backend error: {:?}", e);
+                        Message::Close(reason) => {
+                            log::info!("[WS_PROXY] Backend -> Router close {:?}", reason);
+
+                            // Debug incoming close frame
+                            debug_ws_message(
+                                "Received from backend",
+                                &Message::Close(reason.clone()),
+                            );
+
+                            // Create clean close
+                            let clean_close = CloseReason {
+                                code: reason.as_ref().map(|r| r.code).unwrap_or(CloseCode::Normal),
+                                // Skip description to avoid frame mixing
+                                description: None,
+                            };
+
+                            // Debug outgoing close frame
+                            debug_ws_message(
+                                "Sending to client",
+                                &Message::Close(Some(clean_close.clone())),
+                            );
+
+                            if let Err(e) = session.close(Some(clean_close)).await {
+                                log::error!("[WS_PROXY] Failed to close client: {}", e);
+                            }
+
+                            // Close backend sink
+                            let mut sink = backend_ws_sink2.lock().await;
+                            if let Err(e) = sink.close().await {
+                                log::error!("[WS_PROXY] Failed to close backend sink: {}", e);
+                            }
                             break;
                         }
+                        Message::Binary(bin) => {
+                            if session.binary(bin).await.is_err() {
+                                break;
+                            }
+                        }
+                        Message::Ping(ping) => {
+                            if session.ping(&ping).await.is_err() {
+                                break;
+                            }
+                        }
+                        Message::Pong(pong) => {
+                            if session.pong(&pong).await.is_err() {
+                                break;
+                            }
+                        }
+                        _ => log::warn!("[WS_PROXY] Unsupported message type: {:?}", ws_msg),
                     }
                 }
-            } => {}
+                Err(e) => {
+                    log::error!("[WS_PROXY] Backend error: {:?}", e);
+                    break;
+                }
+            }
         }
     };
 
@@ -247,14 +264,24 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
 /// Convert tungstenite WebSocket message to actix-web message format
 fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Message {
     match msg {
-        tungstenite::protocol::Message::Text(text) => Message::Text(text.into()),
+        tungstenite::protocol::Message::Text(text) => {
+            log_frame_details("Converting Text ->", &text, false);
+            Message::Text(text.into())
+        }
         tungstenite::protocol::Message::Binary(bin) => Message::Binary(bin.into()),
         tungstenite::protocol::Message::Ping(msg) => Message::Ping(msg.into()),
         tungstenite::protocol::Message::Pong(msg) => Message::Pong(msg.into()),
         tungstenite::protocol::Message::Close(reason) => {
+            if let Some(r) = &reason {
+                log_frame_details("Converting Close ->", &r.reason, true);
+            }
             Message::Close(reason.map(|r| actix_ws::CloseReason {
                 code: u16::from(r.code).into(),
-                description: Some(r.reason.to_string()),
+                description: if r.reason.is_empty() {
+                    None
+                } else {
+                    Some(r.reason.to_string())
+                },
             }))
         }
         _ => {
@@ -340,4 +367,44 @@ pub fn convert_actix_to_tungstenite_request(
     let ws_request = request_builder.body(())?;
 
     Ok(ws_request)
+}
+
+/// Add this helper function
+fn log_frame_details(prefix: &str, text: &str, is_close: bool) {
+    // 7b is '{' in JSON
+    log::debug!(
+        "[WS_FRAME] {} Length: {}, First 50 bytes: {}, Is close: {}",
+        prefix,
+        text.len(),
+        hex::encode(&text.as_bytes()[..std::cmp::min(50, text.len())]),
+        is_close
+    );
+}
+
+// Add helper function to debug frame details
+fn debug_ws_message(prefix: &str, msg: &Message) {
+    match msg {
+        Message::Text(text) => {
+            log::debug!(
+                "[WS_PROXY] {} Text frame: len={}, content_start='{}'",
+                prefix,
+                text.len(),
+                &text[..text.len().min(50)]
+            );
+        }
+        Message::Close(reason) => {
+            if let Some(r) = reason {
+                log::debug!(
+                    "[WS_PROXY] {} Close frame: code={:?}, desc={:?}, desc_len={}",
+                    prefix,
+                    r.code,
+                    r.description,
+                    r.description.as_ref().map(|d| d.len()).unwrap_or(0)
+                );
+            } else {
+                log::debug!("[WS_PROXY] {} Close frame: no reason", prefix);
+            }
+        }
+        _ => log::debug!("[WS_PROXY] {} Other frame type: {:?}", prefix, msg),
+    }
 }

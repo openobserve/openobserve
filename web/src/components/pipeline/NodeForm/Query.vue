@@ -451,6 +451,10 @@ const validateSqlQuery = () => {
 
   delete query.aggs;
 
+  // We get 15 minutes time range for the query, so reducing it by 14 minutes and 55 seconds to get 5 seconds of data as the query is just for validation purpose
+
+  query.query.start_time = query.query.start_time + 895000000;
+
   query.query.sql = streamRoute.value.query_condition.sql;
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
