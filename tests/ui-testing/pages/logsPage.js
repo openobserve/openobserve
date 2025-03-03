@@ -449,49 +449,7 @@ export class LogsPage {
     await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
 }
 
-async selectStreamDropDown() {
-  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-  await this.page.waitForTimeout(3000);
-}
 
-async searchSchedulerDropdown() {
-  await this.page.waitForSelector('[data-test="search-scheduler-dropdown-btn-group"]');
-  await this.page.locator('[data-test="search-scheduler-dropdown-btn-group"]').click();
-}
-
-async searchSchedulerCreate() {
-  await this.page.waitForSelector(`[data-test="search-scheduler-create-new-label"]`);
-  await this.page.locator(`[data-test="search-scheduler-create-new-label"]`).click();
-}
-
-async searchSchedulerSubmit() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('1000');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
-  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
-  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
-  await this.page.getByRole('button', { name: 'Go To Job Scheduler' }).click();
-
-}
-
-async validateAddJob() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully');
-}
-
-async queryJobSearch() {
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1");
-
-  // Clear the existing content
-  await queryEditor.fill(''); // Clear the field
-
-  // Fill with the new query
-  await queryEditor.fill('SELECT * FROM "e2e_automate"');
-
-  // Optional: Wait for any processing or loading after filling the query
-  await this.page.waitForTimeout(5000); // Adjust the timeout as needed
-}
 
 
 
@@ -554,11 +512,7 @@ async searchSchedulerInvalid() {
 }
 
 
-async validateInvalidData() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Scheduler should be between 1 and 100000');
-  
-  
-}
+
 
 
 async toggleHistogram() {
