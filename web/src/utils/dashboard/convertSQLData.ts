@@ -1753,7 +1753,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      options.series = getSeries({ barMinHeight: 1, stack: "total" });
+      options.series = getSeries({ barMinHeight: 1 });
 
       break;
     }
@@ -2643,8 +2643,6 @@ export const convertSQLData = async (
       zlevel: 1,
     });
   }
-
-  console.log("options", options);
 
   return {
     options,
