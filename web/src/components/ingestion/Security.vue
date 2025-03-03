@@ -75,7 +75,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "DatabasePage",
+  name: "SecurityPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -94,12 +94,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("sqlserver");
+    const ingestTabType = ref("falco");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "databases") {
+      if (router.currentRoute.value.name === "security") {
         router.push({
-          name: "sqlserver",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -109,9 +109,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "databases") {
+      if (router.currentRoute.value.name === "security") {
         router.push({
-          name: "sqlserver",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -122,146 +122,80 @@ export default defineComponent({
 
     const databaseTabs = [
       {
-        name: "sqlserver",
+        name: "falco",
         to: {
-          name: "sqlserver",
+          name: "falco",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "SQL Server",
+        label: "Falco",
         contentClass: "tab_content",
       },
       {
-        name: "postgres",
+        name: "osquery",
         to: {
-          name: "postgres",
+          name: "osquery",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Postgres",
+        label: "OS Query",
         contentClass: "tab_content",
       },
       {
-        name: "mongodb",
+        name: "okta",
         to: {
-          name: "mongodb",
+          name: "okta",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "MongoDB",
+        label: "Okta",
         contentClass: "tab_content",
       },
       {
-        name: "redis",
+        name: "jumpcloud",
         to: {
-          name: "redis",
+          name: "jumpcloud",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Redis",
+        label: "Jumpcloud",
         contentClass: "tab_content",
       },
       {
-        name: "couchdb",
+        name: "openvpn",
         to: {
-          name: "couchdb",
+          name: "openvpn",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "CouchDB",
+        label: "OpenVPN",
         contentClass: "tab_content",
       },
       {
-        name: "elasticsearch",
+        name: "office365",
         to: {
-          name: "elasticsearch",
+          name: "office365",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Elasticsearch",
+        label: "Office365",
         contentClass: "tab_content",
       },
       {
-        name: "mysql",
+        name: "google-workspace",
         to: {
-          name: "mysql",
+          name: "google-workspace",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "MySQL",
-        contentClass: "tab_content",
-      },
-      {
-        name: "saphana",
-        to: {
-          name: "saphana",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "SAP HANA",
-        contentClass: "tab_content",
-      },
-      {
-        name: "snowflake",
-        to: {
-          name: "snowflake",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Snowflake",
-        contentClass: "tab_content",
-      },
-      {
-        name: "zookeeper",
-        to: {
-          name: "zookeeper",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Zookeeper",
-        contentClass: "tab_content",
-      },
-      {
-        name: "cassandra",
-        to: {
-          name: "cassandra",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Cassandra",
-        contentClass: "tab_content",
-      },
-      {
-        name: "aerospike",
-        to: {
-          name: "aerospike",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Aerospike",
-        contentClass: "tab_content",
-      },
-      {
-        name: "dynamodb",
-        to: {
-          name: "dynamodb",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "DynamoDB",
+        label: "Google Workspace",
         contentClass: "tab_content",
       }
     ];
