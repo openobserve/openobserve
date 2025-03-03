@@ -983,6 +983,7 @@ export default defineComponent({
         window.location.pathname.indexOf("/web/") > -1
           ? "/web/assets/editor.api.v1.js"
           : "/assets/editor.api.v1.js";
+          
       const existingLink = document.querySelector(
         `link[rel="prefetch"][href="${href}"]`,
       );
