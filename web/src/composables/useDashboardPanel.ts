@@ -383,7 +383,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           ].fields.y.length >= 1
         );
       case "area-stacked":
-      case "stacked":
       case "heatmap":
       case "h-stacked":
         return (

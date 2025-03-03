@@ -1346,7 +1346,7 @@ export const convertSQLData = async (
 
     return (
       yAxisKeys
-        .map((yAxis: any) => {
+        .map((yAxis: any, index: number) => {
           let yAxisName = getYAxisLabel(yAxis);
 
           if (breakDownKeys.length) {
@@ -1355,8 +1355,21 @@ export const convertSQLData = async (
               yAxisName = getYAxisLabel(yAxis, key);
 
               const seriesData = getSeriesData(breakdownKey, yAxis, key);
+              // Add stack property for stacked charts
+              const updatedSeriesConfig = {
+                ...seriesConfig,
+                // Only add stack property for stacked chart types
+                ...(panelSchema.type === "stacked" && {
+                  stack: `stack-${index}`,
+                }),
+              };
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, seriesConfig, key);
+              return getSeriesObj(
+                yAxisName,
+                seriesData,
+                updatedSeriesConfig,
+                key,
+              );
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
@@ -1740,7 +1753,7 @@ export const convertSQLData = async (
       // stacked with xAxis's second value
       // allow 2 xAxis and 1 yAxis value for stack chart
       // get second x axis key
-      options.series = getSeries({ barMinHeight: 1 });
+      options.series = getSeries({ barMinHeight: 1, stack: "total" });
 
       break;
     }
@@ -2631,6 +2644,8 @@ export const convertSQLData = async (
     });
   }
 
+  console.log("options", options);
+
   return {
     options,
     extras: {
@@ -2782,7 +2797,6 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "stacked":
       return {
         type: "bar",
-        stack: "total",
         emphasis: {
           focus: "series",
         },
