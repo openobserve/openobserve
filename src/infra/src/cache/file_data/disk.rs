@@ -49,7 +49,7 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
-// read only parquet cache 
+// read only parquet cache
 static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -474,13 +474,17 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
-    
+
     // Only add files to the cache if they're not temporary
     if file.ends_with(".tmp") {
-        log::debug!("[trace_id {}] Skipping temporary file from being added to cache: {}", trace_id, file);
+        log::debug!(
+            "[trace_id {}] Skipping temporary file from being added to cache: {}",
+            trace_id,
+            file
+        );
         return Ok(());
     }
-    
+
     // hash the file name and get the bucket index
     let idx = get_bucket_idx(file);
 
@@ -521,13 +525,16 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Ok(None) => break,
             Ok(Some(f)) => {
                 let path = f.path();
-                
+
                 // Skip temporary files
-                if path.extension().map_or(false, |ext| ext == "tmp") {
-                    log::debug!("Skipping temporary file during cache load: {}", path.display());
+                if path.extension().is_some_and(|ext| ext == "tmp") {
+                    log::debug!(
+                        "Skipping temporary file during cache load: {}",
+                        path.display()
+                    );
                     continue;
                 }
-                
+
                 let fp = match path.canonicalize() {
                     Ok(p) => p,
                     Err(e) => {
@@ -643,14 +650,17 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         return Ok(());
     }
-    
+
     // First, clean up any lingering .tmp files from interrupted operations
     let root_dir = FILES[0].read().await.root_dir.clone();
     let root_path = Path::new(&root_dir);
     if let Err(e) = clean_tmp_files(root_path, "global").await {
-        log::warn!("[trace_id global] Failed to clean up temporary files: {}", e);
+        log::warn!(
+            "[trace_id global] Failed to clean up temporary files: {}",
+            e
+        );
     }
-    
+
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
@@ -682,30 +692,42 @@ async fn clean_tmp_files(dir: &Path, trace_id: &str) -> Result<(), anyhow::Error
     if !dir.exists() {
         return Ok(());
     }
-    
+
     let mut entries = tokio::fs::read_dir(dir).await?;
-    
+
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         let metadata = tokio::fs::metadata(&path).await?;
-        
+
         if metadata.is_dir() {
             // Recursively clean temporary files in subdirectories
             if let Err(e) = clean_tmp_files(&path, trace_id).await {
-                log::warn!("[trace_id {}] Failed to clean tmp files in directory {}: {}", 
-                    trace_id, path.display(), e);
+                log::warn!(
+                    "[trace_id {}] Failed to clean tmp files in directory {}: {}",
+                    trace_id,
+                    path.display(),
+                    e
+                );
             }
-        } else if metadata.is_file() && path.extension().map_or(false, |ext| ext == "tmp") {
+        } else if metadata.is_file() && path.extension().is_some_and(|ext| ext == "tmp") {
             // Remove any .tmp files
             if let Err(e) = tokio::fs::remove_file(&path).await {
-                log::warn!("[trace_id {}] Failed to remove tmp file {}: {}", 
-                    trace_id, path.display(), e);
+                log::warn!(
+                    "[trace_id {}] Failed to remove tmp file {}: {}",
+                    trace_id,
+                    path.display(),
+                    e
+                );
             } else {
-                log::debug!("[trace_id {}] Removed temporary file: {}", trace_id, path.display());
+                log::debug!(
+                    "[trace_id {}] Removed temporary file: {}",
+                    trace_id,
+                    path.display()
+                );
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -764,9 +786,12 @@ pub async fn get_dir() -> String {
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     // Prevent downloading temporary files from object storage
     if file.ends_with(".tmp") {
-        return Err(anyhow::anyhow!("Cannot download temporary files from object storage: {}", file));
+        return Err(anyhow::anyhow!(
+            "Cannot download temporary files from object storage: {}",
+            file
+        ));
     }
-    
+
     let data = storage::get(file).await?;
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
