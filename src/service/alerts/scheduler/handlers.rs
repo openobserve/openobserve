@@ -766,7 +766,7 @@ async fn handle_derived_stream_triggers(
         "[SCHEDULER trace_id {trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_config().limit.scheduler_pipeline_max_retries;
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
