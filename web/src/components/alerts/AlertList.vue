@@ -28,19 +28,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
+          <div class="flex q-ml-auto  tw-ps-2">
           <q-input
-            data-test="alert-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')"
+          v-model="dynamicQueryModel"   
+          dense
+          filled
+          borderless
+          :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')"
+          data-test="dashboard-search"
+          :clearable="searchAcrossFolders"
+          @clear="clearSearchHistory"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+              <div>
+          <q-toggle
+            data-test="dashboard-search-across-folders-toggle"
+            v-model="searchAcrossFolders"
+            label="All Folders"
+            class="tw-mr-3"
           >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
+        </q-toggle>
+          <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+            {{ searchAcrossFolders
+              ? t("dashboard.searchSelf")
+              : t("dashboard.searchAll") }}
+          </q-tooltip>
+        </div>
+          </div>
           <q-btn
             data-test="alert-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
@@ -71,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           data-test="alert-list-table"
           ref="qTable"
-          :rows="alertsRows"
+          :rows="alertsList"
           :columns="columns"
           row-key="alert_id"
           :pagination="pagination"
@@ -382,13 +399,14 @@ import {
   watch,
   defineAsyncComponent,
   onMounted,
+  computed,
 } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { QTable, date, useQuasar, type QTableProps } from "quasar";
+import { QTable, date, debounce, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -414,6 +432,7 @@ import {
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import { toRaw } from "vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -440,6 +459,7 @@ export default defineComponent({
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
     const alertsRows: Ref<AlertListItem[]> = ref([]);
+    const alertRowsToDisplay: Ref<AlertListItem[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<any> = ref({});
     const showAddAlertDialog: any = ref(false);
@@ -528,6 +548,11 @@ export default defineComponent({
     const destinations = ref([0]);
     const templates = ref([0]);
     const selected: Ref<any> = ref([]);
+
+    const searchQuery = ref("");
+    const filterQuery = ref("");
+    const searchAcrossFolders = ref(false);
+    const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
     const getAlerts = () => {
       const dismiss = $q.notify({
@@ -587,6 +612,7 @@ export default defineComponent({
               ),
             };
           });
+
           alertsRows.value.forEach((alert: AlertListItem) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
@@ -618,18 +644,19 @@ export default defineComponent({
           }
           else{
             alertsRows.value = store.state.organizationData.allAlertsListByFolderId[folderId];
-
           }
-          resultTotal.value = alertsRows.value.length;
         } catch (error) {
           throw error;
         }
     };
-    const getAlertsFn = async (store: any, folderId: string) => {
+    const getAlertsFn = async (store: any, folderId: string, query = "") => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading alerts...",
       });
+      if(query){
+        folderId = ""
+      }
       alertsService
         .listByFolderId(
           1,
@@ -638,11 +665,11 @@ export default defineComponent({
           false,
           "",
           store.state.selectedOrganization.identifier,
-          folderId
+          folderId,
+          query
         )
         .then((res) => {
           var counter = 1;
-          resultTotal.value = res.data.list.length;
           alerts.value = res.data.list.map((alert: any) => {
             return {
               ...alert,
@@ -685,13 +712,18 @@ export default defineComponent({
               ),
             };
           });
+
           alertsRows.value.forEach((alert: AlertListItem) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
-          store.dispatch("setAllAlertsListByFolderId", {
+          if(query == "" && !searchAcrossFolders.value){
+            store.dispatch("setAllAlertsListByFolderId", {
             ...store.state.organizationData.allAlertsListByFolderId,
             [folderId]: alertsRows.value
-          });
+            });
+          }else{
+            filteredResults.value = alertsRows.value;
+          }
           console.log("alertsRows.value", store.state.organizationData.allAlertsListByFolderId['default']);
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -760,6 +792,11 @@ export default defineComponent({
       }
     });
     watch(()=> activeFolderId.value, async (newVal)=>{
+      if(searchAcrossFolders.value) {
+        searchAcrossFolders.value = false
+        searchQuery.value = "";
+        filteredResults.value = [];
+      }
       await  getAlertsByFolderId(store,newVal);
       router.push({
         name: "alertList",
@@ -770,6 +807,13 @@ export default defineComponent({
       });
 
     })
+
+    watch(searchQuery, async (newQuery) => {
+      await debouncedSearch(newQuery);
+      if(searchQuery.value == ""){
+        filteredResults.value = [];
+      }
+    });
     const getDestinations = async () => {
       destinationService
         .list({
@@ -812,7 +856,17 @@ export default defineComponent({
       { label: "100", value: 100 },
       { label: "All", value: 0 },
     ];
-    const resultTotal = ref<number>(0);
+    const resultTotal = computed(function () {
+      if(!searchAcrossFolders.value || searchQuery.value == ""){
+        return store.state.organizationData?.allAlertsListByFolderId[
+          activeFolderId.value
+        ]?.length;
+      }
+      else{
+        return filteredResults.value.length;
+      }
+
+    });    
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
     const pagination: any = ref({
@@ -1210,6 +1264,42 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     }
 
+    const dynamicQueryModel = computed ({
+      get() {
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
+      },
+      set(value) {
+        if (searchAcrossFolders.value) {
+          searchQuery.value = value;
+        } else {
+          filterQuery.value = value;
+        }
+      },
+    });
+
+    const clearSearchHistory = () => {
+      searchQuery.value = "";
+      filteredResults.value = [];
+    }
+
+    const debouncedSearch = debounce (async (query) => {
+      if(!query) return;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while searching for dashboards...",
+        });
+        dismiss();
+        await getAlertsFn(store, activeFolderId.value, query);
+        filteredResults.value = alertsRows.value;
+    }, 600);
+
+    const alertsList = computed(() => {
+      if(searchAcrossFolders.value && searchQuery.value != ""){
+        return filteredResults.value;
+      }
+      return store.state.organizationData.allAlertsListByFolderId[activeFolderId.value] ?? [];
+    });
+
     return {
       t,
       qTable,
@@ -1255,7 +1345,7 @@ export default defineComponent({
       isSubmitting,
       changeMaxRecordToReturn,
       outlinedDelete,
-      filterQuery: ref(""),
+      filterQuery,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -1308,7 +1398,13 @@ export default defineComponent({
       updateAcrossFolders,
       selected,
       getSelectedString,
-      moveMultipleAlerts
+      moveMultipleAlerts,
+      dynamicQueryModel,
+      searchAcrossFolders,
+      searchQuery,
+      clearSearchHistory,
+      filteredResults,
+      alertsList,
     };
   },
 });

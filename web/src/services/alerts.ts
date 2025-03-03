@@ -35,11 +35,17 @@ const alerts = {
     desc: boolean,
     name: string,
     org_identifier: string,
-    folder_id: string
+    folder_id?: string,
+    query?: string
   ) => {
-    return http().get(
-      `/api/v2/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folder_id}&enabled=true`
-    );
+    let url = `/api/v2/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&enabled=true`;
+    if(folder_id){
+      url += `&folder=${folder_id}`;
+    }
+    if(query){
+      url += `&name_substring=${query}`;
+    }
+    return http().get(url);
   },
   create: (
     org_identifier: string,
