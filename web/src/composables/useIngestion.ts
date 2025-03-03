@@ -35,8 +35,12 @@ const useIngestion = () => {
     tls: url.protocol === "https:" ? "On" : "Off",
   };
 
-  const databaseContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
-Access Key: Basic [BASIC_PASSCODE]`;
+  const databaseContent = `exporters:
+  otlphttp/openobserve:
+    endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/
+    headers:
+      Authorization: Basic [BASIC_PASSCODE]
+      stream-name: default`;
 
   const databaseDocURLs = {
     sqlServer: "https://short.openobserve.ai/database/sql-server",
