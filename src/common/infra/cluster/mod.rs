@@ -43,6 +43,9 @@ use once_cell::sync::Lazy;
 
 mod etcd;
 mod nats;
+mod scheduler;
+
+pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
 
