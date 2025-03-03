@@ -18,40 +18,31 @@ use config::{
     utils::sysinfo::NodeMetrics,
 };
 
-// Adjust MAX_EXPECTED_CONNECTIONS based on your environment
-const MAX_EXPECTED_CONNECTIONS: f64 = 2000.0;
+const MAX_EXPECTED_CONNECTIONS: f64 = 2000.0; // Maximum connection factor
 const CONNECTION_WEIGHT: f64 = 0.5; // Connections is the most important factor
 const CPU_WEIGHT: f64 = 0.3; // CPU is second most important
 const MEMORY_WEIGHT: f64 = 0.2; // Memory is third
 
 fn calculate_load_score(stats: &NodeMetrics) -> f64 {
-    // Normalize values to 0.0-1.0 range
-    let cpu_usage_normalized = stats.cpu_usage as f64 / 100.0;
-    let memory_usage_normalized = stats.memory_usage as f64 / stats.memory_total as f64;
-
     // Connection load factor - normalize based on reasonable maximum
     let connection_factor = (stats.tcp_conns as f64) / MAX_EXPECTED_CONNECTIONS;
     let connection_factor = connection_factor.min(1.0); // Cap at 1.0
 
-    // Assign weights to each factor (these should be tuned for your specific workload)
-    // Calculate weighted score
-    let score = (cpu_usage_normalized * CPU_WEIGHT)
+    // Normalize values to 0.0-1.0 range
+    let cpu_usage_normalized = stats.cpu_usage as f64 / 100.0;
+    let memory_usage_normalized = stats.memory_usage as f64 / stats.memory_total as f64;
+
+    // Assign weights to each factor
+    (connection_factor * CONNECTION_WEIGHT)
+        + (cpu_usage_normalized * CPU_WEIGHT)
         + (memory_usage_normalized * MEMORY_WEIGHT)
-        + (connection_factor * CONNECTION_WEIGHT);
-
-    // Consider CPU capacity - a higher capacity node can handle more load
-    // This gives preference to more powerful nodes when load is equal
-    let capacity_factor = 1.0 - ((stats.cpu_total as f64 - 1.0) * 0.05).min(0.5);
-
-    // Final score adjusted for capacity
-    score * capacity_factor
 }
 
 pub fn select_best_node(nodes: &[Node]) -> Option<&Node> {
     let trace_id = config::ider::uuid();
     for node in nodes.iter() {
         log::debug!(
-            "[ROUTER trace_id: {:?}] node: {:?}, score: {:?}, cpu_usage: {:?}, memory_usage: {:?}, connections: {:?}",
+            "[ROUTER trace_id: {:?}] node: {:?}, score: {:?}, cpu_usage: {:?}, mem_usage: {:?}, conns: {:?}",
             trace_id,
             node.name,
             calculate_load_score(&node.metrics),
@@ -152,7 +143,26 @@ mod tests {
 
         // Assert
         assert!(selected.is_some());
-        assert_eq!(selected.unwrap().id, 2); // Should prefer the more powerful node
+        assert_eq!(selected.unwrap().id, 1); // we don't care about the cpu_num, we care about the cpu_usage
+    }
+
+    #[test]
+    fn test_select_best_node_prefers_more_cpu_usage_nodes() {
+        // Arrange
+        let mut nodes = vec![
+            create_test_node(1, 50.0, 50.0, 500),
+            create_test_node(2, 50.0, 50.0, 500),
+        ];
+
+        // Make node 2 more busy
+        nodes[1].metrics.cpu_usage = 100.0;
+
+        // Act
+        let selected = select_best_node(&nodes);
+
+        // Assert
+        assert!(selected.is_some());
+        assert_eq!(selected.unwrap().id, 1); // we don't care about the cpu_num, we care about the cpu_usage
     }
 
     #[test]
