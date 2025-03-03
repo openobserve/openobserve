@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, str::FromStr, time::Instant};
+use std::{collections::HashMap, intrinsics::needs_drop, str::FromStr, time::Instant};
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
@@ -1165,6 +1165,7 @@ async fn handle_derived_stream_triggers(
             error_source: ErrorSource::Pipeline(pipeline_error),
         })
         .await;
+        new_trigger.retries = 0; // start over
     }
 
     if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
