@@ -223,6 +223,7 @@ async fn handle_alert_triggers(
                 is_partial: None,
                 evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
+                query_took: None,
             })
             .await;
             log::info!(
@@ -277,6 +278,7 @@ async fn handle_alert_triggers(
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
         source_node: Some(source_node),
+        query_took: None,
     };
 
     let evaluation_took = Instant::now();
@@ -347,13 +349,18 @@ async fn handle_alert_triggers(
         return Err(err);
     }
 
-    let (ret, end_time) = result.unwrap();
+    // let (ret, end_time) = {
+    //     let res = result.unwrap();
+    //     res.
+    // };
+    let trigger_results = result.unwrap();
+    trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {trace_id}] result of alert {} evaluation matched condition: {}",
         &new_trigger.module_key,
-        ret.is_some(),
+        trigger_results.data.is_some(),
     );
-    if ret.is_some() {
+    if trigger_results.data.is_some() {
         log::info!(
             "[SCHEDULER trace_id {trace_id}] Alert conditions satisfied, org: {}, module_key: {}",
             &new_trigger.org,
@@ -372,7 +379,7 @@ async fn handle_alert_triggers(
         }
         _ => 0,
     };
-    if ret.is_some() && alert.trigger_condition.silence > 0 {
+    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
         if alert.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
             let silence =
@@ -424,12 +431,12 @@ async fn handle_alert_triggers(
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
-    if ret.is_some() {
+    if trigger_results.data.is_some() {
         trigger_data.last_satisfied_at = Some(triggered_at);
     }
 
     // send notification
-    if let Some(data) = ret {
+    if let Some(data) = trigger_results.data {
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -443,14 +450,14 @@ async fn handle_alert_triggers(
         let (alert_start_time, alert_end_time) = get_alert_start_end_time(
             &vars,
             alert.trigger_condition.period,
-            end_time,
+            trigger_results.end_time,
             start_time,
             use_given_time,
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert
-            .send_notification(&data, end_time, start_time, now)
+            .send_notification(&data, trigger_results.end_time, start_time, now)
             .await
         {
             Ok((success_msg, err_msg)) => {
@@ -473,7 +480,7 @@ async fn handle_alert_triggers(
                 trigger_data_stream.success_response = Some(success_msg);
                 // Notification was sent successfully, store the last used end_time in the triggers
                 trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(end_time)
+                    Some(trigger_results.end_time)
                 } else {
                     None
                 };
@@ -537,7 +544,7 @@ async fn handle_alert_triggers(
         // Condition did not match, store the last used end_time in the triggers
         // In the next run, the alert will be checked from the last end_time
         trigger_data.period_end_time = if should_store_last_end_time {
-            Some(end_time)
+            Some(trigger_results.end_time)
         } else {
             None
         };
@@ -546,14 +553,14 @@ async fn handle_alert_triggers(
         trigger_data_stream.start_time = match start_time {
             Some(start_time) => start_time,
             None => {
-                end_time
+                trigger_results.end_time
                     - Duration::try_minutes(alert.trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
                         .unwrap()
             }
         };
-        trigger_data_stream.end_time = end_time;
+        trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
@@ -677,6 +684,7 @@ async fn handle_report_triggers(
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
         source_node: Some(LOCAL_NODE.name.clone()),
+        query_took: None,
     };
 
     if trigger.retries >= max_retries {
@@ -878,6 +886,7 @@ async fn handle_derived_stream_triggers(
             delay_in_secs: None,
             evaluation_took_in_secs: None,
             source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
         };
 
         // evaluate trigger and configure trigger next run time
@@ -916,8 +925,11 @@ async fn handle_derived_stream_triggers(
                 // set end to now to exit the loop below
                 end = now + 1;
             }
-            Ok((ret, next)) => {
-                let is_satisfied = ret.as_ref().map_or(false, |ret| !ret.is_empty());
+            Ok(trigger_results) => {
+                let is_satisfied = trigger_results
+                    .data
+                    .as_ref()
+                    .map_or(false, |ret| !ret.is_empty());
 
                 // ingest evaluation result into destination
                 if is_satisfied {
@@ -927,7 +939,7 @@ async fn handle_derived_stream_triggers(
                         new_trigger.module_key
                     );
 
-                    let local_val = ret // checked is some
+                    let local_val = trigger_results.data // checked is some
                         .unwrap()
                         .into_iter()
                         .map(json::Value::Object)
@@ -1046,7 +1058,7 @@ async fn handle_derived_stream_triggers(
                         end = now + 1;
                     } else {
                         // SUCCESS: move the time range forward by frequency and continue
-                        start = Some(next);
+                        start = Some(trigger_results.end_time);
                         // There could still be some data to be processed for the current period
                         // so we need to move the end time forward by the period length or the
                         // remaining time whichever is smaller
@@ -1057,6 +1069,7 @@ async fn handle_derived_stream_triggers(
                         } else {
                             std::cmp::min(end + _end, now)
                         };
+                        trigger_data_stream.query_took = trigger_results.query_took;
                     }
                 } else {
                     log::info!(
@@ -1065,9 +1078,10 @@ async fn handle_derived_stream_triggers(
                         &new_trigger.module_key
                     );
                     trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+                    trigger_data_stream.query_took = trigger_results.query_took;
 
                     // move the time range forward by frequency and continue
-                    start = Some(next);
+                    start = Some(trigger_results.end_time);
                     // There could still be some data to be processed for the current period
                     // so we need to move the end time forward by the period length or the remaining
                     // time whichever is smaller

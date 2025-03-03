@@ -20,12 +20,11 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        alerts::{FrequencyType, QueryType},
+        alerts::{FrequencyType, QueryType, TriggerEvalResults},
         pipeline::components::DerivedStream,
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
     },
-    utils::json::{Map, Value},
 };
 use cron::Schedule;
 
@@ -165,7 +164,7 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
 #[async_trait]
@@ -181,7 +180,7 @@ impl DerivedStreamExt for DerivedStream {
         &self,
         (start_time, end_time): (Option<i64>, i64),
         module_key: &str,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         self.query_condition
             .evaluate_scheduled(
                 &self.org_id,

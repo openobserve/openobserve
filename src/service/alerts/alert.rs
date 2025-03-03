@@ -26,7 +26,7 @@ use config::{
         alerts::{
             alert::{Alert, AlertListFilter, ListAlertsParams},
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-            FrequencyType, Operator, QueryType,
+            FrequencyType, Operator, QueryType, TriggerEvalResults,
         },
         folder::{Folder, FolderType, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
@@ -666,7 +666,7 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
@@ -685,7 +685,7 @@ impl AlertExt for Alert {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {

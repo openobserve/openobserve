@@ -918,12 +918,15 @@ async fn write_traces(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert
+                    match alert
                         .evaluate(Some(&record_val), (None, alert_end_time))
                         .await
                     {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                        Ok(res) if res.data.is_some() => {
+                            triggers.push((alert.clone(), res.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }
