@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::{
-    connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream, WebSocketStream,
+    MaybeTlsStream, WebSocketStream, connect_async, tungstenite::protocol::Message as WsMessage,
 };
 
 use crate::router::http::ws_v2::{error::*, types::*};
@@ -17,6 +17,7 @@ pub trait Connection: Send + Sync {
     async fn disconnect(&self) -> WsResult<()>;
     async fn send_message(&self, message: Message) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
+    async fn receive_message(&self) -> WsResult<Option<Message>>;
     fn get_name(&self) -> &QuerierName;
 }
 
@@ -98,10 +99,8 @@ impl Connection for QuerierConnection {
     fn get_name(&self) -> &QuerierName {
         &self.name
     }
-}
 
-impl QuerierConnection {
-    pub async fn receive_message(&self) -> WsResult<Option<Message>> {
+    async fn receive_message(&self) -> WsResult<Option<Message>> {
         let mut stream_guard = self.stream.lock().await;
         if let Some(stream) = stream_guard.as_mut() {
             match stream.next().await {

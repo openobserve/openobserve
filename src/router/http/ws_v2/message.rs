@@ -38,6 +38,18 @@ impl RouterMessageBus {
         Ok(())
     }
 
+    pub async fn start(&self) {
+        // needs 2 tasks
+
+        // 'stream' from connect_async -> split to sink, stream
+        // sink forward_to_querier
+        
+        
+        // backward to router
+        // stream listens from querier
+        
+    }
+
     pub async fn forward_to_querier(
         &self,
         session_id: &SessionId,
