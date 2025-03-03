@@ -42,7 +42,7 @@ pub fn select_best_node(nodes: &[Node]) -> Option<&Node> {
     let trace_id = config::ider::uuid();
     for node in nodes.iter() {
         log::debug!(
-            "[ROUTER trace_id: {:?}] node: {:?}, score: {:?}, cpu_usage: {:?}, mem_usage: {:?}, conns: {:?}",
+            "[ROUTER trace_id: {}] node: {}, score: {:.2}, cpu_usage: {:.2}, mem_usage: {:.2}, conns: {}",
             trace_id,
             node.name,
             calculate_load_score(&node.metrics),
@@ -64,9 +64,9 @@ pub fn select_best_node(nodes: &[Node]) -> Option<&Node> {
         });
 
     log::debug!(
-        "[ROUTER trace_id: {:?}] selected node: {:?}",
+        "[ROUTER trace_id: {}] selected node: {}",
         trace_id,
-        ret.map(|node| node.name.clone())
+        ret.map(|node| node.name.clone()).unwrap_or_default()
     );
     ret
 }
