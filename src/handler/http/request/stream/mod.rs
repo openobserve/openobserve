@@ -18,7 +18,7 @@ use std::{
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, post, put, web};
 use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,

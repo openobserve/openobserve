@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -183,9 +183,11 @@ mod tests {
         put_file_contents(&file_name, content).unwrap();
         assert_eq!(get_file_contents(&file_name, None).unwrap(), content);
         assert!(get_file_meta(&file_name).unwrap().is_file());
-        assert!(!scan_files("./scan_dir/", "parquet", None)
-            .unwrap()
-            .is_empty());
+        assert!(
+            !scan_files("./scan_dir/", "parquet", None)
+                .unwrap()
+                .is_empty()
+        );
 
         std::fs::remove_file(&file_name).unwrap();
         std::fs::remove_dir(&dir_name).unwrap();

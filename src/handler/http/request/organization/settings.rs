@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error as StdErr;
 
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, post, web};
 use config::get_config;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]

@@ -15,10 +15,10 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    TIMESTAMP_COL_NAME, get_config,
     meta::{
         function::VRLResultResolver,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
@@ -28,7 +28,6 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    TIMESTAMP_COL_NAME,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
@@ -229,7 +228,7 @@ pub async fn search_multi(
 
             use crate::common::{
                 infra::config::USERS,
-                utils::auth::{is_root_user, AuthExtractor},
+                utils::auth::{AuthExtractor, is_root_user},
             };
 
             if !is_root_user(user_id) {

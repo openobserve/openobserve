@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,11 +20,11 @@ use config::{
     meta::{
         function,
         pipeline::{
+            Pipeline,
             components::{
                 ConditionParams, DerivedStream, Edge, FunctionParams, Node, NodeData,
                 PipelineSource,
             },
-            Pipeline,
         },
         stream::{StreamParams, StreamType},
     },

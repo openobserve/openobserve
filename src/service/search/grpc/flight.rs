@@ -50,9 +50,9 @@ use crate::service::{
     search::{
         datafusion::{
             distributed_plan::{
+                NewEmptyExecVisitor, ReplaceTableScanExec,
                 codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
                 empty_exec::NewEmptyExec,
-                NewEmptyExecVisitor, ReplaceTableScanExec,
             },
             exec::{prepare_datafusion_context, register_udf},
             plan::tantivy_count_exec::TantivyCountExec,

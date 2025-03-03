@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -93,7 +93,7 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
                         "Invalid argument types[needle] to str_match function".to_string(),
                     ),
                     None,
-                ))
+                ));
             }
         };
         if needle.is_none() || needle.as_ref().unwrap().is_empty() {

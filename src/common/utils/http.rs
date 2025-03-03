@@ -232,10 +232,12 @@ mod tests {
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
 
-        assert!(parsed_addresses
-            .iter()
-            .zip(valid_addresses)
-            .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-            .fold(true, |acc, x| { acc | x }));
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addresses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
     }
 }

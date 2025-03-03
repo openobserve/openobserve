@@ -16,8 +16,8 @@
 use std::io::Error;
 
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use config::{
     meta::{
@@ -109,7 +109,7 @@ pub async fn test_run_function(
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
-            )))
+            )));
         }
     };
 
@@ -386,10 +386,7 @@ fn extract_num_args(func: &mut Transform) {
 }
 
 async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
-    match db::functions::get(org_id, fn_name).await {
-        Ok(function) => Some(function),
-        Err(_) => None,
-    }
+    (db::functions::get(org_id, fn_name).await).ok()
 }
 
 #[cfg(test)]
@@ -439,9 +436,11 @@ mod tests {
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
-            .await
-            .is_ok());
+        assert!(
+            delete_function("nexus".to_string(), "dummyfn".to_owned())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

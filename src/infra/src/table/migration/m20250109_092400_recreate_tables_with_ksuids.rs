@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,8 +43,8 @@
 
 use itertools::Itertools;
 use sea_orm::{
-    sea_query::{Table, TableCreateStatement},
     DeriveIden, EntityTrait, IntoActiveModel, PaginatorTrait, Set, TransactionTrait,
+    sea_query::{Table, TableCreateStatement},
 };
 use sea_orm_migration::prelude::*;
 

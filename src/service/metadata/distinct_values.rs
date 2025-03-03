@@ -16,17 +16,16 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    get_config,
+    FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map},
-    FxIndexMap, TIMESTAMP_COL_NAME,
 };
 use infra::{
     errors::{Error, Result},
@@ -36,7 +35,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::{
-    sync::{mpsc, RwLock},
+    sync::{RwLock, mpsc},
     time,
 };
 

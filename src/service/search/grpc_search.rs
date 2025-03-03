@@ -20,8 +20,8 @@ use config::{
     utils::json,
 };
 use infra::errors::{Error, ErrorCodes};
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
-use tracing::{info_span, Instrument};
+use rand::{SeedableRng, rngs::StdRng, seq::SliceRandom};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::infra::cluster as infra_cluster,

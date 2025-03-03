@@ -19,10 +19,11 @@ use std::{
     sync::Arc,
 };
 
-use actix_web::{http, web, HttpResponse};
+use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     meta::{
         alerts::alert,
@@ -33,10 +34,9 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashSet;
-use infra::schema::{unwrap_partition_time_level, update_setting, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level, update_setting};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -52,9 +52,9 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            evaluate_trigger,
+            TriggerAlertData, evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
-            write_file, TriggerAlertData,
+            write_file,
         },
         metrics::{format_label_name, get_exclude_labels},
         pipeline::batch_execution::ExecutablePipeline,

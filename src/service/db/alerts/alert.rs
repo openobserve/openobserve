@@ -20,7 +20,7 @@ use config::meta::{
 };
 use infra::{
     cluster_coordinator::alerts as cluster,
-    db::{connect_to_orm, ORM_CLIENT},
+    db::{ORM_CLIENT, connect_to_orm},
     table::alerts as table,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};

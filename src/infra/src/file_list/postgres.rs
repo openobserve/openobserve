@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{end_of_the_day, DAY_MICRO_SECS},
+        time::{DAY_MICRO_SECS, end_of_the_day},
     },
 };
 use hashbrown::HashMap;
@@ -33,8 +33,8 @@ use sqlx::{Executor, Postgres, QueryBuilder, Row};
 
 use crate::{
     db::{
-        postgres::{create_index, CLIENT},
         IndexStatement,
+        postgres::{CLIENT, create_index},
     },
     errors::{Error, Result},
 };

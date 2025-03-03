@@ -18,9 +18,8 @@ use std::io::{Error, ErrorKind};
 use actix_web::HttpResponse;
 use arrow::array::{Int64Array, RecordBatch};
 use config::{
-    get_config,
+    FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    FILE_EXT_JSON, TIMESTAMP_COL_NAME,
 };
 
 use crate::{
@@ -131,7 +130,10 @@ pub async fn get_settings_max_query_range(
 }
 
 pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i64 {
-    log::debug!("get_max_query_range_if_sa stream_max_query_range: {stream_max_query_range}, user_role: {:?}", user.role);
+    log::debug!(
+        "get_max_query_range_if_sa stream_max_query_range: {stream_max_query_range}, user_role: {:?}",
+        user.role
+    );
     if user.role == UserRole::ServiceAccount {
         let max_query_range_sa = get_config().limit.max_query_range_for_sa;
         return if max_query_range_sa > 0 {
@@ -199,9 +201,11 @@ mod tests {
     #[test]
     fn test_get_file_name_v1() {
         let file_key = get_file_name_v1("nexus", "Olympics", 2);
-        assert!(file_key
-            .as_str()
-            .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json"));
+        assert!(
+            file_key
+                .as_str()
+                .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json")
+        );
     }
 
     #[test]

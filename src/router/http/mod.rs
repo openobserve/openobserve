@@ -24,8 +24,9 @@ use ::config::{
     utils::rand::get_rand_element,
 };
 use actix_web::{
+    FromRequest, HttpRequest, HttpResponse,
     http::{Error, Method},
-    route, web, FromRequest, HttpRequest, HttpResponse,
+    route, web,
 };
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
@@ -441,10 +442,10 @@ async fn proxy_ws(
         match ws::ws_proxy(req, payload, &ws_url).await {
             Ok(res) => {
                 log::info!(
-                "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                ws_url,
-                start.elapsed().as_millis()
-            );
+                    "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                    ws_url,
+                    start.elapsed().as_millis()
+                );
                 Ok(res)
             }
             Err(e) => {

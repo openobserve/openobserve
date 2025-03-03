@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -35,15 +35,33 @@ impl From<DashboardError> for HttpResponse {
         match value {
             DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
             DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
-            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error("Request to update existing dashboard with missing or invalid hash value. BUG"),
-            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict("Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."),
-            DashboardError::PutMissingTitle => MetaHttpResponse::internal_error("Dashboard should have title"),
-            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request("Please specify from & to folder from dashboard movement"),
-            DashboardError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
+            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error(
+                "Request to update existing dashboard with missing or invalid hash value. BUG",
+            ),
+            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict(
+                "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes.",
+            ),
+            DashboardError::PutMissingTitle => {
+                MetaHttpResponse::internal_error("Dashboard should have title")
+            }
+            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request(
+                "Please specify from & to folder from dashboard movement",
+            ),
+            DashboardError::MoveDestinationFolderNotFound => {
+                MetaHttpResponse::not_found("Folder not found")
+            }
             DashboardError::CreateFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
-            DashboardError::CreateDefaultFolder => MetaHttpResponse::internal_error("Error saving default folder"),
-            DashboardError::DistinctValueError => MetaHttpResponse::internal_error("Error in updating distinct values"),
-            DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => MetaHttpResponse::internal_error(format!("error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}")),
+            DashboardError::CreateDefaultFolder => {
+                MetaHttpResponse::internal_error("Error saving default folder")
+            }
+            DashboardError::DistinctValueError => {
+                MetaHttpResponse::internal_error("Error in updating distinct values")
+            }
+            DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
+                MetaHttpResponse::internal_error(format!(
+                    "error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"
+                ))
+            }
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
         }
     }

@@ -24,12 +24,13 @@ use arrow_schema::{DataType, SortOptions};
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{internal_err, Result, Statistics},
+    common::{Result, Statistics, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
     physical_plan::{
-        expressions::Column, DisplayAs, DisplayFormatType, Distribution, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        expressions::Column,
     },
 };
 use futures::{Stream, StreamExt};
@@ -66,7 +67,8 @@ impl DeduplicationExec {
             // Output Partitioning
             Partitioning::UnknownPartitioning(1),
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }

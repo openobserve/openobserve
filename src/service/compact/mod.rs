@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::{
         cluster::{CompactionJobType, Role},
-        stream::{PartitionTimeLevel, StreamType, ALL_STREAM_TYPES},
+        stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
 };
 use infra::{
@@ -28,7 +28,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 
 use crate::{common::infra::cluster::get_node_from_consistent_hash, service::db};
 

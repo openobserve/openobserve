@@ -17,13 +17,14 @@ use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
 use actix_web::{
+    HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
     http::header,
-    middleware, web, HttpRequest, HttpResponse,
+    middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{from_fn, Next};
+use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -32,8 +33,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
-    actix_web::{web::BytesMut, HttpMessage},
-    base64::{engine::general_purpose, Engine as _},
+    actix_web::{HttpMessage, web::BytesMut},
+    base64::{Engine as _, engine::general_purpose},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},
@@ -574,8 +575,8 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use actix_web::{
-        test::{call_service, init_service, TestRequest},
         App,
+        test::{TestRequest, call_service, init_service},
     };
 
     use super::*;

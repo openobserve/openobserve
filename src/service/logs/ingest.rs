@@ -22,18 +22,18 @@ use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
-    common::v1::{any_value::Value, AnyValue, KeyValue},
+    common::v1::{AnyValue, KeyValue, any_value::Value},
     metrics::v1::metric::Data,
 };
 use prost::Message;
