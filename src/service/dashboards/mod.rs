@@ -482,7 +482,7 @@ pub async fn move_dashboards(
     };
 
     let futs = dashboard_ids
-        .into_iter()
+        .into()
         .map(|d_id| move_dashboard(org_id, d_id, to_folder));
     let _ = join_all(futs)
         .await
