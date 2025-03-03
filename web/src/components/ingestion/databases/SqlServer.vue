@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw-text-[16px]">
       <CopyContent class="q-mt-sm" :content="content" />
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
-        Check further documentation at:
-        <br />
-        <a :href='docURL' target="_blank" class="cursor-pointer">{{docURL}}</a>
+        Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
       </div>
     </div>
   </div>
