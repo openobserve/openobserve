@@ -74,8 +74,22 @@ pub async fn put_file_contents(
     path: impl AsRef<Path>,
     contents: &[u8],
 ) -> Result<(), std::io::Error> {
-    let mut file = File::create(path).await?;
-    file.write_all(contents).await
+    use tokio::io::BufWriter;
+
+    // Create a temporary file in the same directory
+    let temp_file = format!("{}.tmp", file);
+
+    // Write to temporary file first
+    let file_handle = File::create(&temp_file).await?;
+    let mut writer = BufWriter::new(file_handle).await;
+    writer.write_all(contents).await?;
+    writer.flush().await?;
+
+    // Atomically rename the temp file to the target file
+    // This ensures we either have the old file or the new file, never a partially written file
+    tokio::fs::rename(temp_file, file).await?;
+
+    Ok(())
 }
 
 pub async fn clean_empty_dirs(

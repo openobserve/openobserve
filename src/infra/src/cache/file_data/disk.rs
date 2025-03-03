@@ -419,11 +419,6 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     if !get_config().disk_cache.enabled {
         return None;
     }
-    // Skip temporary files to prevent them from being used in operations
-    if file.ends_with(".tmp") {
-        log::debug!("Skipping temporary file access: {}", file);
-        return None;
-    }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES_READER.get(idx).unwrap()
@@ -436,10 +431,6 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
 #[inline]
 pub async fn get_size(file: &str) -> Option<usize> {
     if !get_config().disk_cache.enabled {
-        return None;
-    }
-    // Skip temporary files
-    if file.ends_with(".tmp") {
         return None;
     }
     let idx = get_bucket_idx(file);
@@ -456,10 +447,6 @@ pub async fn exist(file: &str) -> bool {
     if !get_config().disk_cache.enabled {
         return false;
     }
-    // Skip temporary files
-    if file.ends_with(".tmp") {
-        return false;
-    }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES[idx].read().await
@@ -472,16 +459,6 @@ pub async fn exist(file: &str) -> bool {
 #[inline]
 pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
-        return Ok(());
-    }
-
-    // Only add files to the cache if they're not temporary
-    if file.ends_with(".tmp") {
-        log::debug!(
-            "[trace_id {}] Skipping temporary file from being added to cache: {}",
-            trace_id,
-            file
-        );
         return Ok(());
     }
 
@@ -784,14 +761,6 @@ pub async fn get_dir() -> String {
 }
 
 pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
-    // Prevent downloading temporary files from object storage
-    if file.ends_with(".tmp") {
-        return Err(anyhow::anyhow!(
-            "Cannot download temporary files from object storage: {}",
-            file
-        ));
-    }
-
     let data = storage::get(file).await?;
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
