@@ -277,7 +277,11 @@ fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Mes
             }
             Message::Close(reason.map(|r| actix_ws::CloseReason {
                 code: u16::from(r.code).into(),
-                description: Some(r.reason.to_string()),
+                description: if r.reason.is_empty() {
+                    None
+                } else {
+                    Some(r.reason.to_string())
+                },
             }))
         }
         _ => {
