@@ -241,7 +241,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("trace_id {} Search canceled", trace_id)),
+                        description: None,
                     });
 
                     #[cfg(feature = "enterprise")]
@@ -288,7 +288,7 @@ pub async fn handle_text_message(
                     let _ = send_message(req_id, response.to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
-                        description: Some(format!("id {} benchmark completed", id)),
+                        description: None,
                     });
                     cleanup_and_close_session(req_id, close_reason).await;
                 }
@@ -305,7 +305,7 @@ pub async fn handle_text_message(
             let _ = send_message(req_id, err_res.to_json().to_string()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
-                description: Some(format!("req_id {} Request Error", req_id)),
+                description: None,
             });
             let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
                 session
@@ -472,7 +472,7 @@ async fn handle_search_event(
 
                         let close_reason = CloseReason {
                             code: CloseCode::Normal,
-                            description: Some(format!("trace_id {} Search completed", trace_id_for_task)),
+                            description: None,
                         };
 
                         // Add audit before closing
@@ -586,7 +586,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     // Close with error
     let close_reason = CloseReason {
         code: CloseCode::Error,
-        description: Some(format!("trace_id {} Search Error", trace_id)),
+        description: None,
     };
 
     // Update registry state
