@@ -1157,6 +1157,8 @@ pub struct Limit {
     #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_PIPELINE_MAX_RETRIES", default = 20)]
+    pub scheduler_pipeline_max_retries: i32,
+    #[env_config(name = "ZO_SCHEDULER_PAUSE_ALERT_AFTER_RETRIES", default = false)]
     pub pause_alerts_on_retries: bool,
     #[env_config(
         name = "ZO_ALERT_CONSIDERABLE_DELAY",
