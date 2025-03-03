@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{str::FromStr, sync::Arc};
+use std::{cell::RefCell, rc::Rc, str::FromStr, sync::Arc};
 
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use actix_ws::{CloseCode, CloseReason, Message, Session};
@@ -80,11 +80,10 @@ use url::Url;
 ///   3. Send acknowledgment
 ///   4. Clean up resources
 /// ```
-
 /// Represents a WebSocket proxy session between client and backend
 struct WsProxySession {
     client_session: Session,
-    msg_stream: Arc<Mutex<actix_ws::MessageStream>>,
+    msg_stream: Rc<RefCell<actix_ws::MessageStream>>,
     c2r_sink:
         Arc<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>>>,
     r2q_sink:
@@ -133,7 +132,7 @@ impl WsProxySession {
         Ok((
             Self {
                 client_session,
-                msg_stream: Arc::new(Mutex::new(client_msg_stream)),
+                msg_stream: Rc::new(RefCell::new(client_msg_stream)),
                 c2r_sink: backend_ws_sink,
                 r2q_sink: backend_ws_sink2,
                 r2q_stream: Arc::new(Mutex::new(backend_ws_stream)),
@@ -147,7 +146,7 @@ impl WsProxySession {
         let start_time = std::time::Instant::now();
 
         let client_session = self.client_session.clone();
-        let msg_stream = Arc::clone(&self.msg_stream);
+        let msg_stream = Rc::clone(&self.msg_stream);
         let r2q_stream = Arc::clone(&self.r2q_stream);
         let c2r_sink = Arc::clone(&self.c2r_sink);
         let r2q_sink = Arc::clone(&self.r2q_sink);
@@ -155,23 +154,37 @@ impl WsProxySession {
         // Task 1: Client -> Router
         let client_to_backend = {
             async move {
-                let mut msg_stream = msg_stream.lock().await;
-                while let Some(Ok(msg)) = msg_stream.next().await {
-                    let ws_msg = from_actix_message(msg);
-                    match ws_msg {
-                        tungstenite::protocol::Message::Close(reason) => {
-                            let mut sink = c2r_sink.lock().await;
-                            let close_msg = tungstenite::protocol::Message::Close(reason.clone());
-                            if let Err(e) = sink.send(close_msg).await {
-                                log::error!("[WS_PROXY] Failed to forward close: {}", e);
+                // Box the stream itself instead of individual futures
+                let mut stream = Box::pin({
+                    let stream_guard = msg_stream.borrow_mut();
+                    stream_guard
+                });
+
+                while let Some(msg_result) = stream.next().await {
+                    match msg_result {
+                        Ok(msg) => {
+                            let ws_msg = from_actix_message(msg);
+                            match ws_msg {
+                                tungstenite::protocol::Message::Close(reason) => {
+                                    let mut sink = c2r_sink.lock().await;
+                                    let close_msg =
+                                        tungstenite::protocol::Message::Close(reason.clone());
+                                    if let Err(e) = sink.send(close_msg).await {
+                                        log::error!("[WS_PROXY] Failed to forward close: {}", e);
+                                    }
+                                    break;
+                                }
+                                _ => {
+                                    let mut sink = c2r_sink.lock().await;
+                                    if sink.send(ws_msg).await.is_err() {
+                                        break;
+                                    }
+                                }
                             }
-                            break;
                         }
-                        _ => {
-                            let mut sink = c2r_sink.lock().await;
-                            if sink.send(ws_msg).await.is_err() {
-                                break;
-                            }
+                        Err(e) => {
+                            log::error!("[WS_PROXY] Client->Backend error: {:?}", e);
+                            break;
                         }
                     }
                 }
