@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,20 +18,19 @@ use std::{
     net::SocketAddr,
 };
 
-use actix_web::{http, HttpResponse};
+use actix_web::{HttpResponse, http};
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
-use syslog_loose::{Message, ProcId, Protocol};
+use syslog_loose::{Message, ProcId, Protocol, Variant};
 
 use super::{
     bulk::TS_PARSE_FAILED, ingest::handle_timestamp, ingestion_log_enabled, log_failed_record,
@@ -121,7 +120,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let mut json_data_by_stream = HashMap::new();
 
     // parse msg to json::Value
-    let parsed_msg = syslog_loose::parse_message(msg);
+    let parsed_msg = syslog_loose::parse_message(msg, Variant::Either);
     let mut value = message_to_value(parsed_msg);
 
     // store a copy of original data before it's modified, when
@@ -286,9 +285,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // handle timestamp
-                        let Some(timestamp) = local_val
-                            .get(&cfg.common.column_timestamp)
-                            .and_then(|ts| ts.as_i64())
+                        let Some(timestamp) =
+                            local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
                         else {
                             let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
                             stream_status.status.failed += 1;

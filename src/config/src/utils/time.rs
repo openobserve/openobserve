@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -44,6 +44,11 @@ pub fn now() -> DateTime<Utc> {
 #[inline(always)]
 pub fn now_micros() -> i64 {
     Utc::now().timestamp_micros()
+}
+
+#[inline(always)]
+pub fn day_micros(n: i64) -> i64 {
+    Duration::try_days(n).unwrap().num_microseconds().unwrap()
 }
 
 #[inline(always)]

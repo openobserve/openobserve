@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,11 @@ use chrono::Duration;
 use config::utils::json;
 use sqlx::{Pool, Row, Sqlite};
 
-use super::{get_scheduler_max_retries, Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
     db::{
-        self,
-        sqlite::{create_index, CLIENT_RO, CLIENT_RW},
-        IndexStatement,
+        self, IndexStatement,
+        sqlite::{CLIENT_RO, CLIENT_RW, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -220,18 +219,34 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         key: &str,
         status: TriggerStatus,
         retries: i32,
+        data: Option<&str>,
     ) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module_key = $4 AND module = $5;"#
-        )
-        .bind(status)
-        .bind(retries)
-        .bind(org)
-        .bind(key)
-        .bind(&module)
-        .execute(&*client).await?;
+        let query = match data {
+            Some(data) => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = $1, retries = $2, data = $3 WHERE org = $4 AND module_key = $5 AND module = $6;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(data)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            },
+            None => {
+                sqlx::query(
+                    r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module_key = $4 AND module = $5;"#,
+                )
+                .bind(status)
+                .bind(retries)
+                .bind(org)
+                .bind(key)
+                .bind(&module)
+            },
+        };
+        query.execute(&*client).await?;
 
         drop(client);
 
@@ -241,25 +256,44 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
-    async fn update_trigger(&self, trigger: Trigger) -> Result<()> {
+    async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
-WHERE org = $7 AND module_key = $8 AND module = $9;"#,
-        )
-        .bind(&trigger.status)
-        .bind(trigger.retries)
-        .bind(trigger.next_run_at)
-        .bind(trigger.is_realtime)
-        .bind(trigger.is_silenced)
-        .bind(&trigger.data)
-        .bind(&trigger.org)
-        .bind(&trigger.module_key)
-        .bind(&trigger.module)
-        .execute(&*client)
-        .await?;
+        let query = if clone {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, start_time = $2, end_time = $3, retries = $4, next_run_at = $5, is_realtime = $6, is_silenced = $7, data = $8
+    WHERE org = $9 AND module_key = $10 AND module = $11;"#,
+            )
+            .bind(&trigger.status)
+            .bind(trigger.start_time)
+            .bind(trigger.end_time)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        } else {
+            sqlx::query(
+                r#"UPDATE scheduled_jobs
+    SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
+    WHERE org = $7 AND module_key = $8 AND module = $9;"#,
+            )
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(&trigger.org)
+            .bind(&trigger.module_key)
+            .bind(&trigger.module)
+        };
+
+        query.execute(&*client).await?;
 
         // release lock
         drop(client);
@@ -382,6 +416,27 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         Ok(jobs)
     }
 
+    /// List all the jobs for the given module and organization
+    async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+        let client = CLIENT_RO.clone();
+        let jobs: Vec<Trigger> = if let Some(module) = module {
+            let query =
+                r#"SELECT * FROM scheduled_jobs WHERE org = $1 AND module = $2 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(org)
+                .bind(module)
+                .fetch_all(&client)
+                .await?
+        } else {
+            let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 ORDER BY id;"#;
+            sqlx::query_as::<_, Trigger>(query)
+                .bind(org)
+                .fetch_all(&client)
+                .await?
+        };
+        Ok(jobs)
+    }
+
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
@@ -391,11 +446,15 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         if include_max {
             max_retries += 1;
         }
-        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
-            .bind(TriggerStatus::Completed)
-            .bind(max_retries)
-            .execute(&*client)
-            .await?;
+        // Since alert scheduled_jobs contain last_satisfied_at field, we should not delete them
+        sqlx::query(
+            r#"DELETE FROM scheduled_jobs WHERE (status = $1 OR retries >= $2) AND module != $3;"#,
+        )
+        .bind(TriggerStatus::Completed)
+        .bind(max_retries)
+        .bind(TriggerModule::Alert)
+        .execute(&*client)
+        .await?;
         Ok(())
     }
 

@@ -30,8 +30,8 @@ use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::sync::{mpsc, Mutex};
-pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
+use tokio::sync::{Mutex, mpsc};
+pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
@@ -82,7 +82,7 @@ pub async fn init() -> errors::Result<()> {
 }
 
 async fn run() -> errors::Result<()> {
-    // start persidt worker
+    // start persist worker
     let cfg = config::get_config();
     let (tx, rx) = mpsc::channel::<PathBuf>(cfg.limit.mem_dump_thread_num);
     let rx = Arc::new(Mutex::new(rx));

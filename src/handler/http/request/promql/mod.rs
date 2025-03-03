@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
 use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
 use infra::errors;
 use promql_parser::parser;
@@ -157,7 +157,7 @@ async fn query(
     {
         use crate::common::{
             infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
@@ -414,7 +414,7 @@ async fn query_range(
     {
         use crate::common::{
             infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
@@ -665,7 +665,7 @@ async fn series(
     {
         use crate::common::{
             infra::config::USERS,
-            utils::auth::{is_root_user, AuthExtractor},
+            utils::auth::{AuthExtractor, is_root_user},
         };
 
         let metric_name = match selector

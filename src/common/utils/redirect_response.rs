@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,10 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{http::header::ContentType, HttpResponse, ResponseError};
+use actix_web::{
+    HttpResponse, ResponseError,
+    http::header::{ContentType, LOCATION},
+};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -49,10 +52,11 @@ impl RedirectResponse {
     }
 
     fn build_redirect_response(&self) -> HttpResponse {
-        let redirect_uri = self.build_full_redirect_uri();
+        let mut redirect_uri = self.build_full_redirect_uri();
+        redirect_uri = redirect_uri.trim_matches('"').to_string();
         if redirect_uri.len() < 1024 {
             HttpResponse::Found()
-                .append_header(("Location", redirect_uri))
+                .append_header((LOCATION, redirect_uri))
                 .finish()
         } else {
             let html = format!(
@@ -130,7 +134,7 @@ impl Default for RedirectResponseBuilder {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::{http::header::LOCATION, HttpResponse};
+    use actix_web::{HttpResponse, http::header::LOCATION};
 
     use super::*;
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,15 +18,17 @@ use std::sync::Arc;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{cluster::CompactionJobType, stream::FileKey},
+    meta::{
+        cluster::CompactionJobType,
+        stream::{ALL_STREAM_TYPES, FileKey},
+    },
     metrics,
 };
-use tokio::sync::{mpsc, Mutex};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+use tokio::sync::{Mutex, mpsc};
 
-use crate::service::compact::{
-    self,
-    merge::{MergeBatch, MergeSender},
-};
+use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
@@ -38,7 +40,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<(MergeSender, MergeBatch)>(cfg.limit.file_merge_thread_num * 2);
+    let (tx, rx) = mpsc::channel::<(compact::merge::MergeSender, compact::merge::MergeBatch)>(
+        cfg.limit.file_merge_thread_num * 2,
+    );
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
     for thread_id in 0..cfg.limit.file_merge_thread_num {
@@ -63,10 +67,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         .await
                         {
                             Ok((file, meta, _)) => {
-                                if let Err(e) = tx
-                                    .send(Ok((msg.batch_id, FileKey::new(&file, meta, false))))
-                                    .await
-                                {
+                                let mut new_file_keys = Vec::with_capacity(file.len());
+                                for (file, meta) in file.into_iter().zip(meta.into_iter()) {
+                                    new_file_keys.push(FileKey::new(file, meta, false));
+                                }
+                                if let Err(e) = tx.send(Ok((msg.batch_id, new_file_keys))).await {
                                     log::error!(
                                         "[COMPACTOR:JOB] Error sending file to merge_job: {}",
                                         e
@@ -97,10 +102,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(async move { run_generate_job().await });
     tokio::task::spawn(async move { run_generate_old_data_job().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { run_generate_downsampling_job().await });
     tokio::task::spawn(async move { run_merge(tx).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
     tokio::task::spawn(async move { run_sync_to_db().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
     tokio::task::spawn(async move { run_check_running_jobs().await });
     tokio::task::spawn(async move { run_clean_done_jobs().await });
     tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
@@ -126,6 +135,23 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             }
         };
 
+        // reset all metrics
+        let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+        for org in orgs {
+            for stream_type in ALL_STREAM_TYPES {
+                if metrics::COMPACT_PENDING_JOBS
+                    .with_label_values(&[org.as_str(), stream_type.as_str()])
+                    .get()
+                    > 0
+                {
+                    metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .set(0);
+                }
+            }
+        }
+
+        // set new metrics
         for (org, inner_map) in job_status {
             for (stream_type, counter) in inner_map {
                 metrics::COMPACT_PENDING_JOBS
@@ -165,8 +191,32 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     }
 }
 
+/// Generate downsampling job for compactor
+#[cfg(feature = "enterprise")]
+async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
+    if get_o2_config()
+        .downsampling
+        .metrics_downsampling_rules
+        .is_empty()
+    {
+        return Ok(());
+    }
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_o2_config().downsampling.downsampling_interval,
+        ))
+        .await;
+        log::debug!("[COMPACTOR] Running generate downsampling job");
+        if let Err(e) = compact::run_generate_downsampling_job().await {
+            log::error!("[COMPACTOR] run generate downsampling job error: {e}");
+        }
+    }
+}
+
 /// Merge small files
-async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
+async fn run_merge(
+    tx: mpsc::Sender<(compact::merge::MergeSender, compact::merge::MergeBatch)>,
+) -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.interval + 2,
@@ -216,6 +266,27 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
         log::debug!("[COMPACTOR] Running sync cached compact offset to db");
         if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
             log::error!("[COMPACTOR] run sync cached compact offset to db error: {e}");
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
+    if get_o2_config()
+        .downsampling
+        .metrics_downsampling_rules
+        .is_empty()
+    {
+        return Ok(());
+    }
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.sync_to_db_interval,
+        ))
+        .await;
+        log::debug!("[COMPACTOR] Running sync cached downsampling offset to db");
+        if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
+            log::error!("[COMPACTOR] run sync cached downsampling offset to db error: {e}");
         }
     }
 }

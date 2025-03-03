@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{fs::Metadata, ops::Range, path::Path, time::SystemTime};
 use async_walkdir::WalkDir;
 use futures::StreamExt;
 use tokio::{
-    fs::{read_dir, remove_dir, File},
+    fs::{File, read_dir, remove_dir},
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 

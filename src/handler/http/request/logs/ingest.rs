@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse, http, post, web};
 
 use crate::{
     common::meta::{
@@ -62,8 +62,10 @@ pub async fn bulk(
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
                 log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-                // TODO: remove this once we have a proper error response
-                MetaHttpResponse::json(crate::common::meta::ingestion::BulkResponse::default())
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
             }
         },
     )

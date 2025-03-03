@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use dashmap::DashMap;
 use datafusion::{common::Statistics, execution::cache::CacheAccessor};
-use object_store::{path::Path, ObjectMeta};
+use object_store::{ObjectMeta, path::Path};
 use once_cell::sync::Lazy;
 
 pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
@@ -126,7 +126,7 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
 
     fn remove(&mut self, k: &Path) -> Option<Arc<Statistics>> {
         let k = self.format_key(k);
-        self.statistics.remove(&k).map(|x| x.1 .1)
+        self.statistics.remove(&k).map(|x| x.1.1)
     }
 
     fn contains_key(&self, k: &Path) -> bool {

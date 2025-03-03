@@ -18,6 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::web;
 use chrono::{TimeZone, Utc};
 use config::{
+    FxIndexMap, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -28,14 +29,13 @@ use config::{
     },
     metrics,
     utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
-    FxIndexMap,
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
     errors::{Error, Result},
-    schema::{unwrap_partition_time_level, update_setting, SchemaCache},
+    schema::{SchemaCache, unwrap_partition_time_level, update_setting},
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -49,7 +49,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
         metrics::format_label_name,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
@@ -326,7 +326,7 @@ pub async fn remote_write(
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
             value.as_object_mut().unwrap().insert(
-                cfg.common.column_timestamp.clone(),
+                TIMESTAMP_COL_NAME.to_string(),
                 json::Value::Number(timestamp.into()),
             );
 
@@ -417,7 +417,7 @@ pub async fn remote_write(
             let hash = super::signature_without_labels(val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             val_map.insert(
-                cfg.common.column_timestamp.clone(),
+                TIMESTAMP_COL_NAME.to_string(),
                 json::Value::Number(timestamp.into()),
             );
             let value_str = config::utils::json::to_string(&val_map).unwrap();
@@ -689,13 +689,12 @@ pub(crate) async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
-    let cfg = get_config();
     // Comma-separated list of label names
     let label_names = schema
         .fields()
         .iter()
         .map(|f| f.name().as_str())
-        .filter(|&s| s != cfg.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
+        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
         .collect::<Vec<_>>()
         .join("\", \"");
     if label_names.is_empty() {
@@ -706,7 +705,7 @@ pub(crate) async fn get_series(
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
-            if mat.name == cfg.common.column_timestamp
+            if mat.name == TIMESTAMP_COL_NAME
                 || mat.name == VALUE_LABEL
                 || schema.field_with_name(&mat.name).is_err()
             {
@@ -781,7 +780,6 @@ pub(crate) async fn get_labels(
         Ok(schemas) => schemas,
     };
     let mut label_names = hashbrown::HashSet::new();
-    let cfg = get_config();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {
@@ -797,9 +795,7 @@ pub(crate) async fn get_labels(
                 .fields()
                 .iter()
                 .map(|f| f.name())
-                .filter(|&s| {
-                    s != &cfg.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL
-                })
+                .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
                 .cloned();
             label_names.extend(field_names);
         }

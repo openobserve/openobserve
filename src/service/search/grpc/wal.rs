@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use arrow::array::{new_null_array, ArrayRef};
+use arrow::array::{ArrayRef, new_null_array};
 use config::{
     get_config,
     meta::{
@@ -25,6 +25,7 @@ use config::{
     utils::{
         file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
+        record_batch_ext::concat_batches,
     },
 };
 use datafusion::{
@@ -267,7 +268,7 @@ pub async fn search_parquet(
             target_partitions: cfg.limit.cpu_num,
         };
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
         match exec::create_parquet_table(
             &session,
             latest_schema.clone(),
@@ -392,20 +393,67 @@ pub async fn search_memtable(
             continue;
         }
 
-        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map)?;
+        let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
 
         for batch in record_batches.iter_mut() {
             *batch = adapt_batch(latest_schema.clone(), batch);
         }
 
-        let table = Arc::new(NewMemTable::try_new(
-            record_batches[0].schema().clone(),
-            vec![record_batches],
+        // merge small batches into big batches
+        let mut merge_groupes = Vec::new();
+        let mut current_group = Vec::new();
+        let group_limit = config::PARQUET_BATCH_SIZE;
+        let mut group_size = 0;
+        for batch in record_batches {
+            if group_size > 0 && group_size + batch.num_rows() > group_limit {
+                merge_groupes.push(current_group);
+                current_group = Vec::new();
+                group_size = 0;
+            }
+            group_size += batch.num_rows();
+            current_group.push(batch);
+        }
+        if !current_group.is_empty() {
+            merge_groupes.push(current_group);
+        }
+        let record_batches = merge_groupes
+            .into_iter()
+            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .collect::<Vec<_>>();
+
+        // split record_batches into chunks by cpu_num
+        let chunk_size = record_batches.len().div_ceil(cfg.limit.cpu_num);
+        let mut new_batches = Vec::with_capacity(cfg.limit.cpu_num);
+        let mut current_group = Vec::new();
+        for batch in record_batches {
+            if current_group.len() >= chunk_size {
+                new_batches.push(current_group);
+                current_group = Vec::new();
+            }
+            current_group.push(batch);
+        }
+        if !current_group.is_empty() {
+            new_batches.push(current_group);
+        }
+
+        let table = match NewMemTable::try_new(
+            new_batches[0][0].schema().clone(),
+            new_batches,
             diff_fields,
             sorted_by_time,
             index_condition.clone(),
             fst_fields.clone(),
-        )?);
+        ) {
+            Ok(table) => Arc::new(table),
+            Err(e) => {
+                log::error!(
+                    "[trace_id {}] wal->mem->search: create memtable error: {}",
+                    query.trace_id,
+                    e
+                );
+                return Err(e.into());
+            }
+        };
         tables.push(table as _);
     }
 

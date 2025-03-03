@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,8 +18,8 @@ use std::str::FromStr;
 use config::{cluster::LOCAL_NODE, get_config, meta::cluster::get_internal_grpc_token};
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, QueryCacheRequest};
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
-use tracing::{info_span, Instrument};
+use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy},

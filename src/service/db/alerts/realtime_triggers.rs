@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -50,7 +50,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     if ev.value.is_none() || ev.value.as_ref().unwrap().is_empty() {
                         match db::scheduler::get(
                             columns.0,
-                            infra::scheduler::TriggerModule::Alert,
+                            config::meta::triggers::TriggerModule::Alert,
                             columns.1,
                         )
                         .await

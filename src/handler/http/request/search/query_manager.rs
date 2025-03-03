@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, put, web};
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;

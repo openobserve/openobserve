@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,11 +20,11 @@ use bytes::Bytes;
 use config::{get_config, metrics};
 use futures::stream::BoxStream;
 use object_store::{
-    limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartUpload,
-    ObjectMeta, ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result,
+    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
 };
 
-use crate::storage::{format_key, CONCURRENT_REQUESTS};
+use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
@@ -236,6 +236,7 @@ fn init_aws_config() -> object_store::Result<object_store::aws::AmazonS3> {
         .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
         .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
         .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates)
+        .with_http2_keep_alive_timeout(Duration::from_secs(cfg.s3.keepalive_timeout))
         .with_allow_http(true);
     if cfg.s3.feature_http1_only {
         opts = opts.with_http1_only();

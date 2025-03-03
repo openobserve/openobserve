@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::meta::{
-    pipeline::{components::PipelineSource, Pipeline},
+    pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
 use infra::{
@@ -196,7 +196,9 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 if let Err(e) =
                     o2_enterprise::enterprise::super_cluster::queue::pipelines_delete(&key).await
                 {
-                    log::error!("[Pipeline] error triggering super cluster event to remove pipeline from cache: {e}");
+                    log::error!(
+                        "[Pipeline] error triggering super cluster event to remove pipeline from cache: {e}"
+                    );
                 }
             }
         }
@@ -229,7 +231,9 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                             )
                             .await
                         {
-                            log::error!("[Pipeline] error triggering super cluster event to add pipeline to cache: {e}");
+                            log::error!(
+                                "[Pipeline] error triggering super cluster event to add pipeline to cache: {e}"
+                            );
                         }
                     }
                 };

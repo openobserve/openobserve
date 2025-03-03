@@ -55,6 +55,9 @@ const getDefaultDashboardPanelData: any = () => ({
       unit_custom: null,
       decimals: 2,
       line_thickness: 1.5,
+      step_value: "0",
+      y_axis_min: null,
+      y_axis_max: null,
       top_results: null,
       top_results_others: false,
       axis_width: null,
@@ -104,6 +107,9 @@ const getDefaultDashboardPanelData: any = () => ({
     },
     htmlContent: "",
     markdownContent: "",
+    customChartContent: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  `,
+    customChartResult: {},
     queryType: "sql",
     queries: [
       {
@@ -151,6 +157,7 @@ const getDefaultDashboardPanelData: any = () => ({
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
+    showFieldList: true,
   },
   meta: {
     parsedQuery: "",
@@ -187,6 +194,11 @@ const getDefaultDashboardPanelData: any = () => ({
 const dashboardPanelDataObj: any = {
   dashboard: reactive({ ...getDefaultDashboardPanelData() }),
 };
+
+const getDefaultCustomChartText = () => {
+  return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  `
+}
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
@@ -821,6 +833,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -863,6 +876,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         break;
       case "table":
       case "pie":
@@ -901,6 +915,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -924,6 +940,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.source = null;
           query.fields.target = null;
@@ -939,6 +957,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -947,6 +966,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+
+        dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "custom_chart":
+        dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -996,6 +1026,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
@@ -2175,18 +2206,32 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ?.filter((it: any) => !it?.isDerived)
       ?.map((it: any) => it?.alias);
 
-    if (dashboardPanelData.data.type == "heatmap") {
-      query +=
-        xAxisAlias.length && yAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ")
-          : "";
-    } else if (bAxisAlias?.length) {
-      query +=
-        xAxisAlias.length && bAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + bAxisAlias.join(", ")
-          : "";
-    } else {
-      query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+    const tableTypeWithXFieldOnly =
+      dashboardPanelData.data.type === "table" &&
+      xAxisAlias.length > 0 &&
+      yAxisAlias.length === 0 &&
+      !bAxisAlias?.length;
+
+    if (!tableTypeWithXFieldOnly) {
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias?.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
     }
 
     // array of sorting fields with followed by asc or desc
@@ -2627,6 +2672,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         errors.push("Please enter your markdown code");
       }
     }
+    if (dashboardPanelData.data.type == 'custom_chart'){
+      if(dashboardPanelData.data.queries[0].query.trim() == ""){
+         errors.push("Please enter query for custom chart")
+      }
+    }
 
     if (promqlMode.value) {
       // 1. chart type: only line chart is supported
@@ -2780,7 +2830,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
-      const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
+      const regex = new RegExp(`\\$(?:{${varName}}|${varName})(?!\\w)`, "g");
       return q.replace(regex, replacement);
     };
 
@@ -2977,11 +3027,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].query,
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].customQuery,
+      ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
-    () => {
-      
+    (newVal, oldVal) => {
+      // Check if customQuery mode has changed
+      const customQueryChanged = newVal[1] !== oldVal[1];
+
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
@@ -2991,10 +3043,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         if (parser) updateQueryValue();
-      } else {
+      } else if (customQueryChanged) {
+        // Only clear lists when switching modes
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
       }
       // if (dashboardPanelData.data.queryType == "promql") {
       //     updatePromQLQuery()

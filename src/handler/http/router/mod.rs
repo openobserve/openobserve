@@ -17,13 +17,14 @@ use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
 use actix_web::{
+    HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
     http::header,
-    middleware, web, HttpRequest, HttpResponse,
+    middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{from_fn, Next};
+use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -32,8 +33,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
-    actix_web::{web::BytesMut, HttpMessage},
-    base64::{engine::general_purpose, Engine as _},
+    actix_web::{HttpMessage, web::BytesMut},
+    base64::{Engine as _, engine::general_purpose},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},
@@ -216,7 +217,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::list_node)
+            .service(status::node_metrics),
     );
 
     if get_config().common.swagger_enabled {
@@ -514,21 +517,21 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(search::search_job::cancel_job)
         .service(search::search_job::delete_job)
         .service(search::search_job::retry_job)
-        .service(search::job::cancel_multiple_query)
-        .service(search::job::cancel_query)
-        .service(search::job::query_status)
+        .service(search::query_manager::query_status)
+        .service(search::query_manager::cancel_multiple_query)
+        .service(search::query_manager::cancel_query)
         .service(keys::get)
         .service(keys::delete)
         .service(keys::save)
         .service(keys::list)
         .service(keys::update)
-        .service(search::job::query_status)
         .service(actions::action::get_action_from_id)
         .service(actions::action::list_actions)
         .service(actions::action::upload_zipped_action)
         .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
-        .service(actions::action::delete_action);
+        .service(actions::action::delete_action)
+        .service(actions::operations::test_action);
 
     svc.service(service);
 }
@@ -572,8 +575,8 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use actix_web::{
-        test::{call_service, init_service, TestRequest},
         App,
+        test::{TestRequest, call_service, init_service},
     };
 
     use super::*;

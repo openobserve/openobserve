@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,9 +20,9 @@ use tracing::{Event, Subscriber};
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::{
     fmt::{
+        FmtContext, FormatEvent, FormatFields,
         format::{self, Writer},
         time::FormatTime,
-        FmtContext, FormatEvent, FormatFields,
     },
     registry::LookupSpan,
 };

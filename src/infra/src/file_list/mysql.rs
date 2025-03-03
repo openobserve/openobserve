@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{end_of_the_day, DAY_MICRO_SECS},
+        time::{DAY_MICRO_SECS, end_of_the_day},
     },
 };
 use hashbrown::HashMap;
@@ -33,8 +33,8 @@ use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{
     db::{
-        mysql::{create_index, CLIENT},
         IndexStatement,
+        mysql::{CLIENT, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -734,7 +734,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
         if deleted {
             sql = format!("{} AND deleted IS TRUE", sql);
         }
-        match pk_value {
+        let sql = match pk_value {
             None => format!("{} GROUP BY stream", sql),
             Some((0, 0)) => format!("{} GROUP BY stream", sql),
             Some((min, max)) => {
