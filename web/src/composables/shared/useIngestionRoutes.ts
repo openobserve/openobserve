@@ -47,18 +47,33 @@ import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue"
 import DatabaseConfig from "@/components/ingestion/Database.vue";
 import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
 import Postgres from "@/components/ingestion/databases/Postgres.vue";
-import MongoDB from '@/components/ingestion/databases/MongoDB.vue'
-import Redis from '@/components/ingestion/databases/Redis.vue'
-import CouchDB from '@/components/ingestion/databases/CouchDB.vue'
-import Elasticsearch from '@/components/ingestion/databases/Elasticsearch.vue'
-import MySQL from '@/components/ingestion/databases/MySQL.vue'
-import SAPHana from '@/components/ingestion/databases/SAPHana.vue'
-import Snowflake from '@/components/ingestion/databases/Snowflake.vue'
-import Zookeeper from '@/components/ingestion/databases/Zookeeper.vue'
-import Cassandra from '@/components/ingestion/databases/Cassandra.vue'
-import Aerospike from '@/components/ingestion/databases/Aerospike.vue'
-import DynamoDB from '@/components/ingestion/databases/DynamoDB.vue'
+import MongoDB from '@/components/ingestion/databases/MongoDB.vue';
+import Redis from '@/components/ingestion/databases/Redis.vue';
+import CouchDB from '@/components/ingestion/databases/CouchDB.vue';
+import Elasticsearch from '@/components/ingestion/databases/Elasticsearch.vue';
+import MySQL from '@/components/ingestion/databases/MySQL.vue';
+import SAPHana from '@/components/ingestion/databases/SAPHana.vue';
+import Snowflake from '@/components/ingestion/databases/Snowflake.vue';
+import Zookeeper from '@/components/ingestion/databases/Zookeeper.vue';
+import Cassandra from '@/components/ingestion/databases/Cassandra.vue';
+import Aerospike from '@/components/ingestion/databases/Aerospike.vue';
+import DynamoDB from '@/components/ingestion/databases/DynamoDB.vue';
 
+import Security from "@/components/ingestion/Security.vue";
+import Falco from "@/components/ingestion/security/Falco.vue";
+import OSQuery from "@/components/ingestion/security/OSQuery.vue";
+import Okta from "@/components/ingestion/security/Okta.vue";
+import Jumpcloud from "@/components/ingestion/security/Jumpcloud.vue";
+import OpenVPN from "@/components/ingestion/security/OpenVPN.vue";
+import Office365 from "@/components/ingestion/security/Office365.vue";
+import GoogleWorkspace from "@/components/ingestion/security/GoogleWorkspace.vue";
+
+import DevOps from "@/components/ingestion/DevOps.vue";
+import Jenkins from "@/components/ingestion/devops/Jenkins.vue";
+import Ansible from "@/components/ingestion/devops/Ansible.vue";
+import Terraform from "@/components/ingestion/devops/Terraform.vue";
+import GithubActions from "@/components/ingestion/devops/GithubActions.vue";
+import path from "path";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -401,6 +416,114 @@ const useIngestionRoutes = () => {
               },
             },
           ]
+        },
+        {
+          path: "security",
+          name: "security",
+          component: Security,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "falco",
+              name: "falco",
+              component: Falco,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "osquery",
+              name: "osquery",
+              component: OSQuery,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "okta",
+              name: "okta",
+              component: Okta,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "jumpcloud",
+              name: "jumpcloud",
+              component: Jumpcloud,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "openvpn",
+              name: "openvpn",
+              component: OpenVPN,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "office365",
+              name: "office365",
+              component: Office365,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "google-workspace",
+              name: "google-workspace",
+              component: GoogleWorkspace,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ]
+        },
+        {
+          path: "devops",
+          name: "devops",
+          component: DevOps,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "jenkins",
+              name: "jenkins",
+              component: Jenkins,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "ansible",
+              name: "ansible",
+              component: Ansible,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "terraform",
+              name: "terraform",
+              component: Terraform,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "github-actions",
+              name: "github-actions",
+              component: GithubActions,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
         },
       ],
     },
