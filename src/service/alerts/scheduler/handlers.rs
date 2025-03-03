@@ -1109,7 +1109,7 @@ async fn handle_derived_stream_triggers(
             // at the next batch immediately Once it reaches max retries, the trigger
             // will be run again at the next scheduled time.
             if !(trigger_data_stream.status == TriggerDataStatus::Failed
-                && new_trigger.retries >= max_retries)
+                && new_trigger.retries < max_retries)
             {
                 // Go to the next nun at, but use the same trigger start time
                 if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {

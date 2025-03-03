@@ -1875,7 +1875,7 @@ mod tests {
             is_realtime: false,
             is_silenced: false,
             status: config::meta::triggers::TriggerStatus::Processing,
-            retries: 19,
+            retries: 2,
             data: "{}".to_string(),
         };
 
@@ -1912,7 +1912,7 @@ mod tests {
             is_realtime: false,
             is_silenced: false,
             status: config::meta::triggers::TriggerStatus::Processing,
-            retries: 20,
+            retries: 3,
             data: "{}".to_string(),
         };
 
@@ -1981,7 +1981,7 @@ mod tests {
             is_realtime: false,
             is_silenced: false,
             status: config::meta::triggers::TriggerStatus::Processing,
-            retries: 19,
+            retries: 2,
             data: "{}".to_string(),
         };
 
