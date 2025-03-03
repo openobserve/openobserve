@@ -52,6 +52,7 @@ import {
   generateTraceContext,
   arraysMatch,
   isWebSocketEnabled,
+  formatLargeNumber,
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -3553,7 +3554,7 @@ const useLogs = () => {
         " to " +
         endCount +
         " out of " +
-        totalCount.toLocaleString() +
+        formatLargeNumber(totalCount) +
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
