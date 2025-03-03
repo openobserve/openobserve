@@ -246,7 +246,7 @@ async fn get_url(path: &str) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = get_rand_element(&nodes);
+    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
     URLDetails {
         is_error: false,
         error: None,
