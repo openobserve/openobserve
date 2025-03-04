@@ -15,10 +15,10 @@
 
 use std::collections::HashMap;
 
-use actix_web_prometheus::{PrometheusMetrics, PrometheusMetricsBuilder};
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
+    TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -893,17 +893,15 @@ fn create_const_labels() -> HashMap<String, String> {
     labels
 }
 
-pub fn create_prometheus_handler() -> PrometheusMetrics {
-    PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
-        .const_labels(create_const_labels())
-        .registry(get_registry())
-        .build()
-        .expect("Prometheus build failed")
+pub fn gather() -> String {
+    let registry = prometheus::default_registry();
+    let mut buffer = vec![];
+    TextEncoder::new()
+        .encode(&registry.gather(), &mut buffer)
+        .unwrap();
+    String::from_utf8(buffer).unwrap()
 }
 
-pub fn get_registry() -> Registry {
-    let registry = prometheus::Registry::new();
-    register_metrics(&registry);
-    registry
+pub fn init() {
+    register_metrics(prometheus::default_registry());
 }

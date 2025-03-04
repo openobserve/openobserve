@@ -19,6 +19,7 @@ use actix_cors::Cors;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
     middleware, web, HttpRequest, HttpResponse,
 };
@@ -143,6 +144,21 @@ async fn audit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     next.call(req).await
+}
+
+#[get("/metrics")]
+async fn get_metrics() -> Result<HttpResponse, actix_web::Error> {
+    let body = if config::get_config().common.prometheus_enabled {
+        config::metrics::gather()
+    } else {
+        "".to_string()
+    };
+    let mut resp = HttpResponse::Ok().body(body);
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
+    Ok(resp)
 }
 
 /// This is a very trivial proxy to overcome the cors errors while
