@@ -91,12 +91,7 @@ pub async fn check_for_schema(
 
     if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
         metrics::INGEST_ERRORS
-            .with_label_values(&[
-                org_id,
-                stream_type.as_str(),
-                stream_name,
-                SCHEMA_CONFORMANCE_FAILED,
-            ])
+            .with_label_values(&[org_id, stream_type.as_str(), SCHEMA_CONFORMANCE_FAILED])
             .inc();
         return Err(get_request_columns_limit_error(
             &format!("{}/{}/{}", org_id, stream_type, stream_name),

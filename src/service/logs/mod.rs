@@ -385,7 +385,6 @@ async fn write_logs(
                             .with_label_values(&[
                                 org_id,
                                 StreamType::Logs.to_string().as_str(),
-                                stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
                             .inc();
@@ -397,7 +396,6 @@ async fn write_logs(
                             .with_label_values(&[
                                 org_id,
                                 StreamType::Logs.to_string().as_str(),
-                                stream_name,
                                 SCHEMA_CONFORMANCE_FAILED,
                             ])
                             .inc();

@@ -147,7 +147,6 @@ pub async fn handle_grpc_request(
                         .with_label_values(&[
                             org_id,
                             StreamType::Logs.to_string().as_str(),
-                            &stream_name,
                             TS_PARSE_FAILED,
                         ])
                         .inc();
@@ -281,7 +280,6 @@ pub async fn handle_grpc_request(
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.to_string().as_str(),
-                        &stream_name,
                         TRANSFORM_FAILED,
                     ])
                     .inc();
@@ -406,7 +404,6 @@ pub async fn handle_grpc_request(
             ep,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(took_time);
@@ -415,7 +412,6 @@ pub async fn handle_grpc_request(
             ep,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();

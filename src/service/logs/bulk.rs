@@ -280,7 +280,6 @@ pub async fn ingest(
                                 .with_label_values(&[
                                     org_id,
                                     StreamType::Logs.to_string().as_str(),
-                                    &stream_name,
                                     TS_PARSE_FAILED,
                                 ])
                                 .inc();
@@ -308,7 +307,6 @@ pub async fn ingest(
                         .with_label_values(&[
                             org_id,
                             StreamType::Logs.to_string().as_str(),
-                            &stream_name,
                             TS_PARSE_FAILED,
                         ])
                         .inc();
@@ -363,7 +361,6 @@ pub async fn ingest(
                         .with_label_values(&[
                             org_id,
                             StreamType::Logs.to_string().as_str(),
-                            &stream_name,
                             TRANSFORM_FAILED,
                         ])
                         .inc();
@@ -436,7 +433,6 @@ pub async fn ingest(
                                             .with_label_values(&[
                                                 org_id,
                                                 StreamType::Logs.to_string().as_str(),
-                                                &stream_name,
                                                 TS_PARSE_FAILED,
                                             ])
                                             .inc();
@@ -468,7 +464,6 @@ pub async fn ingest(
                                     .with_label_values(&[
                                         org_id,
                                         StreamType::Logs.to_string().as_str(),
-                                        &stream_name,
                                         TS_PARSE_FAILED,
                                     ])
                                     .inc();
@@ -546,7 +541,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(took_time);
@@ -555,7 +549,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();

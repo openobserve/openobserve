@@ -120,7 +120,6 @@ pub fn apply_vrl_fn(
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.to_string().as_str(),
-                        &format!("{:?}", stream_name),
                         TRANSFORM_FAILED,
                     ])
                     .inc();
@@ -137,7 +136,6 @@ pub fn apply_vrl_fn(
                 .with_label_values(&[
                     org_id,
                     StreamType::Logs.to_string().as_str(),
-                    &format!("{:?}", stream_name),
                     TRANSFORM_FAILED,
                 ])
                 .inc();

@@ -187,7 +187,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.to_string().as_str(),
-                        &stream_name,
                         TS_PARSE_FAILED,
                     ])
                     .inc();
@@ -227,7 +226,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.to_string().as_str(),
-                        &stream_name,
                         TRANSFORM_FAILED,
                     ])
                     .inc();
@@ -281,7 +279,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                                     .with_label_values(&[
                                         org_id,
                                         StreamType::Logs.to_string().as_str(),
-                                        &stream_name,
                                         TS_PARSE_FAILED,
                                     ])
                                     .inc();
@@ -351,7 +348,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(time);
@@ -360,7 +356,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             "/api/org/ingest/logs/_syslog",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();

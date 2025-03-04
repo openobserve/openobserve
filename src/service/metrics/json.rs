@@ -473,7 +473,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             &StreamType::Metrics.to_string(),
         ])
         .observe(time);
@@ -482,7 +481,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             &StreamType::Metrics.to_string(),
         ])
         .inc();

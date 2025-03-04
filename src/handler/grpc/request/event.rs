@@ -67,10 +67,10 @@ impl Event for Eventer {
                     // metrics
                     let time = start.elapsed().as_secs_f64();
                     metrics::GRPC_RESPONSE_TIME
-                        .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                        .with_label_values(&["/event/send_file_list", "500", "", ""])
                         .observe(time);
                     metrics::GRPC_INCOMING_REQUESTS
-                        .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                        .with_label_values(&["/event/send_file_list", "500", "", ""])
                         .inc();
                     return Err(Status::internal(e.to_string()));
                 }
@@ -79,10 +79,10 @@ impl Event for Eventer {
                 // metrics
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .with_label_values(&["/event/send_file_list", "500", "", ""])
                     .observe(time);
                 metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .with_label_values(&["/event/send_file_list", "500", "", ""])
                     .inc();
                 return Err(Status::internal(e.to_string()));
             }
@@ -126,10 +126,10 @@ impl Event for Eventer {
         // metrics
         let time = start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/event/send_file_list", "200", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/event/send_file_list", "200", "", "", ""])
+            .with_label_values(&["/event/send_file_list", "200", "", ""])
             .inc();
 
         Ok(Response::new(EmptyResponse {}))
