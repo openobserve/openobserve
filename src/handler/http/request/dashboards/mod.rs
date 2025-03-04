@@ -63,6 +63,7 @@ impl From<DashboardError> for HttpResponse {
                 ))
             }
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
+            DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
         }
     }
 }
