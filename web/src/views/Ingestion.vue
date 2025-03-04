@@ -140,6 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.devopsLabel')"
         content-class="tab_content"
       />
+
+      <q-route-tab
+        name="networking"
+        :to="{
+          name: 'networking',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.networkingLabel')"
+        content-class="tab_content"
+      />
     </q-tabs>
     <q-separator class="separator" />
     <router-view

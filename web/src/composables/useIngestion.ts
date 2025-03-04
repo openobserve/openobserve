@@ -81,6 +81,13 @@ Access Key: [BASIC_PASSCODE]`;
     githubactions: "https://short.openobserve.ai/devops/github-actions",
   };
 
+  const networkingContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const networkingDocURLs = {
+    netflow: "https://short.openobserve.ai/network/netflow",
+  };
+
 
   return {
     endpoint,
@@ -90,6 +97,8 @@ Access Key: [BASIC_PASSCODE]`;
     securityDocURLs,
     devopsContent,
     devopsDocURLs,
+    networkingContent,
+    networkingDocURLs,
   };
 };
 
