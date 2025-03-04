@@ -83,11 +83,7 @@ impl QuerierConnectionPool {
                 if !conn.is_connected().await {
                     // Try to reconnect
                     if let Err(e) = conn.connect().await {
-                        log::error!(
-                            "Failed to reconnect to querier {}: {}",
-                            conn.querier_name,
-                            e
-                        );
+                        log::error!("Failed to reconnect to querier {}: {}", conn.get_name(), e);
                         to_remove.push(querier_name.clone());
                     }
                 }

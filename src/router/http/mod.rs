@@ -498,25 +498,25 @@ async fn proxy_ws(
                 Err(e) => {
                     log::error!("Error converting URL to WebSocket: {:?}", e);
                     return Ok(HttpResponse::BadRequest()
-                    .force_close()
-                    .body("Invalid WebSocket URL"));
+                        .force_close()
+                        .body("Invalid WebSocket URL"));
                 }
             };
 
             match ws::ws_proxy(req, payload, &ws_url).await {
                 Ok(res) => {
                     log::info!(
-                            "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                            ws_url,
-                            start.elapsed().as_millis()
-                        );
+                        "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                        ws_url,
+                        start.elapsed().as_millis()
+                    );
                     Ok(res)
                 }
                 Err(e) => {
                     log::error!("[WS_ROUTER] failed: {:?}", e);
                     Ok(HttpResponse::InternalServerError()
-                    .force_close()
-                    .body("WebSocket proxy error"))
+                        .force_close()
+                        .body("WebSocket proxy error"))
                 }
             }
         }
