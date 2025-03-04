@@ -152,6 +152,10 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
@@ -239,12 +243,12 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         if columns.len() <= 2 {
             // query functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], "", "", "query"])
+                .with_label_values(&[columns[0], "", "query"])
                 .inc();
         } else {
             // ingest functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], columns[2], columns[1], "ingest"])
+                .with_label_values(&[columns[0], columns[1], "ingest"])
                 .inc();
         }
     }
@@ -256,20 +260,24 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
 }
 
 async fn update_storage_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
         metrics::STORAGE_ORIGINAL_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.storage_size as i64);
         metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.compressed_size as i64);
         metrics::STORAGE_FILES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.file_num);
         metrics::STORAGE_RECORDS
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.doc_num);
     }
     Ok(())

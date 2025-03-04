@@ -53,7 +53,6 @@ actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.21"
 actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
-actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
     "support-rust-embed-for-web",
     "base64",
@@ -216,7 +215,6 @@ report_server = { path = "src/report_server" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
-actix-web-prometheus = "0.1"
 actix-tls = { version = "3.4", features = [
     "connect",
     "uri",

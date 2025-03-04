@@ -531,7 +531,6 @@ pub async fn logs_json_handler(
             "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
         ])
         .observe(took_time);
@@ -540,7 +539,6 @@ pub async fn logs_json_handler(
             "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
         ])
         .inc();

@@ -577,10 +577,10 @@ pub async fn handle_otlp_request(
 
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str()])
         .observe(time_took);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[ep, "200", org_id, "", StreamType::Metrics.as_str()])
+        .with_label_values(&[ep, "200", org_id, StreamType::Metrics.as_str()])
         .inc();
 
     // only one trigger per request, as it updates etcd

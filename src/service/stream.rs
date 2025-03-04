@@ -33,9 +33,8 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
-        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, unwrap_partition_time_level,
-        unwrap_stream_settings,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        unwrap_partition_time_level, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -581,9 +580,6 @@ pub async fn delete_stream(
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
-    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;

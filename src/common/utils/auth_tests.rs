@@ -3111,7 +3111,6 @@ mod tests {
                 report_user_password: String::default(),
                 report_server_url: String::default(),
                 report_server_skip_tls_verify: bool::default(),
-                schema_cache_compress_enabled: bool::default(),
                 skip_formatting_stream_name: bool::default(),
                 bulk_api_response_errors_only: bool::default(),
                 allow_user_defined_schemas: bool::default(),

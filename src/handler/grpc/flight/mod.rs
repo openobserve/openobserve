@@ -309,10 +309,10 @@ impl Drop for FlightSenderStream {
         // metrics
         let time = self.start.elapsed().as_secs_f64();
         metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/search/flight/do_get", "200", "", "", ""])
+            .with_label_values(&["/search/flight/do_get", "200", "", ""])
             .observe(time);
         metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/search/flight/do_get", "200", "", "", ""])
+            .with_label_values(&["/search/flight/do_get", "200", "", ""])
             .inc();
 
         if let Some(defer) = self.defer.take() {
