@@ -155,7 +155,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     if !config::cluster::LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    
+
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
@@ -263,8 +263,8 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
     if !config::cluster::LOCAL_NODE.is_compactor() {
         return Ok(());
     }
-    
-     let stats = cache::stats::get_stats();
+
+    let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
         metrics::STORAGE_ORIGINAL_BYTES

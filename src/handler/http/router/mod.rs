@@ -19,8 +19,8 @@ use actix_cors::Cors;
 use actix_web::{
     HttpRequest, HttpResponse,
     body::MessageBody,
-    get,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
     middleware, web,
 };

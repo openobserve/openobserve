@@ -1363,13 +1363,7 @@ pub async fn search_history(
     let mut search_res = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(
-                start,
-                &org_id,
-                stream_type,
-                "500",
-                "_search_history",
-            );
+            http_report_metrics(start, &org_id, stream_type, "500", "_search_history");
             log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
@@ -1404,13 +1398,7 @@ pub async fn search_history(
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
-    http_report_metrics(
-        start,
-        &org_id,
-        stream_type,
-        "200",
-        "_search_history",
-    );
+    http_report_metrics(start, &org_id, stream_type, "200", "_search_history");
 
     // prepare usage metrics
     let time_taken = start.elapsed().as_secs_f64();

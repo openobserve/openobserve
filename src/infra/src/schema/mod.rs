@@ -124,7 +124,7 @@ pub async fn get_versions(
 ) -> Result<Vec<Schema>> {
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
- 
+
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
     let mut last_schema_index = None;
     let r = STREAM_SCHEMAS.read().await;
