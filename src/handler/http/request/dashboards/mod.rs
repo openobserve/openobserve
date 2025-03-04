@@ -44,6 +44,7 @@ impl From<DashboardError> for HttpResponse {
             DashboardError::DistinctValueError => MetaHttpResponse::internal_error("Error in updating distinct values"),
             DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => MetaHttpResponse::internal_error(format!("error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}")),
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
+            DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
         }
     }
 }
