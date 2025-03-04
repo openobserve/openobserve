@@ -1010,8 +1010,6 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -1046,10 +1044,8 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
-
+        let mut app = App::new();
         app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
-
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
