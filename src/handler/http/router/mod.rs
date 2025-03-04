@@ -51,7 +51,9 @@ pub mod ui;
 
 pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_methods(vec![
+            "HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE", "PATCH",
+        ])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::ACCEPT,
