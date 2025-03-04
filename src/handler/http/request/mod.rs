@@ -27,6 +27,7 @@ pub mod functions;
 pub mod keys;
 pub mod kv;
 pub mod logs;
+pub mod lookup;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;
