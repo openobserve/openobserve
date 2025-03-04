@@ -2841,7 +2841,6 @@ const getPropsByChartTypeForSeries = (panelSchema: any) => {
     case "h-stacked":
       return {
         type: "bar",
-        stack: "total",
         emphasis: {
           focus: "series",
         },
