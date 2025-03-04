@@ -537,7 +537,8 @@
     "redirectionIngestionMsg": "Note: In order to access pages other than IAM, data ingestion must be initiated within the current organization.",
     "databaseLabel": "Databases",
     "securityLabel": "Security",
-    "devopsLabel": "DevOps"
+    "devopsLabel": "DevOps",
+    "networkingLabel": "Networking"
   },
   "syslog": {
     "stream": "Stream",
