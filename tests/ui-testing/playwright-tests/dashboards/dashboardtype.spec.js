@@ -234,5 +234,6 @@ test.describe("dashboard testcases", () => {
       .locator('[data-test="dashboard-delete"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
+    
   });
 });
