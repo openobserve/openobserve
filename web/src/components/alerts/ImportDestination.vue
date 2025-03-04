@@ -707,7 +707,7 @@ export default defineComponent({
       // Only redirect and show success message if ALL destinations were imported successfully
       if (successCount === totalCount) {
         q.notify({
-          message: `Successfully imported ${successCount} destination${successCount > 1 ? 's' : ''}`,
+          message: `Successfully imported destination(s)`,
           color: "positive",
           position: "bottom",
           timeout: 2000,
