@@ -539,7 +539,7 @@ export default defineComponent({
     const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const activeFolderId = ref("default");
     const showMoveAlertDialog = ref(false);
-    const expandedRow = ref("");
+    const expandedRow: Ref<any> = ref("");
     const triggerExpand = (props: any) => {
       if (expandedRow.value === props.row.alert_id) {
         expandedRow.value = null;
