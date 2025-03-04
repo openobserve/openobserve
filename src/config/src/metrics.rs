@@ -110,7 +110,7 @@ pub static INGEST_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "error_type"],
+        &["organization", "stream_type", "stream", "error_type"],
     )
     .expect("Metric created")
 });
