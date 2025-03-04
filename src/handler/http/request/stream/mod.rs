@@ -18,7 +18,9 @@ use std::{
     io::{Error, ErrorKind},
 };
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, post, put, web};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
+};
 use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,
@@ -48,6 +50,9 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Stream),
@@ -62,7 +67,51 @@ async fn schema(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    stream::get_stream(&org_id, &stream_name, stream_type).await
+    let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
+    let Some(mut schema) = schema else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            "stream not found".to_string(),
+        )));
+    };
+    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+        let mut schema_fields = schema
+            .schema
+            .iter()
+            .map(|f| (&f.name, f))
+            .collect::<HashMap<_, _>>();
+        schema.uds_schema = Some(
+            uds_fields
+                .iter()
+                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            schema.schema.retain(|f| f.name.contains(keyword));
+        }
+    }
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= schema.schema.len() {
+        schema.schema = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, schema.schema.len());
+        schema.schema = schema.schema[offset..end].to_vec();
+    }
+
+    Ok(HttpResponse::Ok().json(schema))
 }
 
 /// CreateStreamSettings
@@ -285,6 +334,9 @@ async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
@@ -349,6 +401,29 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     )
     .await;
     indices.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            indices.retain(|s| s.name.contains(keyword));
+        }
+    }
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= indices.len() {
+        indices = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, indices.len());
+        indices = indices[offset..end].to_vec();
+    }
     Ok(HttpResponse::Ok().json(ListStream { list: indices }))
 }
 
