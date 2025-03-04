@@ -695,7 +695,6 @@ export default defineComponent({
       let hasErrors = false;
       let successCount = 0;
       const totalCount = jsonArrayOfObj.value.length;
-
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
         if (!success) {
@@ -820,6 +819,8 @@ export default defineComponent({
         });
       }
 
+      
+
       // Check if 'method' is required for both webhook and email
 
       // Check if 'skip_tls_verify' is required for both webhook and email, and it should be a boolean
@@ -843,11 +844,17 @@ export default defineComponent({
         );
       }
 
-      if (input.type === "email" && Object.keys(input.headers).length !== 0) {
+
+      if (input.type === "email" && input.hasOwnProperty('headers') && Object.keys(input.headers).length !== 0) {
         destinationErrors.push(
           `Destination - ${index} 'headers' should not be provided for email`,
         );
       }
+
+
+
+
+
 
       // Check if 'name' is required for both webhook and email
       if (!input.name || typeof input.name !== "string") {
@@ -855,6 +862,7 @@ export default defineComponent({
           `Destination - ${index} 'name' is required and should be a string`,
         );
       }
+
 
       // 'emails' should be required for email type and should be an array of strings
       if (input.type === "email") {
@@ -877,11 +885,14 @@ export default defineComponent({
         );
       }
 
+
       // Log all destination errors at the end if any exist
       if (destinationErrors.length > 0) {
         destinationErrorsToDisplay.value.push(destinationErrors);
         return false;
       }
+
+
 
       // If all validations pass
       return true;
