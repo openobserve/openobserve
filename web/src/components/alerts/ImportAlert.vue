@@ -671,14 +671,15 @@ export default defineComponent({
       const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
+      console.log(input.org_id,'org id')
       if (
         !input.org_id ||
         typeof input.org_id !== "string" ||
         input.org_id.trim() === "" ||
-        !orgList.includes(input.org_id)
+        input.org_id != store.state.selectedOrganization.identifier
       ) {
         alertErrors.push(
-          `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be a valid string.`,
+          `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
         );
       }
 
