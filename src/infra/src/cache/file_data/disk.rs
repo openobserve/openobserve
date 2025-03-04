@@ -501,21 +501,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Err(e) => return Err(e.into()),
             Ok(None) => break,
             Ok(Some(f)) => {
-                let path = f.path();
-
-                // Delete temporary files instead of skipping them
-                if path.extension().is_some_and(|ext| ext == "tmp") {
-                    log::debug!(
-                        "Removing temporary file during cache load: {}",
-                        path.display()
-                    );
-                    if let Err(e) = tokio::fs::remove_file(&path).await {
-                        log::warn!("Failed to remove tmp file {}: {}", path.display(), e);
-                    }
-                    continue;
-                }
-
-                let fp = match path.canonicalize() {
+                let fp = match f.path().canonicalize() {
                     Ok(p) => p,
                     Err(e) => {
                         log::error!("canonicalize file path error: {}", e);
@@ -534,6 +520,17 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         log::error!("load disk cache error: {}", e);
                     }
                 } else {
+                    // check file is tmp file
+                    if fp.extension().is_some_and(|ext| ext == "tmp") {
+                        log::debug!(
+                            "Removing temporary file during cache load: {}",
+                            fp.display()
+                        );
+                        if let Err(e) = tokio::fs::remove_file(&fp).await {
+                            log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
+                        }
+                        continue;
+                    }
                     let meta = match get_file_meta(&fp) {
                         Ok(m) => m,
                         Err(e) => {
