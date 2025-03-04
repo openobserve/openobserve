@@ -21,7 +21,7 @@ const common = {
     return http().get(`/api/v2/${organization}/folders/${folder_type}/${folderId}`);
   },
   move_across_folders: (organization: string, type: string, data: any) => {
-    return http().put(`/api/v2/${organization}/${type}/move`, data);
+    return http().patch(`/api/v2/${organization}/${type}/move`, data);
   }
 };
 

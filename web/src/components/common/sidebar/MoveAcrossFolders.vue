@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="column full-height">
       <q-card-section
         class="q-px-md q-py-md"
-        data-test="dashboard-folder-move-header"
+        :data-test="`${type}-folder-move-header`"
       >
         <div class="row items-center no-wrap">
           <div class="col">
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               icon="cancel"
-              data-test="dashboard-folder-move-cancel"
+              :data-test="`${type}-folder-move-cancel`"
             />
           </div>
         </div>
@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <q-card-section
         class="q-w-md q-mx-lg"
-        data-test="dashboard-folder-move-body"
+        :data-test="`${type}-folder-move-body`"
       >
         <q-form
           ref="moveFolderForm"
           @submit.stop="onSubmit.execute()"
-          data-test="dashboard-folder-move-form"
+          :data-test="`${type}-folder-move-form`"
         >
           <q-input
             v-model="store.state.organizationData.foldersByType[type].find((item: any) => item.folderId === activeFolderId).name"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :disable="true"
-            data-test="dashboard-folder-move-name"
+            :data-test="`${type}-folder-move-name`"
           />
           <span>&nbsp;</span>
   
@@ -73,10 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               text-color="light-text"
               padding="sm md"
               no-caps
-              data-test="dashboard-folder-move-cancel"
+              :data-test="`${type}-folder-move-cancel`"
             />
             <q-btn
-              data-test="dashboard-folder-move"
+              :data-test="`${type}-folder-move`"
               :disable="activeFolderId === selectedFolder.value"
               :loading="onSubmit.isLoading.value"
               :label="t('common.move')"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
   
   export default defineComponent({
-    name: "MoveDashboardToAnotherFolder",
+    name: "MoveAcrossFolders",
     components: { SelectFolderDropDown },
     props: {
       activeFolderId: {
@@ -111,8 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default: "default",
       },
       moduleId: {
-        type: String,
-        default: "",
+        type: Array,
+        default: [],
       },
       type: {
         type: String,
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
   
           try {
-            const moduleIds = Array.isArray(props.moduleId) ? props.moduleId : [props.moduleId];
+            const moduleIds = props.moduleId
             const data = {
               [getModuleName()]: moduleIds,
               dst_folder_id: selectedFolder.value.value,
@@ -152,14 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               props.type
             );
   
-            showPositiveNotification("Dashboard Moved successfully", {
+            showPositiveNotification(`${props.type} Moved successfully`, {
               timeout: 2000,
             });
   
             emit("updated", props.activeFolderId, selectedFolder.value.value);
             moveFolderForm.value.resetValidation();
           } catch (err: any) {
-            showErrorNotification(err?.message ?? "Dashboard move failed.", {
+            showErrorNotification(err?.message ?? `${props.type} move failed.`, {
               timeout: 2000,
             });
           }

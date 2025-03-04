@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedFolder"
         :label="t('dashboard.selectFolderLabel')"
         :options="store.state.organizationData.foldersByType[type].map((item: any)=> {return {label: item.name, value: item.folderId}})"
-        data-test="index-dropdown-stream_type"
+        :data-test="`${type}-index-dropdown-stream_type`"
         input-debounce="0"
         behavior="menu"
         filled
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
       <q-btn
         class="q-mb-md text-bold"
-        data-test="dashboard-folder-move-new-add"
+        :data-test="`${type}-folder-move-new-add`"
         label="+"
         text-color="light-text"
         style="width: 40px; height: 42px"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       position="right"
       full-height
       maximized
-      data-test="dashboard-folder-move-dialog"
+      :data-test="`${type}-folder-move-dialog`"
     >
       <AddFolder :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
     </q-dialog>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         // use activeFolderId if available
         // else use router query if available
         // else use default
-        const activeFolderData = store.state.organizationData.folders.find(
+        const activeFolderData = store.state.organizationData.foldersByType[props.type].find(
           (item: any) =>
             item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
         );
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       });
   
       watch(
-        () => store.state.organizationData.folders,
+        () => store.state.organizationData.foldersByType[props.type],
         () => {
           // refresh selected folder, on folders list change
           selectedFolder.value = getInitialFolderValue();

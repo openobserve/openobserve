@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           filled
           borderless
-          :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')"
+          :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
           data-test="dashboard-search"
           :clearable="searchAcrossFolders"
           @clear="clearSearchHistory"
@@ -97,10 +97,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 100%"
       >
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
-      </template>
+        <q-checkbox
+        v-model="allSelected"
+        size="sm"
+        color="secondary"
+        @update:model-value="toggleAll"
+      />      
+    </template>
       <template #body-selection="scope">
         <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+      </template>
+      <template v-slot:body="props">
+        <q-tr
+          :data-test="`stream-association-table-${props.row.trace_id}-row`"
+          :props="props"
+          style="cursor: pointer"
+          @click="triggerExpand(props)"
+        >
+      <q-td>
+        <q-checkbox v-model="props.row.selected" size="sm" color="secondary" @update:model-value="handleRowSelection(props.row, $event)" />
+      </q-td>
+          
+          <q-td v-for="col in columns" :key="col.name" :props="props">
+            <template v-if="col.name  !== 'actions'">
+            {{ props.row[col.field] }}
+          </template>
+          <template v-else>
+            <div
+              data-test="alert-list-loading-alert"
+              v-if="alertStateLoadingMap[props.row.uuid]"
+              style="display: inline-block; width: 33.14px; height: auto"
+              class="flex justify-center items-center q-ml-xs"
+              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+            >
+              <q-circular-progress
+                indeterminate
+                rounded
+                size="16px"
+                :value="1"
+                color="secondary"
+              />
+            </div>
+            <q-btn
+              v-else
+              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
+              class="q-ml-xs material-symbols-outlined"
+              padding="sm"
+              unelevated
+              size="sm"
+              :color="props.row.enabled ? 'negative' : 'positive'"
+              round
+              flat
+              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+              @click="toggleAlertState(props.row)"
+            />
+            <q-btn
+              :data-test="`alert-list-${props.row.name}-update-alert`"
+              icon="edit"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.edit')"
+              @click="editAlert(props.row)"
+            ></q-btn>
+            <q-btn
+              icon="content_copy"
+              :title="t('alerts.clone')"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="duplicateAlert(props.row)"
+              :data-test="`alert-list-${props.row.name}-clone-alert`"
+            ></q-btn>
+            <q-btn
+              :icon="outlinedMoreVert" 
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="openMenu($event, props.row)"
+              :data-test="`alert-list-${props.row.name}-more-options`"
+            >
+              <q-menu>
+                <q-list style="min-width: 100px">
+                  <q-item class="flex items-center" clickable v-close-popup @click="moveAlertToAnotherFolder(props.row)">
+                    <q-item-section dense avatar>
+                      <q-icon size="16px" :name="outlinedDriveFileMove" />
+                    </q-item-section>
+                    <q-item-section>Move</q-item-section>
+                  </q-item>
+
+                  <q-item class="flex items-center justify-center" clickable v-close-popup @click="showDeleteDialogFn(props)">
+                    <q-item-section dense avatar>
+                      <q-icon size="16px" :name="outlinedDelete" />
+                    </q-item-section>
+                    <q-item-section>{{ t('alerts.delete') }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </template>
+          </q-td>
+        </q-tr>
+  <q-tr v-show="expandedRow === props.row.alert_id" :props="props" >
+
+    <q-td  colspan="100%">
+
+      <div class="text-left tw-px-2 q-mb-sm  expand-content">
+        <div class="tw-flex tw-items-start  tw-justify-start" >
+          <strong >{{ props.row.type == 'sql' ? 'SQL Query' : 'Conditions' }} :  <span v-if="props.row.conditions != '' && props.row.conditions != '--'" >  <q-btn
+            @click.stop="copyToClipboard(props.row.conditions, 'Conditions')"
+            size="xs"
+            dense
+            flat
+            icon="content_copy"
+            class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
+          /></span></strong>
+        </div>
+
+          <div data-test="scheduled-pipeline-expanded-sql" class="scroll-content  expanded-sql ">
+
+                <pre style="text-wrap: wrap;">{{  (props.row.conditions != '' && props.row.conditions != '--')? props.row?.conditions : 'No condition' }} </pre>
+              </div>
+      </div>
+      <div class="text-left tw-px-2 q-mb-sm  expand-content">
+        <div class="tw-flex tw-items-start  tw-justify-start" >
+          <strong >Description : <span></span></strong>
+        </div>
+
+          <div data-test="scheduled-pipeline-expanded-sql" class="scroll-content  expanded-sql ">
+                <pre style="text-wrap: wrap;">{{ props.row?.description || 'No description' }}  </pre>
+              </div>
+      </div>
+    </q-td>
+  </q-tr>
       </template>
         <template #no-data>
           <div
@@ -154,87 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <NoData />
           </template>
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div
-              data-test="alert-list-loading-alert"
-              v-if="alertStateLoadingMap[props.row.uuid]"
-              style="display: inline-block; width: 33.14px; height: auto"
-              class="flex justify-center items-center q-ml-xs"
-              :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-            >
-              <q-circular-progress
-                indeterminate
-                rounded
-                size="16px"
-                :value="1"
-                color="secondary"
-              />
-            </div>
-            <q-btn
-              v-else
-              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-              :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-              class="q-ml-xs material-symbols-outlined"
-              padding="sm"
-              unelevated
-              size="sm"
-              :color="props.row.enabled ? 'negative' : 'positive'"
-              round
-              flat
-              :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-              @click="toggleAlertState(props.row)"
-            />
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-update-alert`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.edit')"
-              @click="editAlert(props.row)"
-            ></q-btn>
-            <q-btn
-              icon="content_copy"
-              :title="t('alerts.clone')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="duplicateAlert(props.row)"
-              :data-test="`alert-list-${props.row.name}-clone-alert`"
-            ></q-btn>
-            <q-btn
-              :icon="outlinedDriveFileMove"
-              :title="t('alerts.move')"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click.stop="moveAlertToAnotherFolder(props.row)"
-              :data-test="`alert-list-${props.row.name}-clone-alert`"
-            ></q-btn>
-            <q-btn
-              :data-test="`alert-list-${props.row.name}-delete-alert`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.delete')"
-              @click="showDeleteDialogFn(props)"
-            ></q-btn>
-          </q-td>
-        </template>
 
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
@@ -258,11 +310,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template #bottom="scope">
-          <div class="bottom-btn">
-            
+        <template #bottom="scope" >
+          <div class="bottom-btn"> 
           <q-btn
             v-if="selected.length > 0"
+            data-test="alert-list-move-across-folders-btn"
             class="flex items-center move-btn"
             color="secondary"
             icon="folder"
@@ -427,6 +479,7 @@ import {
   outlinedPause,
   outlinedPlayArrow,
   outlinedDriveFileMove,
+  outlinedMoreVert,
 } from "@quasar/extras/material-icons-outlined";
 
 import FolderList from "../common/sidebar/FolderList.vue";
@@ -486,6 +539,14 @@ export default defineComponent({
     const alertStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
     const activeFolderId = ref("default");
     const showMoveAlertDialog = ref(false);
+    const expandedRow = ref("");
+    const triggerExpand = (props: any) => {
+      if (expandedRow.value === props.row.alert_id) {
+        expandedRow.value = null;
+      } else {
+        expandedRow.value = props.row.alert_id;
+      }
+    }
     const activeFolderToMove = ref("default");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -493,6 +554,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 40px",
       },
       {
         name: "name",
@@ -507,34 +569,23 @@ export default defineComponent({
         label: t("alerts.owner"),
         align: "center",
         sortable: true,
-      },
-      {
-        name: "conditions",
-        field: "conditions",
-        label: t("alerts.condition"),
-        align: "left",
-        sortable: false,
-      },
-      {
-        name: "description",
-        field: "description",
-        label: t("alerts.description"),
-        align: "center",
-        sortable: false,
+        style: "width: 150px",
       },
       {
         name: "last_triggered_at",
         field: "last_triggered_at",
         label: t("alerts.lastTriggered"),
-        align: "left",
+        align: "center",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "last_satisfied_at",
         field: "last_satisfied_at",
         label: t("alerts.lastSatisfied"),
-        align: "left",
+        align: "center",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "actions",
@@ -542,101 +593,20 @@ export default defineComponent({
         label: t("alerts.actions"),
         align: "center",
         sortable: false,
+        style: "width: 150px",
       },
     ]);
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
     const selected: Ref<any> = ref([]);
+    const allSelected = ref(false);
 
     const searchQuery = ref("");
     const filterQuery = ref("");
     const searchAcrossFolders = ref(false);
     const filteredResults: Ref<any[]> = ref([]);
     const selectedAlertToMove: Ref<any> = ref({});
-    const getAlerts = () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait while loading alerts...",
-      });
-      alertsService
-        .list(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
-        .then((res) => {
-          var counter = 1;
-          alerts.value = res.data.list.map((alert: any) => {
-            return {
-              ...alert,
-              uuid: getUUID(),
-            };
-          });
-          alertsRows.value = alerts.value.map((data: any) => {
-            let conditions = "--";
-            if (data.query_condition.conditions?.length) {
-              conditions = data.query_condition.conditions
-                .map((condition: any) => {
-                  return `${condition.column} ${condition.operator} ${condition.value}`;
-                })
-                .join(" AND ");
-            } else if (data.query_condition.sql) {
-              conditions = data.query_condition.sql;
-            } else if (data.query_condition.promql) {
-              conditions = data.query_condition.promql;
-            }
-            if (conditions.length > 50) {
-              conditions = conditions.substring(0, 32) + "...";
-            }
-            return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              alert_id: data.alert_id,
-              name: data.name,
-              alert_type: data.is_real_time ? "Real Time" : "Scheduled",
-              stream_name: data.stream_name ? data.stream_name : "--",
-              stream_type: data.stream_type,
-              enabled: data.enabled,
-              conditions: conditions,
-              description: data.description,
-              uuid: data.uuid,
-              owner: data.owner,
-              last_triggered_at: convertUnixToQuasarFormat(
-                data.last_triggered_at
-              ),
-              last_satisfied_at: convertUnixToQuasarFormat(
-                data.last_satisfied_at
-              ),
-            };
-          });
-
-          alertsRows.value.forEach((alert: AlertListItem) => {
-            alertStateLoadingMap.value[alert.uuid as string] = false;
-          });
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          if (router.currentRoute.value.query.action == "update") {
-            const alertName = router.currentRoute.value.query.name as string;
-            showAddUpdateFn({
-              row: getAlertByName(alertName),
-            });
-          }
-          dismiss();
-        })
-        .catch((e) => {
-          console.error(e);
-          dismiss();
-          $q.notify({
-            type: "negative",
-            message: "Error while pulling alerts.",
-            timeout: 2000,
-          });
-        });
-    };
     const getAlertsByFolderId = async (store: any, folderId: any) => {
         try {
           if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
@@ -668,7 +638,7 @@ export default defineComponent({
           folderId,
           query
         )
-        .then((res) => {
+        .then(async (res) => {
           var counter = 1;
           alerts.value = res.data.list.map((alert: any) => {
             return {
@@ -689,9 +659,6 @@ export default defineComponent({
             } else if (data.condition.promql) {
               conditions = data.condition.promql;
             }
-            if (conditions.length > 50) {
-              conditions = conditions.substring(0, 32) + "...";
-            }
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               alert_id: data.alert_id,
@@ -710,6 +677,8 @@ export default defineComponent({
               last_satisfied_at: convertUnixToQuasarFormat(
                 data.last_satisfied_at
               ),
+              selected: false,
+              type: data.condition.type
             };
           });
 
@@ -724,14 +693,15 @@ export default defineComponent({
           }else{
             filteredResults.value = alertsRows.value;
           }
-          console.log("alertsRows.value", store.state.organizationData.allAlertsListByFolderId['default']);
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
           }
           if (router.currentRoute.value.query.action == "update") {
             const alertId = router.currentRoute.value.query.alert_id as string;
-            showAddUpdateFn({
-              row: getAlertById(alertId),
+            const alert = await getAlertById(alertId);
+
+            showAddUpdateFn( {
+              row: alert,
             });
           }
           dismiss();
@@ -765,7 +735,6 @@ export default defineComponent({
        }
     };
     if (!alerts.value.length) {
-      // getAlerts();
       getAlertsByFolderId(store, activeFolderId.value);
     }
     onBeforeMount(async () => {
@@ -790,6 +759,8 @@ export default defineComponent({
       } else {
         activeFolderId.value = "default";
       }
+      getAlertsFn(store, activeFolderId.value);
+
     });
     watch(()=> activeFolderId.value, async (newVal)=>{
       if(searchAcrossFolders.value) {
@@ -954,7 +925,6 @@ export default defineComponent({
                 timeout: 2000,
               });
               showForm.value = false;
-              // getAlerts();
               getAlertsFn(store, activeFolderId.value);
             } else {
               $q.notify({
@@ -1012,7 +982,7 @@ export default defineComponent({
           query: {
             action: "update",
             name: props.row.name,
-            alert_id: props.row.alert_id,
+            alert_id: props.row.id,
             org_identifier: store.state.selectedOrganization.identifier,
             folder: activeFolderId.value,
           },
@@ -1029,7 +999,6 @@ export default defineComponent({
       }
     };
     const refreshList = () => {
-      // getAlerts();
       getAlertsFn(store, activeFolderId.value);
       hideForm();
     };
@@ -1042,51 +1011,6 @@ export default defineComponent({
           folder: activeFolderId.value,
         },
       });
-    };
-    const deleteAlert = () => {
-      alertsService
-        .delete(
-          store.state.selectedOrganization.identifier,
-          selectedDelete.value.stream_name,
-          selectedDelete.value.name,
-          selectedDelete.value.stream_type
-        )
-        .then((res: any) => {
-          if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
-              message: res.data.message,
-              timeout: 2000,
-            });
-            // getAlerts();
-            getAlertsByFolderId(store, activeFolderId.value);
-          } else {
-            $q.notify({
-              type: "negative",
-              message: res.data.message,
-              timeout: 2000,
-            });
-          }
-        })
-        .catch((err) => {
-          if(err.response?.status == 403){
-            return;
-          }
-          $q.notify({
-            type: "negative",
-            message: err?.data?.message || "Error while deleting alert.",
-            timeout: 2000,
-          });
-        });
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
-          button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          alert_name: selectedDelete.value.name,
-          page: "Alerts",
-        });
-      }
     };
     const deleteAlertByAlertId = () => {
       alertsService
@@ -1101,7 +1025,6 @@ export default defineComponent({
               message: res.data.message,
               timeout: 2000,
             });
-            // getAlerts();
             getAlertsFn(store, activeFolderId.value);
           } else {
             $q.notify({
@@ -1202,6 +1125,11 @@ export default defineComponent({
           alertsRows.value.forEach((alert) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
+          $q.notify({
+            type: "positive",
+            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
+            timeout: 2000,
+          });
         })
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
@@ -1230,21 +1158,23 @@ export default defineComponent({
 
     const editAlert = async (row: any) => {
       const selectedAlert = await getAlertById(row.alert_id);
-      console.log("selectedAlert", selectedAlert);
       showAddUpdateFn({ row: selectedAlert });
     }
 
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
-      selectedAlertToMove.value = row.alert_id;
+      selectedAlertToMove.value = [row.alert_id];
       activeFolderToMove.value = activeFolderId.value;
     }
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
-      
       await getAlertsFn(store, activeFolderId);
       await getAlertsFn(store, selectedFolderId);
       showMoveAlertDialog.value = false;
+      selectedAlertToMove.value = [];
+      activeFolderToMove.value = "";
+      selected.value = [];
+      allSelected.value = false;
     }
 
     const getSelectedString = () => {
@@ -1300,6 +1230,56 @@ export default defineComponent({
       return store.state.organizationData.allAlertsListByFolderId[activeFolderId.value] ?? [];
     });
 
+    const toggleAll = () => {
+      if (allSelected.value) {
+        // Select all rows
+        selected.value = [...alertsList.value];
+        alertsRows.value.forEach((alert: any) => {
+          alert.selected = true;
+        });
+      } else {
+        // Deselect all rows
+        selected.value = [];
+        alertsRows.value.forEach((alert: any) => {
+          alert.selected = false;
+        });
+      }
+    };
+
+    // Add watcher to update allSelected when selected items change
+    watch(selected, (newVal) => {
+      allSelected.value = newVal.length === alertsList.value.length && alertsList.value.length > 0;
+    });
+
+    const handleRowSelection = (row: any, isSelected: boolean) => {
+      row.selected = isSelected;
+      if (isSelected) {
+        selected.value = [...selected.value, row];
+      } else {
+        selected.value = selected.value.filter((item: any) => item.alert_id !== row.alert_id);
+      }
+    };
+
+    const  copyToClipboard = (text: string,type: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        $q.notify({
+            type: "positive",
+            message: `${type} Copied Successfully!`,
+            timeout: 5000,
+          });
+      }).catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Error while copy content.",
+            timeout: 5000,
+          });
+      });
+    }
+
+    const openMenu = (event: Event, row: any) => {
+      event.stopPropagation();
+    };
+
     return {
       t,
       qTable,
@@ -1313,14 +1293,12 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      getAlerts,
       pagination,
       resultTotal,
       refreshList,
       perPageOptions,
       selectedPerPage,
       addAlert,
-      deleteAlert,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
@@ -1405,6 +1383,14 @@ export default defineComponent({
       clearSearchHistory,
       filteredResults,
       alertsList,
+      expandedRow,
+      triggerExpand,
+      allSelected,
+      toggleAll,
+      handleRowSelection,
+      copyToClipboard,
+      openMenu,
+      outlinedMoreVert,
     };
   },
 });
@@ -1433,6 +1419,8 @@ export default defineComponent({
 .alert-list-table {
   th:last-child,
   td:last-child {
+    //the fixed width as we have moved some actions to the menu so lot of space is occupied by actions section so remvoed that 
+    padding: 10px  !important;
     position: sticky;
     right: 0;
     z-index: 1;
@@ -1485,5 +1473,27 @@ export default defineComponent({
 }
 .clone-alert-popup {
   width: 400px;
+}
+
+.expand-content {
+  padding: 0  3rem;
+  max-height: 100vh; /* Set a fixed height for the container */
+  overflow: hidden; /* Hide overflow by default */
+}
+
+.scroll-content {
+  width: 100%; /* Use the full width of the parent */
+  overflow-y: auto; /* Enable vertical scrolling for long content */
+  padding: 10px; /* Optional: padding for aesthetics */
+  border: 1px solid #ddd; /* Optional: border for visibility */
+  height: 100%;
+  max-height: 200px;
+   /* Use the full height of the parent */
+  text-wrap: normal;
+  background-color: #e8e8e8;
+  color: black;
+}
+.expanded-sql{
+  border-left: #7A54A2 3px solid;
 }
 </style>
