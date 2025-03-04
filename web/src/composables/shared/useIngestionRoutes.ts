@@ -73,6 +73,9 @@ import Jenkins from "@/components/ingestion/devops/Jenkins.vue";
 import Ansible from "@/components/ingestion/devops/Ansible.vue";
 import Terraform from "@/components/ingestion/devops/Terraform.vue";
 import GithubActions from "@/components/ingestion/devops/GithubActions.vue";
+
+import Networking from "@/components/ingestion/Networking.vue";
+import Netflow from "@/components/ingestion/networking/Netflow.vue";
 import path from "path";
 
 const useIngestionRoutes = () => {
@@ -525,6 +528,24 @@ const useIngestionRoutes = () => {
             },
           ],
         },
+        {
+          path: "networking",
+          name: "networking",
+          component: Networking,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "netflow",
+              name: "netflow",
+              component: Netflow,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
+        }
       ],
     },
   ];
