@@ -4,42 +4,55 @@ import uuid
 import pytest
 import requests
 import logging
-
+import os
 # # Setup logging
 # logger = logging.getLogger(__name__)
 
-def get_alertsnew(session, url, org):
-    resp_allalertsnew = session.get(f"{url}api/v2/{org}/alerts")
+# Constants for WebSocket URL and user credentials
+ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
+ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
+ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
+ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
+
+
+def get_alertsnew(session, base_url, org):
+    resp_allalertsnew = session.get(f"{base_url}api/v2/{org}/alerts")
     assert (
         resp_allalertsnew.status_code == 200
     ), f"Get all new alerts list 200, but got {resp_allalertsnew.status_code} {resp_allalertsnew.content}"
-    response_json = resp_allalertsnew.json()
-    # Check if "list" is in the response and proceed
-    assert "list" in response_json, "Response does not contain 'list'"
-    # Get the list of alerts from the response
-    alerts = response_json["list"]
-    # Now you can iterate over the alerts
-    for alert in alerts:
-        alert_id = alert.get("alert_id")
-        assert alert_id, f"Alert ID is missing for alert: {alert}"
-        return alerts
-    print(f"Extracted alert_id: {alert_id}")
     
+    response_json = resp_allalertsnew.json()
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    alerts = response_json["list"]
+    alert_ids = []
+
+    for alert in alerts:
+        alert_id = alert.get("alert_id")  # Changed to access 'alert_id'
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+        alert_ids.append(alert_id)
+    
+    return alert_ids
 
 
-def get_alert(session, url, org, alert_id):
-    resp_alert = session.get(f"{url}api/v2/{org}/alerts/{alert_id}")
+
+def get_alert(session, base_url, org, alert_id):
+    resp_alert = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
     assert (
         resp_alert.status_code == 200
     ), f"Get alert 200, but got {resp_alert.status_code} {resp_alert.content}"
     return resp_alert.json()    
 
-def delete_alert(session, url, org, alert_id):
-    resp_delete = session.delete(f"{url}api/v2/{org}/alerts/{alert_id}")
+def delete_alert(session, base_url, org, alert_id):
+    resp_delete = session.delete(f"{base_url}api/v2/{org}/alerts/{alert_id}")
     assert (
         resp_delete.status_code == 200
     ), f"Delete alert 200, but got {resp_delete.status_code} {resp_delete.content}"
-    return resp_delete.json()
+    
+    # Verify alert deletion
+    resp_verify = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
+    assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
+
 
 
 def create_folder(session, base_url, org, folder_name):
@@ -54,7 +67,7 @@ def create_template(session, base_url, org, template_name):
 
     payload = {
         "name": template_name,
-        "body": '{"text": "For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active"}',
+        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
         "type": "http",
         "title": ""
     }
@@ -144,7 +157,7 @@ def create_alert(session, base_url, org, folder_id, alert_name, template_name, s
     "trigger_condition": {
         "period": 10,
         "operator": ">=",
-        "frequency": 1,
+        "frequency": 3,
         "cron": "",
         "threshold": 3,
         "silence": 10,
@@ -163,12 +176,15 @@ def create_alert(session, base_url, org, folder_id, alert_name, template_name, s
     assert response.status_code == 200, f"Failed to create alert: {response.content}"
 
 def update_alert(session, base_url, org, alert_id, alert_name, template_name, stream_name, destination_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    headers = {
+        "Content-Type": "application/json",
+        "Custom-Header": "value"
+        }
 
     payload_alert_update = {
         "id": alert_id,
         "name": alert_name,
-        "org": org,
+        "org_id": org,
         "stream_type": "logs",
         "stream_name": stream_name,
         "is_real_time": False,
@@ -195,7 +211,7 @@ def update_alert(session, base_url, org, alert_id, alert_name, template_name, st
         "period": 10,
         "operator": ">=",
         "threshold": 3,
-        "frequency": 1,
+        "frequency": 3,
         "cron": "",
         "frequency_type": "minutes",
         "silence": 10,
@@ -292,7 +308,7 @@ def validate_trigger(session, base_url, org, alert_id):
     # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
     assert alert_data["last_triggered_at"] is not None, "Alert was not triggered"
     print(f"Alert data: {alert_data}")
-   
+    return alert_data   
 
 
     
@@ -306,8 +322,12 @@ def delete_alert(session, base_url, org, alert_id):
 
 def test_alert_workflow(create_session, base_url):
     session = create_session
-    stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+    stream_name = "default"
+    org = "default"
+
+    base_url = ZO_BASE_URL
+    base_url_sc = ZO_BASE_URL_SC
+    
     # Create folder
     folder_name = f"newfolder_{random.randint(1000, 9999)}"
 
@@ -321,20 +341,50 @@ def test_alert_workflow(create_session, base_url):
     destination_name = f"newdest_{random.randint(10000, 99999)}"
     create_destination(session, base_url, org, destination_name, template_name)
 
+    # Now create the alert
+    alert_name = f"newalert_{random.randint(1000, 9999)}"
+    create_alert(session, base_url, org, folder_id, alert_name, template_name, stream_name, destination_name)
+    time.sleep(5)
     # Ingest logs
     ingest_logs(session, base_url, org, stream_name)
 
-    # Create alert
-    alert_name = f"newalert_{random.randint(1000, 9999)}"
-    create_alert(session, base_url, org, folder_id, alert_name, template_name, destination_name)
-    alert_id = get_alert(session, base_url, org, alert_name)["id"]
-    time.sleep(5)
-    # Update alert
-    update_alert(session, base_url, org, alert_id, alert_name, template_name, stream_name, destination_name)
+    # Get alert IDs
+    alert_ids = get_alertsnew(session, base_url, org)
+    alert_ids_sc = get_alertsnew(session, base_url_sc, org)
 
-    # Delete alert
-    delete_alert(session, base_url, org, alert_id)
+    # Print the extracted alert IDs
+    for alert_id in alert_ids:
+        print(f"Extracted alert_id: {alert_id}")
 
-    # Verify alert deletion
-    resp_verify = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
+    for alert_id in alert_ids_sc:
+        print(f"Extracted alert_id from SC: {alert_id}")
+
+    # Example of using the first alert ID if needed
+    if alert_ids:
+        first_alert_id = alert_ids[0]  # Accessing the first alert ID
+        # Do something with first_alert_id if needed
+        print(f"First alert ID: {first_alert_id}")
+
+    # time.sleep(5)
+    # # Update alert
+    # update_alert(session, base_url_sc, org, first_alert_id, alert_name, template_name, stream_name, destination_name)
+
+
+
+
+
+
+
+    
+
+    # # Trigger alert
+    # alertnew_trigger(session, base_url, org, alert_id, caplog)
+
+    # time.sleep(5)
+    # # Update alert
+    # update_alert(session, base_url, org, alert_id, alert_name, template_name, stream_name, destination_name)
+
+    # # # Delete alert
+    # # delete_alert(session, base_url, org, alert_id)
+
+    
