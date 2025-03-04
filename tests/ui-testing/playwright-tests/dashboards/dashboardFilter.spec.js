@@ -148,7 +148,8 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.getByText("Operatorarrow_drop_down").click();
+    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
@@ -303,7 +304,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.getByText("Operatorarrow_drop_down").click();
+      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
@@ -320,7 +321,8 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-add-condition-condition-1"]')
       .click();
 
-    await page.getByText("Operatorarrow_drop_down").click();
+    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+
 
     await page
       .getByRole("option", { name: "<>" })
@@ -521,14 +523,16 @@ test.describe("dashboard filter testcases", () => {
       .click({ force: true });
     console.log("After click");
 
-    await page.getByText("Filters on Fieldarrow_drop_down").click();
+    await page.locator('[data-test="dashboard-add-condition-column-1\\}"]').click();
+
     await page
       .getByRole("option", { name: "kubernetes_container_name" })
       .click();
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.getByText("Operatorarrow_drop_down").click();
+    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
@@ -544,15 +548,15 @@ test.describe("dashboard filter testcases", () => {
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
 
-    await page.getByText("Filters on Fieldarrow_drop_down").click();
-    await page
+      await page.locator('[data-test="dashboard-add-condition-column-1\\}"]').click();
+      await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .click();
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.getByText("Operatorarrow_drop_down").click();
-    await page
+      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+      await page
       .getByRole("option", { name: "<>" })
       .locator("div")
       .nth(2)
@@ -578,7 +582,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
+    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
      // Delete dashbaord 
@@ -740,7 +744,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').click();
-    await page.locator('[data-test="dashboard-panel-name"]').fill("test");
+    await page.locator('[data-test="dashboard-panel-name"]').fill("Dashbaord_test");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
      // Delete dashbaord 
@@ -1118,8 +1122,8 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.getByText("Operatorarrow_drop_down").click();
-    await page.getByText("=", { exact: true }).click();
+      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+      await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
     await page.locator('[data-test="dashboard-apply"]').click();
