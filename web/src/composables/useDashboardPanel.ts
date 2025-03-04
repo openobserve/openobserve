@@ -384,7 +384,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         );
       case "area-stacked":
       case "heatmap":
-      case "h-stacked":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex

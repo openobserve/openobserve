@@ -1358,8 +1358,8 @@ export const convertSQLData = async (
               // Add stack property for stacked charts
               const updatedSeriesConfig = {
                 ...seriesConfig,
-                // Only add stack property for stacked chart types
-                ...(panelSchema.type === "stacked" && {
+                // Only add stack property for stacked or h-stacked chart types
+                ...(["stacked", "h-stacked"].includes(panelSchema.type) && {
                   stack: `stack-${index}`,
                 }),
               };

@@ -584,7 +584,8 @@ export const validateSQLPanelFields = (
 
       break;
     }
-    case "stacked": {
+    case "stacked":
+    case "h-stacked": {
       if (panelData.queries[queryIndex].fields.y.length == 0) {
         errors.push("Add at least one field for the Y-Axis");
       }
@@ -593,21 +594,18 @@ export const validateSQLPanelFields = (
         panelData.queries[queryIndex].fields.breakdown.length != 1
       ) {
         errors.push(
-          `Add exactly one fields on the X-Axis and breakdown for stacked chart`,
+          `Add exactly one fields on the X-Axis and breakdown for stacked and h-stacked charts`,
         );
       }
 
       break;
     }
-    case "area-stacked":
-    case "h-stacked": {
+    case "area-stacked": {
       if (
         panelData.queries[queryIndex].fields.y.length > 1 ||
         panelData.queries[queryIndex].fields.y.length == 0
       ) {
-        errors.push(
-          "Add exactly one field on Y-Axis for stacked and h-stacked charts",
-        );
+        errors.push("Add exactly one field on Y-Axis for area-stacked charts");
       }
       if (
         panelData.queries[queryIndex].fields.x.length != 1 ||
