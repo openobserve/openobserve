@@ -6,13 +6,14 @@ mod message;
 mod pool;
 mod session;
 mod types;
+mod utils;
 
 use std::sync::Arc;
 
 pub use config::WsConfig;
 pub use error::WsResult;
 pub use handler::WsHandler;
-pub use message::RouterMessageBus;
+pub use message::RouterWsManager;
 pub use pool::QuerierConnectionPool;
 pub use session::RouterSessionManager;
 
@@ -21,7 +22,7 @@ pub async fn init() -> WsResult<Arc<WsHandler>> {
     let session_manager = Arc::new(RouterSessionManager::new());
     let connection_pool = Arc::new(QuerierConnectionPool::new(config.clone()));
 
-    let message_bus = Arc::new(RouterMessageBus::new(
+    let message_bus = Arc::new(RouterWsManager::new(
         session_manager,
         connection_pool.clone(),
     ));

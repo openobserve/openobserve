@@ -372,4 +372,8 @@ impl WsServerEvents {
             },
         }
     }
+
+    pub fn from_json(value: serde_json::Value) -> serde_json::Result<Self> {
+        serde_json::from_value(value)
+    }
 }

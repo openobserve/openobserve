@@ -93,6 +93,39 @@ impl Message {
             _ => None,
         }
     }
+
+    pub fn from_server_event_actix_msg(msg: actix_ws::Message) -> Option<Self> {
+        let payload = match msg {
+            actix_ws::Message::Text(text) => serde_json::from_str::<serde_json::Value>(&text).unwrap_or_default(),
+            actix_ws::Message::Binary(bytes) => serde_json::from_slice::<serde_json::Value>(&bytes).unwrap_or_default(),
+            _ => return None,
+        };
+        
+        if let Ok(event) = WsServerEvents::from_json(payload.clone()) {
+            let message = match event {
+                WsServerEvents::SearchResponse {
+                    trace_id,
+                    results,
+                    time_offset,
+                    streaming_aggs,
+                } => Message::new(trace_id, MessageType::SearchResponse, payload),
+                // FIXME: `trace_id` is optional for Error and End fix or redesign it
+                WsServerEvents::Error {
+                    code,
+                    message,
+                    error_detail,
+                    trace_id,
+                    request_id,
+                } => Message::new(trace_id.unwrap_or_default(), MessageType::Error, payload),
+                WsServerEvents::End { trace_id } => {
+                    Message::new(trace_id.unwrap_or_default(), MessageType::End, payload)
+                }
+            };
+            Some(message)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

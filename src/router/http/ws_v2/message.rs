@@ -1,18 +1,19 @@
 use std::sync::Arc;
 
+use actix_web::rt;
 use config::meta::cluster::RoleGroup;
 use dashmap::DashMap;
 use tokio::sync::mpsc;
 
 use super::{connection::Connection, error::*, pool::*, session::*, types::*};
 
-pub struct RouterMessageBus {
+pub struct RouterWsManager {
     pub session_manager: Arc<RouterSessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
     pub client_channels: DashMap<SessionId, mpsc::Sender<Message>>,
 }
 
-impl RouterMessageBus {
+impl RouterWsManager {
     pub fn new(
         session_manager: Arc<RouterSessionManager>,
         connection_pool: Arc<QuerierConnectionPool>,
@@ -38,16 +39,18 @@ impl RouterMessageBus {
         Ok(())
     }
 
-    pub async fn start(&self) {
-        // needs 2 tasks
-
-        // 'stream' from connect_async -> split to sink, stream
-        // sink forward_to_querier
-        
-        
-        // backward to router
-        // stream listens from querier
-        
+    // The Manager will need to start all the connections as tasks between the client and querier
+    // and the querier and router and handle the messages between them
+    pub async fn start(&self) -> WsResult<()> {
+        // Start all router to querier connections
+        for conn in self.connection_pool.connections.iter() {
+            let conn = Arc::clone(conn.value());
+            let mut sender = self.client_channels.get(&conn.get_name()).unwrap().clone();
+            rt::spawn(async move {
+                conn.receive_messages(&mut sender).await;
+            });
+        }
+        Ok(())
     }
 
     pub async fn forward_to_querier(

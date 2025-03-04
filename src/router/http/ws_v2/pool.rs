@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use actix_web::rt;
 use dashmap::DashMap;
 use tokio::sync::Mutex;
 
@@ -12,8 +13,8 @@ use super::{
 use crate::common::infra::cluster;
 
 pub struct QuerierConnectionPool {
-    connections: DashMap<QuerierName, Arc<QuerierConnection>>,
-    config: WsConfig,
+    pub connections: DashMap<QuerierName, Arc<QuerierConnection>>,
+    pub config: WsConfig,
 }
 
 impl QuerierConnectionPool {

@@ -7,11 +7,11 @@ use serde_json::json;
 use super::{error::*, message::*, types::*};
 
 pub struct WsHandler {
-    message_bus: Arc<RouterMessageBus>,
+    message_bus: Arc<RouterWsManager>,
 }
 
 impl WsHandler {
-    pub fn new(message_bus: Arc<RouterMessageBus>) -> Self {
+    pub fn new(message_bus: Arc<RouterWsManager>) -> Self {
         Self { message_bus }
     }
 
@@ -56,6 +56,8 @@ impl WsHandler {
                                 {
                                     log::error!("Error forwarding message: {}", e);
                                 }
+                            } else {
+                                log::error!("Invalid message: {}", text);
                             }
                         }
                         Ok(actix_ws::Message::Close(_)) => break,

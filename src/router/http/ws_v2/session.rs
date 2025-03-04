@@ -56,7 +56,7 @@ impl RouterSessionManager {
 
     pub async fn update_session_activity(&self, session_id: &SessionId) -> WsResult<()> {
         if let Some(mut session) = self.sessions.get_mut(session_id) {
-            session.last_active = chrono::Utc::now();
+            session.last_active = chrono::Utc::timestamp_micros();
         }
         Ok(())
     }
