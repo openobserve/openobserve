@@ -57,10 +57,10 @@ impl MetricsService for MetricsIngester {
             // metrics
             let time = start.elapsed().as_secs_f64();
             metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .with_label_values(&["/otlp/v1/metrics", "200", "", ""])
                 .observe(time);
             metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/otlp/v1/metrics", "200", "", "", ""])
+                .with_label_values(&["/otlp/v1/metrics", "200", "", ""])
                 .inc();
             return Ok(Response::new(ExportMetricsServiceResponse {
                 partial_success: None,

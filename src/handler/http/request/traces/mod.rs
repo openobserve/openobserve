@@ -320,7 +320,6 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
                 ])
                 .observe(time);
@@ -329,7 +328,6 @@ pub async fn get_latest_traces(
                     "/api/org/traces/latest",
                     "500",
                     &org_id,
-                    "default",
                     stream_type.as_str(),
                 ])
                 .inc();
@@ -411,7 +409,6 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
                     ])
                     .observe(time);
@@ -420,7 +417,6 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        &stream_name,
                         stream_type.as_str(),
                     ])
                     .inc();
@@ -504,7 +500,6 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
         ])
         .observe(time);
@@ -513,7 +508,6 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            &stream_name,
             stream_type.as_str(),
         ])
         .inc();
