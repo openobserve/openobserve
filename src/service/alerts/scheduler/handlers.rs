@@ -931,7 +931,7 @@ async fn handle_derived_stream_triggers(
                 let is_satisfied = trigger_results
                     .data
                     .as_ref()
-                    .map_or(false, |ret| !ret.is_empty());
+                    .is_some_and(|ret| !ret.is_empty());
 
                 // ingest evaluation result into destination
                 if is_satisfied {
