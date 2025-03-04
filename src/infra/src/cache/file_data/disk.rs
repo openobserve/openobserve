@@ -39,6 +39,7 @@ use tokio::sync::RwLock;
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
 
+// parquet cache
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -48,7 +49,7 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
-// read only
+// read only parquet cache
 static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
@@ -460,7 +461,11 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     if !get_config().disk_cache.enabled {
         return Ok(());
     }
+
+    // hash the file name and get the bucket index
     let idx = get_bucket_idx(file);
+
+    // get all the files from the bucket
     let mut files = if file.starts_with("files") {
         FILES[idx].write().await
     } else {
@@ -515,6 +520,17 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         log::error!("load disk cache error: {}", e);
                     }
                 } else {
+                    // check file is tmp file
+                    if fp.extension().is_some_and(|ext| ext == "tmp") {
+                        log::debug!(
+                            "Removing temporary file during cache load: {}",
+                            fp.display()
+                        );
+                        if let Err(e) = tokio::fs::remove_file(&fp).await {
+                            log::warn!("Failed to remove tmp file: {}, error: {}", fp.display(), e);
+                        }
+                        continue;
+                    }
                     let meta = match get_file_meta(&fp) {
                         Ok(m) => m,
                         Err(e) => {
@@ -611,6 +627,7 @@ async fn gc() -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         return Ok(());
     }
+
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
@@ -727,7 +744,7 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = dbg!(file_data.set(trace_id, &file_key, content.clone()).await);
             assert!(resp.is_ok());
         }
     }
@@ -787,7 +804,7 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let resp = dbg!(file_data.set(trace_id, &file_key, content.clone()).await);
             assert!(resp.is_ok());
         }
     }

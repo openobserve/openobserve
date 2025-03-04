@@ -220,12 +220,7 @@ impl From<TemplateError> for Error {
 
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"{{"error_code": {}, "error_msg": "{}"}}"#,
-            self.get_code(),
-            self.get_message()
-        )
+        write!(f, "{}", self.to_json())
     }
 }
 
