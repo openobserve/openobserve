@@ -509,10 +509,11 @@ pub async fn handle_otlp_request(
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(val_map), (None, alert_end_time)).await
-                        {
-                            trigger_alerts.push((alert.clone(), v));
+                        match alert.evaluate(Some(val_map), (None, alert_end_time)).await {
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));
