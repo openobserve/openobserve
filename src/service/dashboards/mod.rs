@@ -102,6 +102,10 @@ pub enum DashboardError {
     #[error("error in updating distinct values")]
     DistinctValueError,
 
+    /// Error that occurs when the user making the api call is not found.
+    #[error("user not found")]
+    UserNotFound,
+
     /// Error that occurs when trying to get the list of dashboards that a user is permitted to
     /// get.
     #[error(transparent)]
@@ -369,8 +373,9 @@ pub async fn list_dashboards(
     params: ListDashboardsParams,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     let org_id = params.org_id.clone();
+    let folder_id = params.folder_id.clone();
     let dashboards = table::dashboards::list(params).await?;
-    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards).await?;
+    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards, folder_id).await?;
     Ok(dashboards)
 }
 
@@ -537,6 +542,7 @@ async fn filter_permitted_dashboards(
     _org_id: &str,
     _user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,
+    _folder_id: Option<String>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     Ok(dashboards)
 }
@@ -547,11 +553,53 @@ async fn filter_permitted_dashboards(
     org_id: &str,
     user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,
+    folder_id: Option<String>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    // This function assumes the user already has `LIST` permission on the folder.
+    // Otherwise, the user will not be able to see the folder in the first place.
+
+    // So, we check for the `GET` permission on the folder.
+    // If the user has `GET` permission on the folder, then they will be able to see the folder and
+    // all its contents. This includes the dashboards inside the folder.
+
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+
+    if let Some(folder_id) = folder_id {
+        let user_role = match get_user(Some(org_id), user_id).await {
+            Ok(Some(user)) => user.role,
+            _ => return Err(DashboardError::UserNotFound),
+        };
+        let permitted = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                org_id: org_id.to_string(),
+                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key,),
+                method: "GET".to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                auth: "".to_string(), // We don't need to pass the auth token here.
+            },
+            user_role,
+            false,
+        )
+        .await;
+        if permitted {
+            // The user has `GET` permission on the folder.
+            // So, they will be able to see all the dashboards inside the folder.
+            return Ok(dashboards);
+        }
+    }
+
+    // We also check for the `GET_INDIVIDUAL` permission on the dashboards.
+    // If the user has `GET_INDIVIDUAL` permission on a dashboard, then they will be able to see the
+    // dashboard. This is used to check if the user has permission to see a specific dashboard.
+
     let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
         org_id,
         user_id,
-        "GET",
+        "GET_INDIVIDUAL",
         "dashboard",
     )
     .await
