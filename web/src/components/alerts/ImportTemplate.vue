@@ -592,7 +592,7 @@ export default defineComponent({
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
         q.notify({
-          message: `Successfully imported ${successCount} template${successCount > 1 ? 's' : ''}`,
+          message: `Successfully imported template(s)`,
           color: "positive",
           position: "bottom",
           timeout: 2000,
