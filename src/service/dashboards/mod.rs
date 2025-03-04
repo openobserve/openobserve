@@ -562,7 +562,7 @@ async fn filter_permitted_dashboards(
     // If the user has `GET` permission on the folder, then they will be able to see the folder and
     // all its contents. This includes the dashboards inside the folder.
 
-    use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+    use o2_openfga::meta::mapping::OFGA_MODELS;
 
     use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
 

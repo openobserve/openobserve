@@ -271,7 +271,7 @@ async fn permitted_folders(
     org_id: &str,
     user_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, FolderError> {
-    use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+    use o2_openfga::meta::mapping::OFGA_MODELS;
     let folder_ofga_model = OFGA_MODELS.get("folders").unwrap().key;
 
     let Some(user_id) = user_id else {
