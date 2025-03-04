@@ -361,19 +361,6 @@ pub async fn merge_by_stream(
         .timestamp_micros();
 
     let cfg = get_config();
-    // check offset
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
 
     // get current hour(day) all files
     let (partition_offset_start, partition_offset_end) =
@@ -595,9 +582,6 @@ pub async fn merge_by_stream(
     metrics::COMPACT_USED_TIME
         .with_label_values(&[org_id, stream_type.to_string().as_str()])
         .inc_by(time);
-    metrics::COMPACT_DELAY_HOURS
-        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .set((time_now_hour - offset_time_hour) / hour_micros(1));
 
     Ok(())
 }
