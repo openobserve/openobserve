@@ -938,6 +938,12 @@ export default defineComponent({
       if(!input.hasOwnProperty('context_attributes')){
         input.context_attributes = {};
       }
+      if(!input.trigger_condition.hasOwnProperty('timezone') || input.trigger_condition.timezone === ""){
+        input.trigger_condition.timezone = "UTC";
+      }
+      if(!input.trigger_condition.hasOwnProperty('tolerance_in_secs') && input.trigger_condition.tolerance_in_secs === ""){
+      input.trigger_condition.tolerance_in_secs = null;
+      }
       try {
         await alertsService.create(
           store.state.selectedOrganization.identifier,
