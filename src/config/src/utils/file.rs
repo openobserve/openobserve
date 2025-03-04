@@ -70,8 +70,18 @@ pub fn get_file_contents(
 
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
-    let mut file = File::create(file)?;
-    file.write_all(contents)
+    // Create a temporary file in the same directory
+    let temp_file = format!("{}.tmp", file);
+
+    // Write to temporary file first
+    let mut file_handle = File::create(&temp_file)?;
+    file_handle.write_all(contents)?;
+
+    // Atomically rename the temp file to the target file
+    // This ensures we either have the old file or the new file, never a partially written file
+    std::fs::rename(temp_file, file)?;
+
+    Ok(())
 }
 
 #[inline(always)]
