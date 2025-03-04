@@ -21,6 +21,7 @@ use config::{
         stream::{DistinctField, StreamType},
     },
 };
+use futures::future::join_all;
 use hashbrown::HashMap;
 use infra::table::{
     self,
@@ -101,6 +102,10 @@ pub enum DashboardError {
     /// dashboard variables
     #[error("error in updating distinct values")]
     DistinctValueError,
+
+    /// Error that occurs when the user making the api call is not found.
+    #[error("user not found")]
+    UserNotFound,
 
     /// Error that occurs when trying to get the list of dashboards that a user is permitted to
     /// get.
@@ -369,8 +374,9 @@ pub async fn list_dashboards(
     params: ListDashboardsParams,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     let org_id = params.org_id.clone();
+    let folder_id = params.folder_id.clone();
     let dashboards = table::dashboards::list(params).await?;
-    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards).await?;
+    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards, folder_id).await?;
     Ok(dashboards)
 }
 
@@ -418,43 +424,34 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
 pub async fn move_dashboard(
     org_id: &str,
     dashboard_id: &str,
-    from_folder: &str,
     to_folder: &str,
 ) -> Result<(), DashboardError> {
-    if from_folder.is_empty() || to_folder.is_empty() {
-        return Err(DashboardError::MoveMissingFolderParam);
-    };
-
-    let Some(dashboard) =
-        table::dashboards::get_from_folder(org_id, from_folder, dashboard_id).await?
-    else {
-        return Err(DashboardError::DashboardNotFound);
-    };
-
-    // make sure the destination folder exists
     if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
-    // update the dashboard so that it's parent folder is the destination folder
-    put(
+    let (curr_folder, dashboard) = table::dashboards::get_by_id(org_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
+    let hash = dashboard.hash.clone();
+    let _updated_dashboard = put(
         org_id,
         dashboard_id,
-        from_folder,
+        &curr_folder.folder_id,
         Some(to_folder),
-        dashboard.clone(),
-        Some(&dashboard.hash),
+        dashboard,
+        Some(&hash),
     )
     .await?;
-    // OFGA ownership
+
     #[cfg(feature = "enterprise")]
     {
         if get_o2_config().super_cluster.enabled {
             let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put_v2(
                 org_id,
-                from_folder,
+                &curr_folder.folder_id,
                 Some(to_folder),
-                dashboard,
+                _updated_dashboard,
             )
             .await;
         }
@@ -469,12 +466,34 @@ pub async fn move_dashboard(
             remove_parent_relation(
                 dashboard_id,
                 &get_ofga_type("dashboards"),
-                from_folder,
+                &curr_folder.folder_id,
                 &get_ofga_type("folders"),
             )
             .await;
         }
     }
+
+    Ok(())
+}
+
+#[tracing::instrument]
+pub async fn move_dashboards(
+    org_id: &str,
+    dashboard_ids: &[String],
+    to_folder: &str,
+) -> Result<(), DashboardError> {
+    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
+        return Err(DashboardError::MoveDestinationFolderNotFound);
+    };
+
+    let futs = dashboard_ids
+        .iter()
+        .map(|d_id| move_dashboard(org_id, d_id, to_folder));
+    let _ = join_all(futs)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(())
 }
 
@@ -537,6 +556,7 @@ async fn filter_permitted_dashboards(
     _org_id: &str,
     _user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,
+    _folder_id: Option<String>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     Ok(dashboards)
 }
@@ -547,11 +567,53 @@ async fn filter_permitted_dashboards(
     org_id: &str,
     user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,
+    folder_id: Option<String>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    // This function assumes the user already has `LIST` permission on the folder.
+    // Otherwise, the user will not be able to see the folder in the first place.
+
+    // So, we check for the `GET` permission on the folder.
+    // If the user has `GET` permission on the folder, then they will be able to see the folder and
+    // all its contents. This includes the dashboards inside the folder.
+
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+
+    if let Some(folder_id) = folder_id {
+        let user_role = match get_user(Some(org_id), user_id).await {
+            Ok(Some(user)) => user.role,
+            _ => return Err(DashboardError::UserNotFound),
+        };
+        let permitted = crate::handler::http::auth::validator::check_permissions(
+            user_id,
+            AuthExtractor {
+                org_id: org_id.to_string(),
+                o2_type: format!("{}:{folder_id}", OFGA_MODELS.get("folders").unwrap().key,),
+                method: "GET".to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                auth: "".to_string(), // We don't need to pass the auth token here.
+            },
+            user_role,
+            false,
+        )
+        .await;
+        if permitted {
+            // The user has `GET` permission on the folder.
+            // So, they will be able to see all the dashboards inside the folder.
+            return Ok(dashboards);
+        }
+    }
+
+    // We also check for the `GET_INDIVIDUAL` permission on the dashboards.
+    // If the user has `GET_INDIVIDUAL` permission on a dashboard, then they will be able to see the
+    // dashboard. This is used to check if the user has permission to see a specific dashboard.
+
     let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
         org_id,
         user_id,
-        "GET",
+        "GET_INDIVIDUAL",
         "dashboard",
     )
     .await

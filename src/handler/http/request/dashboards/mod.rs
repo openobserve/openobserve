@@ -15,14 +15,14 @@
 
 use std::collections::HashMap;
 
-use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::dashboards::{
         CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
         ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
-        UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        MoveDashboardsRequestBody, UpdateDashboardRequestBody, UpdateDashboardResponseBody,
     },
     service::dashboards::{self, DashboardError},
 };
@@ -63,6 +63,7 @@ impl From<DashboardError> for HttpResponse {
                 ))
             }
             DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
+            DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
         }
     }
 }
@@ -280,12 +281,50 @@ async fn move_dashboard(
     req_body: web::Json<MoveDashboardRequestBody>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.from, &req_body.to).await {
+    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.to).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard moved".to_string(),
         )),
         Err(err) => err.into(),
+    }
+}
+
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "MoveDashboards",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[patch("/{org_id}/dashboards/move")]
+async fn move_dashboards(
+    path: web::Path<String>,
+    req_body: web::Json<MoveDashboardsRequestBody>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    match dashboards::move_dashboards(&org_id, &req_body.dashboard_ids, &req_body.dst_folder_id)
+        .await
+    {
+        Ok(_) => {
+            let message = if req_body.dashboard_ids.len() == 1 {
+                "Dashboard moved"
+            } else {
+                "Dashboards moved"
+            };
+            MetaHttpResponse::ok(message)
+        }
+        Err(e) => e.into(),
     }
 }
 

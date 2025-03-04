@@ -242,6 +242,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             delay_in_secs: None,
             evaluation_took_in_secs: None,
             source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
