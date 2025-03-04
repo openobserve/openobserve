@@ -1,10 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
-use tokio::{net::TcpStream, sync::Mutex};
+use config::utils::json;
+use futures_util::{SinkExt, StreamExt, stream::SplitSink};
+use tokio::{
+    net::TcpStream,
+    sync::{Mutex, mpsc::Sender},
+};
 use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, connect_async, tungstenite::protocol::Message as WsMessage,
+    MaybeTlsStream, WebSocketStream, connect_async,
+    tungstenite::{self, protocol::Message as WsMessage},
 };
 
 use crate::router::http::ws_v2::{error::*, types::*};
@@ -18,33 +23,87 @@ pub trait Connection: Send + Sync {
     async fn send_message(&self, message: Message) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
     async fn receive_message(&self) -> WsResult<Option<Message>>;
-    fn get_name(&self) -> &QuerierName;
 }
 
 pub struct QuerierConnection {
-    name: QuerierName,
-    stream: Arc<Mutex<Option<WsStreamType>>>,
-    url: String,
-    last_active: std::sync::atomic::AtomicI64,
+    pub querier_name: QuerierName,
+    pub write: Arc<Mutex<SplitSink<WsStreamType, tungstenite::protocol::Message>>>,
+    pub last_active: std::sync::atomic::AtomicI64,
 }
 
 impl QuerierConnection {
-    pub async fn new(name: QuerierName, url: String) -> WsResult<Self> {
+    pub async fn establish_connection(
+        querier_name: QuerierName,
+        url: String,
+        response_tx: Sender<Message>,
+    ) -> WsResult<Arc<Self>> {
+        let (ws_stream, response) = connect_async(&url)
+            .await
+            .map_err(|e| WsError::ConnectionError(e.to_string()))?;
+
+        let (write, mut read) = ws_stream.split();
+
+        // Spawn task for listening to querier
+        // TODO: maybe this handler needs to be included in struct and waited?
+        let listen_handler = tokio::spawn(async move {
+            while let Some(msg) = read.next().await {
+                match msg {
+                    Ok(msg) => {
+                        // forward back to thread that's handling conn between router and client
+                        // directly forwarding the same `Message` type. client handles the parse
+                        response_tx.send(msg.into());
+                    }
+                    Err(e) => {
+                        // TODO: error handling
+                    }
+                }
+            }
+        });
+
         let conn = Self {
-            name,
-            stream: Arc::new(Mutex::new(None)),
-            url,
+            querier_name,
+            write: Arc::new(Mutex::new(write)),
             last_active: std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),
         };
         conn.connect().await?;
-        Ok(conn)
+
+        Ok(Arc::new(conn))
     }
+
+    // pub async fn new(querier_name: QuerierName, url: String) -> WsResult<Self> {
+    //     let conn = Self {
+    //         querier_name,
+    //         stream: Arc::new(Mutex::new(None)),
+    //         last_active:
+    // std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),     };
+    //     conn.connect().await?;
+    //     Ok(conn)
+    // }
 
     fn update_last_active(&self) {
         self.last_active.store(
             chrono::Utc::now().timestamp_micros(),
             std::sync::atomic::Ordering::SeqCst,
         );
+    }
+}
+
+// need protocol exchange from our Message -> tungstenite::protocol::Message
+impl From<Message> for tungstenite::protocol::Message {
+    fn from(value: Message) -> Self {
+        tungstenite::protocol::Message::Text("TODO".to_string());
+        todo!("protocol exchange needed")
+    }
+}
+
+impl From<tungstenite::protocol::Message> for Message {
+    fn from(value: tungstenite::protocol::Message) -> Self {
+        Message::new(
+            "trace_id".to_string(),
+            MessageType::SearchResponse,
+            json::Value::default(),
+        );
+        todo!("protocol exchange needed")
     }
 }
 
@@ -56,6 +115,7 @@ impl Connection for QuerierConnection {
             let (ws_stream, _) = connect_async(&self.url)
                 .await
                 .map_err(|e| WsError::ConnectionError(e.to_string()))?;
+            let (write, read) = ws_stream.split();
             *stream_guard = Some(ws_stream);
         }
         Ok(())
@@ -96,9 +156,9 @@ impl Connection for QuerierConnection {
         stream_guard.is_some()
     }
 
-    fn get_name(&self) -> &QuerierName {
-        &self.name
-    }
+    // fn get_name(&self) -> &QuerierName {
+    //     &self.name
+    // }
 
     async fn receive_message(&self) -> WsResult<Option<Message>> {
         let mut stream_guard = self.stream.lock().await;

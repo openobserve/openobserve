@@ -7,14 +7,14 @@ use tokio::sync::mpsc;
 use super::{connection::Connection, error::*, pool::*, session::*, types::*};
 
 pub struct RouterMessageBus {
-    pub session_manager: Arc<RouterSessionManager>,
+    pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
     pub client_channels: DashMap<SessionId, mpsc::Sender<Message>>,
 }
 
 impl RouterMessageBus {
     pub fn new(
-        session_manager: Arc<RouterSessionManager>,
+        session_manager: Arc<SessionManager>,
         connection_pool: Arc<QuerierConnectionPool>,
     ) -> Self {
         Self {
@@ -43,53 +43,46 @@ impl RouterMessageBus {
 
         // 'stream' from connect_async -> split to sink, stream
         // sink forward_to_querier
-        
-        
+
         // backward to router
         // stream listens from querier
-        
     }
 
-    pub async fn forward_to_querier(
-        &self,
-        session_id: &SessionId,
-        message: Message,
-    ) -> WsResult<()> {
-        let start = std::time::Instant::now();
+    pub async fn forward_to_querier(&self, client_id: &ClientId, message: Message) -> WsResult<()> {
+        // let start = std::time::Instant::now();
 
-        // Get session info
-        let _session = self
-            .session_manager
-            .get_session(session_id)
-            .await
-            .ok_or_else(|| WsError::SessionError("Session not found".into()))?;
+        // // Get session info
+        // let _session = self.session_manager.get_or_create_session(&client_id).await;
 
-        // Get or assign querier for this trace
-        let querier_name = if let Some(querier_name) = self
-            .session_manager
-            .get_querier_for_trace(session_id, &message.trace_id)
-            .await?
-        {
-            querier_name
-        } else {
-            let node_group = if let MessageType::Search(search_req) = &message.message_type {
-                Some(RoleGroup::from(search_req.search_type.clone()))
-            } else {
-                None
-            };
-            // Use consistent hashing to select querier
-            let querier_name = self.select_querier(&message.trace_id, node_group).await?;
-            self.session_manager
-                .set_querier_for_trace(session_id, message.trace_id.clone(), querier_name.clone())
-                .await?;
-            querier_name
-        };
+        // // Get or assign querier for this trace
+        // let querier_name = if let Some(querier_name) = self
+        //     .session_manager
+        //     .get_querier_for_trace(session_id, &message.trace_id)
+        //     .await?
+        // {
+        //     querier_name
+        // } else {
+        //     let node_group = if let MessageType::Search(search_req) = &message.message_type {
+        //         Some(RoleGroup::from(search_req.search_type.clone()))
+        //     } else {
+        //         None
+        //     };
+        //     // Use consistent hashing to select querier
+        //     let querier_name = self.select_querier(&message.trace_id, node_group).await?;
+        //     self.session_manager
+        //         .set_querier_for_trace(session_id, message.trace_id.clone(),
+        // querier_name.clone())         .await?;
+        //     querier_name
+        // };
 
-        // Get connection to querier
-        let conn = self.connection_pool.get_connection(&querier_name).await?;
+        // // Get connection to querier
+        // let conn = self.connection_pool.get_connection(&querier_name).await?;
 
-        // Send message
-        conn.send_message(message).await?;
+        // // once we get the connection back, we need to start listening to the querier
+        // // and forward back to router
+
+        // // Send message
+        // conn.send_message(message).await?;
 
         Ok(())
     }
