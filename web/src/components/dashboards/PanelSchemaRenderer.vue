@@ -1652,14 +1652,22 @@ export default defineComponent({
             return;
           }
 
-          // Get column headers from first data object
-          const headers = Object.keys(chartData?.[0]);
+          // Collect all possible keys from all objects
+          const allKeys = new Set();
+          chartData?.forEach((row: any) => {
+            Object.keys(row).forEach((key) => allKeys.add(key));
+          });
+
+          // Convert Set to Array and sort for consistent order
+          const headers = Array.from(allKeys).sort();
 
           // Create CSV content with headers and data rows
           const content = [
             headers?.join(","), // Headers row
             ...chartData?.map((row: any) =>
-              headers?.map((header) => wrapCsvValue(row[header])).join(","),
+              headers
+                ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                .join(","),
             ),
           ].join("\r\n");
 
