@@ -859,11 +859,20 @@ export default defineComponent({
       }
 
       if (
-        triggerCondition.frequency_type !== "minutes" ||
+        triggerCondition.frequency_type !== "minutes" &&
+        triggerCondition.frequency_type !== "cron" ||
         typeof triggerCondition.frequency_type !== "string"
+
       ) {
+          alertErrors.push(
+            `Alert - ${index}: Frequency Type must be 'minutes' or 'cron' and should be a string.`,
+          );
+        
+      }
+
+      if (triggerCondition.frequency_type === "cron" && (triggerCondition.cron.trim() === "" || typeof triggerCondition.cron !== "string")) {
         alertErrors.push(
-          `Alert - ${index}: Frequency Type must be 'minutes' and should be a string.`,
+          `Alert - ${index}: Cron expression should be a valid cron expression.`,
         );
       }
 
