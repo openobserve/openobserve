@@ -20,7 +20,10 @@ use chrono::{Duration, Utc};
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
-        alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
+        alerts::{
+            AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
+            TriggerEvalResults,
+        },
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -45,7 +48,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
     async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     #[allow(clippy::too_many_arguments)]
     async fn evaluate_scheduled(
@@ -57,7 +60,7 @@ pub trait QueryConditionExt: Sync + Send + 'static {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 }
 
 #[async_trait]
@@ -65,27 +68,32 @@ impl QueryConditionExt for QueryCondition {
     async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
+        let mut eval_results = TriggerEvalResults {
+            end_time: now,
+            ..Default::default()
+        };
         let row = match row {
             Some(row) => row,
             None => {
-                return Ok((None, now));
+                return Ok(eval_results);
             }
         };
         if self.conditions.is_none() {
-            return Ok((None, now));
+            return Ok(eval_results);
         }
         let conditions = self.conditions.as_ref().unwrap();
         if conditions.is_empty() {
-            return Ok((None, now));
+            return Ok(eval_results);
         }
         for condition in conditions.iter() {
             if !condition.evaluate(row).await {
-                return Ok((None, now));
+                return Ok(eval_results);
             }
         }
-        Ok((Some(vec![row.to_owned()]), now))
+        eval_results.data = Some(vec![row.to_owned()]);
+        return Ok(eval_results);
     }
 
     async fn evaluate_scheduled(
@@ -97,32 +105,36 @@ impl QueryConditionExt for QueryCondition {
         (start_time, end_time): (Option<i64>, i64),
         search_type: Option<SearchEventType>,
         search_event_context: Option<SearchEventContext>,
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
+        let mut eval_results = TriggerEvalResults {
+            end_time,
+            ..Default::default()
+        };
         let sql = match self.query_type {
             QueryType::Custom => {
                 let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
                     // CustomQuery type needs to provide source StreamName.
                     // CustomQuery is only used by Alerts' triggers.
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 if v.is_empty() {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 } else {
                     v.to_string()
                 }
             }
             QueryType::PromQL => {
                 let Some(v) = self.promql.as_ref() else {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 if v.is_empty() {
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 }
                 let start = if let Some(start_time) = start_time {
                     start_time
@@ -157,7 +169,7 @@ impl QueryConditionExt for QueryCondition {
                 let resp = match promql::search::search("", org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
-                        return Ok((None, end_time));
+                        return Ok(eval_results);
                     }
                 };
                 let promql::value::Value::Matrix(value) = resp else {
@@ -166,41 +178,34 @@ impl QueryConditionExt for QueryCondition {
                         v,
                         resp
                     );
-                    return Ok((None, end_time));
+                    return Ok(eval_results);
                 };
                 // TODO calculate the sample in a row, suddenly a sample can be ignored
                 let value = value
                     .into_iter()
                     .filter(|f| f.samples.len() >= trigger_condition.threshold as usize)
                     .collect::<Vec<_>>();
-                return if value.is_empty() {
-                    return Ok((None, end_time));
-                } else {
-                    Ok((
-                        Some(
-                            value
-                                .iter()
-                                .map(|v| {
-                                    let mut val = Map::with_capacity(v.labels.len() + 2);
-                                    for label in v.labels.iter() {
-                                        val.insert(
-                                            label.name.to_string(),
-                                            label.value.to_string().into(),
-                                        );
-                                    }
-                                    let last_sample = v.samples.last().unwrap();
+                if !value.is_empty() {
+                    eval_results.data = Some(
+                        value
+                            .iter()
+                            .map(|v| {
+                                let mut val = Map::with_capacity(v.labels.len() + 2);
+                                for label in v.labels.iter() {
                                     val.insert(
-                                        "_timestamp".to_string(),
-                                        last_sample.timestamp.into(),
+                                        label.name.to_string(),
+                                        label.value.to_string().into(),
                                     );
-                                    val.insert("value".to_string(), last_sample.value.into());
-                                    val
-                                })
-                                .collect(),
-                        ),
-                        end_time,
-                    ))
-                };
+                                }
+                                let last_sample = v.samples.last().unwrap();
+                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
+                                val.insert("value".to_string(), last_sample.value.into());
+                                val
+                            })
+                            .collect(),
+                    );
+                }
+                return Ok(eval_results);
             }
         };
 
@@ -413,46 +418,23 @@ impl QueryConditionExt for QueryCondition {
             }
         });
         log::debug!("alert resp hits len:{:#?}", records.len());
-        let records = Some(records);
-        if self.search_event_type.is_none() {
+        eval_results.query_took = Some(resp.took as i64);
+        eval_results.data = if self.search_event_type.is_none() {
             let threshold = trigger_condition.threshold as usize;
             match trigger_condition.operator {
-                Operator::EqualTo => {
-                    if records.as_ref().unwrap().len() == threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::NotEqualTo => {
-                    if records.as_ref().unwrap().len() != threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::GreaterThan => {
-                    if records.as_ref().unwrap().len() > threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::GreaterThanEquals => {
-                    if records.as_ref().unwrap().len() >= threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::LessThan => {
-                    if records.as_ref().unwrap().len() < threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                Operator::LessThanEquals => {
-                    if records.as_ref().unwrap().len() <= threshold {
-                        return Ok((records, end_time));
-                    }
-                }
-                _ => {}
+                Operator::EqualTo => (records.len() == threshold).then_some(records),
+                Operator::NotEqualTo => (records.len() != threshold).then_some(records),
+                Operator::GreaterThan => (records.len() > threshold).then_some(records),
+                Operator::GreaterThanEquals => (records.len() >= threshold).then_some(records),
+                Operator::LessThan => (records.len() < threshold).then_some(records),
+                Operator::LessThanEquals => (records.len() <= threshold).then_some(records),
+                _ => None,
             }
-            Ok((None, end_time))
         } else {
-            Ok((records, end_time))
-        }
+            Some(records)
+        };
+
+        Ok(eval_results)
     }
 }
 
