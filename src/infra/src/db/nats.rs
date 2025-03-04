@@ -601,7 +601,7 @@ impl super::Db for NatsDb {
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("watching prefix: {}, get message error", prefix);
+                            log::error!("[NATS:watch] prefix: {}, get message error", prefix);
                             break;
                         }
                         Some(entry) => {
@@ -609,7 +609,7 @@ impl super::Db for NatsDb {
                                 Ok(entry) => entry,
                                 Err(e) => {
                                     log::error!(
-                                        "watching prefix: {}, get message error: {}",
+                                        "[NATS:watch] prefix: {}, get message error: {}",
                                         prefix,
                                         e
                                     );

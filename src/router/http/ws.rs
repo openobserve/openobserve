@@ -15,7 +15,7 @@
 
 use std::{cell::RefCell, rc::Rc, str::FromStr, sync::Arc};
 
-use actix_web::{Error, HttpRequest, HttpResponse, rt, web};
+use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use actix_ws::{CloseCode, CloseReason, Message, Session};
 use config::get_config;
 use futures::stream::{SplitSink, SplitStream};
@@ -23,7 +23,7 @@ use futures_util::{SinkExt, StreamExt};
 use hex;
 use reqwest::header::{HeaderName, HeaderValue};
 use tokio::{net::TcpStream, sync::Mutex};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite};
+use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
 /// WebSocket proxy that manages bidirectional communication using two concurrent tasks.
