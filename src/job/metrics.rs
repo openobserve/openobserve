@@ -245,12 +245,12 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         if columns.len() <= 2 {
             // query functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], "", "", "query"])
+                .with_label_values(&[columns[0], "", "query"])
                 .inc();
         } else {
             // ingest functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], columns[2], columns[1], "ingest"])
+                .with_label_values(&[columns[0], columns[1], "ingest"])
                 .inc();
         }
     }
