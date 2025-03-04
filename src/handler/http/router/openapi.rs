@@ -94,6 +94,7 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::get_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
+        request::dashboards::move_dashboards,
         request::dashboards::timed_annotations::create_annotations,
         request::dashboards::timed_annotations::get_annotations,
         request::dashboards::timed_annotations::delete_annotations,
@@ -188,6 +189,7 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
+            crate::handler::http::models::dashboards::MoveDashboardsRequestBody,
             // Destinations
             crate::handler::http::models::destinations::Destination,
             crate::handler::http::models::destinations::DestinationType,
