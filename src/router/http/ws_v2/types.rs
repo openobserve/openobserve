@@ -51,6 +51,7 @@ impl Message {
             }
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { trace_id } => Self::new(
+                trace_id.clone(),
                 MessageType::Cancel,
                 serde_json::json!({"trace_id": trace_id}),
             ),
