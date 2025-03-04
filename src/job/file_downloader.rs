@@ -36,7 +36,7 @@ impl DownloadQueue {
     }
 }
 
-const FILE_DOWNLOAD_QUEUE_SIZE: usize = 500;
+const FILE_DOWNLOAD_QUEUE_SIZE: usize = 10000;
 static FILE_DOWNLOAD_CHANNEL: Lazy<DownloadQueue> = Lazy::new(|| {
     let (tx, rx) =
         tokio::sync::mpsc::channel::<(String, String, CacheType)>(FILE_DOWNLOAD_QUEUE_SIZE);
