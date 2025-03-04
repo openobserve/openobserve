@@ -64,18 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- if table chart then download button as a csv file -->
         <q-btn
-          v-if="
-            !viewOnly && isCurrentlyHoveredPanel && props.data.type == 'table'
-          "
+          v-if="!viewOnly && isCurrentlyHoveredPanel"
           icon="download"
           flat
           size="sm"
           padding="1px"
-          @click="
-            PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
-              props.data.title,
-            )
-          "
+          @click="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
           title="Download as a CSV"
           data-test="dashboard-panel-table-download-as-csv-btn"
         />
