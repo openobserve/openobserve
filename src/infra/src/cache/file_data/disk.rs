@@ -503,12 +503,15 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             Ok(Some(f)) => {
                 let path = f.path();
 
-                // Skip temporary files
+                // Delete temporary files instead of skipping them
                 if path.extension().is_some_and(|ext| ext == "tmp") {
                     log::debug!(
-                        "Skipping temporary file during cache load: {}",
+                        "Removing temporary file during cache load: {}",
                         path.display()
                     );
+                    if let Err(e) = tokio::fs::remove_file(&path).await {
+                        log::warn!("Failed to remove tmp file {}: {}", path.display(), e);
+                    }
                     continue;
                 }
 
@@ -628,16 +631,6 @@ async fn gc() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // First, clean up any lingering .tmp files from interrupted operations
-    let root_dir = FILES[0].read().await.root_dir.clone();
-    let root_path = Path::new(&root_dir);
-    if let Err(e) = clean_tmp_files(root_path, "global").await {
-        log::warn!(
-            "[trace_id global] Failed to clean up temporary files: {}",
-            e
-        );
-    }
-
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
@@ -660,51 +653,6 @@ async fn gc() -> Result<(), anyhow::Error> {
         w.gc("global", cfg.disk_cache.gc_size).await?;
         drop(w);
     }
-    Ok(())
-}
-
-// Helper function to clean up temporary files
-#[async_recursion]
-async fn clean_tmp_files(dir: &Path, trace_id: &str) -> Result<(), anyhow::Error> {
-    if !dir.exists() {
-        return Ok(());
-    }
-
-    let mut entries = tokio::fs::read_dir(dir).await?;
-
-    while let Some(entry) = entries.next_entry().await? {
-        let path = entry.path();
-        let metadata = tokio::fs::metadata(&path).await?;
-
-        if metadata.is_dir() {
-            // Recursively clean temporary files in subdirectories
-            if let Err(e) = clean_tmp_files(&path, trace_id).await {
-                log::warn!(
-                    "[trace_id {}] Failed to clean tmp files in directory {}: {}",
-                    trace_id,
-                    path.display(),
-                    e
-                );
-            }
-        } else if metadata.is_file() && path.extension().is_some_and(|ext| ext == "tmp") {
-            // Remove any .tmp files
-            if let Err(e) = tokio::fs::remove_file(&path).await {
-                log::warn!(
-                    "[trace_id {}] Failed to remove tmp file {}: {}",
-                    trace_id,
-                    path.display(),
-                    e
-                );
-            } else {
-                log::debug!(
-                    "[trace_id {}] Removed temporary file: {}",
-                    trace_id,
-                    path.display()
-                );
-            }
-        }
-    }
-
     Ok(())
 }
 
