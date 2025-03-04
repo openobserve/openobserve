@@ -935,6 +935,9 @@ export default defineComponent({
     };
 
     const createAlert = async (input: any, index: any) => {
+      if(!input.hasOwnProperty('context_attributes')){
+        input.context_attributes = {};
+      }
       try {
         await alertsService.create(
           store.state.selectedOrganization.identifier,
