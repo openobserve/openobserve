@@ -264,21 +264,40 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    // reset metrics
+    metrics::STORAGE_ORIGINAL_BYTES.reset();
+    metrics::STORAGE_COMPRESSED_BYTES.reset();
+    metrics::STORAGE_FILES.reset();
+    metrics::STORAGE_RECORDS.reset();
+
+    // update metrics
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
+        let cur_val = metrics::STORAGE_ORIGINAL_BYTES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_ORIGINAL_BYTES
             .with_label_values(&[columns[0], columns[1]])
-            .set(stat.storage_size as i64);
+            .set(cur_val + stat.storage_size as i64);
+        let cur_val = metrics::STORAGE_COMPRESSED_BYTES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_COMPRESSED_BYTES
             .with_label_values(&[columns[0], columns[1]])
-            .set(stat.compressed_size as i64);
+            .set(cur_val + stat.compressed_size as i64);
+        let cur_val = metrics::STORAGE_FILES
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_FILES
             .with_label_values(&[columns[0], columns[1]])
-            .set(stat.file_num);
+            .set(cur_val + stat.file_num);
+        let cur_val = metrics::STORAGE_RECORDS
+            .with_label_values(&[columns[0], columns[1]])
+            .get();
         metrics::STORAGE_RECORDS
             .with_label_values(&[columns[0], columns[1]])
-            .set(stat.doc_num);
+            .set(cur_val + stat.doc_num);
     }
     Ok(())
 }
