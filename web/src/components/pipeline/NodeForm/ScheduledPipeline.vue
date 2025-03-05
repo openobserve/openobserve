@@ -1039,6 +1039,7 @@ import {
   defineAsyncComponent,
   nextTick,
   onMounted,
+  onBeforeMount,
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
@@ -1127,6 +1128,7 @@ const emits = defineEmits([
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams ();
+let parser: any;
 
 const selectedStreamName = ref("");
 
@@ -1242,12 +1244,32 @@ watch(()=> selectedStreamName.value, (val)=>{
   searchObj.data.stream.pipelineQueryStream = [val];
 })
 
+onBeforeMount(async ()=>{
+  await importSqlParser();
+})
+
 
 
 
 onMounted(async ()=>{
   getStreamList();
+
+setTimeout(() => {
+  if(tab.value === 'sql' && query.value != ""){
+  const parsedQuery = parser.parse(query.value);
+  selectedStreamName.value = parsedQuery.ast.from[0].table;
+
+  getStreamFields();
+}
+}, 100);
+  
 })
+
+const importSqlParser = async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    parser = await sqlParser();
+  };
 
 const filteredTimezone: any = ref([]);
 const expandState =ref( {
