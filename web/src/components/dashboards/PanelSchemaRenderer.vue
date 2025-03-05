@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="panelSchema.htmlContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
         <div
@@ -73,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :markdownContent="panelSchema.markdownContent"
             style="width: 100%; height: 100%"
             class="col"
+            :variablesData="variablesData"
           />
         </div>
 
