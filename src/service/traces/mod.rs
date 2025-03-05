@@ -896,7 +896,7 @@ async fn write_traces(
                         "{}/{}/{}/{}",
                         org_id,
                         StreamType::Traces,
-                        service_name,
+                        stream_name,
                         alert.name
                     );
                     // check if alert already evaluated
