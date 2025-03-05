@@ -323,6 +323,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'timezone'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div>
+                          <q-select
+                            v-model="userSelectedTimezone[index]"
+                            :options="filteredTimezone"
+                            :label="'Timezone *'"
+                            :popup-content-style="{ textTransform: 'lowercase' }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            @update:model-value="updateTimezone(userSelectedTimezone[index], index)"
+                            @filter="timezoneFilterFn"
+                            use-input
+                            hide-selected
+                            fill-input
+                            :input-debounce="400"
+                            behavior="menu"
+                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            style="width: 300px"
+                          />
+                        </div>
+                      </span>
 
                       <span v-else>{{ errorMessage }}</span>
                     </div>
@@ -448,15 +481,14 @@ export default defineComponent({
       });
     });
 
-    // watch(
-    //   () => userSelectedDestinations.value,
-    //   (newVal, oldVal) => {
-    //     if (newVal) {
-    //       jsonArrayOfObj.value.destinations = newVal;
-    //       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    //     }
-    //   },
-    // );
+    const userSelectedTimezone = ref<string[]>([]);
+
+    // @ts-ignore
+    let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
+      return tz;
+    });
+    const filteredTimezone = ref<any>([]);
+      filteredTimezone.value = [...timezoneOptions];
 
     const updateUserSelectedDestinations = (destinations: string[], index: number) => {
       jsonArrayOfObj.value[index].destinations = destinations;
@@ -901,6 +933,13 @@ export default defineComponent({
         );
       }
 
+      if(input.trigger_condition.frequency_type == 'cron' && !input.trigger_condition.hasOwnProperty('timezone') || input.trigger_condition.timezone === ""){
+        alertErrors.push({
+          message: `Alert - ${index}: Timezone is required when frequency type is 'cron'.`,
+          field: "timezone",
+        });
+      }
+
       input.destinations.forEach((destination: any) => {
         if (!checkDestinationInList(props.destinations, destination)) {
           alertErrors.push({
@@ -938,11 +977,11 @@ export default defineComponent({
       if(!input.hasOwnProperty('context_attributes')){
         input.context_attributes = {};
       }
-      if(!input.trigger_condition.hasOwnProperty('timezone') || input.trigger_condition.timezone === ""){
-        input.trigger_condition.timezone = "UTC";
+      if(!input.trigger_condition.hasOwnProperty('timezone')){
+        input.trigger_condition.timezone = store.state.timezone;
       }
-      if(!input.trigger_condition.hasOwnProperty('tolerance_in_secs') && input.trigger_condition.tolerance_in_secs === ""){
-      input.trigger_condition.tolerance_in_secs = null;
+      if(!input.trigger_condition.hasOwnProperty("tolerance_in_secs")){
+        input.trigger_condition.tolerance_in_secs = null;
       }
       try {
         await alertsService.create(
@@ -1020,6 +1059,27 @@ export default defineComponent({
       updateUserSelectedDestinations(destinations, index);
     };
 
+      const updateTimezone = (timezone: string, index: number) => {
+        jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
+        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      };
+
+    const timezoneFilterFn = (val: string, update: Function) => {
+      if (val === '') {
+        update(() => {
+          filteredTimezone.value = timezoneOptions;
+        });
+        return;
+      }
+
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredTimezone.value = timezoneOptions.filter(
+          (timezone: string) => timezone.toLowerCase().includes(needle)
+        );
+      });
+    };
+
     return {
       t,
       jsonStr,
@@ -1056,6 +1116,10 @@ export default defineComponent({
       filteredDestinations,
       updateUserSelectedDestinations,
       toggleDestination,
+      userSelectedTimezone,
+      filteredTimezone,
+      updateTimezone,
+      timezoneFilterFn,
     };
   },
   components: {
