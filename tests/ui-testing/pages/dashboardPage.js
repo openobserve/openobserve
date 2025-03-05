@@ -196,11 +196,10 @@ async addCustomChart(page, pictorialJSON) {
 }
 
 async navigateToDashboardFolder() {
-  await this.page.waitForSelector('[data-test="dashboard-folder-tab-71538835530786119688kAPB8"]');  
-  await this.page.locator('[data-test="dashboard-folder-tab-71538835530786119688kAPB8"]').click();
-  await this.page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/dashboards?org_identifier=default&folder=71538835530786119688kAPB8");
+  await this.page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/dashboards?org_identifier=otlp-production&folder=default");
   await this.page.waitForTimeout(5000);
-  await this.page.getByRole('cell', { name: '7153885143055372288czBGQl' }).click();
+  await this.page.getByRole('cell', { name: '7296021498282649800' }).click();
+  await this.page.waitForTimeout(5000);
 }
 
 async refreshDashboard() {

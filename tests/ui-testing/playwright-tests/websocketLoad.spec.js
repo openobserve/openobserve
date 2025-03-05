@@ -35,8 +35,9 @@ test.describe("Websocket for UI Load Testing", () => {
         
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser();
-        await loginPage.login(); // Login as root user
-        await ingestionPage.ingestion();
+        await loginPage.login(); 
+        await logsPage.navigateToLogs();
+        await logsPage.logsPageOtlpOrg();
         await managementPage.goToManagement();
         await page.waitForTimeout(5000);
         await managementPage.checkAndEnableWebSocket();
@@ -44,8 +45,8 @@ test.describe("Websocket for UI Load Testing", () => {
 
     test("Enable Websocket for running query after selecting stream, SQL Mode On and dashboard refresh", async ({ page }) => {
         await logsPage.navigateToLogs();
-        await logsPage.selectStreamE2eAutomate();
-        await logsPage.selectQueryE2eAutomate();
+        await logsPage.selectStreamDefault();
+        await logsPage.selectQueryDefault();
         await logsPage.enableSQLMode();
         await logsPage.selectQuery1DayTime();
         await logsPage.selectRunQuery();
@@ -54,8 +55,8 @@ test.describe("Websocket for UI Load Testing", () => {
         await dashboardPage.selectQuery2DayTime();
         await dashboardPage.refreshDashboard();
         await logsPage.navigateToLogs();
-        await logsPage.selectStreamE2eAutomate();
-        await logsPage.selectQueryE2eAutomate();
+        await logsPage.selectStreamDefault();
+        await logsPage.selectQueryDefault();
         await logsPage.enableSQLMode();
         await logsPage.selectQuery1DayTime();
         await logsPage.selectRunQuery();
