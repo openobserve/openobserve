@@ -1591,6 +1591,42 @@ export default defineComponent({
       return needsQuotes ? `"${str}"` : str;
     };
 
+    const downloadDataAsJSON = (title: string) => {
+      try {
+        // Handle table type charts
+        if (panelSchema?.value?.type === "table") {
+          tableRendererRef?.value?.downloadTableAsJSON(title);
+        } else {
+          // Handle non-table charts
+          const chartData = data.value;
+
+          if (!chartData || !chartData?.[0]?.length) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          const content = JSON.stringify(chartData, null, 2);
+
+          const status = exportFile(
+            (title ?? "data-export") + ".json",
+            content,
+            "application/json",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a JSON file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     return {
       store,
       chartPanelRef,
@@ -1623,6 +1659,7 @@ export default defineComponent({
       isCursorOverPanel,
       showPopupsAndOverlays,
       downloadDataAsCSV,
+      downloadDataAsJSON,
     };
   },
 });
