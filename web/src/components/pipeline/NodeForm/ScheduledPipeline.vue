@@ -918,7 +918,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Output"
                   class="tw-mt-1"
                 />
-                {{ expandedLogs }}
                   <TenstackTable
 
                     v-if="rows.length > 0 && tab == 'sql'"
@@ -1740,10 +1739,10 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
-        if(tab.value === 'sql'){
+        if(tab.value === 'sql' && query.value == ""){
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
         }
-        else if (tab.value === 'promql'){
+        else if (tab.value === 'promql' && query.value == ""){
           query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
