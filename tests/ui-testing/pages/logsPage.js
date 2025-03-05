@@ -481,19 +481,19 @@ async waitForSearchResultAndCheckText(expectedText) {
   await expect(locator).toContainText(expectedText);
 }
 
-async selectStreamE2eAutomate() {
+async selectStreamDefault() {
   await this.page.waitForSelector('[data-test="logs-search-index-list"]');
   await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
-  await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div');
-  await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+  await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-default"] div');
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
   
 }
 
-async selectQueryE2eAutomate() {
+async selectQueryDefault() {
   await this.page
     .locator('[data-test="logs-search-bar-query-editor"]')
     .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT * FROM "e2e_automate');
+    .fill('SELECT * FROM "default"');
   await this.page.waitForTimeout(5000);
 }
 
@@ -503,6 +503,16 @@ async selectQuery1DayTime() {
   await this.page.waitForSelector('[data-test="date-time-relative-1-d-btn"]');
   await this.page.locator('[data-test="date-time-relative-1-d-btn"]').click();
   await this.page.waitForTimeout(5000);
+}
+
+async logsPageOtlpOrg() {
+
+  await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(2000);
+  await this.page.getByRole('option', { name: 'otlp-production' }).locator('div').nth(2).click();
+
+
+
 }
 
 }
