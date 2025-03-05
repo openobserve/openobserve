@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 export const formatInterval = (interval: any) => {
   switch (true) {
@@ -132,4 +134,64 @@ export const formatRateInterval = (interval: any) => {
   if (remainingSeconds > 0) formattedStr += remainingSeconds.toString() + "s";
 
   return formattedStr;
+};
+
+export const processVariableContent = (content: string, variablesData: any) => {
+  let processedContent: any = content;
+
+  if (variablesData && variablesData.values) {
+    variablesData.values.forEach((variable: any) => {
+      if (variable.name) {
+        const placeholders = [
+          `\${${variable.name}}`,
+          `\${${variable.name}:csv}`,
+          `\${${variable.name}:pipe}`,
+          `\${${variable.name}:doublequote}`,
+          `\${${variable.name}:singlequote}`,
+          `\$${variable.name}`,
+        ];
+
+        placeholders.forEach((placeholder) => {
+          let value = variable.value ?? "";
+
+          if (Array.isArray(value)) {
+            if (placeholder.includes(":csv")) {
+              value = value.join(",");
+            } else if (placeholder.includes(":pipe")) {
+              value = value.join("|");
+            } else if (placeholder.includes(":doublequote")) {
+              value = value.map((v) => `"${v}"`).join(",");
+            } else if (placeholder.includes(":singlequote")) {
+              value = value.map((v) => `'${v}'`).join(",");
+            } else {
+              value = value.join(",");
+            }
+          }
+
+          processedContent = processedContent.replace(
+            new RegExp(
+              placeholder
+                .replace(/\$/g, "\\$")
+                .replace(/\{/g, "\\{")
+                .replace(/\}/g, "\\}"),
+              "g",
+            ),
+            value,
+          );
+        });
+      }
+    });
+  }
+
+  return processedContent;
+};
+
+export const processHTMLContent = (content: string, variablesData: any) => {
+  const processedContent = processVariableContent(content, variablesData);
+  return DOMPurify.sanitize(processedContent);
+};
+
+export const processMarkdownContent = (content: string, variablesData: any) => {
+  const processedContent = processVariableContent(content, variablesData);
+  return DOMPurify.sanitize(marked(processedContent));
 };
