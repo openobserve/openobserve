@@ -353,10 +353,11 @@ async fn handle_diff_schema(
         if let Some(stream_schema) = stream_schema_map.get(stream_name) {
             for field in stream_schema.schema().fields() {
                 let field_name = field.name();
-                if !should_skip(field_name) && uds_fields.insert(field_name.to_string()) {
-                    if uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds {
-                        break;
-                    }
+                if !should_skip(field_name)
+                    && uds_fields.insert(field_name.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
                 }
             }
         }
@@ -365,10 +366,11 @@ async fn handle_diff_schema(
         if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
             for field in final_schema.fields() {
                 let field_name = field.name();
-                if !should_skip(field_name) && uds_fields.insert(field_name.to_string()) {
-                    if uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds {
-                        break;
-                    }
+                if !should_skip(field_name)
+                    && uds_fields.insert(field_name.to_string())
+                    && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
+                {
+                    break;
                 }
             }
         }
