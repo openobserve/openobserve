@@ -304,7 +304,8 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-      await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+      await page.locator('[data-test="dashboard-add-condition-operator"]').first().click();
+
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
     await page.getByLabel("Value").fill("$variablename");
@@ -321,8 +322,7 @@ test.describe("dashboard filter testcases", () => {
       .locator('[data-test="dashboard-add-condition-condition-1"]')
       .click();
 
-    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
-
+    await page.locator('[data-test="dashboard-add-condition-operator"]').last().click();
 
     await page
       .getByRole("option", { name: "<>" })
@@ -523,7 +523,7 @@ test.describe("dashboard filter testcases", () => {
       .click({ force: true });
     console.log("After click");
 
-    await page.locator('[data-test="dashboard-add-condition-column-1\\}"]').click();
+    await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
 
     await page
       .getByRole("option", { name: "kubernetes_container_name" })
@@ -531,7 +531,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator('[data-test="dashboard-add-condition-condition-0"]')
       .click();
-    await page.locator('[data-test="dashboard-add-condition-operator"]').click();
+      await page.locator('[data-test="dashboard-add-condition-operator"]').first().click();
 
     await page.getByText("=", { exact: true }).click();
     await page.getByLabel("Value").click();
@@ -547,8 +547,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
-
-      await page.locator('[data-test="dashboard-add-condition-column-1\\}"]').click();
+      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
       await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .click();
