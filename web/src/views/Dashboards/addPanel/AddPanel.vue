@@ -712,7 +712,9 @@ export default defineComponent({
         },
       });
 
-      if (needsVariablesAutoUpdate) {
+      if (["html", "markdown"].includes(dashboardPanelData.data.type)) {
+        Object.assign(updatedVariablesData, variablesData);
+      } else if (needsVariablesAutoUpdate) {
         // check if the length is > 0
         if (checkIfVariablesAreLoaded(variablesData)) {
           needsVariablesAutoUpdate = false;
