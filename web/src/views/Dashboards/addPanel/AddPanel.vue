@@ -319,10 +319,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
+        <VariablesValueSelector
+          :variablesConfig="currentDashboardData.data?.variables"
+          :showDynamicFilters="
+            currentDashboardData.data?.variables?.showDynamicFilters
+          "
+          :selectedTimeDate="dashboardPanelData.meta.dateTime"
+          @variablesData="variablesDataUpdated"
+          :initialVariableValues="initialVariableValues"
+        />
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
           style="width: 100%; height: 100%"
           class="col"
+          :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
@@ -331,10 +341,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
+        <VariablesValueSelector
+          :variablesConfig="currentDashboardData.data?.variables"
+          :showDynamicFilters="
+            currentDashboardData.data?.variables?.showDynamicFilters
+          "
+          :selectedTimeDate="dashboardPanelData.meta.dateTime"
+          @variablesData="variablesDataUpdated"
+          :initialVariableValues="initialVariableValues"
+        />
         <CustomMarkdownEditor
           v-model="dashboardPanelData.data.markdownContent"
           style="width: 100%; height: 100%"
           class="col"
+          :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>

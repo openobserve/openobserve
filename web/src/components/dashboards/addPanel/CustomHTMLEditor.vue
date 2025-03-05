@@ -45,11 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <HTMLRenderer :htmlContent="htmlContent" />
+          <HTMLRenderer
+            :htmlContent="htmlContent"
+            :variables-data="initialVariableValues"
+          />
         </template>
       </q-splitter>
     </div>
-  </div>
+  </div> 
 </template>
 
 <script lang="ts">
@@ -59,7 +62,7 @@ import HTMLRenderer from "../panels/HTMLRenderer.vue";
 export default defineComponent({
   components: {
     MonacoHTMLEditor: defineAsyncComponent(
-      () => import("./MonacoHTMLEditor.vue")
+      () => import("./MonacoHTMLEditor.vue"),
     ),
     HTMLRenderer,
   },
@@ -69,8 +72,14 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    initialVariableValues: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   setup(props, { emit }) {
+    console.log("CustomHTMLEditor setup", props);
+
     const htmlContent = ref(props.modelValue);
     const splitterModel = ref(50);
 

@@ -24,14 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw-prose tw-prose-sm tw-max-w-none',
         store.state?.theme === 'dark' && 'tw-prose-invert',
       ]"
-      v-html="DOMPurify.sanitize(marked(markdownContent))"
+      v-html="DOMPurify.sanitize(marked(processedHtmlContent))"
       data-test="markdown-renderer"
     ></div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { computed, defineComponent } from "vue";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useStore } from "vuex";
@@ -43,13 +43,67 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    variablesData: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  setup(): any {
+  setup(props): any {
     const store = useStore();
+    const processedHtmlContent = computed(() => {
+      let content = props.markdownContent;
+
+      if (props.variablesData && props.variablesData.values) {
+        props.variablesData.values.forEach((variable: any) => {
+          if (variable.name) {
+            const placeholders = [
+              `\${${variable.name}}`,
+              `\${${variable.name}:csv}`,
+              `\${${variable.name}:pipe}`,
+              `\${${variable.name}:doublequote}`,
+              `\${${variable.name}:singlequote}`,
+              `\$${variable.name}`,
+            ];
+
+            placeholders.forEach((placeholder) => {
+              let value = variable.value;
+
+              if (Array.isArray(value)) {
+                if (placeholder.includes(":csv")) {
+                  value = value.join(",");
+                } else if (placeholder.includes(":pipe")) {
+                  value = value.join("|");
+                } else if (placeholder.includes(":doublequote")) {
+                  value = value.map((v) => `"${v}"`).join(",");
+                } else if (placeholder.includes(":singlequote")) {
+                  value = value.map((v) => `'${v}'`).join(",");
+                } else {
+                  value = value.join("|");
+                }
+              }
+
+              content = content.replace(
+                new RegExp(
+                  placeholder
+                    .replace(/\$/g, "\\$")
+                    .replace(/\{/g, "\\{")
+                    .replace(/\}/g, "\\}"),
+                  "g",
+                ),
+                value,
+              );
+            });
+          }
+        });
+      }
+
+      return content;
+    });
     return {
       DOMPurify,
       marked,
       store,
+      processedHtmlContent,
     };
   },
 });
