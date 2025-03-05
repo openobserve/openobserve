@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-  </div> 
+  </div>
 </template>
 
 <script lang="ts">
@@ -78,8 +78,6 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    console.log("CustomHTMLEditor setup", props);
-
     const htmlContent = ref(props.modelValue);
     const splitterModel = ref(50);
 
