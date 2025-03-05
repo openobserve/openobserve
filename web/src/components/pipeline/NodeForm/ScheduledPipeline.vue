@@ -988,7 +988,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="stream-routing-query-save-btn"
-                  :label="t('alerts.save')"
+                  :label="'Validate and Close'"
                   class="text-bold no-border q-ml-md"
                   color="secondary"
                   padding="sm xl"
