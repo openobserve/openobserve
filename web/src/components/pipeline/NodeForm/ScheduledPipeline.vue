@@ -895,17 +895,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-1"
                 />
                 <query-editor
-                v-show="expandState.query"
-                data-test="scheduled-pipeline-sql-editor"
-                ref="pipelineEditorRef"
-                editor-id="pipeline-query-editor"
-                class="monaco-editor"
-                v-model:query="query"
-                :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
-                @update:query="updateQueryValue"
-                @focus="queryEditorPlaceholderFlag = false"
-                @blur="onBlurQueryEditor"
-                style="height: calc(100vh - 190px) !important;"
+                  v-show="expandState.query"
+                  data-test="scheduled-pipeline-sql-editor"
+                  ref="pipelineEditorRef"
+                  editor-id="pipeline-query-editor"
+                  :debounceTime="300"
+                  class="monaco-editor"
+                  v-model:query="query"
+                  :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
+                  @update:query="updateQueryValue"
+                  @focus="focusQueryEditor"
+                  @blur="onBlurQueryEditor"
+                  style="height: calc(100vh - 190px) !important;"
               />
               
              
@@ -917,7 +918,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Output"
                   class="tw-mt-1"
                 />
+                {{ expandedLogs }}
                   <TenstackTable
+
                     v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
                     v-show="expandState.output"
@@ -925,6 +928,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="getColumns"
                     :rows="rows"
                     :jsonpreviewStreamName="selectedStreamName"
+                    :expandedRows="expandedLogs"
+                    @expand-row="expandLog"
+                    @copy="copyLogToClipboard"
+
+
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />
@@ -1050,7 +1058,7 @@ import {
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { useQuasar } from "quasar";
+import { useQuasar, copyToClipboard } from "quasar";
 import cronParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
@@ -1193,6 +1201,7 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const  pipelineEditorRef : any = ref(null);
+const expandedLogs = ref([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
@@ -1231,7 +1240,6 @@ watch(()=> splitterModel.value ,  (val)=>{
 })
 
 watch(()=> selectedStreamName.value, (val)=>{
-  console.log(val, "selectedStreamName");
   searchObj.data.stream.pipelineQueryStream = [val];
 })
 
@@ -1241,28 +1249,6 @@ watch(()=> selectedStreamName.value, (val)=>{
 onMounted(async ()=>{
   getStreamList();
 })
-const standardOutput = ref(`
-{
-  "data": {
-    "results": [
-      {
-        "event": {
-          "_timestamp": 1735128523652186,
-          "job": "test",
-          "level": "info",
-          "log": "test message for openobserve",
-        },
-      },
-      {
-        "event": {
-          "log": "test message for openobserve",
-        },
-        "message": "Error in event",
-      },
-    ],
-  },
-}
-`)
 
 const filteredTimezone: any = ref([]);
 const expandState =ref( {
@@ -1636,8 +1622,6 @@ const filterFunctionOptions = (val: string, update: any) => {
 
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
-
-  // emits("validate-sql");
 };
 
 const validateInputs = (notify: boolean = true) => {
@@ -1856,7 +1840,6 @@ const handleSidebarEvent = (event: string, value: any) => {
       if(cursorPosition.value != -1){
         cursorPosition.value += valueToInsert.length;
       } 
-      console.log("newQuery Cursor Position", newQuery, cursorPosition.value);
 
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
@@ -1907,16 +1890,7 @@ const runQuery = async () => {
 }
 else if(tab.value == 'promql'){
   previewPromqlQueryRef.value.refreshData();
-  // searchService.metrics_query_range({
-  //   org_identifier: store.state.selectedOrganization.identifier,
-  //   query: query.value,
-  //   start_time: dateTime.value.startTime,
-  //   end_time: dateTime.value.endTime,
-  // }).then((res: any) => {
-  //   console.log(res, 'res')
-  // }).catch((err: any) => {
-  //   console.log(err, 'err')
-  // })
+
 }
 }
 
@@ -1936,6 +1910,24 @@ watch(() => q.fullscreen.isActive, (val) => {
   emits('update:fullscreen', val);
 });
 
+const focusQueryEditor = () => {
+  queryEditorPlaceholderFlag.value = false;
+}
+
+const expandLog = (index: any) => {
+  expandedLogs.value = [];
+}
+const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
+  const copyData = copyAsJson ? JSON.stringify(log) : log;
+  copyToClipboard(copyData).then(() =>
+    q.notify({
+      type: "positive",
+      message: "Content Copied Successfully!",
+      timeout: 1000,
+    }),
+  );
+};
+
 defineExpose({
   tab,
   validateInputs,
@@ -1946,7 +1938,6 @@ defineExpose({
   collapseFieldList,
   collapseFields,
   expandState,
-  standardOutput,
   streamFields,
   getStreamFields,
   selectedStreamName,
@@ -1962,6 +1953,10 @@ defineExpose({
   sideBarSplitterModel,
   previewPromqlQueryRef,
   cursorPosition,
+  focusQueryEditor,
+  expandedLogs,
+  copyLogToClipboard,
+  copyToClipboard,
 });
 
 </script>
@@ -2027,6 +2022,11 @@ defineExpose({
     &.icon-dark {
       filter: none !important;
     }
+  }
+  .empty-query .monaco-editor-background {
+    background-image: url("@/assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
   }
 }
 .field-list-collapse-btn {
