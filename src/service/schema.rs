@@ -336,7 +336,7 @@ async fn handle_diff_schema(
 
         // Helper to check if a field should be skipped
         let should_skip = |field_name: &str| {
-            field_name == cfg.common.column_timestamp || field_name == cfg.common.column_all
+            field_name == TIMESTAMP_COL_NAME || field_name == cfg.common.column_all
         };
 
         // Add FTS fields first
