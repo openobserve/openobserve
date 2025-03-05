@@ -868,7 +868,7 @@ async fn write_traces(
         if !map.is_empty() {
             distinct_values.push(MetadataItem::DistinctValues(DvItem {
                 stream_type: StreamType::Traces,
-                stream_name: service_name.to_string(),
+                stream_name: stream_name.to_string(),
                 value: map,
             }));
         }

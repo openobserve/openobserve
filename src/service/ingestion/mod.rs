@@ -123,11 +123,7 @@ pub fn apply_vrl_fn(
     };
     match result {
         Ok(res) => match res.try_into() {
-            Ok(val) => {
-                println!("VRL execution result: {:?}", val);
-                println!("Updated target: {:?}", target);
-                (val, None)
-            }
+            Ok(val) => (val, None),
             Err(err) => {
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
