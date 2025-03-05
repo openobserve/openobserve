@@ -637,6 +637,7 @@ async fn process_node(
         NodeData::Function(func_params) => {
             log::debug!("[Pipeline]: func node {node_idx} starts processing");
             let mut runtime = crate::service::ingestion::init_functions_runtime();
+            let stream_name = stream_name.unwrap_or("pipeline".to_string());
             while let Some((idx, mut record, mut flattened)) = receiver.recv().await {
                 if let Some(vrl_runtime) = &vrl_runtime {
                     if func_params.after_flatten && !flattened {
