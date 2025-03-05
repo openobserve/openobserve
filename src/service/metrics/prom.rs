@@ -359,7 +359,10 @@ pub async fn remote_write(
             };
             let (records, timestamps): (Vec<json::Value>, Vec<i64>) =
                 pipeline_inputs.into_iter().unzip();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Ingestion]: Stream {} pipeline batch processing failed: {}",
