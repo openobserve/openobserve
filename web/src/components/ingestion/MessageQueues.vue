@@ -75,7 +75,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "SecurityPage",
+  name: "DevOpsPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -94,12 +94,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("falco");
+    const ingestTabType = ref("rabbitmq");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "message-queues") {
         router.push({
-          name: "falco",
+          name: "rabbitmq",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -109,9 +109,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "message-queues") {
         router.push({
-          name: "falco",
+          name: "rabbitmq",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -120,89 +120,45 @@ export default defineComponent({
       }
     });
 
-    const securityTabs = [
+    const messageQueueTabs = [
       {
-        name: "falco",
+        name: "rabbitmq",
         to: {
-          name: "falco",
+          name: "rabbitmq",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Falco",
+        label: "RabbitMQ",
         contentClass: "tab_content",
       },
       {
-        name: "osquery",
+        name: "kafka",
         to: {
-          name: "osquery",
+          name: "kafka",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "OS Query",
+        label: "Kafka",
         contentClass: "tab_content",
       },
       {
-        name: "okta",
+        name: "nats",
         to: {
-          name: "okta",
+          name: "nats",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Okta",
+        label: "NATS",
         contentClass: "tab_content",
       },
-      {
-        name: "jumpcloud",
-        to: {
-          name: "jumpcloud",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Jumpcloud",
-        contentClass: "tab_content",
-      },
-      {
-        name: "openvpn",
-        to: {
-          name: "openvpn",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "OpenVPN",
-        contentClass: "tab_content",
-      },
-      {
-        name: "office365",
-        to: {
-          name: "office365",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Office365",
-        contentClass: "tab_content",
-      },
-      {
-        name: "google-workspace",
-        to: {
-          name: "google-workspace",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Google Workspace",
-        contentClass: "tab_content",
-      }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return securityTabs.filter((tab) => {
+      return messageQueueTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });

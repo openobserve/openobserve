@@ -538,7 +538,11 @@
     "databaseLabel": "Databases",
     "securityLabel": "Security",
     "devopsLabel": "DevOps",
-    "networkingLabel": "Networking"
+    "networkingLabel": "Networking",
+    "serverLabel": "Servers",
+    "messageQueuesLabel": "Message Queues",
+    "languagesLabel": "Languages/Frameworks",
+    "otherLabel": "Other"
   },
   "syslog": {
     "stream": "Stream",

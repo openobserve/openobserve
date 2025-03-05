@@ -75,7 +75,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "SecurityPage",
+  name: "LanguagesPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -94,12 +94,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("falco");
+    const ingestTabType = ref("python");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "languages") {
         router.push({
-          name: "falco",
+          name: "python",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -109,9 +109,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "languages") {
         router.push({
-          name: "falco",
+          name: "python",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -120,89 +120,89 @@ export default defineComponent({
       }
     });
 
-    const securityTabs = [
+    const languagesTabs = [
       {
-        name: "falco",
+        name: "python",
         to: {
-          name: "falco",
+          name: "python",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Falco",
+        label: "Python",
         contentClass: "tab_content",
       },
       {
-        name: "osquery",
+        name: "dotnet",
         to: {
-          name: "osquery",
+          name: "dotnet",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "OS Query",
+        label: ".Net",
         contentClass: "tab_content",
       },
       {
-        name: "okta",
+        name: "nodejs",
         to: {
-          name: "okta",
+          name: "nodejs",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Okta",
+        label: "NodeJS",
         contentClass: "tab_content",
       },
       {
-        name: "jumpcloud",
+        name: "go",
         to: {
-          name: "jumpcloud",
+          name: "go",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Jumpcloud",
+        label: "Go",
         contentClass: "tab_content",
       },
       {
-        name: "openvpn",
+        name: "rust",
         to: {
-          name: "openvpn",
+          name: "rust",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "OpenVPN",
+        label: "Rust",
         contentClass: "tab_content",
       },
       {
-        name: "office365",
+        name: "java",
         to: {
-          name: "office365",
+          name: "java",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Office365",
+        label: "Java",
         contentClass: "tab_content",
       },
       {
-        name: "google-workspace",
+        name: "fastapi",
         to: {
-          name: "google-workspace",
+          name: "fastapi",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Google Workspace",
+        label: "FastAPI",
         contentClass: "tab_content",
       }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return securityTabs.filter((tab) => {
+      return languagesTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });

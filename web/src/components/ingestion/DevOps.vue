@@ -120,7 +120,7 @@ export default defineComponent({
       }
     });
 
-    const databaseTabs = [
+    const devopsTabs = [
       {
         name: "jenkins",
         to: {
@@ -169,7 +169,7 @@ export default defineComponent({
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return databaseTabs.filter((tab) => {
+      return devopsTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });

@@ -120,7 +120,7 @@ export default defineComponent({
       }
     });
 
-    const databaseTabs = [
+    const networkingTabs = [
       {
         name: "netflow",
         to: {
@@ -136,7 +136,7 @@ export default defineComponent({
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return databaseTabs.filter((tab) => {
+      return networkingTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });
