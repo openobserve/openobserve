@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }"
                     :hideIncludeExlcude="true"
                     :hideCopyValue="false"
+                    :hideAddSearchTerm="true"
                 />
                
                 
