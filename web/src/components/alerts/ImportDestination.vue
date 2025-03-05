@@ -784,10 +784,10 @@ export default defineComponent({
         });
       }
       if (
-        !input.method ||
+        input.type == "http" && (!input.method ||
         (input.method !== "post" &&
           input.method !== "get" &&
-          input.method !== "put")
+          input.method !== "put"))
       ) {
         destinationErrors.push({
           message: `Destination - ${index} 'method' is required and should be either 'post', 'get', or 'put'`,
@@ -825,8 +825,8 @@ export default defineComponent({
 
       // Check if 'skip_tls_verify' is required for both webhook and email, and it should be a boolean
       if (
-        input.skip_tls_verify === undefined ||
-        typeof input.skip_tls_verify !== "boolean"
+        input.type == "http" && (input.skip_tls_verify === undefined ||
+        typeof input.skip_tls_verify !== "boolean")
       ) {
         destinationErrors.push({
           message: `Destination - ${index} 'skip_tls_verify' is required and should be a boolean value`,
@@ -836,7 +836,7 @@ export default defineComponent({
 
       // Check if 'headers' is required for webhook but not for email
       if (
-        !input.hasOwnProperty("type") &&
+        input.type == "http" &&
         Object.keys(input.headers).length === 0
       ) {
         destinationErrors.push(
