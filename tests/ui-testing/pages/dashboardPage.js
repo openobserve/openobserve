@@ -195,6 +195,32 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.keyboard.press('Delete');
 }
 
+async navigateToDashboardFolder() {
+  await this.page.waitForSelector('[data-test="dashboard-folder-tab-71538835530786119688kAPB8"]');  
+  await this.page.locator('[data-test="dashboard-folder-tab-71538835530786119688kAPB8"]').click();
+  await this.page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/dashboards?org_identifier=default&folder=71538835530786119688kAPB8");
+  await this.page.waitForTimeout(5000);
+  await this.page.getByRole('cell', { name: '7153885143055372288czBGQl' }).click();
+}
+
+async refreshDashboard() {
+  await this.page.waitForSelector('[data-test="dashboard-refresh-btn"]');
+  await this.page.locator('[data-test="dashboard-refresh-btn"]').click();
+  await this.page.waitForTimeout(10000);
+}
+
+async selectQuery2DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-2-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-2-d-btn"]').click();
+  await this.page.waitForSelector('[data-test="date-time-apply-btn"]');
+  await this.page.locator('[data-test="date-time-apply-btn"]').click();
+  await this.page.waitForTimeout(5000);
+  
+
+}
+
 
 }
 
