@@ -481,5 +481,28 @@ async waitForSearchResultAndCheckText(expectedText) {
   await expect(locator).toContainText(expectedText);
 }
 
+async selectStreamE2eAutomate() {
+  await this.page.waitForSelector('[data-test="logs-search-index-list"]');
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div');
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] div').first().click();
+  
+}
+
+async selectQueryE2eAutomate() {
+  await this.page
+    .locator('[data-test="logs-search-bar-query-editor"]')
+    .getByLabel("Editor content;Press Alt+F1")
+    .fill('SELECT * FROM "e2e_automate');
+  await this.page.waitForTimeout(5000);
+}
+
+async selectQuery1DayTime() {
+  await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+  await this.page.locator(this.dateTimeButton).click();
+  await this.page.waitForSelector('[data-test="date-time-relative-1-d-btn"]');
+  await this.page.locator('[data-test="date-time-relative-1-d-btn"]').click();
+  await this.page.waitForTimeout(5000);
+}
 
 }
