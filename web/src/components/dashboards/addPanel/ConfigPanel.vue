@@ -1627,7 +1627,9 @@ export default defineComponent({
 
       // by default, set show_symbol as false
       if (!dashboardPanelData.data.config.show_symbol) {
-        dashboardPanelData.data.config.show_symbol = false;
+        const isNewPanel = !dashboardPanelData.data.id;
+
+        dashboardPanelData.data.config.show_symbol = isNewPanel;
       }
 
       // by default, set line interpolation as smooth
