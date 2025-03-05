@@ -930,7 +930,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 </span>
                   <TenstackTable
-
                     v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
                     v-show="expandState.output"
@@ -1394,7 +1393,7 @@ const currentTimezone =
 const browserTimezone = ref(currentTimezone);
 const streamTypes = ["logs", "metrics", "traces"];
 
-const rows = ref([ ])
+const rows = ref([])
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1947,7 +1946,9 @@ const focusQueryEditor = () => {
 }
 
 const expandLog = (index: any) => {
-  expandedLogs.value = [];
+  if (expandedLogs.value.includes(index))
+    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
+  else expandedLogs.value.push(index);
 }
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
