@@ -1,6 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import { waitForDateTimeBtn } from "./waitForButton.util";
 
 // TODO - Modernize imports to use consistent ES module syntax
 const fs = require("fs");
@@ -164,7 +165,7 @@ test.describe("dashboard testcases", () => {
 
    
     // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await waitForDateTimeBtn(page);
     
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
@@ -173,7 +174,7 @@ test.describe("dashboard testcases", () => {
     // await page. waitForTimeout(3000);
 
     // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await waitForDateTimeBtn(page);
     
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
@@ -181,7 +182,7 @@ test.describe("dashboard testcases", () => {
     // await page.waitForTimeout(3000);
 
     // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await waitForDateTimeBtn(page);
    
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-d-btn"]').click();
@@ -189,7 +190,7 @@ test.describe("dashboard testcases", () => {
     // await page.waitForTimeout(3000);
 
     //  await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    await waitForDateTimeBtn(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
