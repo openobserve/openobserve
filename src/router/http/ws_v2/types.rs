@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 use chrono::{DateTime, Utc};
 use config::meta::websocket::SearchEventReq;
 use serde::{Deserialize, Serialize};
 
-use crate::handler::http::request::websocket::utils::{TimeOffset, WsClientEvents, WsServerEvents};
+use crate::service::websocket_events::{TimeOffset, WsClientEvents, WsServerEvents};
 
 pub type SessionId = String;
 pub type ClientId = String;

@@ -29,7 +29,7 @@ use tracing::Instrument;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
-use crate::handler::http::request::websocket::utils::enterprise_utils;
+use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -40,12 +40,13 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::{
-        session::send_message,
-        utils::{TimeOffset, WsServerEvents, search_registry_utils},
-    },
-    service::search::{
-        self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
+    handler::http::request::websocket::session::send_message,
+    service::{
+        search::{
+            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
+            sql::Sql,
+        },
+        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
     },
 };
 

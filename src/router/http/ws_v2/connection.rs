@@ -84,11 +84,14 @@ impl QuerierConnection {
         });
 
         // Spawn read handler
+        // Router -> Querier connection
+        // Task to receive messages from the querier
         tokio::spawn(async move {
             tokio::select! {
                 Some(msg) = read.next() => {
                     match msg {
                         Ok(msg) => {
+                            // Send the message to mpsc channel to be sent to the client
                             if let Err(e) = response_tx.send(msg.into()).await {
                                 log::error!("[WS] Failed to forward message: {}", e);
                                 // TODO: cleanup resource

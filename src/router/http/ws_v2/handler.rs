@@ -50,6 +50,7 @@ impl WsHandler {
         stream: web::Payload,
         client_id: ClientId,
     ) -> Result<HttpResponse, Error> {
+        // Client -> Router connection
         let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, stream)?;
 
         // Create session. maybe change to register client

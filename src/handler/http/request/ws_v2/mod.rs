@@ -1,27 +1,14 @@
-// Copyright 2025 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 pub mod session;
 
 use actix_web::{Error, HttpRequest, HttpResponse, get, web};
 use config::get_config;
-use session::WsSession;
 
-use crate::service::websocket_events::sessions_cache_utils;
+use crate::{
+    handler::http::request::websocket::session::WsSession,
+    service::websocket_events::sessions_cache_utils,
+};
 
-#[get("{org_id}/ws/{request_id}")]
+#[get("{org_id}/ws_v2/{router_id}")]
 pub async fn websocket(
     path_params: web::Path<(String, String)>,
     req: HttpRequest,
@@ -38,7 +25,7 @@ pub async fn websocket(
         return Ok(HttpResponse::NotFound().body("WebSocket is disabled"));
     }
 
-    let (org_id, request_id) = path_params.into_inner();
+    let (org_id, router_id) = path_params.into_inner();
 
     let prefix = format!("{}/api/", get_config().common.base_uri);
     let path = req.path().strip_prefix(&prefix).unwrap().to_string();
@@ -53,15 +40,15 @@ pub async fn websocket(
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
     let ws_session = WsSession::new(session);
-    sessions_cache_utils::insert_session(&request_id, ws_session);
+    sessions_cache_utils::insert_session(&router_id, ws_session);
     log::info!(
-        "[WS_HANDLER]: Node Role: {} Got websocket request for request_id: {}",
+        "[WS_HANDLER]: Node Role: {} Got websocket request for router_id: {}",
         cfg.common.node_role,
-        request_id,
+        router_id,
     );
 
     // Spawn the handler
-    actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id, path));
+    actix_web::rt::spawn(session::run(msg_stream, user_id, router_id, org_id, path));
 
     Ok(res)
 }
