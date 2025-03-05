@@ -233,10 +233,6 @@ pub async fn handle_text_message(
 
                     let res = handle_cancel(&trace_id, org_id).await;
                     let _ = send_message(req_id, res.to_json().to_string()).await;
-                    let close_reason = Some(CloseReason {
-                        code: CloseCode::Normal,
-                        description: None,
-                    });
 
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel { trace_id };
@@ -255,13 +251,11 @@ pub async fn handle_text_message(
                                 path: path.clone(),
                                 message_type: client_msg.get_type(),
                                 content: client_msg.to_json(),
-                                close_reason: format!("{:#?}", close_reason),
+                                close_reason: "".to_string(),
                             }),
                         })
                         .await;
                     }
-
-                    cleanup_and_close_session(req_id, close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
                     // simulate random delay for benchmarking by sleep for 10/20/30/60/90
@@ -416,11 +410,6 @@ async fn handle_search_event(
                             };
                         }
 
-                        let close_reason = CloseReason {
-                            code: CloseCode::Normal,
-                            description: None,
-                        };
-
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -432,37 +421,33 @@ async fn handle_search_event(
                                     path: path.clone(),
                                     message_type: client_msg.get_type(),
                                     content: client_msg.to_json(),
-                                    close_reason: format!("{:#?}", close_reason),
+                                    close_reason: "".to_string(),
                                 }),
                             })
                             .await;
                         }
 
-                        cleanup_and_close_session(&req_id, Some(close_reason)).await;
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        if let Some(close_reason) = handle_search_error(e, &req_id, &trace_id_for_task).await {
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws(WsMeta {
-                                        path: path.clone(),
-                                        message_type: client_msg.get_type(),
-                                        content: client_msg.to_json(),
-                                        close_reason: format!("{:#?}", close_reason),
-                                    }),
-                                })
-                                .await;
-                            }
-
-
-                            cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                        let _ = handle_search_error(e, &req_id, &trace_id_for_task).await;
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                          audit(AuditMessage {
+                                  user_email: user_id,
+                                  org_id,
+                                  _timestamp: chrono::Utc::now().timestamp(),
+                                  protocol: Protocol::Ws(WsMeta {
+                                      path: path.clone(),
+                                      message_type: client_msg.get_type(),
+                                      content: client_msg.to_json(),
+                                      close_reason: "".to_string(),
+                                  }),
+                              })
+                              .await;
                         }
+
                         // Even if the search is cancelled, we need to cleanup the resources
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
