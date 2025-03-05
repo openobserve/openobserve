@@ -17,9 +17,9 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        make_builder, new_null_array, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray,
-        BooleanBuilder, Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder,
-        RecordBatchOptions, StringArray, StringBuilder, UInt64Array, UInt64Builder,
+        ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Float64Array,
+        Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions, StringArray,
+        StringBuilder, UInt64Array, UInt64Builder, make_builder, new_null_array,
     },
     record_batch::RecordBatch,
 };

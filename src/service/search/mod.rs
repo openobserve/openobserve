@@ -19,7 +19,7 @@ use arrow_schema::{DataType, Field, Schema};
 use cache::cacher::get_ts_col_order_by;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    TIMESTAMP_COL_NAME, get_config, ider,
     meta::{
         cluster::RoleGroup,
         search,
@@ -33,7 +33,6 @@ use config::{
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
     },
-    TIMESTAMP_COL_NAME,
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
@@ -668,7 +667,7 @@ pub async fn search_partition(
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,

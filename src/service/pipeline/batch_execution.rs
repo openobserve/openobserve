@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,26 +15,26 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{components::NodeData, Pipeline},
+        pipeline::{Pipeline, components::NodeData},
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
     utils::{
         flatten,
-        json::{get_string_value, Value},
+        json::{Value, get_string_value},
     },
 };
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
@@ -526,7 +526,9 @@ async fn process_node(
                             }
                             resolve_res => {
                                 let err_msg = if let Err(e) = resolve_res {
-                                    format!("Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped")
+                                    format!(
+                                        "Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped"
+                                    )
                                 } else {
                                     "Dynamic Stream Name resolved to empty. Record dropped"
                                         .to_string()
@@ -691,7 +693,7 @@ async fn process_node(
 
             let mut remote_stream = remote_stream.clone();
             remote_stream.org_id = org_id.into();
-            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream.clone()).await?;
+            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
             if let Err(e) = writer.write_wal(records).await {
                 let err_msg = format!(
                     "DestinationNode error persisting data to be ingested externally: {}",
@@ -718,8 +720,8 @@ async fn process_node(
                 .await
             {
                 log::error!(
-                        "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
-                    );
+                    "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                );
             }
         }
     }

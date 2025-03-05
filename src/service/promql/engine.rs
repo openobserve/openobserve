@@ -18,9 +18,9 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 use arrow::array::Array;
 use async_recursion::async_recursion;
 use config::{
-    meta::promql::{HashLabelValue, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    utils::json,
     TIMESTAMP_COL_NAME,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, HashLabelValue, NAME_LABEL, VALUE_LABEL},
+    utils::json,
 };
 use datafusion::{
     arrow::{
@@ -29,26 +29,26 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, DataFrame, SessionContext},
+    prelude::{DataFrame, SessionContext, col, lit},
 };
-use futures::{future::try_join_all, TryStreamExt};
+use futures::{TryStreamExt, future::try_join_all};
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
-        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
-        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
+        AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
+        LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
+        VectorMatchCardinality, VectorSelector, token,
     },
 };
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{
-    utils::{apply_label_selector, apply_matchers},
     PromqlContext,
+    utils::{apply_label_selector, apply_matchers},
 };
 use crate::service::promql::{
-    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
+    DEFAULT_MAX_SERIES_PER_QUERY, aggregations, binaries, functions, micros, value::*,
 };
 
 pub struct Engine {
@@ -529,7 +529,10 @@ impl Engine {
         let metrics = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}", self.trace_id);
+                log::error!(
+                    "[trace_id: {}] [PromQL] Failed to load data for stream: {table_name}, error: {e:?}",
+                    self.trace_id
+                );
                 data_loaded.insert(table_name.to_string());
                 return Err(e);
             }
@@ -678,7 +681,7 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] load data done for stream: {}, took: {}ms",
+            "[trace_id: {}] load data done for stream: {}, took: {} ms",
             self.trace_id,
             table_name,
             start_time.elapsed().as_millis()

@@ -21,16 +21,16 @@ use std::{
 use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
+    SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
         alerts::{
+            FrequencyType, Operator, QueryType, TriggerEvalResults,
             alert::{Alert, AlertListFilter, ListAlertsParams},
-            FrequencyType, Operator, QueryType,
         },
         destinations::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
         },
-        folder::{Folder, FolderType, DEFAULT_FOLDER},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -39,12 +39,11 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT, TIMESTAMP_COL_NAME,
 };
 use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
-use lettre::{message::MultiPart, AsyncTransport, Message};
+use lettre::{AsyncTransport, Message, message::MultiPart};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
@@ -54,7 +53,7 @@ use crate::{
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
-        alerts::{build_sql, destinations, QueryConditionExt},
+        alerts::{QueryConditionExt, build_sql, destinations},
         db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
@@ -130,7 +129,9 @@ pub enum AlertError {
     #[error(transparent)]
     GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
 
-    #[error("Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\"")]
+    #[error(
+        "Alert period is greater than max query range of {max_query_range_hours} hours for stream \"{stream_name}\""
+    )]
     PeriodExceedsMaxQueryRange {
         max_query_range_hours: i64,
         stream_name: String,
@@ -679,7 +680,7 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+    ) -> Result<TriggerEvalResults, anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
@@ -698,7 +699,7 @@ impl AlertExt for Alert {
         &self,
         row: Option<&Map<String, Value>>,
         (start_time, end_time): (Option<i64>, i64),
-    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
+    ) -> Result<TriggerEvalResults, anyhow::Error> {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {

@@ -6,10 +6,10 @@
 use std::io::{self, Write};
 
 use prometheus::{
-    proto::{self, MetricFamily, MetricType},
     Encoder, Result,
+    proto::{self, MetricFamily, MetricType},
 };
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// The text format of metric family.
 pub const TEXT_FORMAT: &str = "text/plain; version=0.0.4";

@@ -31,9 +31,9 @@ use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
+    ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
-    ReadRecordBatchEntry,
 };
 
 pub(crate) struct Partition {
@@ -142,7 +142,22 @@ impl Partition {
             if data.data.is_empty() {
                 continue;
             }
-            let chunks = data.data.chunks(2000);
+            let mut chunks = Vec::new();
+            let mut cur_batches = Vec::new();
+            let mut cur_num_rows = 0;
+            for data in data.data.iter() {
+                let num_rows = data.data.num_rows();
+                if cur_num_rows > 0 && cur_num_rows + num_rows > config::PARQUET_FILE_CHUNK_SIZE {
+                    chunks.push(std::mem::take(&mut cur_batches));
+                    cur_num_rows = 0;
+                } else {
+                    cur_num_rows += num_rows;
+                    cur_batches.push(data);
+                }
+            }
+            if !cur_batches.is_empty() {
+                chunks.push(std::mem::take(&mut cur_batches));
+            }
             for data in chunks {
                 let mut file_meta = FileMeta::default();
                 data.iter().for_each(|r| {

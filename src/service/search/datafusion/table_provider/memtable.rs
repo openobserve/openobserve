@@ -24,7 +24,7 @@ use datafusion::{
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
     physical_expr::{LexOrdering, PhysicalSortExpr},
-    physical_plan::{expressions::Column, sorts::sort::SortExec, ExecutionPlan},
+    physical_plan::{ExecutionPlan, expressions::Column, sorts::sort::SortExec},
 };
 use hashbrown::HashMap;
 

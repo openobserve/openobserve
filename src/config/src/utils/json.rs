@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub use serde_json::{
-    from_slice, from_str, from_value, json, to_string, to_value, to_vec, Error, Map, Number, Value,
+    Error, Map, Number, Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec,
 };
 
 pub fn get_float_value(val: &Value) -> f64 {

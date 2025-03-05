@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
 use crate::{
-    db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE},
+    db::{ORM_CLIENT, SQLITE_STORE, connect_to_orm, sqlite::CLIENT_RW},
     dist_lock,
 };
 

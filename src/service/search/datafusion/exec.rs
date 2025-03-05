@@ -17,13 +17,12 @@ use std::{str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    get_config,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
-    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -39,7 +38,7 @@ use datafusion::{
         cache::cache_manager::{CacheManagerConfig, FileStatisticsCache},
         context::SessionConfig,
         memory_pool::{FairSpillPool, GreedyMemoryPool},
-        runtime_env::{RuntimeConfig, RuntimeEnv},
+        runtime_env::{RuntimeEnv, RuntimeEnvBuilder},
         session_state::SessionStateBuilder,
     },
     logical_expr::AggregateUDF,
@@ -65,7 +64,7 @@ use super::{
     optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
-    table_provider::{uniontable::NewUnionTable, NewListingTable},
+    table_provider::{NewListingTable, uniontable::NewUnionTable},
     udf::transform_udf::get_all_transform,
 };
 use crate::service::{
@@ -377,14 +376,14 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
 
     let cfg = get_config();
-    let mut rn_config =
-        RuntimeConfig::new().with_object_store_registry(Arc::new(object_store_registry));
+    let mut builder =
+        RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
     if cfg.limit.datafusion_file_stat_cache_max_entries > 0 {
         let cache_config = CacheManagerConfig::default();
         let cache_config = cache_config.with_files_statistics_cache(Some(
             super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
         ));
-        rn_config = rn_config.with_cache_manager(cache_config);
+        builder = builder.with_cache_manager(cache_config);
     }
 
     let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
@@ -394,14 +393,14 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         })?;
     match mem_pool {
         super::MemoryPoolType::Greedy => {
-            rn_config = rn_config.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+            builder = builder.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
         }
         super::MemoryPoolType::Fair => {
-            rn_config = rn_config.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
+            builder = builder.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
         }
         super::MemoryPoolType::None => {}
     };
-    RuntimeEnv::try_new(rn_config)
+    builder.build()
 }
 
 pub async fn prepare_datafusion_context(
@@ -468,7 +467,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));
-
+    ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
     let udf_list = get_all_transform(org_id)?;
     for udf in udf_list {
         ctx.register_udf(udf.clone());

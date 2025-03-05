@@ -17,13 +17,15 @@ use std::{rc::Rc, str::FromStr};
 
 use actix_cors::Cors;
 use actix_web::{
+    HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
-    middleware, web, HttpRequest, HttpResponse,
+    middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{from_fn, Next};
+use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -32,8 +34,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
     actix_http::h1::Payload,
-    actix_web::{web::BytesMut, HttpMessage},
-    base64::{engine::general_purpose, Engine as _},
+    actix_web::{HttpMessage, web::BytesMut},
+    base64::{Engine as _, engine::general_purpose},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, HttpMeta, Protocol},
@@ -50,7 +52,9 @@ pub mod ui;
 
 pub fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
-        .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
+        .allowed_methods(vec![
+            "HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE", "PATCH",
+        ])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::ACCEPT,
@@ -143,6 +147,21 @@ async fn audit_middleware(
     next.call(req).await
 }
 
+#[get("/metrics")]
+async fn get_metrics() -> Result<HttpResponse, actix_web::Error> {
+    let body = if config::get_config().common.prometheus_enabled {
+        config::metrics::gather()
+    } else {
+        "".to_string()
+    };
+    let mut resp = HttpResponse::Ok().body(body);
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
+    Ok(resp)
+}
+
 /// This is a very trivial proxy to overcome the cors errors while
 /// session-replay in rrweb.
 pub fn get_proxy_routes(svc: &mut web::ServiceConfig) {
@@ -216,7 +235,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::list_node)
+            .service(status::node_metrics),
     );
 
     if get_config().common.swagger_enabled {
@@ -402,6 +423,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::get_dashboard)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
+        .service(dashboards::move_dashboards)
         .service(dashboards::reports::create_report)
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)
@@ -575,8 +597,8 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
     use actix_web::{
-        test::{call_service, init_service, TestRequest},
         App,
+        test::{TestRequest, call_service, init_service},
     };
 
     use super::*;

@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::{BufRead, BufReader},
     path::PathBuf,
     sync::Arc,
 };
 
 use async_walkdir::WalkDir;
-use config::{metrics, utils::schema::infer_json_schema_from_values};
+use config::{
+    metrics,
+    utils::{schema::infer_json_schema_from_values, schema_ext::SchemaExt},
+};
 use futures::StreamExt;
 use snafu::ResultExt;
 
@@ -175,7 +178,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let Some(entry_bytes) = entry else {
                 break;
             };
-            let entry = match super::Entry::from_bytes(&entry_bytes) {
+            let mut entry = match super::Entry::from_bytes(&entry_bytes) {
                 Ok(v) => v,
                 Err(Error::ReadDataError { source }) => {
                     log::error!("Unable to read entry from: {}, skip the entry", source);
@@ -190,7 +193,13 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let infer_schema = Arc::new(infer_schema);
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+                .await
+                .map_err(|e| Error::ExternalError {
+                    source: Box::new(e),
+                })?;
+            entry.schema_key = latest_schema.hash_key().into();
+            let infer_schema = Arc::new(infer_schema.cloned_from(latest_schema.schema()));
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
             memtable.write(infer_schema, entry, batch)?;
         }
@@ -240,11 +249,7 @@ async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<P
                     .extension()
                     .and_then(|s| s.to_str())
                     .unwrap_or_default();
-                if path_ext == ext {
-                    Some(path)
-                } else {
-                    None
-                }
+                if path_ext == ext { Some(path) } else { None }
             } else {
                 None
             }

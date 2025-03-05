@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,10 +17,10 @@ use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use async_trait::async_trait;
-use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
+use chromiumoxide::{Page, browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use chrono::Timelike;
 use config::{
-    get_chrome_launch_options, get_config,
+    SMTP_CLIENT, get_chrome_launch_options, get_config,
     meta::dashboards::{
         datetime_now,
         reports::{
@@ -28,14 +28,13 @@ use config::{
             ReportFrequencyType, ReportListFilters, ReportTimerangeType,
         },
     },
-    SMTP_CLIENT,
 };
 use cron::Schedule;
-use futures::{future::try_join_all, StreamExt};
+use futures::{StreamExt, future::try_join_all};
 use infra::table;
 use lettre::{
-    message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
+    message::{MultiPart, SinglePart, header::ContentType},
 };
 use reqwest::Client;
 

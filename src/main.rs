@@ -19,17 +19,17 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
     time::Duration,
 };
 
-use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
 use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
-use config::get_config;
+use config::{get_config, utils::size::bytes_to_human_readable};
 use log::LevelFilter;
 #[cfg(feature = "enterprise")]
 use openobserve::handler::http::{
@@ -43,6 +43,7 @@ use openobserve::{
         utils::zo_logger,
     },
     handler::{
+        self,
         grpc::{
             auth::check_auth,
             flight::FlightServiceImpl,
@@ -61,14 +62,14 @@ use openobserve::{
     job, router,
     service::{db, metadata, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
 };
-use opentelemetry::{global, trace::TracerProvider, KeyValue};
+use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
-use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
+use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
     query_cache_server::QueryCacheServer, search_server::SearchServer,
@@ -77,7 +78,7 @@ use proto::cluster_rpc::{
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use pyroscope_pprofrs::{PprofConfig, pprof_backend};
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
@@ -90,7 +91,7 @@ use tracing_subscriber::Registry;
 #[cfg(feature = "pyroscope")]
 use {
     pyroscope::PyroscopeAgent,
-    pyroscope_pprofrs::{pprof_backend, PprofConfig},
+    pyroscope_pprofrs::{PprofConfig, pprof_backend},
 };
 
 #[cfg(feature = "mimalloc")]
@@ -100,7 +101,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use tracing_subscriber::{
-    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
+    EnvFilter, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*,
 };
 
 #[tokio::main]
@@ -188,17 +189,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
-        "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
+        "System info: CPU cores {}, MEM total {}, Disk total {}, free {}",
         cfg.limit.real_cpu_num,
-        cfg.limit.mem_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_total as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.limit.disk_free as f64 / 1024.0 / 1024.0 / 1024.0,
+        bytes_to_human_readable(cfg.limit.mem_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_total as f64),
+        bytes_to_human_readable(cfg.limit.disk_free as f64),
     );
     log::info!(
-        "Caches info: Disk max size {:.2} GB, MEM max size {:.2} GB, Datafusion pool size: {:.2} GB",
-        cfg.disk_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.max_size as f64 / 1024.0 / 1024.0 / 1024.0,
-        cfg.memory_cache.datafusion_max_size as f64 / 1024.0 / 1024.0 / 1024.0,
+        "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
+        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
+        bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
     // init script server
@@ -295,6 +296,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("meter provider init failed");
             };
+
+            // init websocket gc
+            if cfg.websocket.enabled {
+                log::info!("Initializing WebSocket session garbage collector");
+                if let Err(e) = handler::http::request::websocket::init().await {
+                    job_init_tx.send(false).ok();
+                    panic!("websocket gc init failed: {}", e);
+                }
+            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
@@ -617,8 +627,6 @@ async fn init_router_grpc_server(
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -649,7 +657,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -670,6 +678,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -688,6 +697,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -734,9 +744,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
 async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
-
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
@@ -768,7 +775,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             local_id
         );
 
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -781,6 +788,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -799,6 +807,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -845,7 +854,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 async fn graceful_shutdown(handle: ServerHandle) {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{signal, SignalKind};
+        use tokio::signal::unix::{SignalKind, signal};
 
         let mut sigquit = signal(SignalKind::quit()).unwrap();
         let mut sigterm = signal(SignalKind::terminate()).unwrap();
@@ -1009,8 +1018,6 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn init_script_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -1045,10 +1052,8 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
-
+        let mut app = App::new();
         app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
-
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(cfg.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))

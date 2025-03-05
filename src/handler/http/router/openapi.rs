@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{get_config, meta::stream::StreamType};
-use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
+use utoipa::{Modify, OpenApi, openapi::security::SecurityScheme};
 
 use crate::{common::meta, handler::http::request};
 
@@ -94,6 +94,7 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::get_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::move_dashboard,
+        request::dashboards::move_dashboards,
         request::dashboards::timed_annotations::create_annotations,
         request::dashboards::timed_annotations::get_annotations,
         request::dashboards::timed_annotations::delete_annotations,
@@ -188,6 +189,7 @@ use crate::{common::meta, handler::http::request};
             crate::handler::http::models::dashboards::ListDashboardsResponseBody,
             crate::handler::http::models::dashboards::ListDashboardsResponseBodyItem,
             crate::handler::http::models::dashboards::MoveDashboardRequestBody,
+            crate::handler::http::models::dashboards::MoveDashboardsRequestBody,
             // Destinations
             crate::handler::http::models::destinations::Destination,
             crate::handler::http::models::destinations::DestinationType,

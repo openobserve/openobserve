@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -220,12 +220,7 @@ impl From<TemplateError> for Error {
 
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"{{"error_code": {}, "error_msg": "{}"}}"#,
-            self.get_code(),
-            self.get_message()
-        )
+        write!(f, "{}", self.to_json())
     }
 }
 

@@ -18,9 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     ider::SnowflakeIdGenerator,
     meta::{
@@ -33,12 +34,11 @@ use config::{
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
-    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
+    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
     prelude::state,
 };
 
@@ -241,6 +241,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             is_partial: None,
             delay_in_secs: None,
             evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -544,7 +546,7 @@ pub fn create_log_ingestion_req(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{unwrap_stream_settings, STREAM_SETTINGS};
+    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
 
     use super::*;
 

@@ -16,21 +16,21 @@
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use actix_web::{http, web};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use config::{
+    TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     meta::{
         alerts::alert::Alert,
-        promql::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
-    TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
-use infra::schema::{unwrap_partition_time_level, SchemaCache};
+use infra::schema::{SchemaCache, unwrap_partition_time_level};
 
 use super::get_exclude_labels;
 use crate::{
@@ -42,7 +42,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{evaluate_trigger, get_write_partition_key, write_file, TriggerAlertData},
+        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
         pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
@@ -419,10 +419,11 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = chrono::Utc::now().timestamp_micros();
                     for alert in alerts {
-                        if let Ok((Some(v), _)) =
-                            alert.evaluate(Some(record), (None, alert_end_time)).await
-                        {
-                            trigger_alerts.push((alert.clone(), v));
+                        match alert.evaluate(Some(record), (None, alert_end_time)).await {
+                            Ok(res) if res.data.is_some() => {
+                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
+                            }
+                            _ => {}
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
@@ -478,7 +479,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
         ])
         .observe(time);
@@ -487,7 +487,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             "/api/org/ingest/metrics/_json",
             "200",
             org_id,
-            "",
             StreamType::Metrics.as_str(),
         ])
         .inc();

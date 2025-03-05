@@ -25,13 +25,14 @@ use config::{
 use hashbrown::HashMap;
 use infra::{cache, db::get_db};
 use once_cell::sync::Lazy;
-use opentelemetry::{global, metrics::Histogram, KeyValue};
+use opentelemetry::{KeyValue, global, metrics::Histogram};
 use opentelemetry_sdk::{
+    Resource,
     metrics::{
-        new_view, reader::DefaultTemporalitySelector, Aggregation, Instrument, PeriodicReader,
-        SdkMeterProvider, Stream,
+        Aggregation, Instrument, PeriodicReader, SdkMeterProvider, Stream, new_view,
+        reader::DefaultTemporalitySelector,
     },
-    runtime, Resource,
+    runtime,
 };
 use tokio::{sync::Mutex, time};
 
@@ -97,9 +98,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {}", e);
         }
-        if let Err(e) = update_memory_usage().await {
-            log::error!("Error update memory_usage metrics: {}", e);
-        }
         interval.tick().await;
     }
 }
@@ -154,6 +152,10 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
@@ -241,12 +243,12 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         if columns.len() <= 2 {
             // query functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], "", "", "query"])
+                .with_label_values(&[columns[0], "", "query"])
                 .inc();
         } else {
             // ingest functions
             metrics::META_NUM_FUNCTIONS
-                .with_label_values(&[columns[0], columns[2], columns[1], "ingest"])
+                .with_label_values(&[columns[0], columns[1], "ingest"])
                 .inc();
         }
     }
@@ -258,30 +260,25 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
 }
 
 async fn update_storage_metrics() -> Result<(), anyhow::Error> {
+    if !config::cluster::LOCAL_NODE.is_compactor() {
+        return Ok(());
+    }
+
     let stats = cache::stats::get_stats();
     for (key, stat) in stats {
         let columns = key.split('/').collect::<Vec<&str>>();
         metrics::STORAGE_ORIGINAL_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.storage_size as i64);
         metrics::STORAGE_COMPRESSED_BYTES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.compressed_size as i64);
         metrics::STORAGE_FILES
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.file_num);
         metrics::STORAGE_RECORDS
-            .with_label_values(&[columns[0], columns[2], columns[1]])
+            .with_label_values(&[columns[0], columns[1]])
             .set(stat.doc_num);
-    }
-    Ok(())
-}
-
-async fn update_memory_usage() -> Result<(), anyhow::Error> {
-    if let Some(cur_memory) = memory_stats::memory_stats() {
-        metrics::MEMORY_USAGE
-            .with_label_values(&[])
-            .set(cur_memory.physical_mem as i64);
     }
     Ok(())
 }

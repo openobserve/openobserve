@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use components::{DerivedStream, Edge, Node, NodeData, PipelineSource};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Error, FromRow, Row, Type};
@@ -88,6 +88,7 @@ impl Pipeline {
     /// 6. all leaf nodes are of type StreamNode
     /// 7. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
     ///    `after_flattened` checked FunctionNode
+    /// 8. EnrichmentTables can only be used in Scheduled pipelines
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
     pub fn validate(&mut self) -> Result<()> {
@@ -126,11 +127,22 @@ impl Pipeline {
             _ => return Err(anyhow!("Source must be either a StreamNode or QueryNode")),
         };
 
-        // ck 4
-        if self.nodes.iter().any(|node| {
-            matches!(node.get_node_data(), NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
-        }) {
-            return Err(anyhow!("ConditionNode must have non-empty conditions"));
+        for node in self.nodes.iter() {
+            // ck 4
+            if matches!(&node.data, NodeData::Condition(condition_params) if condition_params.conditions.is_empty())
+            {
+                return Err(anyhow!("ConditionNode must have non-empty conditions"));
+            }
+            // ck 8
+            if let NodeData::Stream(stream_params) = &node.data {
+                if stream_params.stream_type == StreamType::EnrichmentTables
+                    && matches!(&self.source, PipelineSource::Realtime(_))
+                {
+                    return Err(anyhow!(
+                        "EnrichmentTables can only be used in Scheduled pipelines"
+                    ));
+                }
+            }
         }
 
         // ck 5
@@ -263,6 +275,23 @@ impl Pipeline {
                 dest.destination_name == destination
             } else {
                 false
+            }
+        })
+    }
+
+    pub fn get_metadata_by_stream_params(
+        &self,
+        other_stream_params: &StreamParams,
+    ) -> Option<HashMap<String, String>> {
+        self.nodes.iter().find_map(|node| {
+            if let NodeData::Stream(this_stream_params) = &node.data {
+                if this_stream_params == other_stream_params {
+                    node.meta.clone()
+                } else {
+                    None
+                }
+            } else {
+                None
             }
         })
     }

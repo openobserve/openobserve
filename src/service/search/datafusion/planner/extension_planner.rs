@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,9 +19,9 @@ use async_trait::async_trait;
 use datafusion::{
     common::Result as DataFusionResult,
     error::DataFusionError,
-    execution::{context::QueryPlanner, SessionState},
+    execution::{SessionState, context::QueryPlanner},
     logical_expr::{LogicalPlan, UserDefinedLogicalNode},
-    physical_plan::{expressions::Column, ExecutionPlan},
+    physical_plan::{ExecutionPlan, expressions::Column},
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
 

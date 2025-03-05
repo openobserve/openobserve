@@ -35,15 +35,15 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 
 use crate::{
     common::infra::cluster,
     service::{
         grpc::make_grpc_metrics_client,
         promql::{
-            adjust_start_end, micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK,
-            DEFAULT_MAX_POINTS_PER_SERIES,
+            DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end,
+            micros, value::*,
         },
         search::server_internal_error,
         self_reporting::report_request_usage_stats,
@@ -105,7 +105,10 @@ async fn search_in_cluster(
         "[trace_id {trace_id}] promql->search->start: org_id: {}, no_cache: {}, time_range: [{},{}), step: {}, query: {}",
         req.org_id,
         cache_disabled,
-        start,end,step,query,
+        start,
+        end,
+        step,
+        query,
     );
 
     // get querier nodes from cluster
@@ -261,12 +264,12 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
                     &node.get_grpc_addr(),
                     req_need_wal,
-                    response.took,
                     scan_stats.files,
                     scan_stats.original_size,
+                    response.took,
                 );
                 Ok(response)
             }
@@ -326,10 +329,10 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
-        op_start.elapsed().as_millis(),
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
+        op_start.elapsed().as_millis(),
     );
 
     let req_stats = RequestStats {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{datetime_now, OrdF64};
+use super::{OrdF64, datetime_now};
 use crate::meta::stream::StreamType;
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -233,6 +233,10 @@ pub struct PanelConfig {
     step_value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y_axis_max: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

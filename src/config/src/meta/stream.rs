@@ -18,7 +18,7 @@ use std::{cmp::max, fmt::Display};
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
 
 use super::bitvec::BitVec;
@@ -26,7 +26,7 @@ use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
     utils::{
-        hash::{gxhash, Sum64},
+        hash::{Sum64, gxhash},
         json::{self, Map, Value},
     },
 };
@@ -703,7 +703,10 @@ impl Serialize for StreamSettings {
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
                 if !fields.is_empty() {
-                    state.serialize_field("defined_schema_fields", fields)?;
+                    let mut fields = fields.clone();
+                    fields.sort_unstable();
+                    fields.dedup();
+                    state.serialize_field("defined_schema_fields", &fields)?;
                 } else {
                     state.skip_field("defined_schema_fields")?;
                 }
@@ -791,13 +794,15 @@ impl From<&str> for StreamSettings {
 
         let mut defined_schema_fields: Option<Vec<String>> = None;
         if let Some(value) = settings.get("defined_schema_fields") {
-            let fields = value
+            let mut fields = value
                 .as_array()
                 .unwrap()
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
             if !fields.is_empty() {
+                fields.sort_unstable();
+                fields.dedup();
                 defined_schema_fields = Some(fields);
             }
         }

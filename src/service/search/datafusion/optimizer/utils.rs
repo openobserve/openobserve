@@ -18,14 +18,14 @@ use std::sync::Arc;
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
+        Column, DFSchema, Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
         },
-        Column, DFSchema, Result,
     },
     datasource::DefaultTableSource,
     logical_expr::{
-        col, Extension, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource,
+        Extension, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col,
     },
     prelude::Expr,
     scalar::ScalarValue,
