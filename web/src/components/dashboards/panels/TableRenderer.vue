@@ -128,6 +128,35 @@ export default defineComponent({
       }
     };
 
+    const downloadTableAsJSON = (title?: string) => {
+      try {
+        // Create JSON structure with columns and rows
+        const jsonContent = {
+          columns: props?.data?.columns,
+          rows: tableRef?.value?.filteredSortedRows || [],
+        };
+
+        const content = JSON.stringify(jsonContent, null, 2);
+
+        const status = exportFile(
+          (title ?? "table-export") + ".json",
+          content,
+          "application/json",
+        );
+
+        if (status === true) {
+          showPositiveNotification("Table downloaded as a JSON file", {
+            timeout: 2000,
+          });
+        } else {
+          showErrorNotification("Browser denied file download...");
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     const getStyle = (rowData: any) => {
       const value = rowData?.row[rowData?.col?.field] ?? rowData?.value;
 
@@ -169,6 +198,7 @@ export default defineComponent({
         rowsPerPage: 0,
       }),
       downloadTableAsCSV,
+      downloadTableAsJSON,
       tableRef,
       getStyle,
       store,

@@ -62,17 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Full screen"
           data-test="dashboard-panel-fullscreen-btn"
         />
-        <!-- if table chart then download button as a csv file -->
-        <q-btn
-          v-if="!viewOnly && isCurrentlyHoveredPanel"
-          icon="download"
-          flat
-          size="sm"
-          padding="1px"
-          @click="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
-          title="Download as a CSV"
-          data-test="dashboard-panel-table-download-as-csv-btn"
-        />
         <q-btn
           v-if="dependentAdHocVariable"
           :icon="outlinedWarning"
@@ -243,6 +232,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-query-inspector-panel"
                   class="q-pa-sm"
                   >Query Inspector</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-if="metaData && metaData.queries?.length > 0"
+              v-close-popup="true"
+              @click="
+                PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
+              "
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-panel-download-as-csv-btn"
+                  class="q-pa-sm"
+                  >Download as CSV</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
+              v-if="metaData && metaData.queries?.length > 0"
+              v-close-popup="true"
+              @click="
+                PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
+              "
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-panel-download-as-json-btn"
+                  class="q-pa-sm"
+                  >Download as JSON</q-item-label
                 >
               </q-item-section>
             </q-item>
