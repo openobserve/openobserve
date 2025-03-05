@@ -190,6 +190,8 @@ async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResu
 
     // use consistent hashing to select querier
     // CONFIRM: map all messages with the same trace_id to the same querier
+    // CONFIRM: is it too expensive to call for every single request?
+    // CONFIRM: can multiple queriers have the same node? 
     let node = cluster::get_node_from_consistent_hash(
         trace_id,
         &config::meta::cluster::Role::Querier,

@@ -52,6 +52,7 @@ impl QuerierConnectionPool {
         }
 
         // Create new connection
+        // can't use the same name
         let conn = self.create_connection(querier_name, response_tx).await?;
         self.connections
             .write()
