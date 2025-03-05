@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
+            :icon="tab.icon"
             :label="tab.label"
             content-class="tab_content"
           />
@@ -129,6 +130,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/python.svg"),
         label: "Python",
         contentClass: "tab_content",
       },
@@ -140,6 +142,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/dotnet.svg"),
         label: ".Net",
         contentClass: "tab_content",
       },
@@ -151,6 +154,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/nodejs.svg"),
         label: "NodeJS",
         contentClass: "tab_content",
       },
@@ -162,6 +166,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/golang.svg"),
         label: "Go",
         contentClass: "tab_content",
       },
@@ -173,6 +178,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/rust.svg"),
         label: "Rust",
         contentClass: "tab_content",
       },
@@ -184,6 +190,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/java.svg"),
         label: "Java",
         contentClass: "tab_content",
       },
@@ -195,6 +202,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/fastapi.svg"),
         label: "FastAPI",
         contentClass: "tab_content",
       }

@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
+            :icon="tab.icon"
             :label="tab.label"
             content-class="tab_content"
           />
@@ -129,6 +130,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/jenkins.svg"),
         label: "Jenkins",
         contentClass: "tab_content",
       },
@@ -140,6 +142,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/ansible.svg"),
         label: "Ansible",
         contentClass: "tab_content",
       },
@@ -151,6 +154,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/terraform.svg"),
         label: "Terraform",
         contentClass: "tab_content",
       },
@@ -162,6 +166,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/github-actions.svg"),
         label: "GitHub Actions",
         contentClass: "tab_content",
       }
