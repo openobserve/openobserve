@@ -36,9 +36,10 @@ use tokio::sync::mpsc;
 #[cfg(feature = "enterprise")]
 use crate::service::self_reporting::audit;
 #[cfg(feature = "enterprise")]
-use crate::service::websocket_events::search_registry_utils::SearchState;
+use crate::service::websocket_events::handle_cancel;
 use crate::service::websocket_events::{
-    WsClientEvents, WsServerEvents, handle_cancel, handle_search_request, search_registry_utils,
+    WsClientEvents, WsServerEvents, handle_search_request,
+    search_registry_utils::{self, SearchState},
     sessions_cache_utils,
 };
 
