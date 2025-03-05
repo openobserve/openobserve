@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
+            :icon="tab.icon"
             :label="tab.label"
             content-class="tab_content"
           />
@@ -129,6 +130,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/sqlserver.png"),
         label: "SQL Server",
         contentClass: "tab_content",
       },
@@ -140,6 +142,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/postgres.png"),
         label: "Postgres",
         contentClass: "tab_content",
       },
@@ -151,6 +154,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/mongodb.svg"),
         label: "MongoDB",
         contentClass: "tab_content",
       },
@@ -162,6 +166,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/redis.svg"),
         label: "Redis",
         contentClass: "tab_content",
       },
@@ -173,6 +178,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/couchdb.svg"),
         label: "CouchDB",
         contentClass: "tab_content",
       },
@@ -184,6 +190,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/elasticsearch.svg"),
         label: "Elasticsearch",
         contentClass: "tab_content",
       },
@@ -195,6 +202,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/mysql.svg"),
         label: "MySQL",
         contentClass: "tab_content",
       },
@@ -206,6 +214,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/saphana.png"),
         label: "SAP HANA",
         contentClass: "tab_content",
       },
@@ -217,6 +226,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/snowflake.svg"),
         label: "Snowflake",
         contentClass: "tab_content",
       },
@@ -228,6 +238,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/zookeeper.png"),
         label: "Zookeeper",
         contentClass: "tab_content",
       },
@@ -239,6 +250,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/cassandra.png"),
         label: "Cassandra",
         contentClass: "tab_content",
       },
@@ -250,6 +262,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/aerospike.svg"),
         label: "Aerospike",
         contentClass: "tab_content",
       },
@@ -261,6 +274,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
+        icon: "img:" + getImageURL("images/ingestion/dynamodb.png"),
         label: "DynamoDB",
         contentClass: "tab_content",
       }
