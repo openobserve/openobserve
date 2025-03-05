@@ -706,7 +706,7 @@ export default defineComponent({
         });
 
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" created successfully`,
+          message: `Template - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file `,
           success: true,
         });
 
