@@ -110,12 +110,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <template #before>
                             <!-- fieldlist section -->
+                <span @click.stop="expandState.buildQuery = !expandState.buildQuery">
                 <FullViewContainer
                   name="query"
                   v-model:is-expanded="expandState.buildQuery"
                   label="Build Query"
                   class="tw-mt-1"
                 />
+              </span>
               <div class="q-pt-sm" v-show="expandState.buildQuery"  >
                 
               <div >
@@ -181,6 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #after>
+              <span @click.stop="expandState.setVariables = !expandState.setVariables">
+
               <!-- set variables part -->
               <FullViewContainer
                   name="query"
@@ -188,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Set Variables"
                   class="tw-mt-1"
                 />
+              </span>
               <div v-show="expandState.setVariables"  class="flex justify-between q-pl-sm full-height" style="overflow-y: auto !important;">
               <div>
               <div
@@ -888,12 +893,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              
               <div class="full-width" style="height: calc(100vh - 140px) !important;" >
               <div class="query-editor-container scheduled-pipelines">
+                <span @click.stop="expandState.query = !expandState.query">
                 <FullViewContainer
                   name="query"
                   v-model:is-expanded="expandState.query"
                   :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
                   class="tw-mt-1"
                 />
+                </span>
                 <query-editor
                   v-show="expandState.query"
                   data-test="scheduled-pipeline-sql-editor"
@@ -911,13 +918,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               
              
               </div>
+
               <div>
+                <span @click.stop="expandState.output = !expandState.output">
                 <FullViewContainer
                   name="output"
                   v-model:is-expanded="expandState.output"
                   label="Output"
                   class="tw-mt-1"
                 />
+                </span>
                   <TenstackTable
 
                     v-if="rows.length > 0 && tab == 'sql'"
