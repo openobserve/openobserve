@@ -930,9 +930,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 </span>
                   <TenstackTable
-                    v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
-                    v-show="expandState.output"
+                    v-show="expandState.output && rows.length > 0 && tab == 'sql'"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
