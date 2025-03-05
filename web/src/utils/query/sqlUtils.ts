@@ -67,6 +67,13 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   }
 };
 
+const formatValue = (value: any): string => {
+  if (Array.isArray(value)) {
+    return `'${value.map((v) => escapeSingleQuotes(v)).join(",")}'`;
+  }
+  return `'${escapeSingleQuotes(value)}'`;
+};
+
 export const addLabelToSQlQuery = async (
   originalQuery: any,
   label: any,
@@ -77,77 +84,93 @@ export const addLabelToSQlQuery = async (
 
   let condition: any;
 
-  switch (operator) {
-    case "Contains":
-      operator = "LIKE";
-      value = "%" + escapeSingleQuotes(value) + "%";
-      break;
-    case "Not Contains":
-      operator = "NOT LIKE";
-      value = "%" + escapeSingleQuotes(value) + "%";
-      break;
-    case "Is Null":
-      operator = "IS NULL";
-      break;
-    case "Is Not Null":
-      operator = "IS NOT NULL";
-      break;
-    case "IN":
-      operator = "IN";
-      // add brackets if not present in "IN" conditions
-      value = splitQuotedString(value).map((it: any) => ({
-        type: "single_quote_string",
-        value: escapeSingleQuotes(it),
-      }));
-      break;
-    case "=":
-    case "<>":
-    case "!=":
-    case "<":
-    case ">":
-    case "<=":
-    case ">=":
-      // If value starts and ends with quote, remove it
-      value =
-        value &&
-        value.length > 1 &&
-        value.startsWith("'") &&
-        value.endsWith("'")
-          ? value.substring(1, value.length - 1)
-          : value;
-      // escape single quotes by doubling them
-      value = escapeSingleQuotes(value);
-      break;
-  }
+  if (operator === "match_all") {
+    condition = `match_all(${formatValue(value)})`;
+  } else if (operator === "match_all_raw") {
+    condition = `match_all_raw(${formatValue(value)})`;
+  } else if (operator === "match_all_raw_ignore_case") {
+    condition = `match_all_raw_ignore_case(${formatValue(value)})`;
+  } else if (operator === "str_match") {
+    condition = `str_match(${label}, ${formatValue(value)})`;
+  } else if (operator === "str_match_ignore_case") {
+    condition = `str_match_ignore_case(${label}, ${formatValue(value)})`;
+  } else if (operator === "re_match") {
+    condition = `re_match(${label}, ${formatValue(value)})`;
+  } else if (operator === "re_not_match") {
+    condition = `re_not_match(${label}, ${formatValue(value)})`;
+  } else {
+    switch (operator) {
+      case "Contains":
+        operator = "LIKE";
+        value = "%" + escapeSingleQuotes(value) + "%";
+        break;
+      case "Not Contains":
+        operator = "NOT LIKE";
+        value = "%" + escapeSingleQuotes(value) + "%";
+        break;
+      case "Is Null":
+        operator = "IS NULL";
+        break;
+      case "Is Not Null":
+        operator = "IS NOT NULL";
+        break;
+      case "IN":
+        operator = "IN";
+        // add brackets if not present in "IN" conditions
+        value = splitQuotedString(value).map((it: any) => ({
+          type: "single_quote_string",
+          value: escapeSingleQuotes(it),
+        }));
+        break;
+      case "=":
+      case "<>":
+      case "!=":
+      case "<":
+      case ">":
+      case "<=":
+      case ">=":
+        // If value starts and ends with quote, remove it
+        value =
+          value &&
+          value.length > 1 &&
+          value.startsWith("'") &&
+          value.endsWith("'")
+            ? value.substring(1, value.length - 1)
+            : value;
+        // escape single quotes by doubling them
+        value = escapeSingleQuotes(value);
+        break;
+    }
 
-  // Construct condition based on operator
-  condition =
-    operator === "IS NULL" || operator === "IS NOT NULL"
-      ? {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: "",
-          },
-        }
-      : {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: operator === "IN" ? "expr_list" : "string",
-            value: value,
-          },
-        };
+    // Construct condition based on operator
+    condition =
+      operator === "IS NULL" || operator === "IS NOT NULL"
+        ? {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type: "",
+            },
+          }
+        : {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type: operator === "IN" ? "expr_list" : "string",
+              value: value,
+            },
+          };
+  }
 
   const ast: any = parser.astify(originalQuery);
 
