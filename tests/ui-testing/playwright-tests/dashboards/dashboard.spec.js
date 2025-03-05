@@ -260,6 +260,7 @@ test.describe("dashboard UI testcases", () => {
       )
       .click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-h-btn"]').click();
     await page
@@ -277,7 +278,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(300);
 
-    await expect(page.locator('[data-test="date-time-btn"]')).toBeVisible();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-absolute-tab"]').click();
     await page
@@ -347,6 +348,7 @@ test.describe("dashboard UI testcases", () => {
     await page.waitForTimeout(200);
 
     await page.locator('[data-test="dashboard-apply"]'); //.toBeVisible();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-h-btn"]').click();
@@ -396,6 +398,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     //  await page.locator('[data-test="field-list-item-logs-e2e_automate-kubernetes_docker_id"] [data-test="dashboard-add-y-data"]').click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -472,6 +475,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_labels_app_kubernetes_io_managed_by"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
 
@@ -562,6 +566,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
       )
       .click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
     await page
@@ -670,6 +675,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
       )
       .click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
     await page
@@ -736,8 +742,9 @@ test.describe("dashboard UI testcases", () => {
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
+      ).click();
+
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -771,6 +778,7 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-edit-panel"]').click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -829,6 +837,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     // Set date-time and timezone
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -848,6 +857,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="selected-chart-table-item"] img').click();
 
     // Set timezone for the table chart
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page
       .locator("label")
@@ -906,7 +916,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-
+     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -917,6 +927,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(200);
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-5-w-btn"]').click();
 
@@ -971,7 +982,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
@@ -1101,7 +1112,9 @@ test.describe("dashboard UI testcases", () => {
 
     // Apply "Is Not Null" filter
     await page.locator('[data-test="no-data"]').click();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
+
     await page.locator('[data-test="date-time-relative-tab"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
