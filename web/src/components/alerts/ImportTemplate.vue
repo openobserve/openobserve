@@ -281,8 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-red"
                         v-else-if="
                           typeof errorMessage === 'object' &&
-                          errorMessage.field == 'title' &&
-                          jsonArrayOfObj.value[index]?.type === 'email'
+                          errorMessage.field == 'title'
                         "
                       >
                         {{ errorMessage.message }}
