@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use ::config::{
     get_config,
@@ -28,30 +28,12 @@ use actix_web::{
     http::{Error, Method},
     route, web,
 };
-use once_cell::sync::OnceCell;
+pub use ws_v2::remove_querier_from_handler;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
 mod ws;
 mod ws_v2;
-
-// Initialize WsHandler global instance
-static WS_HANDLER: OnceCell<Arc<ws_v2::WsHandler>> = OnceCell::new();
-
-// Helper function to get or initialize the WsHandler
-async fn get_ws_handler() -> Arc<ws_v2::WsHandler> {
-    if let Some(handler) = WS_HANDLER.get() {
-        return handler.clone();
-    }
-
-    // Initialize if not already done
-    let handler = ws_v2::init().await.unwrap();
-
-    // This may fail if another thread initialized it first, which is fine
-    let _ = WS_HANDLER.set(handler.clone());
-
-    handler
-}
 
 const QUERIER_ROUTES: [&str; 20] = [
     "/config",
@@ -479,11 +461,8 @@ async fn proxy_ws(
             );
 
             // Use the WebSocket v2 handler
-            match get_ws_handler()
-                .await
-                .handle_connection(req, payload, client_id)
-                .await
-            {
+            let ws_handler = ws_v2::get_ws_handler().await;
+            match ws_handler.handle_connection(req, payload, client_id).await {
                 Ok(response) => Ok(response),
                 Err(e) => {
                     log::error!("[WS_V2_ROUTER] failed: {}", e);

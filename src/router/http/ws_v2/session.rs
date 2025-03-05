@@ -1,11 +1,28 @@
-use std::collections::HashMap;
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::collections::{HashMap, HashSet};
 
 use config::{RwAHashMap, ider};
 
 use super::{error::*, types::*};
 
+#[derive(Debug, Default)]
 pub struct SessionManager {
     sessions: RwAHashMap<ClientId, SessionInfo>,
+    mapped_queriers: RwAHashMap<QuerierName, Vec<TraceId>>,
 }
 
 #[derive(Debug, Clone)]
@@ -17,15 +34,10 @@ pub struct SessionInfo {
 }
 
 impl SessionManager {
-    pub fn new() -> Self {
-        Self {
-            sessions: RwAHashMap::default(),
-        }
-    }
-
-    pub async fn get_or_create_session(&self, client_id: &ClientId) -> SessionInfo {
-        if let Some(session) = self.sessions.read().await.get(client_id) {
-            return session.clone();
+    pub async fn register_client(&self, client_id: &ClientId) {
+        if self.sessions.read().await.get(client_id).is_some() {
+            self.update_session_activity(client_id).await;
+            return;
         }
 
         let now = chrono::Utc::now();
@@ -39,44 +51,86 @@ impl SessionManager {
         let mut write_guard = self.sessions.write().await;
         if !write_guard.contains_key(client_id) {
             write_guard.insert(client_id.clone(), session_info.clone());
-            return session_info;
+            return;
         }
-        drop(write_guard);
-
-        self.sessions.read().await.get(client_id).unwrap().clone()
     }
 
-    pub async fn update_session_activity(&self, client_id: &ClientId) -> WsResult<()> {
+    pub async fn update_session_activity(&self, client_id: &ClientId) {
         let mut write_guard = self.sessions.write().await;
-        write_guard
-            .get_mut(client_id)
-            .ok_or(WsError::SessionNotFound(format!(
-                "[WS::SessionManager]: client_id {} not found",
-                client_id
-            )))?
-            .created_at = chrono::Utc::now();
-        Ok(())
+        if let Some(session_info) = write_guard.get_mut(client_id) {
+            session_info.last_active = chrono::Utc::now();
+        }
     }
 
-    pub async fn remove_session(&self, client_id: &ClientId) {
-        self.sessions.write().await.remove(client_id);
+    pub async fn unregister_client(&self, client_id: &ClientId) {
+        if let Some(session_info) = self.sessions.write().await.remove(client_id) {
+            let mut mapped_querier_write = self.mapped_queriers.write().await;
+
+            for (trace_id, querier_name) in session_info.querier_mappings {
+                if let Some(trace_ids) = mapped_querier_write.get_mut(&querier_name) {
+                    trace_ids.retain(|tid| tid != &trace_id);
+                }
+            }
+        }
+    }
+
+    pub async fn remove_querier_connection(&self, querier_name: &QuerierName) {
+        let client_ids = {
+            let (mapped_read, sessions_read) =
+                tokio::join!(self.mapped_queriers.read(), self.sessions.read());
+
+            match mapped_read.get(querier_name) {
+                Some(_) => sessions_read.keys().cloned().collect::<Vec<_>>(),
+                None => return,
+            }
+        };
+
+        // Remove from mapped_querier
+        let trace_ids = self
+            .mapped_queriers
+            .write()
+            .await
+            .remove(querier_name)
+            .map(|ids| ids.into_iter().collect::<HashSet<_>>())
+            .unwrap(); // existence validated
+
+        // Batch update sessions
+        let mut session_write = self.sessions.write().await;
+        for client_id in client_ids {
+            if let Some(session_info) = session_write.get_mut(&client_id) {
+                session_info
+                    .querier_mappings
+                    .retain(|tid, _| !trace_ids.contains(tid));
+            }
+        }
     }
 
     pub async fn set_querier_for_trace(
         &self,
         client_id: &ClientId,
-        trace_id: TraceId,
-        querier_name: QuerierName,
+        trace_id: &TraceId,
+        querier_name: &QuerierName,
     ) -> WsResult<()> {
-        let mut write_guard = self.sessions.write().await;
-        write_guard
+        // sessions
+        // let mut write_guard = self.sessions.write().await;
+        self.sessions
+            .write()
+            .await
             .get_mut(client_id)
             .ok_or(WsError::SessionNotFound(format!(
                 "[WS::SessionManager]: client_id {} not found",
                 client_id
             )))?
             .querier_mappings
-            .insert(trace_id, querier_name);
+            .insert(trace_id.clone(), querier_name.clone());
+
+        // mapped_queriers
+        self.mapped_queriers
+            .write()
+            .await
+            .entry(querier_name.clone())
+            .or_insert_with(|| Vec::new())
+            .push(trace_id.clone());
         Ok(())
     }
 
