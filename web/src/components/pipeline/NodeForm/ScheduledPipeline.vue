@@ -1211,7 +1211,7 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const  pipelineEditorRef : any = ref(null);
-const expandedLogs = ref([]);
+const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
