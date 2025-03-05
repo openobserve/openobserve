@@ -1304,6 +1304,12 @@ pub struct Limit {
     )]
     pub inverted_index_skip_threshold: usize,
     #[env_config(
+        name = "ZO_DEFAULT_MAX_QUERY_RANGE_DAYS",
+        default = 0,
+        help = "unit: Days. Global default max query range for all streams. If set to a value > 0, this will be used as the default max query range. Can be overridden by stream settings."
+    )]
+    pub default_max_query_range_days: i64,
+    #[env_config(
         name = "ZO_MAX_QUERY_RANGE_FOR_SA",
         default = 0,
         help = "unit: Hour. Optional env variable to add restriction for SA, if not set SA will use max_query_range stream setting. When set which ever is smaller value will apply to api calls"
