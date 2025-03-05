@@ -190,9 +190,15 @@ impl ExecutablePipeline {
         &self,
         org_id: &str,
         records: Vec<Value>,
+        stream_name: Option<String>,
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
-        log::debug!("[Pipeline]: process batch of size {}", batch_size);
+        let pipeline_name = self.name.clone();
+        log::debug!(
+            "[Pipeline] {} : process batch of size {}",
+            pipeline_name,
+            batch_size
+        );
 
         // result_channel
         let (result_sender, mut result_receiver) =
@@ -225,6 +231,8 @@ impl ExecutablePipeline {
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
             let vrl_runtime = self.vrl_map.get(node_id).cloned();
+            let pipeline_name = pipeline_name.clone();
+            let stream_name = stream_name.clone();
 
             let task = tokio::spawn(async move {
                 process_node(
@@ -237,6 +245,8 @@ impl ExecutablePipeline {
                     vrl_runtime,
                     result_sender_cp,
                     error_sender_cp,
+                    pipeline_name,
+                    stream_name,
                 )
                 .await
             });
@@ -485,13 +495,18 @@ async fn process_node(
     vrl_runtime: Option<VRLResultResolver>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
     error_sender: Sender<(String, String, String)>,
+    pipeline_name: String,
+    stream_name: Option<String>,
 ) -> Result<()> {
     let cfg = config::get_config();
     let mut count: usize = 0;
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!("[Pipeline]: Leaf node {node_idx} starts processing");
+                log::debug!(
+                    "[Pipeline] {} : Leaf node {node_idx} starts processing",
+                    pipeline_name
+                );
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
@@ -509,7 +524,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -539,7 +555,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -552,7 +569,8 @@ async fn process_node(
                         result_sender.send((idx, destination_stream, record)).await
                     {
                         log::error!(
-                            "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
+                            "[Pipeline] {} : LeafNode errors sending result for collection caused by: {send_err}",
+                            pipeline_name
                         );
                         break;
                     }
@@ -566,7 +584,10 @@ async fn process_node(
                     send_to_children(&mut child_senders, item, "StreamNode").await;
                     count += 1;
                 }
-                log::debug!("[Pipeline]: source node {node_idx} done processing {count} records");
+                log::debug!(
+                    "[Pipeline] {} : source node {node_idx} done processing {count} records",
+                    pipeline_name
+                );
             }
         }
         NodeData::Condition(condition_params) => {
@@ -586,7 +607,8 @@ async fn process_node(
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline]: ConditionNode failed sending errors for collection caused by: {send_err}"
+                                    "[Pipeline] {} : ConditionNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
                                 );
                                 break;
                             }
@@ -630,7 +652,8 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                        pipeline_name
                                     );
                                     break;
                                 }
@@ -643,7 +666,7 @@ async fn process_node(
                         vrl_runtime,
                         record,
                         &org_id,
-                        &["pipeline".to_string()],
+                        &[stream_name.clone()],
                     ) {
                         (res, None) => res,
                         (res, Some(error)) => {
@@ -653,7 +676,8 @@ async fn process_node(
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline]: FunctionNode failed sending errors for collection caused by: {send_err}"
+                                    "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                    pipeline_name
                                 );
                                 break;
                             }

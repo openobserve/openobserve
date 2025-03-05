@@ -437,7 +437,10 @@ pub async fn handle_otlp_request(
             span_durations,
         ) = stream_pipeline_inputs.into_parts();
         let records_count = records.len();
-        match exec_pl.process_batch(org_id, records).await {
+        match exec_pl
+            .process_batch(org_id, records, in_stream_name.map(String::from))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[TRACES:OTLP] pipeline({}/{}) batch execution error: {}.",
@@ -865,7 +868,7 @@ async fn write_traces(
         if !map.is_empty() {
             distinct_values.push(MetadataItem::DistinctValues(DvItem {
                 stream_type: StreamType::Traces,
-                stream_name: stream_name.to_string(),
+                stream_name: service_name.to_string(),
                 value: map,
             }));
         }
@@ -893,7 +896,7 @@ async fn write_traces(
                         "{}/{}/{}/{}",
                         org_id,
                         StreamType::Traces,
-                        stream_name,
+                        service_name,
                         alert.name
                     );
                     // check if alert already evaluated

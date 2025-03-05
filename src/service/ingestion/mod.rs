@@ -100,11 +100,21 @@ pub fn apply_vrl_fn(
     stream_name: &[String],
 ) -> (Value, Option<String>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(&row),
         metadata: &mut metadata,
         secrets: &mut vrl::value::Secrets::new(),
     };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match vrl::compiler::VrlRuntime::default() {
         vrl::compiler::VrlRuntime::Ast => {
@@ -113,7 +123,11 @@ pub fn apply_vrl_fn(
     };
     match result {
         Ok(res) => match res.try_into() {
-            Ok(val) => (val, None),
+            Ok(val) => {
+                println!("VRL execution result: {:?}", val);
+                println!("Updated target: {:?}", target);
+                (val, None)
+            }
             Err(err) => {
                 metrics::INGEST_ERRORS
                     .with_label_values(&[

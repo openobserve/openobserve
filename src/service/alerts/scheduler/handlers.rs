@@ -961,7 +961,7 @@ async fn handle_derived_stream_triggers(
                             log::error!("{err_msg}");
                             ingestion_error_msg = Some(err_msg);
                         }
-                        Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val).await {
+                        Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
                             Err(e) => {
                                 let err_msg = format!(
                                     "[SCHEDULER trace_id {trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
