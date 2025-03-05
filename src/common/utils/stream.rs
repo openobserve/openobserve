@@ -135,7 +135,6 @@ pub fn get_max_query_range_if_sa(stream_max_query_range: i64, user: &User) -> i6
     let config = get_config();
     let default_max_query_range = config.limit.default_max_query_range_days * 24 ;
     
-    // Use the larger value between stream setting and global setting
     // This will allow the stream setting to override the global setting
     let effective_max_query_range = if stream_max_query_range > 0 {
         stream_max_query_range
