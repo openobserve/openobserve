@@ -75,7 +75,7 @@ import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
-  name: "SecurityPage",
+  name: "OthersPage",
   props: {
     currOrgIdentifier: {
       type: String,
@@ -94,12 +94,12 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("falco");
+    const ingestTabType = ref("airflow");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "others") {
         router.push({
-          name: "falco",
+          name: "airflow",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -109,9 +109,9 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "security") {
+      if (router.currentRoute.value.name === "others") {
         router.push({
-          name: "falco",
+          name: "airflow",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -120,89 +120,34 @@ export default defineComponent({
       }
     });
 
-    const securityTabs = [
+    const othersTabs = [
       {
-        name: "falco",
+        name: "airflow",
         to: {
-          name: "falco",
+          name: "airflow",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "Falco",
+        label: "Airflow",
         contentClass: "tab_content",
       },
       {
-        name: "osquery",
+        name: "airbyte",
         to: {
-          name: "osquery",
+          name: "airbyte",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         },
-        label: "OS Query",
+        label: "Airbyte",
         contentClass: "tab_content",
       },
-      {
-        name: "okta",
-        to: {
-          name: "okta",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Okta",
-        contentClass: "tab_content",
-      },
-      {
-        name: "jumpcloud",
-        to: {
-          name: "jumpcloud",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Jumpcloud",
-        contentClass: "tab_content",
-      },
-      {
-        name: "openvpn",
-        to: {
-          name: "openvpn",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "OpenVPN",
-        contentClass: "tab_content",
-      },
-      {
-        name: "office365",
-        to: {
-          name: "office365",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Office365",
-        contentClass: "tab_content",
-      },
-      {
-        name: "google-workspace",
-        to: {
-          name: "google-workspace",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        },
-        label: "Google Workspace",
-        contentClass: "tab_content",
-      }
     ];
 
     // create computed property to filter tabs
     const filteredList = computed(() => {
-      return securityTabs.filter((tab) => {
+      return othersTabs.filter((tab) => {
         return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
       });
     });
