@@ -63,7 +63,7 @@ async function ingestion(page) {
       logsdata: logsdata,
     }
   );
-  console.log(response);
+  // console.log(response);
 }
 
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -120,10 +120,10 @@ test.describe("dashboard testcases", () => {
     page.on("console", (msg) => console.log(msg.text()));
     page.on("response", async (resp) => {
       if (resp.url().includes("api/default/")) {
-        console.log("url      -> ", resp.url());
-        console.log("code     -> ", resp.status());
-        console.log("payload  -> ", resp.request().postData());
-        console.log("response -> ", await resp.text());
+        // console.log("url      -> ", resp.url());
+        // console.log("code     -> ", resp.status());
+        // console.log("payload  -> ", resp.request().postData());
+        // console.log("response -> ", await resp.text());
       }
     });
 
@@ -146,7 +146,7 @@ test.describe("dashboard testcases", () => {
       .getByRole("option", { name: "e2e_automate" })
       .locator("div")
       .nth(2)
-      .click();
+      .click(); 
     await page.waitForTimeout(3000);
     await page.locator('[data-test="selected-chart-area-item"] img').click();
     await page
@@ -154,16 +154,42 @@ test.describe("dashboard testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubectl_kubernetes_io_default_container"] [data-test="dashboard-add-y-data"]'
       )
       .click();
+      // while (await page.evaluate(() => document.querySelector('[data-test="date-time-btn"]')?.disabled)) {
+      //   await page.waitForTimeout(100); // Waits for 100ms before rechecking
+      // }
+  
+
     await page.locator('[data-test="dashboard-apply"]').click();
+    
+
+   
+    // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+
+    // await page. waitForTimeout(3000);
+
+    // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+    
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+    // await page.waitForTimeout(3000);
+
+    // await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
+   
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-3-d-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
+    // await page.waitForTimeout(3000);
+
+    //  await page.locator('[data-test="date-time-btn"]:not([disabled])').waitFor();
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -182,7 +208,7 @@ test.describe("dashboard testcases", () => {
       threshold: 50,
     });
     // await page.screenshot({ path: screenshotPath, selector: '[data-test="chart-renderer"]', threshold: 50 });
-    console.log(`Screenshot saved at: ${screenshotPath}`);
+    // console.log(`Screenshot saved at: ${screenshotPath}`);
 
     // Load the expected image from disk
     const expectedImage = PNG.sync.read(fs.readFileSync(screenshotPath));
@@ -206,7 +232,7 @@ test.describe("dashboard testcases", () => {
     if (numDiffPixels > 0) {
       const diffImagePath = `playwright-tests/dashboard-snaps/diff.png`;
       await promisify(fs.writeFile)(diffImagePath, PNG.sync.write(diff));
-      console.log(`Diff image saved at: ${diffImagePath}`);
+      // console.log(`Diff image saved at: ${diffImagePath}`);
     }
 
     // Assert the images are visually identical
@@ -234,6 +260,6 @@ test.describe("dashboard testcases", () => {
       .locator('[data-test="dashboard-delete"]')
       .click();
     await page.locator('[data-test="confirm-button"]').click();
-    
+
   });
 });
