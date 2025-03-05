@@ -1,6 +1,3 @@
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-
 export const formatInterval = (interval: any) => {
   switch (true) {
     // 0.01s
@@ -184,14 +181,4 @@ export const processVariableContent = (content: string, variablesData: any) => {
   }
 
   return processedContent;
-};
-
-export const processHTMLContent = (content: string, variablesData: any) => {
-  const processedContent = processVariableContent(content, variablesData);
-  return DOMPurify.sanitize(processedContent);
-};
-
-export const processMarkdownContent = (content: string, variablesData: any) => {
-  const processedContent = processVariableContent(content, variablesData);
-  return DOMPurify.sanitize(marked(processedContent));
 };

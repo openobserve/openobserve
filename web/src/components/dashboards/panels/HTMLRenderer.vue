@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw-prose tw-prose-sm tw-max-w-none',
         store.state?.theme === 'dark' && 'tw-prose-invert',
       ]"
-      v-html="processedContent"
+      v-html="DOMPurify.sanitize(processedContent)"
       data-test="html-renderer"
     ></div>
   </div>
@@ -30,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
-import { processHTMLContent } from "@/utils/dashboard/variables/variablesUtils";
+import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
+import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "HTMLRenderer",
@@ -48,10 +49,11 @@ export default defineComponent({
     const store = useStore();
 
     const processedContent = computed(() => {
-      return processHTMLContent(props.htmlContent, props.variablesData);
+      return processVariableContent(props.htmlContent, props.variablesData);
     });
 
     return {
+      DOMPurify,
       store,
       processedContent,
     };
