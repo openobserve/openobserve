@@ -248,10 +248,6 @@ const getDefaultStreamRoute: any = () => {
 };
 
 onMounted(() => {
-
-  if(scheduledPipelineRef.value){
-    console.log("scheduledPipelineRef.value", scheduledPipelineRef.value)
-  }
   
   if (pipelineObj.isEditNode) {
     streamRoute.value = pipelineObj.currentSelectedNodeData
