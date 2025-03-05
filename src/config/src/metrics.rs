@@ -15,10 +15,10 @@
 
 use std::collections::HashMap;
 
-use actix_web_prometheus::{PrometheusMetrics, PrometheusMetricsBuilder};
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
+    TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -33,17 +33,11 @@ pub static HTTP_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "http_incoming_requests",
-            "HTTP incoming requests. ".to_owned() + HELP_SUFFIX,
+            "HTTP incoming requests.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "endpoint",
-            "status",
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        &["endpoint", "status", "organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -51,17 +45,11 @@ pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
             "http_response_time",
-            "HTTP response time. ".to_owned() + HELP_SUFFIX,
+            "HTTP response time.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "endpoint",
-            "status",
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        &["endpoint", "status", "organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -71,17 +59,11 @@ pub static GRPC_INCOMING_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "grpc_incoming_requests",
-            "gRPC incoming requests. ".to_owned() + HELP_SUFFIX,
+            "gRPC incoming requests.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "endpoint",
-            "status",
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        &["endpoint", "status", "organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -89,17 +71,11 @@ pub static GRPC_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
         HistogramOpts::new(
             "grpc_response_time",
-            "gRPC response time. ".to_owned() + HELP_SUFFIX,
+            "gRPC response time.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[
-            "endpoint",
-            "status",
-            "organization",
-            "stream",
-            "stream_type",
-        ],
+        &["endpoint", "status", "organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -109,20 +85,20 @@ pub static INGEST_RECORDS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "ingest_records",
-            "Ingested records. ".to_owned() + HELP_SUFFIX,
+            "Ingested records.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
 pub static INGEST_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
-        Opts::new("ingest_bytes", "Ingested bytes. ".to_owned() + HELP_SUFFIX)
+        Opts::new("ingest_bytes", "Ingested bytes.".to_owned() + HELP_SUFFIX)
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -142,7 +118,7 @@ pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "ingest_wal_used_bytes",
-            "Ingestor WAL used bytes. ".to_owned() + HELP_SUFFIX,
+            "Ingestor WAL used bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -154,7 +130,7 @@ pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "ingest_wal_write_bytes",
-            "Ingestor WAL write bytes. ".to_owned() + HELP_SUFFIX,
+            "Ingestor WAL write bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -166,7 +142,7 @@ pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "ingest_wal_read_bytes",
-            "Ingestor WAL read bytes. ".to_owned() + HELP_SUFFIX,
+            "Ingestor WAL read bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -254,7 +230,7 @@ pub static QUERY_MEMORY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "query_memory_cache_used_bytes",
-            "Querier memory cache used bytes. ".to_owned() + HELP_SUFFIX,
+            "Querier memory cache used bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -266,7 +242,7 @@ pub static QUERY_MEMORY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "query_memory_cache_files",
-            "Querier memory cached files. ".to_owned() + HELP_SUFFIX,
+            "Querier memory cached files.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -292,7 +268,7 @@ pub static QUERY_DISK_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "query_disk_cache_used_bytes",
-            "Querier diskcache used bytes. ".to_owned() + HELP_SUFFIX,
+            "Querier diskcache used bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -304,7 +280,7 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "query_disk_cache_files",
-            "Querier disk cached files. ".to_owned() + HELP_SUFFIX,
+            "Querier disk cached files.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -318,7 +294,7 @@ pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| 
     IntGaugeVec::new(
         Opts::new(
             "query_disk_result_cache_used_bytes",
-            "Querier disk result cache used bytes. ".to_owned() + HELP_SUFFIX,
+            "Querier disk result cache used bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -330,7 +306,7 @@ pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(||
     IntGaugeVec::new(
         Opts::new(
             "query_disk_metrics_cache_used_bytes",
-            "Querier disk metrics result cached bytes. ".to_owned() + HELP_SUFFIX,
+            "Querier disk metrics result cached bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -344,7 +320,7 @@ pub static QUERY_METRICS_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "query_metrics_cache_requests",
-            "Querier metrics cache requests. ".to_owned() + HELP_SUFFIX,
+            "Querier metrics cache requests.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -356,7 +332,7 @@ pub static QUERY_METRICS_CACHE_HITS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "query_metrics_cache_hits",
-            "Querier metrics cache hits. ".to_owned() + HELP_SUFFIX,
+            "Querier metrics cache hits.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -370,7 +346,7 @@ pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
         Opts::new(
             "compact_used_time",
-            "Compactor used time. ".to_owned() + HELP_SUFFIX,
+            "Compactor used time.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -382,7 +358,7 @@ pub static COMPACT_MERGED_FILES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "compact_merged_files",
-            "Compactor merged files. ".to_owned() + HELP_SUFFIX,
+            "Compactor merged files.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -394,7 +370,7 @@ pub static COMPACT_MERGED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "compact_merged_bytes",
-            "Compactor merged bytes. ".to_owned() + HELP_SUFFIX,
+            "Compactor merged bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -421,11 +397,11 @@ pub static STORAGE_ORIGINAL_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "storage_original_bytes",
-            "Storage original bytes. ".to_owned() + HELP_SUFFIX,
+            "Storage original bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -433,20 +409,20 @@ pub static STORAGE_COMPRESSED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "storage_compressed_bytes",
-            "Storage compressed bytes. ".to_owned() + HELP_SUFFIX,
+            "Storage compressed bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
 pub static STORAGE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
-        Opts::new("storage_files", "Storage files. ".to_owned() + HELP_SUFFIX)
+        Opts::new("storage_files", "Storage files.".to_owned() + HELP_SUFFIX)
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -454,11 +430,11 @@ pub static STORAGE_RECORDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "storage_records",
-            "Storage records. ".to_owned() + HELP_SUFFIX,
+            "Storage records.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -466,7 +442,7 @@ pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "storage_write_requests",
-            "Storage write requests. ".to_owned() + HELP_SUFFIX,
+            "Storage write requests.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -478,7 +454,7 @@ pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "storage_read_requests",
-            "Storage read requests. ".to_owned() + HELP_SUFFIX,
+            "Storage read requests.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -490,7 +466,7 @@ pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "storage_write_bytes",
-            "Storage write bytes. ".to_owned() + HELP_SUFFIX,
+            "Storage write bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -502,7 +478,7 @@ pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "storage_read_bytes",
-            "Storage read bytes. ".to_owned() + HELP_SUFFIX,
+            "Storage read bytes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -514,7 +490,7 @@ pub static STORAGE_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
         Opts::new(
             "storage_time",
-            "Storage response time. ".to_owned() + HELP_SUFFIX,
+            "Storage response time.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -591,11 +567,11 @@ pub static META_NUM_FUNCTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "meta_num_functions",
-            "Metadata function nums. ".to_owned() + HELP_SUFFIX,
+            "Metadata function nums.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type", "function_type"],
+        &["organization", "stream_type", "function_type"],
     )
     .expect("Metric created")
 });
@@ -603,11 +579,11 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "meta_num_alerts",
-            "Metadata alert nums. ".to_owned() + HELP_SUFFIX,
+            "Metadata alert nums.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -672,7 +648,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 pub static DB_QUERY_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     HistogramVec::new(
-        HistogramOpts::new("db_query_time", "db query time. ".to_owned())
+        HistogramOpts::new("db_query_time", "db query time.".to_owned())
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
         &["operation", "table"],
@@ -968,20 +944,15 @@ fn create_const_labels() -> HashMap<String, String> {
     labels
 }
 
-pub fn create_prometheus_handler() -> PrometheusMetrics {
-    let cfg = crate::config::get_config();
-    let mut srv = PrometheusMetricsBuilder::new(NAMESPACE);
-    if cfg.common.prometheus_enabled {
-        srv = srv.endpoint(format!("{}/metrics", cfg.common.base_uri).as_str());
-    };
-    srv.const_labels(create_const_labels())
-        .registry(get_registry())
-        .build()
-        .expect("Prometheus build failed")
+pub fn gather() -> String {
+    let registry = prometheus::default_registry();
+    let mut buffer = vec![];
+    TextEncoder::new()
+        .encode(&registry.gather(), &mut buffer)
+        .unwrap();
+    String::from_utf8(buffer).unwrap()
 }
 
-pub fn get_registry() -> Registry {
-    let registry = prometheus::Registry::new();
-    register_metrics(&registry);
-    registry
+pub fn init() {
+    register_metrics(prometheus::default_registry());
 }

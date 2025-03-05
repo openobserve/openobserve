@@ -24,7 +24,6 @@ use config::{
     utils::{json, schema_ext::SchemaExt},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
-use futures::{StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
@@ -36,8 +35,6 @@ use crate::{
 pub mod history;
 
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
-    Lazy::new(Default::default);
-pub static STREAM_SCHEMAS_COMPRESSED: Lazy<RwAHashMap<String, Vec<(i64, bytes::Bytes)>>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
@@ -128,78 +125,36 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let cache_key = key.strip_prefix("/schema/").unwrap();
 
-    let cfg = get_config();
     let (min_ts, max_ts) = time_range.unwrap_or((0, 0));
-    if cfg.common.schema_cache_compress_enabled {
-        let mut last_schema_index = None;
-        let r = STREAM_SCHEMAS_COMPRESSED.read().await;
-        if let Some(versions) = r.get(cache_key) {
-            let mut compressed_schemas = Vec::new();
+    let mut last_schema_index = None;
+    let r = STREAM_SCHEMAS.read().await;
+    if let Some(versions) = r.get(cache_key) {
+        let mut schemas = Vec::new();
 
-            for (index, (start_dt, data)) in versions.iter().enumerate() {
-                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                    compressed_schemas.push(data.clone());
-                    if last_schema_index.is_none() {
-                        last_schema_index = Some(index);
-                    }
+        for (index, (start_dt, data)) in versions.iter().enumerate() {
+            if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
+                schemas.push(data.clone());
+                if last_schema_index.is_none() {
+                    last_schema_index = Some(index);
                 }
             }
-
-            if let Some(last_index) = last_schema_index {
-                if last_index > 0 {
-                    if let Some((_, data)) = versions.get(last_index - 1) {
-                        // older version of schema before start_dt hence added in start
-                        compressed_schemas.insert(0, data.clone());
-                    }
-                }
-            } else {
-                // this is latest version of schema hence added in end
-                compressed_schemas.push(versions.last().unwrap().1.clone());
-            }
-            let schemas = futures::stream::iter(compressed_schemas)
-                .map(|data| async move {
-                    let de_bytes = zstd::decode_all(data.as_ref())?;
-                    let mut schemas: Vec<Schema> = json::from_slice(&de_bytes)?;
-                    Ok::<Option<Schema>, Error>(schemas.pop())
-                })
-                .buffer_unordered(cfg.limit.cpu_num)
-                .try_collect::<Vec<Option<Schema>>>()
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-            return Ok(schemas.into_iter().flatten().collect());
         }
-        drop(r);
-    } else {
-        let mut last_schema_index = None;
-        let r = STREAM_SCHEMAS.read().await;
-        if let Some(versions) = r.get(cache_key) {
-            let mut schemas = Vec::new();
 
-            for (index, (start_dt, data)) in versions.iter().enumerate() {
-                if *start_dt >= min_ts && (max_ts == 0 || *start_dt <= max_ts) {
-                    schemas.push(data.clone());
-                    if last_schema_index.is_none() {
-                        last_schema_index = Some(index);
-                    }
+        if let Some(last_index) = last_schema_index {
+            if last_index > 0 {
+                if let Some((_, data)) = versions.get(last_index - 1) {
+                    // older version of schema before start_dt should be added in start
+                    schemas.insert(0, data.clone());
                 }
             }
-
-            if let Some(last_index) = last_schema_index {
-                if last_index > 0 {
-                    if let Some((_, data)) = versions.get(last_index - 1) {
-                        // older version of schema before start_dt should be added in start
-                        schemas.insert(0, data.clone());
-                    }
-                }
-            } else {
-                // this is latest version of schema hence added in end
-                schemas.push(versions.last().unwrap().1.clone());
-            }
-
-            return Ok(schemas);
+        } else {
+            // this is latest version of schema hence added in end
+            schemas.push(versions.last().unwrap().1.clone());
         }
-        drop(r);
+
+        return Ok(schemas);
     }
+    drop(r);
 
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {

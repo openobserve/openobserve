@@ -364,7 +364,6 @@ pub async fn search_multi(
                         "/api/org/_search_multi",
                         "200",
                         &org_id,
-                        "",
                         stream_type.as_str(),
                     ])
                     .observe(time);
@@ -373,7 +372,6 @@ pub async fn search_multi(
                         "/api/org/_search_multi",
                         "200",
                         &org_id,
-                        "",
                         stream_type.as_str(),
                     ])
                     .inc();
@@ -458,7 +456,6 @@ pub async fn search_multi(
                         "/api/org/_search_multi",
                         "500",
                         &org_id,
-                        "",
                         stream_type.as_str(),
                     ])
                     .observe(time);
@@ -467,7 +464,6 @@ pub async fn search_multi(
                         "/api/org/_search_multi",
                         "500",
                         &org_id,
-                        "",
                         stream_type.as_str(),
                     ])
                     .inc();
@@ -728,7 +724,6 @@ pub async fn _search_partition_multi(
                     "/api/org/_search_partition_multi",
                     "200",
                     &org_id,
-                    "",
                     stream_type.as_str(),
                 ])
                 .observe(time);
@@ -737,7 +732,6 @@ pub async fn _search_partition_multi(
                     "/api/org/_search_partition_multi",
                     "200",
                     &org_id,
-                    "",
                     stream_type.as_str(),
                 ])
                 .inc();
@@ -750,7 +744,6 @@ pub async fn _search_partition_multi(
                     "/api/org/_search_partition_multi",
                     "500",
                     &org_id,
-                    "",
                     stream_type.as_str(),
                 ])
                 .observe(time);
@@ -759,7 +752,6 @@ pub async fn _search_partition_multi(
                     "/api/org/_search_partition_multi",
                     "500",
                     &org_id,
-                    "",
                     stream_type.as_str(),
                 ])
                 .inc();
@@ -995,7 +987,6 @@ pub async fn around_multi(
                         "/api/org/_around_multi",
                         "500",
                         &org_id,
-                        &stream_names,
                         stream_type.as_str(),
                     ])
                     .observe(time);
@@ -1004,7 +995,6 @@ pub async fn around_multi(
                         "/api/org/_around_multi",
                         "500",
                         &org_id,
-                        &stream_names,
                         stream_type.as_str(),
                     ])
                     .inc();
@@ -1073,7 +1063,6 @@ pub async fn around_multi(
                         "/api/org/_around_multi",
                         "500",
                         &org_id,
-                        &stream_names,
                         stream_type.as_str(),
                     ])
                     .observe(time);
@@ -1082,7 +1071,6 @@ pub async fn around_multi(
                         "/api/org/_around_multi",
                         "500",
                         &org_id,
-                        &stream_names,
                         stream_type.as_str(),
                     ])
                     .inc();
@@ -1132,7 +1120,6 @@ pub async fn around_multi(
                 "/api/org/_around_multi",
                 "200",
                 &org_id,
-                &stream_names,
                 stream_type.as_str(),
             ])
             .observe(time);
@@ -1141,7 +1128,6 @@ pub async fn around_multi(
                 "/api/org/_around_multi",
                 "200",
                 &org_id,
-                &stream_names,
                 stream_type.as_str(),
             ])
             .inc();

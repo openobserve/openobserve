@@ -296,7 +296,7 @@ pub async fn search(
 
     // do search
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, "", "200", "_search");
+    http_report_metrics(start, org_id, stream_type, "200", "_search");
     res.set_trace_id(trace_id.to_string());
     res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
 

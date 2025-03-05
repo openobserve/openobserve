@@ -544,22 +544,10 @@ pub async fn handle_otlp_request(
     }
 
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            &traces_stream_name,
-            StreamType::Traces.as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.as_str()])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            &traces_stream_name,
-            StreamType::Traces.as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.as_str()])
         .inc();
 
     format_response(partial_success, req_type)
@@ -690,22 +678,10 @@ pub async fn ingest_json(
     };
 
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            traces_stream_name,
-            StreamType::Traces.as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.as_str()])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            traces_stream_name,
-            StreamType::Traces.as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.as_str()])
         .inc();
 
     format_response(partial_success, req_type)
@@ -924,12 +900,15 @@ async fn write_traces(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) = alert
+                    match alert
                         .evaluate(Some(&record_val), (None, alert_end_time))
                         .await
                     {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                        Ok(res) if res.data.is_some() => {
+                            triggers.push((alert.clone(), res.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }

@@ -25,6 +25,8 @@ pub use config::*;
 pub async fn init() -> Result<(), anyhow::Error> {
     // init ider
     ider::init();
+    // init metrics
+    metrics::init();
 
     // initialize chrome launch options, so that if chrome download is
     // needed, it will happen now and not during serving report API

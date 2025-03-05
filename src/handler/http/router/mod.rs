@@ -20,6 +20,7 @@ use actix_web::{
     HttpRequest, HttpResponse,
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
+    get,
     http::header,
     middleware, web,
 };
@@ -144,6 +145,21 @@ async fn audit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     next.call(req).await
+}
+
+#[get("/metrics")]
+async fn get_metrics() -> Result<HttpResponse, actix_web::Error> {
+    let body = if config::get_config().common.prometheus_enabled {
+        config::metrics::gather()
+    } else {
+        "".to_string()
+    };
+    let mut resp = HttpResponse::Ok().body(body);
+    resp.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("text/plain; version=0.0.4; charset=utf-8"),
+    );
+    Ok(resp)
 }
 
 /// This is a very trivial proxy to overcome the cors errors while
@@ -407,6 +423,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(dashboards::get_dashboard)
         .service(dashboards::delete_dashboard)
         .service(dashboards::move_dashboard)
+        .service(dashboards::move_dashboards)
         .service(dashboards::reports::create_report)
         .service(dashboards::reports::update_report)
         .service(dashboards::reports::get_report)

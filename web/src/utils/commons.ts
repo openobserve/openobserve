@@ -497,6 +497,7 @@ export const updateDashboard = async (
     const apiResponse = await dashboardService.get_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardId,
+      folderId,
     );
 
     await retrieveAndStoreDashboardData(
@@ -518,18 +519,19 @@ export const getDashboard = async (
   dashboardId: any,
   folderId: any,
 ) => {
-   // check if dashboard data is present in store
+  // check if dashboard data is present in store
   if (store.state.organizationData.allDashboardData[dashboardId]) {
     return store.state.organizationData.allDashboardData[dashboardId];
   }
-  
-  if(!dashboardId){
+
+  if (!dashboardId) {
     return {};
   }
 
   const apiResponse = await dashboardService.get_Dashboard(
     store.state.selectedOrganization.identifier,
     dashboardId,
+    folderId,
   );
 
   return await retrieveAndStoreDashboardData(

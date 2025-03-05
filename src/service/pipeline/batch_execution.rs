@@ -693,7 +693,7 @@ async fn process_node(
 
             let mut remote_stream = remote_stream.clone();
             remote_stream.org_id = org_id.into();
-            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream.clone()).await?;
+            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
             if let Err(e) = writer.write_wal(records).await {
                 let err_msg = format!(
                     "DestinationNode error persisting data to be ingested externally: {}",

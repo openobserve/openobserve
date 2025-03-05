@@ -223,6 +223,7 @@ async fn handle_alert_triggers(
                 is_partial: None,
                 evaluation_took_in_secs: None,
                 source_node: Some(source_node.clone()),
+                query_took: None,
             })
             .await;
             log::info!(
@@ -277,6 +278,7 @@ async fn handle_alert_triggers(
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
         source_node: Some(source_node),
+        query_took: None,
     };
 
     let evaluation_took = Instant::now();
@@ -349,13 +351,14 @@ async fn handle_alert_triggers(
         return Err(err);
     }
 
-    let (ret, end_time) = result.unwrap();
+    let trigger_results = result.unwrap();
+    trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {trace_id}] result of alert {} evaluation matched condition: {}",
         &new_trigger.module_key,
-        ret.is_some(),
+        trigger_results.data.is_some(),
     );
-    if ret.is_some() {
+    if trigger_results.data.is_some() {
         log::info!(
             "[SCHEDULER trace_id {trace_id}] Alert conditions satisfied, org: {}, module_key: {}",
             &new_trigger.org,
@@ -374,7 +377,7 @@ async fn handle_alert_triggers(
         }
         _ => 0,
     };
-    if ret.is_some() && alert.trigger_condition.silence > 0 {
+    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
         if alert.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
             let silence =
@@ -426,12 +429,12 @@ async fn handle_alert_triggers(
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
-    if ret.is_some() {
+    if trigger_results.data.is_some() {
         trigger_data.last_satisfied_at = Some(triggered_at);
     }
 
     // send notification
-    if let Some(data) = ret {
+    if let Some(data) = trigger_results.data {
         let vars = get_row_column_map(&data);
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
@@ -445,14 +448,14 @@ async fn handle_alert_triggers(
         let (alert_start_time, alert_end_time) = get_alert_start_end_time(
             &vars,
             alert.trigger_condition.period,
-            end_time,
+            trigger_results.end_time,
             start_time,
             use_given_time,
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
         match alert
-            .send_notification(&data, end_time, start_time, now)
+            .send_notification(&data, trigger_results.end_time, start_time, now)
             .await
         {
             Ok((success_msg, err_msg)) => {
@@ -475,7 +478,7 @@ async fn handle_alert_triggers(
                 trigger_data_stream.success_response = Some(success_msg);
                 // Notification was sent successfully, store the last used end_time in the triggers
                 trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(end_time)
+                    Some(trigger_results.end_time)
                 } else {
                     None
                 };
@@ -539,7 +542,7 @@ async fn handle_alert_triggers(
         // Condition did not match, store the last used end_time in the triggers
         // In the next run, the alert will be checked from the last end_time
         trigger_data.period_end_time = if should_store_last_end_time {
-            Some(end_time)
+            Some(trigger_results.end_time)
         } else {
             None
         };
@@ -548,14 +551,14 @@ async fn handle_alert_triggers(
         trigger_data_stream.start_time = match start_time {
             Some(start_time) => start_time,
             None => {
-                end_time
+                trigger_results.end_time
                     - Duration::try_minutes(alert.trigger_condition.period)
                         .unwrap()
                         .num_microseconds()
                         .unwrap()
             }
         };
-        trigger_data_stream.end_time = end_time;
+        trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
@@ -678,6 +681,7 @@ async fn handle_report_triggers(
         delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
         evaluation_took_in_secs: None,
         source_node: Some(LOCAL_NODE.name.clone()),
+        query_took: None,
     };
 
     if trigger.retries >= max_retries {
@@ -773,7 +777,7 @@ async fn handle_derived_stream_triggers(
     let pipeline_name = columns[2];
     let pipeline_id = columns[3];
 
-    let Ok(mut pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
+    let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         log::warn!(
             "[SCHEDULER trace_id {trace_id}] Pipeline associated with trigger not found: {}/{}/{}/{}. Deleting this trigger",
             org_id,
@@ -802,6 +806,12 @@ async fn handle_derived_stream_triggers(
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
+        log::error!(
+            "[SCHEDULER trace_id {trace_id}] DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
+            org_id,
+            pipeline_name,
+            pipeline_id,
+        );
         db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await?;
         return Err(anyhow::anyhow!(
             "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
@@ -873,6 +883,7 @@ async fn handle_derived_stream_triggers(
             delay_in_secs: None,
             evaluation_took_in_secs: None,
             source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
         };
 
         // evaluate trigger and configure trigger next run time
@@ -916,8 +927,11 @@ async fn handle_derived_stream_triggers(
                 // set end to now to exit the loop below
                 end = now + 1;
             }
-            Ok((ret, next)) => {
-                let is_satisfied = ret.as_ref().is_some_and(|ret| !ret.is_empty());
+            Ok(trigger_results) => {
+                let is_satisfied = trigger_results
+                    .data
+                    .as_ref()
+                    .is_some_and(|ret| !ret.is_empty());
 
                 // ingest evaluation result into destination
                 if is_satisfied {
@@ -927,7 +941,7 @@ async fn handle_derived_stream_triggers(
                         new_trigger.module_key
                     );
 
-                    let local_val = ret // checked is some
+                    let local_val = trigger_results.data // checked is some
                         .unwrap()
                         .into_iter()
                         .map(json::Value::Object)
@@ -1053,8 +1067,18 @@ async fn handle_derived_stream_triggers(
                         end = now + 1;
                     } else {
                         // SUCCESS: move the time range forward by frequency and continue
-                        start = Some(next);
-                        end += period_num_microseconds + 1;
+                        start = Some(trigger_results.end_time);
+                        // There could still be some data to be processed for the current period
+                        // so we need to move the end time forward by the period length or the
+                        // remaining time whichever is smaller
+                        let _end = period_num_microseconds + 1;
+                        // If the gap is less than or equal to 0, we need to break the loop
+                        end = if now - end <= 0 {
+                            end + _end
+                        } else {
+                            std::cmp::min(end + _end, now)
+                        };
+                        trigger_data_stream.query_took = trigger_results.query_took;
                     }
                 } else {
                     log::info!(
@@ -1063,10 +1087,20 @@ async fn handle_derived_stream_triggers(
                         &new_trigger.module_key
                     );
                     trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+                    trigger_data_stream.query_took = trigger_results.query_took;
 
                     // move the time range forward by frequency and continue
-                    start = Some(next);
-                    end += period_num_microseconds + 1;
+                    start = Some(trigger_results.end_time);
+                    // There could still be some data to be processed for the current period
+                    // so we need to move the end time forward by the period length or the remaining
+                    // time whichever is smaller
+                    let _end = period_num_microseconds + 1;
+                    // If the gap is less than or equal to 0, we need to break the loop
+                    end = if now - end <= 0 {
+                        end + _end
+                    } else {
+                        std::cmp::min(end + _end, now)
+                    };
                 }
             }
         };
@@ -1083,21 +1117,36 @@ async fn handle_derived_stream_triggers(
                 .unwrap();
             }
 
-            if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
-                let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
-                // tz_offset is in minutes
-                let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
-                new_trigger.next_run_at = schedule
-                    .upcoming(tz_offset)
-                    .next()
-                    .unwrap()
-                    .timestamp_micros();
-            } else {
-                new_trigger.next_run_at +=
-                    Duration::try_minutes(derived_stream.trigger_condition.frequency)
+            // If the trigger has failed and is not at the max retries, no need to update the next
+            // run at In that case, the trigger will be picked up again by the scheduler
+            // at the next batch immediately Once it reaches max retries, the trigger
+            // will be run again at the next scheduled time.
+            if !(trigger_data_stream.status == TriggerDataStatus::Failed
+                && new_trigger.retries < max_retries)
+            {
+                // Go to the next nun at, but use the same trigger start time
+                if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+                    let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+                    // tz_offset is in minutes
+                    let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
+                    new_trigger.next_run_at = schedule
+                        .upcoming(tz_offset)
+                        .next()
                         .unwrap()
-                        .num_microseconds()
-                        .unwrap();
+                        .timestamp_micros();
+                } else {
+                    new_trigger.next_run_at +=
+                        Duration::try_minutes(derived_stream.trigger_condition.frequency)
+                            .unwrap()
+                            .num_microseconds()
+                            .unwrap();
+                }
+
+                // If the trigger didn't fail, we need to reset the `retries` count.
+                // Only cumulative failures should be used to check with `max_retries`
+                if trigger_data_stream.status != TriggerDataStatus::Failed {
+                    new_trigger.retries = 0;
+                }
             }
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
         }
@@ -1106,27 +1155,16 @@ async fn handle_derived_stream_triggers(
         publish_triggers_usage(trigger_data_stream).await;
     }
 
+    // If it reaches max retries, go to the next nun at, but use the same trigger start time
     if new_trigger.retries >= max_retries {
-        // 1. delete the trigger, as it won't be picked up again
-        if let Err(e) =
-            db::scheduler::delete(&trigger.org, trigger.module, &trigger.module_key).await
-        {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] pipeline error deleting trigger after pipeline {}/{} reached maximum retries:, {}",
-                &pipeline.org,
-                &pipeline.name,
-                e,
-            )
-        }
-
-        // 2. report a final pipeline error
+        // Report a final pipeline error
         log::warn!(
-            "[SCHEDULER trace_id {trace_id}] Pipeline({}/{})]: DerivedStream trigger has reached maximum retries. Deleting the trigger and pausing the pipeline",
+            "[SCHEDULER trace_id {trace_id}] Pipeline({}/{})]: DerivedStream trigger has reached maximum retries.",
             &pipeline.org,
             &pipeline.name
         );
         let err_msg = format!(
-            "[SCHEDULER trace_id {trace_id}] DerivedStream has reached max retries of {max_retries}. Pipeline is being paused. Please fix reported errors before unpausing the pipeline."
+            "[SCHEDULER trace_id {trace_id}] DerivedStream has reached max retries of {max_retries}. Pipeline will be retried after the next scheduled run. Please fix reported errors in pipeline."
         );
         let pipeline_error = PipelineError {
             pipeline_id: pipeline.id.to_string(),
@@ -1140,18 +1178,10 @@ async fn handle_derived_stream_triggers(
             error_source: ErrorSource::Pipeline(pipeline_error),
         })
         .await;
+        new_trigger.retries = 0; // start over
+    }
 
-        // 3. pause the pipeline
-        pipeline.enabled = false;
-        if let Err(e) = db::pipeline::update(&pipeline, None).await {
-            log::error!(
-                "[SCHEDULER trace_id {trace_id}] pipeline error pausing pipeline {}/{} after it's reached reached maximum retries:, {}",
-                &pipeline.org,
-                &pipeline.name,
-                e,
-            )
-        }
-    } else if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
+    if let Err(e) = db::scheduler::update_trigger(new_trigger).await {
         log::warn!(
             "[SCHEDULER trace_id {trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             &pipeline.org,

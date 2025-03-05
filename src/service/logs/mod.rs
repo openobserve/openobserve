@@ -431,11 +431,12 @@ async fn write_logs(
                     if evaluated_alerts.contains(&key) {
                         continue;
                     }
-                    if let Ok((Some(v), _)) =
-                        alert.evaluate(Some(&record_val), (None, end_time)).await
-                    {
-                        triggers.push((alert.clone(), v));
-                        evaluated_alerts.insert(key);
+                    match alert.evaluate(Some(&record_val), (None, end_time)).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        _ => {}
                     }
                 }
             }

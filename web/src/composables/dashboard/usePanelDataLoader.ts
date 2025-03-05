@@ -1355,9 +1355,8 @@ export const usePanelDataLoader = (
 
         let variableValue = "";
         if (Array.isArray(variable.value)) {
-          const value = variable.value
-            .map((value: any) => `'${value}'`)
-            .join(",");
+          const value =
+            variable.value.map((value: any) => `'${value}'`).join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
             {
               placeHolder: `\${${variable.name}:csv}`,
@@ -1369,7 +1368,9 @@ export const usePanelDataLoader = (
             },
             {
               placeHolder: `\${${variable.name}:doublequote}`,
-              value: variable.value.map((value: any) => `"${value}"`).join(","),
+              value:
+                variable.value.map((value: any) => `"${value}"`).join(",") ||
+                '""',
             },
             {
               placeHolder: `\${${variable.name}:singlequote}`,

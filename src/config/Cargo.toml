@@ -9,7 +9,6 @@ default = ["gxhash"]
 gxhash = ["dep:gxhash"]
 
 [dependencies]
-actix-web-prometheus.workspace = true
 aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true

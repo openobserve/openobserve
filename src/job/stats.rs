@@ -58,7 +58,7 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
 }
 
 async fn cache_stream_stats() -> Result<(), anyhow::Error> {
-    if !LOCAL_NODE.is_querier() {
+    if !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 

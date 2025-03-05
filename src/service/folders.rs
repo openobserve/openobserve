@@ -271,13 +271,59 @@ async fn permitted_folders(
     org_id: &str,
     user_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, FolderError> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+    let folder_ofga_model = OFGA_MODELS.get("folders").unwrap().key;
+
     let Some(user_id) = user_id else {
         return Err(FolderError::PermittedFoldersMissingUser);
     };
-    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "dfolder",
+
+    // Get the list of folders that the user has `GET` permission on.
+    let mut folder_list = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET",
+        OFGA_MODELS.get("folders").unwrap().key,
     )
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
-    Ok(stream_list)
+
+    // In some cases, there might not be direct `GET` permission on the folder.
+    // So, we need to check if the user has `GET` permission on any of the dashboards
+    // inside the folder.
+
+    let permitted_dashboards = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET_INDIVIDUAL_FROM_ROLE",
+        OFGA_MODELS.get("dashboards").unwrap().key,
+    )
+    .await
+    .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    log::info!("permitted_dashboards: {:?}", permitted_dashboards);
+    if permitted_dashboards.is_some() {
+        let mut folder_list_with_roles = vec![];
+        for dashboard in permitted_dashboards.unwrap() {
+            let Some((_, folder_id)) = dashboard.split_once(":") else {
+                continue;
+            };
+            // The folder_id is of the format `{folder_id}/{dashboard_id}`.
+            // So, we need to extract the folder_id from the dashboard string.
+            let Some((folder_id, _)) = folder_id.split_once("/") else {
+                continue;
+            };
+            log::info!("folder_id: {:?}", folder_id);
+            folder_list_with_roles.push(format!("{}:{}", folder_ofga_model, folder_id));
+        }
+        if folder_list.is_some() {
+            let folder_list = folder_list.as_mut().unwrap();
+            folder_list.extend(folder_list_with_roles);
+        } else {
+            folder_list = Some(folder_list_with_roles);
+        }
+    }
+    log::info!("folder_list: {:?}", folder_list);
+
+    Ok(folder_list)
 }
