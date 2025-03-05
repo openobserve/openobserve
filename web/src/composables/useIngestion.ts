@@ -88,6 +88,45 @@ Access Key: [BASIC_PASSCODE]`;
     netflow: "https://short.openobserve.ai/network/netflow",
   };
 
+  const serverContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const serverDocURLs = {
+    nginx: "https://short.openobserve.ai/server/nginx",
+    apache: "https://short.openobserve.ai/server/apache",
+    iis: "https://short.openobserve.ai/server/iis",
+  };
+
+  const messageQueuesContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const messageQueuesDocURLs = {
+    rabbitmq: "https://short.openobserve.ai/message-queues/rabbitmq",
+    kafka: "https://short.openobserve.ai/message-queues/kafka",
+    nats: "https://short.openobserve.ai/message-queues/nats",
+  };
+
+  const languagesContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const languagesDocURLs = {
+    python: "https://short.openobserve.ai/languages/python",
+    dotnet: "https://short.openobserve.ai/languages/dotnet",
+    nodejs: "https://short.openobserve.ai/languages/nodejs",
+    go: "https://short.openobserve.ai/languages/go",
+    rust: "https://short.openobserve.ai/languages/rust",
+    java: "https://short.openobserve.ai/languages/java",
+    fastapi: "https://short.openobserve.ai/framework/fastapi",
+  };
+
+  const othersContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json
+Access Key: [BASIC_PASSCODE]`;
+
+  const othersDocURLs = {
+    airflow: "https://short.openobserve.ai/others/airflow",
+    airbyte: "https://short.openobserve.ai/others/airbyte",
+  };
+
 
   const databaseDocURLs = {
     sqlServer: "https://short.openobserve.ai/database/sql-server",
@@ -116,6 +155,14 @@ Access Key: [BASIC_PASSCODE]`;
     devopsDocURLs,
     networkingContent,
     networkingDocURLs,
+    serverContent,
+    serverDocURLs,
+    messageQueuesContent,
+    messageQueuesDocURLs,
+    languagesContent,
+    languagesDocURLs,
+    othersContent,
+    othersDocURLs,
   };
 };
 

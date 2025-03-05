@@ -76,7 +76,29 @@ import GithubActions from "@/components/ingestion/devops/GithubActions.vue";
 
 import Networking from "@/components/ingestion/Networking.vue";
 import Netflow from "@/components/ingestion/networking/Netflow.vue";
-import path from "path";
+
+import Server from "@/components/ingestion/Server.vue";
+import Nginx from "@/components/ingestion/servers/Nginx.vue";
+import Apache from "@/components/ingestion/servers/Apache.vue";
+import IIS from "@/components/ingestion/servers/IIS.vue";
+
+import MessageQueues from "@/components/ingestion/MessageQueues.vue";
+import Kafka from "@/components/ingestion/messagequeues/Kafka.vue";
+import RabbitMQ from "@/components/ingestion/messagequeues/RabbitMQ.vue";
+import NATS from "@/components/ingestion/messagequeues/Nats.vue";
+
+import Languages from "@/components/ingestion/Languages.vue";
+import Python from "@/components/ingestion/languages/Python.vue";
+import DotNet from "@/components/ingestion/languages/DotNet.vue";
+import NodeJS from "@/components/ingestion/languages/NodeJS.vue";
+import Rust from "@/components/ingestion/languages/Rust.vue";
+import Java from "@/components/ingestion/languages/Java.vue";
+import Go from "@/components/ingestion/languages/Go.vue";
+import FastAPI from "@/components/ingestion/languages/FastAPI.vue";
+
+import Others from "@/components/ingestion/Others.vue";
+import Airflow from "@/components/ingestion/others/Airflow.vue";
+import Airbyte from "@/components/ingestion/others/Airbyte.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -545,7 +567,167 @@ const useIngestionRoutes = () => {
               },
             },
           ],
-        }
+        },
+        {
+          path: "servers",
+          name: "servers",
+          component: Server,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "nginx",
+              name: "nginx",
+              component: Nginx,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "apache",
+              name: "apache",
+              component: Apache,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "iis",
+              name: "iis",
+              component: IIS,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
+        },
+        {
+          path: "message-queues",
+          name: "message-queues",
+          component: MessageQueues,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "rabbitmq",
+              name: "rabbitmq",
+              component: RabbitMQ,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "kafka",
+              name: "kafka",
+              component: Kafka,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "nats",
+              name: "nats",
+              component: NATS,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+          ],
+        },
+        {
+          path: "languages",
+          name: "languages",
+          component: Languages,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "python",
+              name: "python",
+              component: Python,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "dotnet",
+              name: "dotnet",
+              component: DotNet,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "nodejs",
+              name: "nodejs",
+              component: NodeJS,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "java",
+              name: "java",
+              component: Java,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "go",
+              name: "go",
+              component: Go,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "rust",
+              name: "rust",
+              component: Rust,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+            {
+              path: "fastapi",
+              name: "fastapi",
+              component: FastAPI,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              }
+            },
+          ],
+        },
+        {
+          path: "others",
+          name: "others",
+          component: Others,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "airflow",
+              name: "airflow",
+              component: Airflow,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "airbyte",
+              name: "airbyte",
+              component: Airbyte,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
+        },
       ],
     },
   ];
