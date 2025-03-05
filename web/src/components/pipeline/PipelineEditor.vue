@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
-        <NodeSidebar :nodeTypes="nodeTypes" />
+        <NodeSidebar v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'" :nodeTypes="nodeTypes"  />
       </div>
     </div>
     <div
