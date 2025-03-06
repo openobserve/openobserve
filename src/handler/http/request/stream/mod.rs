@@ -95,6 +95,9 @@ async fn schema(
         }
     }
 
+    // set total fields
+    schema.total_fields = schema.schema.len();
+
     // Pagination
     let offset = query
         .get("offset")
@@ -409,6 +412,9 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         }
     }
 
+    // set total streams
+    let total = indices.len();
+
     // Pagination
     let offset = query
         .get("offset")
@@ -424,7 +430,10 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         let end = std::cmp::min(offset + limit, indices.len());
         indices = indices[offset..end].to_vec();
     }
-    Ok(HttpResponse::Ok().json(ListStream { list: indices }))
+    Ok(HttpResponse::Ok().json(ListStream {
+        list: indices,
+        total,
+    }))
 }
 
 #[utoipa::path(

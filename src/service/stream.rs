@@ -178,6 +178,7 @@ pub fn stream_res(
         name: stream_name.to_string(),
         storage_type: storage_type.to_string(),
         stream_type,
+        total_fields: mappings.len(),
         schema: mappings,
         uds_schema: None,
         stats,
