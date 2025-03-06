@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { waitForDateTimeBtn } from "./waitForButton.util";
+import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -166,7 +166,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     // Set the date-time range and apply changes
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -245,7 +245,7 @@ test.describe("dashboard UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
 
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
@@ -337,7 +337,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     // Set the date-time range and apply changes
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -452,7 +452,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -562,7 +562,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -682,7 +682,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -768,7 +768,7 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-apply"]').click();
     // await page.locator('[data-test="date-time-btn"]').click();
     // await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
-    await waitForDateTimeBtn(page);
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
