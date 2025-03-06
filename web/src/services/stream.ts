@@ -16,11 +16,19 @@
 import http from "./http";
 
 const stream = {
-  nameList: (org_identifier: string, type: string, schema: boolean) => {
+  nameList: (org_identifier: string, type: string, schema: boolean, offset: number = -1, limit: number = -1, keyword: string = "") => {
     let url = `/api/${org_identifier}/streams`;
 
     if (type != "") {
       url += "?type=" + type;
+    }
+
+    if(offset != -1 && limit != -1) {
+      url += `&offset=${offset}&limit=${limit}`;
+    }
+
+    if (keyword != "") {
+      url += `&keyword=${keyword}`;
     }
 
     if (schema) {
