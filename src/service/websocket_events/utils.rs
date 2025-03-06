@@ -286,6 +286,9 @@ pub enum WsClientEvents {
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
+        // TODO: remove this once v1 is deprecated
+        #[serde(skip_serializing_if = "Option::is_none")]
+        org_id: Option<String>,
     },
     Benchmark {
         id: String,

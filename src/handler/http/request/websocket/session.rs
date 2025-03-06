@@ -218,7 +218,7 @@ pub async fn handle_text_message(
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }
                 #[cfg(feature = "enterprise")]
-                WsClientEvents::Cancel { trace_id } => {
+                WsClientEvents::Cancel { trace_id, .. } => {
                     // First handle the cancel event
                     // send a cancel flag to the search task
                     if let Err(e) = handle_cancel_event(&trace_id).await {
@@ -240,7 +240,10 @@ pub async fn handle_text_message(
                     });
 
                     #[cfg(feature = "enterprise")]
-                    let client_msg = WsClientEvents::Cancel { trace_id };
+                    let client_msg = WsClientEvents::Cancel {
+                        trace_id,
+                        org_id: Some(org_id.to_string()),
+                    };
 
                     // Add audit before closing
                     #[cfg(feature = "enterprise")]

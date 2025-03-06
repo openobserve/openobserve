@@ -65,11 +65,14 @@ impl Message {
                 Self::new(trace_id, MessageType::Search(req), payload)
             }
             #[cfg(feature = "enterprise")]
-            WsClientEvents::Cancel { trace_id } => Self::new(
-                trace_id.clone(),
-                MessageType::Cancel,
-                serde_json::json!({"trace_id": trace_id}),
-            ),
+            WsClientEvents::Cancel { trace_id, org_id } => {
+                let payload: serde_json::Value = if let Some(org_id) = org_id {
+                    serde_json::json!({"trace_id": trace_id, "org_id": org_id})
+                } else {
+                    serde_json::json!({"trace_id": trace_id})
+                };
+                Self::new(trace_id, MessageType::Cancel, payload)
+            }
             WsClientEvents::Benchmark { id } => Self::new(
                 id.clone(),
                 MessageType::Benchmark,

@@ -36,4 +36,7 @@ pub struct SearchEventReq {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub fallback_order_by_col: Option<String>,
+    // TODO: remove this once v1 is deprecated
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_id: Option<String>,
 }

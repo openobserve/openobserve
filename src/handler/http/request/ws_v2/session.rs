@@ -216,7 +216,16 @@ pub async fn handle_text_message(
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }
                 #[cfg(feature = "enterprise")]
-                WsClientEvents::Cancel { trace_id } => {
+                WsClientEvents::Cancel { trace_id, org_id } => {
+                    let Some(org_id) = org_id else {
+                        log::error!(
+                            "[WS_HANDLER]: Request Id: {} Node Role: {} Org id not found",
+                            req_id,
+                            get_config().common.node_role
+                        );
+                        return;
+                    };
+
                     // First handle the cancel event
                     // send a cancel flag to the search task
                     if let Err(e) = handle_cancel_event(&trace_id).await {
@@ -230,11 +239,14 @@ pub async fn handle_text_message(
                         search_registry_utils::is_cancelled(&trace_id)
                     );
 
-                    let res = handle_cancel(&trace_id, org_id).await;
+                    let res = handle_cancel(&trace_id, &org_id).await;
                     let _ = send_message(req_id, res.to_json().to_string()).await;
 
                     #[cfg(feature = "enterprise")]
-                    let client_msg = WsClientEvents::Cancel { trace_id };
+                    let client_msg = WsClientEvents::Cancel {
+                        trace_id,
+                        org_id: Some(org_id.to_string()),
+                    };
 
                     // Add audit before closing
                     #[cfg(feature = "enterprise")]
@@ -466,7 +478,7 @@ async fn handle_search_event(
 // Cancel handler
 #[cfg(feature = "enterprise")]
 async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
-    if let Some(mut entry) = SEARCH_REGISTRY.get_mut(trace_id) {
+    if let Some(mut entry) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
         let state = entry.value_mut();
         let cancel_tx = match state {
             SearchState::Running { cancel_tx, .. } => cancel_tx.clone(),
