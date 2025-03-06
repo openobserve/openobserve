@@ -29,7 +29,7 @@ use config::{
     utils::{json, time::now_micros},
 };
 use datafusion::arrow::datatypes::Schema;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::stats,
     schema::{
@@ -311,6 +311,17 @@ pub async fn save_stream_settings(
                 "start day should be less than end day".to_string(),
             )));
         }
+    }
+
+    // check for defined_schema_fields
+    if let Some(defined_schema_fields) = settings.defined_schema_fields {
+        let mut fields = HashSet::new();
+        for field in defined_schema_fields {
+            if schema_fields.contains_key(&field) {
+                fields.insert(field);
+            }
+        }
+        settings.defined_schema_fields = Some(fields.into_iter().collect());
     }
 
     let mut metadata = schema.metadata.clone();

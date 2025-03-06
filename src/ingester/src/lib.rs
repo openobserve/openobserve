@@ -23,15 +23,18 @@ mod stream;
 mod wal;
 mod writer;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
+use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use writer::{Writer, check_memtable_size, flush_all, get_writer, read_from_memtable};
+
+use crate::errors::OpenDirSnafu;
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
 
@@ -52,8 +55,15 @@ pub async fn init() -> errors::Result<()> {
     wal::check_uncompleted_parquet_files().await?;
 
     // replay wal files to create immutable
+    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
+    create_dir_all(&wal_dir).context(OpenDirSnafu {
+        path: wal_dir.clone(),
+    })?;
+    let wal_files = wal::wal_scan_files(&wal_dir, "wal")
+        .await
+        .unwrap_or_default();
     tokio::task::spawn(async move {
-        if let Err(e) = wal::replay_wal_files().await {
+        if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
             log::error!("replay wal files error: {}", e);
         }
     });

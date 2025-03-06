@@ -105,12 +105,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 }
 
 // replay wal files to create immutable
-pub(crate) async fn replay_wal_files() -> Result<()> {
-    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
-    create_dir_all(&wal_dir).context(OpenDirSnafu {
-        path: wal_dir.clone(),
-    })?;
-    let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap_or_default();
+pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) -> Result<()> {
     if wal_files.is_empty() {
         return Ok(());
     }
@@ -239,7 +234,10 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<PathBuf>> {
+pub(crate) async fn wal_scan_files(
+    root_dir: impl Into<PathBuf>,
+    ext: &str,
+) -> Result<Vec<PathBuf>> {
     Ok(WalkDir::new(root_dir.into())
         .filter_map(|entry| async move {
             let entry = entry.ok()?;
