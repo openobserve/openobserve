@@ -378,7 +378,7 @@ test.describe("dashboard UI testcases", () => {
     ); // Replace with the actual selector for the graph
     await expect(graphLocatorScatter).toBeVisible();
 
-    
+
 
     // H-stacked chart
     await page
@@ -388,7 +388,6 @@ test.describe("dashboard UI testcases", () => {
       '[data-test="selected-chart-h-stacked-item"]'
     ); // Replace with the actual selector for the graph
     await expect(graphLocatorHStacked).toBeVisible();
-
     // Stacked chart
     await page.locator('[data-test="selected-chart-stacked-item"] img').click();
     const graphLocatorStacked = page.locator(
@@ -772,7 +771,6 @@ await page.waitForTimeout(3000);
       )
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-
     // await page.locator('[data-test="date-time-btn"]').click();
     // await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
     await waitForDateTimeBtn(page);
@@ -780,8 +778,6 @@ await page.waitForTimeout(3000);
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
-
-    
     await page.locator(".layout-panel-container > .flex").click();
     await page.getByText("expand_allConfig").click();
     await page.locator(".q-pa-none > .q-list > div").first().click();
