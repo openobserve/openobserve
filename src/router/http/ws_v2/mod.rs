@@ -25,7 +25,6 @@ mod config;
 mod connection;
 mod error;
 mod handler;
-mod message;
 mod pool;
 mod session;
 mod types;

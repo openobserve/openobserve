@@ -228,7 +228,7 @@ impl ResponseRouter {
                 resp_sender
                     .send(message)
                     .await
-                    .map_err(|e| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                    .map_err(|_| WsError::ResponseChannelClosed(trace_id.clone()))?;
                 Ok(())
             }
         }
