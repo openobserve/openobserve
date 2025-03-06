@@ -398,14 +398,19 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
 
+await page.waitForTimeout(3000);
     // Switch to Bar chart and apply changes
-    await page.locator('[data-test="selected-chart-bar-item"] img').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.waitForTimeout(200);
+    await page
+    .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
+    .click();
+    await page.locator('[data-test="dashboard-edit-panel"]').click();
 
+    await page.locator('[data-test="selected-chart-bar-item"] img').click();
+
+    await page.locator('[data-test="dashboard-apply"]').click();
+    await page.locator('[data-test="dashboard-panel-save"]').click()
+    await page.waitForTimeout(1000);
     // Delete the panel and confirm
     await page
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
