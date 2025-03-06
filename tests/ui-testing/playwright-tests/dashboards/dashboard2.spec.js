@@ -378,6 +378,8 @@ test.describe("dashboard UI testcases", () => {
     ); // Replace with the actual selector for the graph
     await expect(graphLocatorScatter).toBeVisible();
 
+    
+
     // H-stacked chart
     await page
       .locator('[data-test="selected-chart-h-stacked-item"] img')
@@ -422,7 +424,7 @@ await page.waitForTimeout(3000);
     await page.locator('[data-test="confirm-button"]').click();
   });
     
-  
+
 
   test("should create the panel successfully after adding a breakdown", async ({
     page,
