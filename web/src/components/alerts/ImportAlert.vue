@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outline
             @click="router.back()"
             icon="arrow_back_ios_new"
+            data-test="alert-import-back-btn"
           />
           <div class="text-h6 q-ml-md">Import Alert</div>
         </div>
@@ -38,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="router.back()"
+          data-test="alert-import-cancel-btn"
         />
         <q-btn
           class="text-bold no-border"
@@ -47,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="importJson"
+          data-test="alert-import-json-btn"
         />
       </div>
     </div>
@@ -56,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex">
     <div class="report-list-tabs flex items-center justify-center q-mx-md">
       <app-tabs
-        data-test="pipeline-list-tabs"
+        data-test="alert-import-tabs"
         class="q-mr-md"
         :tabs="tabs"
         v-model:active-tab="activeTab"
@@ -79,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
               <div style="width: 100%" class="q-mb-md">
                 <q-input
+                  data-test="alert-import-url-input"
                   v-model="url"
                   :label="t('dashboard.addURL')"
                   color="input-border"
@@ -89,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="alert-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -115,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
               <div style="width: 100%" class="q-mb-md">
                 <q-file
+                  data-test="alert-import-json-file-input"
                   v-model="jsonFiles"
                   filled
                   bottom-slots
@@ -136,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-file>
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="alert-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="alert-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -158,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #after>
           <div
-            data-test="logs-vrl-function-editor"
+            data-test="alert-import-output-editor"
             style="width: 100%; height: 100%"
           >
             <div
@@ -177,12 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="(errorGroup, index) in alertErrorsToDisplay"
                     :key="index"
+                    :data-test="`alert-import-error-${index}`"
                   >
                     <!-- Iterate through each inner array (the individual error message) -->
                     <div
                       v-for="(errorMessage, errorIndex) in errorGroup"
                       :key="errorIndex"
                       class="error-item"
+                      :data-test="`alert-import-error-${index}-${errorIndex}`"
                     >
                       <span
                         class="text-red"
@@ -195,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
+                            data-test="alert-import-name-input"
                             v-model="userSelectedAlertName[index]"
                             :label="t('alerts.name') + ' *'"
                             color="input-border"
@@ -222,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
+                            data-test="alert-import-stream-name-input"
                             v-model="userSelectedStreamName[index]"
                             :options="streamList"
                             :label="t('alerts.stream_name') + ' *'"
@@ -253,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
+                            data-test="alert-import-destination-name-input"
                             v-model="userSelectedDestinations[index]"
                             :options="filteredDestinations"
                             @filter="filterDestinations"
@@ -283,13 +293,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <q-item-section side>
                                   <q-checkbox 
+                                    data-test="alert-import-destination-checkbox"
                                     :model-value="userSelectedDestinations[index]?.includes(scope.opt) ?? false"
                                     dense
                                     @update:model-value="toggleDestination(scope.opt, index)"
                                   />
                                 </q-item-section>
                                 <q-item-section>
-                                  <q-item-label>{{ scope.opt }}</q-item-label>
+                                  <q-item-label data-test="alert-import-destination-label">{{ scope.opt }}</q-item-label>
                                 </q-item-section>
                               </q-item>
                             </template>
@@ -306,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
+                            data-test="alert-import-stream-type-input"
                             v-model="userSelectedStreamType[index]"
                             :options="streamTypes"
                             :label="t('alerts.streamType') + ' *'"
@@ -333,6 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
+                            data-test="alert-import-timezone-input"
                             v-model="userSelectedTimezone[index]"
                             :options="filteredTimezone"
                             :label="'Timezone *'"
@@ -364,11 +377,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="alertCreators.length > 0">
-                <div class="section-title text-primary">Alert Creation</div>
+                <div class="section-title text-primary" data-test="alert-import-creation-title">Alert Creation</div>
                 <div
                   class="error-list"
                   v-for="(val, index) in alertCreators"
                   :key="index"
+                  :data-test="`alert-import-creation-${index}`"
                 >
                   <div
                     :class="{
@@ -376,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
+                    :data-test="`alert-import-creation-${index}-message`"
                   >
                     <pre>{{ val.message }}</pre>
                   </div>

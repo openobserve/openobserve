@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outline
             @click="arrowBackFn"
             icon="arrow_back_ios_new"
+            data-test="template-import-back-btn"
           />
           <div class="text-h6 q-ml-md">Import Template</div>
         </div>
@@ -38,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="router.back()"
+          data-test="template-import-cancel-btn"
         />
         <q-btn
           class="text-bold no-border"
@@ -47,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="importJson"
+          data-test="template-import-json-btn"
         />
       </div>
     </div>
@@ -56,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex">
     <div class="report-list-tabs flex items-center justify-center q-mx-md">
       <app-tabs
-        data-test="pipeline-list-tabs"
+        data-test="template-import-tabs"
         class="q-mr-md"
         :tabs="tabs"
         v-model:active-tab="activeTab"
@@ -82,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
               <div style="width: 100%" class="q-mb-md">
                 <q-input
+                  data-test="template-import-url-input"
                   v-model="url"
                   :label="t('dashboard.addURL')"
                   color="input-border"
@@ -92,9 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="template-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="template-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -114,10 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="activeTab == 'import_json_file'"
             class="editor-container-json"
+            data-test="template-import-json-file-container"
           >
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
               <div style="width: 100%" class="q-mb-md">
                 <q-file
+                  data-test="template-import-json-file-input"
                   v-model="jsonFiles"
                   filled
                   bottom-slots
@@ -139,9 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-file>
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="template-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="template-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -162,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #after>
           <div
-            data-test="logs-vrl-function-editor"
+            data-test="template-import-output-editor"
             style="width: 100%; height: 100%"
           >
             <div
@@ -184,12 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="(errorGroup, index) in templateErrorsToDisplay"
                     :key="index"
+                    :data-test="`template-import-error-${index}`"
                   >
                     <!-- Iterate through each inner array (the individual error message) -->
                     <div
                       v-for="(errorMessage, errorIndex) in errorGroup"
                       :key="errorIndex"
                       class="error-item"
+                      :data-test="`template-import-error-${index}-${errorIndex}`"
                     >
                       <span
                         class="text-red"
@@ -201,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-input
+                            data-test="template-import-name-input"
                             v-model="userSelectedTemplateNames[index]"
                             :label="'Template Name *'"
                             color="input-border"
@@ -227,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-input
+                            data-test="template-import-body-input"
                             v-model="userSelectedTemplateBodies[index]"
                             :label="'Template Body *'"
                             color="input-border"
@@ -254,6 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
+                            data-test="template-import-type-input"
                             v-model="userSelectedTemplateTypes[index]"
                             :options="destinationTypes"
                             :label="'Template Type *'"
@@ -287,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-input
+                            data-test="template-import-title-input"
                             v-model="userSelectedTemplateTitles[index]"
                             :label="'Template Title *'"
                             color="input-border"
@@ -310,11 +322,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="tempalteCreators.length > 0">
-                <div class="section-title text-primary">Alert Creation</div>
+                <div class="section-title text-primary" data-test="template-import-creation-title">Template Creation</div>
                 <div
                   class="error-list"
                   v-for="(val, index) in tempalteCreators"
                   :key="index"
+                  :data-test="`template-import-creation-${index}`"
                 >
                   <div
                     :class="{
@@ -322,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
+                    :data-test="`template-import-creation-${index}-message`"
                   >
                     <pre>{{ val.message }}</pre>
                   </div>
