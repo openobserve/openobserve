@@ -851,15 +851,6 @@ export default defineComponent({
         });
       }
 
-      // Check if 'headers' is required for webhook but not for email
-      if (
-        input.type == "http" &&
-        input.headers == undefined
-      ) {
-        destinationErrors.push(
-          `Destination - ${index} 'headers' is required for webhook`,
-        );
-      }
 
       if(input.type == 'http' && input.headers != undefined) {
         if(typeof input.headers !== 'object') {
