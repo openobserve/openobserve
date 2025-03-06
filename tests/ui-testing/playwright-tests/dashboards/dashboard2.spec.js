@@ -421,6 +421,8 @@ await page.waitForTimeout(3000);
     );
     await page.locator('[data-test="confirm-button"]').click();
   });
+    
+  
 
   test("should create the panel successfully after adding a breakdown", async ({
     page,
