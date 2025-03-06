@@ -8,7 +8,7 @@ use crate::{
     service::websocket_events::sessions_cache_utils,
 };
 
-#[get("{org_id}/ws_v2/{router_id}")]
+#[get("{org_id}/ws/v2/{router_id}")]
 pub async fn websocket(
     path_params: web::Path<(String, String)>,
     req: HttpRequest,

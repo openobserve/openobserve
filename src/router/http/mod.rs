@@ -433,12 +433,11 @@ async fn proxy_ws(
         // Check if this is a WebSocket v2 request (e.g., contains a specific path segment or
         // header)
         let path = req.uri().path();
-        if path.contains("/ws_v2/") {
-            // Extract client ID from the path or query parameters
-            // Path format example: /api/{org_id}/ws_v2/{client_id}
+        // Extract client ID from the path or query parameters
+        // Path format example: /api/{org_id}/ws/v2/{client_id}
+        if path.contains("/ws/v2/") {
             let path_parts: Vec<&str> = path.split('/').collect();
-            let client_id = if path_parts.len() >= 4 {
-                // Get client ID from path
+            let client_id = if path_parts.len() >= 5 {
                 path_parts[path_parts.len() - 1].to_string()
             } else {
                 // Fallback to a default or query parameter
