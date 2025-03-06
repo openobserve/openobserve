@@ -21,13 +21,22 @@ pub enum WsError {
     #[error("Connection error: {0}")]
     ConnectionError(String),
 
+    #[error("Pooled connection disconnected")]
+    ConnectionDisconnected,
+
     #[error("Session error: {0}")]
     SessionError(String),
 
     #[error("Session not found: {0}")]
     SessionNotFound(String),
 
-    #[error("Message error: {0}")]
+    #[error("Response channel not found: {0}")]
+    ResponseChannelNotFound(String),
+
+    #[error("Response channel registered for trace_id {0} not found")]
+    ResponseChannelClosed(String),
+
+    #[error("Response channel registered for trace_id {0} closed")]
     MessageError(String),
 
     #[error("Querier not available: {0}")]
@@ -47,6 +56,7 @@ impl ResponseError for WsError {
     fn status_code(&self) -> StatusCode {
         match self {
             WsError::ConnectionError(_) => StatusCode::SERVICE_UNAVAILABLE,
+            WsError::ConnectionDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::SessionError(_) => StatusCode::BAD_REQUEST,
             WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
             WsError::MessageError(_) => StatusCode::BAD_REQUEST,
@@ -54,6 +64,8 @@ impl ResponseError for WsError {
             WsError::CircuitBreakerOpen(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::Timeout(_) => StatusCode::REQUEST_TIMEOUT,
             WsError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            WsError::ResponseChannelNotFound(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            WsError::ResponseChannelClosed(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

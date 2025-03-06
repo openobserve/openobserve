@@ -18,7 +18,6 @@ use std::sync::Arc;
 use actix_web::{Error, HttpRequest, HttpResponse, web};
 use config::meta::cluster::RoleGroup;
 use futures_util::StreamExt;
-use tokio::sync::mpsc::Sender;
 
 use super::{
     connection::{Connection, QuerierConnection},
@@ -28,6 +27,7 @@ use super::{
     types::*,
 };
 
+#[derive(Debug)]
 pub struct WsHandler {
     pub session_manager: Arc<SessionManager>,
     pub connection_pool: Arc<QuerierConnectionPool>,
@@ -81,7 +81,6 @@ impl WsHandler {
                                         connection_pool.clone(),
                                         &client_id,
                                         &message,
-                                        &response_tx,
                                     )
                                     .await
                                     {
@@ -93,6 +92,13 @@ impl WsHandler {
                                         }
                                         Ok(querier_conn) => querier_conn,
                                     };
+                                    querier_conn
+                                        .register_request(
+                                            message.trace_id.clone(),
+                                            response_tx.clone(),
+                                        )
+                                        .await;
+
                                     if let Err(e) = querier_conn.send_message(message).await {
                                         log::error!(
                                             "[WS::Handler] error forwarding client message via selected querier connection: {e}"
@@ -119,6 +125,8 @@ impl WsHandler {
                         break;
                     }
                 }
+                // TODO: need to close client websocket connection?
+                _ = ws_session.close(None).await;
                 Ok::<_, Error>(())
             };
 
@@ -152,36 +160,43 @@ pub async fn get_querier_connection(
     connection_pool: Arc<QuerierConnectionPool>,
     client_id: &ClientId,
     message: &Message,
-    response_tx: &Sender<Message>,
 ) -> WsResult<Arc<QuerierConnection>> {
-    // Get or assign querier for this trace_id included in message
-    let querier_name = match session_manager
-        .get_querier_for_trace(client_id, &message.trace_id)
-        .await?
-    {
-        Some(querier_name) => querier_name,
-        None => {
-            let role_group = if let MessageType::Search(search_req) = &message.message_type {
-                Some(RoleGroup::from(search_req.search_type.clone()))
-            } else {
-                None
-            };
+    loop {
+        // Get or assign querier for this trace_id included in message
+        let querier_name = match session_manager
+            .get_querier_for_trace(client_id, &message.trace_id)
+            .await?
+        {
+            Some(querier_name) => querier_name,
+            None => {
+                let role_group = if let MessageType::Search(search_req) = &message.message_type {
+                    Some(RoleGroup::from(search_req.search_type.clone()))
+                } else {
+                    None
+                };
 
-            // use consistent hashing to select querier
-            let querier_name = select_querier(&message.trace_id, role_group).await?;
-            session_manager
-                .set_querier_for_trace(client_id, &message.trace_id, &querier_name)
-                .await?;
-            querier_name
+                // use consistent hashing to select querier
+                let querier_name = select_querier(&message.trace_id, role_group).await?;
+                session_manager
+                    .set_querier_for_trace(client_id, &message.trace_id, &querier_name)
+                    .await?;
+                querier_name
+            }
+        };
+
+        // Get connection for selected querier
+        match connection_pool
+            .get_or_create_connection(&querier_name)
+            .await
+        {
+            Ok(conn) => return Ok(conn),
+            Err(_) => {
+                session_manager
+                    .remove_querier_connection(&querier_name)
+                    .await;
+            }
         }
-    };
-
-    // Get connection for selected querier
-    let conn = connection_pool
-        .get_or_create_connection(&querier_name, response_tx)
-        .await?;
-
-    Ok(conn)
+    }
 }
 
 // TODO: potentially where load balancing can be applied to select least busy querier
@@ -191,7 +206,7 @@ async fn select_querier(trace_id: &str, role_group: Option<RoleGroup>) -> WsResu
     // use consistent hashing to select querier
     // CONFIRM: map all messages with the same trace_id to the same querier
     // CONFIRM: is it too expensive to call for every single request?
-    // CONFIRM: can multiple queriers have the same node? 
+    // CONFIRM: can multiple queriers have the same node?
     let node = cluster::get_node_from_consistent_hash(
         trace_id,
         &config::meta::cluster::Role::Querier,

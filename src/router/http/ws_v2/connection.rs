@@ -19,7 +19,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use config::utils::json;
+use config::{RwAHashMap, utils::json};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use tokio::{
     net::TcpStream,
@@ -46,20 +46,26 @@ pub trait Connection: Send + Sync {
     fn get_name(&self) -> &QuerierName;
 }
 
+#[derive(Debug)]
 pub struct QuerierConnection {
     querier_name: QuerierName,
     url: String,
     write: Arc<Mutex<Option<SplitSink<WsStreamType, WsMessage>>>>,
     shutdown_tx: Sender<()>,
+    response_router: Arc<ResponseRouter>,
     is_connected: Arc<AtomicBool>,
     last_active: std::sync::atomic::AtomicI64,
+}
+
+#[derive(Debug, Default)]
+pub struct ResponseRouter {
+    routes: RwAHashMap<TraceId, Sender<Message>>,
 }
 
 impl QuerierConnection {
     pub async fn establish_connection(
         querier_name: QuerierName,
         url: String,
-        response_tx: Sender<Message>,
     ) -> WsResult<Arc<Self>> {
         // Connect to querier
         let (ws_stream, _) = connect_async(&url)
@@ -71,53 +77,74 @@ impl QuerierConnection {
         // Signal to shutdown
         let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
 
+        // Setting up components needed for the two tasks
+        let response_router = ResponseRouter::new();
         let is_connected = Arc::new(AtomicBool::new(true));
         let is_connected_health_task = is_connected.clone();
+        let querier_name_cp_t1 = querier_name.clone();
+        let querier_name_cp_t2 = querier_name.clone();
 
         let conn = Arc::new(Self {
             querier_name,
             url,
             write: write.clone(),
             shutdown_tx,
+            response_router: response_router.clone(),
             is_connected: is_connected.clone(),
             last_active: std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),
         });
 
-        // Spawn read handler
-        // Router -> Querier connection
-        // Task to receive messages from the querier
+        // Spawn task to forward response messages from querier
         tokio::spawn(async move {
-            tokio::select! {
-                Some(msg) = read.next() => {
-                    match msg {
-                        Ok(msg) => {
-                            // Send the message to mpsc channel to be sent to the client
-                            if let Err(e) = response_tx.send(msg.into()).await {
-                                log::error!("[WS] Failed to forward message: {}", e);
+            loop {
+                tokio::select! {
+                    Some(msg) = read.next() => {
+                        match msg {
+                            Ok(msg) => {
+                                match response_router.route_response(msg.into()).await {
+                                    Err(e) => {
+                                        log::error!(
+                                            "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
+                                            e
+                                        );
+                                    }
+                                    Ok(_) => {
+                                        log::debug!(
+                                            "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("[WS] Read error: {}", e);
+                                // mark the connection disconnected
+                                is_connected.store(false, Ordering::SeqCst);
                                 // TODO: cleanup resource
+
+                                break;
                             }
                         }
-                        Err(e) => {
-                            log::error!("[WS] Read error: {}", e);
-                            // mark the connection disconnected
-                            is_connected.store(false, Ordering::SeqCst);
-                            // TODO: cleanup resource
-                        }
+                    }
+                    _ = shutdown_rx.recv() => {
+                        log::info!("[WS::QuerierConnection] shutting down. Stop listening from the querier");
+                        // mark the connection disconnected
+                        is_connected.store(false, Ordering::SeqCst);
+                        // TODO: cleanup resource?
+
+                        break;
                     }
                 }
-                _ = shutdown_rx.recv() => {
-                    log::info!("[WS::QuerierConnection] shutting down. Stop listening from the querier");
-                    // mark the connection disconnected
-                    is_connected.store(false, Ordering::SeqCst);
-                    // TODO: cleanup resource?
-                }
             }
+
+            log::info!(
+                "[WS::QuerierConnection] connection to querier {querier_name_cp_t1} response handler stopped."
+            );
         });
 
         // Spawn health check task
         tokio::spawn(async move {
             // TODO: configurable duration interval
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
             loop {
                 interval.tick().await;
@@ -137,20 +164,74 @@ impl QuerierConnection {
             }
 
             log::warn!(
-                "[WS:QuerierConnection] connection health check failed, marked disconnected"
+                "[WS:QuerierConnection] connection to querier {querier_name_cp_t2} health check failed, marked disconnected"
             );
         });
 
         Ok(conn)
     }
 
-    // async fn
+    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<Message>) {
+        self.response_router
+            .register_request(trace_id, response_tx)
+            .await
+    }
 
     fn update_last_active(&self) {
         self.last_active.store(
             chrono::Utc::now().timestamp_micros(),
             std::sync::atomic::Ordering::SeqCst,
         );
+    }
+}
+
+impl ResponseRouter {
+    pub fn new() -> Arc<Self> {
+        let response_router = Arc::new(Self {
+            routes: Default::default(),
+        });
+
+        // Spawn cleanup task
+        Self::spawn_cleanup_task(response_router.clone());
+
+        response_router
+    }
+
+    fn spawn_cleanup_task(router: Arc<ResponseRouter>) {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+            loop {
+                interval.tick().await;
+                router.remove_completed_requests().await;
+            }
+        });
+    }
+
+    async fn register_request(&self, trace_id: TraceId, response_tx: Sender<Message>) {
+        self.routes.write().await.insert(trace_id, response_tx);
+    }
+
+    async fn remove_completed_requests(&self) {
+        self.routes
+            .write()
+            .await
+            .retain(|_, response_tx| !response_tx.is_closed());
+    }
+
+    pub async fn route_response(&self, message: Message) -> WsResult<()> {
+        let trace_id = message.trace_id.clone();
+
+        match self.routes.read().await.get(&trace_id) {
+            None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
+            Some(resp_sender) => {
+                resp_sender
+                    .send(message)
+                    .await
+                    .map_err(|e| WsError::ResponseChannelClosed(trace_id.clone()))?;
+                Ok(())
+            }
+        }
     }
 }
 

@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::RwAHashMap;
-use tokio::sync::mpsc::Sender;
 
 use super::{
     config::*,
@@ -26,6 +25,7 @@ use super::{
 };
 use crate::common::infra::cluster;
 
+#[derive(Debug)]
 pub struct QuerierConnectionPool {
     connections: RwAHashMap<QuerierName, Arc<QuerierConnection>>,
     config: WsConfig,
@@ -42,18 +42,19 @@ impl QuerierConnectionPool {
     pub async fn get_or_create_connection(
         &self,
         querier_name: &QuerierName,
-        response_tx: &Sender<Message>,
     ) -> WsResult<Arc<QuerierConnection>> {
         if let Some(conn) = self.connections.read().await.get(querier_name) {
             // double check if the connection is still connected
-            if conn.is_connected().await {
-                return Ok(conn.clone());
-            }
+            return if conn.is_connected().await {
+                Ok(conn.clone())
+            } else {
+                Err(WsError::ConnectionDisconnected)
+            };
         }
 
         // Create new connection
         // can't use the same name
-        let conn = self.create_connection(querier_name, response_tx).await?;
+        let conn = self.create_connection(querier_name).await?;
         self.connections
             .write()
             .await
@@ -64,7 +65,6 @@ impl QuerierConnectionPool {
     async fn create_connection(
         &self,
         querier_name: &QuerierName,
-        response_tx: &Sender<Message>,
     ) -> WsResult<Arc<QuerierConnection>> {
         // Get querier info from cluster
         let node = cluster::get_cached_node_by_name(querier_name)
@@ -75,12 +75,7 @@ impl QuerierConnectionPool {
         let ws_url = crate::router::http::ws::convert_to_websocket_url(&node.http_addr)
             .map_err(|e| WsError::ConnectionError(e))?;
 
-        let conn = QuerierConnection::establish_connection(
-            querier_name.clone(),
-            ws_url,
-            response_tx.clone(),
-        )
-        .await?;
+        let conn = QuerierConnection::establish_connection(querier_name.clone(), ws_url).await?;
         Ok(conn)
     }
 
