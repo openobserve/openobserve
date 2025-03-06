@@ -126,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Place the content you want in the middle here -->
       <q-btn
-        data-test="logs-search-field-list-collapse-btn"
+        data-test="logs-search-field-list-collapse-btn-management"
         :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
         :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
         dense
         size="20px"
         round
-        class="field-list-collapse-btn "
+        class="field-list-collapse-btn-management "
         :style="{
                       right: showManagementTabs ? '0px' : '-4px',
                     }"
@@ -295,7 +295,7 @@ export default defineComponent({
     }
   }
 }
-    .field-list-collapse-btn {
+    .field-list-collapse-btn-management {
       z-index: 90;
       position: relative;
       
