@@ -92,8 +92,8 @@ pub mod sessions_cache_utils {
 
     use super::search_registry_utils::SearchState;
     use crate::{
-        common::infra::config::WS_SESSIONS,
-        handler::http::request::websocket::session::{SEARCH_REGISTRY, WsSession},
+        common::infra::config::{WS_SEARCH_REGISTRY, WS_SESSIONS},
+        handler::http::request::websocket::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -162,7 +162,7 @@ pub mod sessions_cache_utils {
     }
 
     fn cleanup_searches_for_session(session_id: &str) {
-        let searches_to_remove: Vec<String> = SEARCH_REGISTRY
+        let searches_to_remove: Vec<String> = WS_SEARCH_REGISTRY
             .iter()
             .filter_map(|entry| {
                 if entry.value().get_req_id() == session_id {
@@ -174,7 +174,7 @@ pub mod sessions_cache_utils {
             .collect();
 
         for trace_id in searches_to_remove {
-            if let Some((_, state)) = SEARCH_REGISTRY.remove(&trace_id) {
+            if let Some((_, state)) = WS_SEARCH_REGISTRY.remove(&trace_id) {
                 match state {
                     SearchState::Running { cancel_tx, req_id } => {
                         let _ = cancel_tx.try_send(());
@@ -227,7 +227,7 @@ pub mod sessions_cache_utils {
 pub mod search_registry_utils {
     use tokio::sync::mpsc;
 
-    use crate::handler::http::request::websocket::session::SEARCH_REGISTRY;
+    use crate::common::infra::config::WS_SEARCH_REGISTRY;
 
     #[derive(Debug)]
     pub enum SearchState {
@@ -255,7 +255,7 @@ pub mod search_registry_utils {
 
     // Add this function to check if a search is cancelled
     pub fn is_cancelled(trace_id: &str) -> Option<bool> {
-        SEARCH_REGISTRY
+        WS_SEARCH_REGISTRY
             .get(trace_id)
             .map(|state| matches!(*state, SearchState::Cancelled { .. }))
     }

@@ -21,7 +21,6 @@ use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
 };
-use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
@@ -29,7 +28,6 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
     infra::config::get_config as get_o2_config,
 };
-use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
@@ -37,14 +35,14 @@ use tokio::sync::mpsc;
 use crate::service::self_reporting::audit;
 #[cfg(feature = "enterprise")]
 use crate::service::websocket_events::handle_cancel;
-use crate::service::websocket_events::{
-    WsClientEvents, WsServerEvents, handle_search_request,
-    search_registry_utils::{self, SearchState},
-    sessions_cache_utils,
+use crate::{
+    common::infra::config::WS_SEARCH_REGISTRY,
+    service::websocket_events::{
+        WsClientEvents, WsServerEvents, handle_search_request,
+        search_registry_utils::{self, SearchState},
+        sessions_cache_utils,
+    },
 };
-
-// Global registry for search requests by `trace_id`
-pub static SEARCH_REGISTRY: Lazy<DashMap<String, SearchState>> = Lazy::new(DashMap::new);
 
 // Do not clone the session, instead use a reference to the session
 pub struct WsSession {
@@ -379,7 +377,7 @@ async fn handle_search_event(
     let client_msg = WsClientEvents::Search(Box::new(search_req.clone()));
 
     // Register running search BEFORE spawning the search task
-    SEARCH_REGISTRY.insert(
+    WS_SEARCH_REGISTRY.insert(
         trace_id.clone(),
         SearchState::Running {
             cancel_tx,
@@ -405,7 +403,7 @@ async fn handle_search_event(
             ) => {
                 match search_result {
                     Ok(_) => {
-                        if let Some(mut state) = SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
+                        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(&trace_id_for_task) {
                             *state = SearchState::Completed {
                                 req_id: req_id.to_string(),
                             };
@@ -501,7 +499,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
             trace_id
         );
         // Update state to cancelled before returning
-        if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
+        if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
             *state = SearchState::Cancelled {
                 req_id: trace_id.to_string(),
             };
@@ -522,7 +520,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     };
 
     // Update registry state
-    if let Some(mut state) = SEARCH_REGISTRY.get_mut(trace_id) {
+    if let Some(mut state) = WS_SEARCH_REGISTRY.get_mut(trace_id) {
         *state = SearchState::Completed {
             req_id: trace_id.to_string(),
         };
@@ -533,6 +531,6 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
 
 // Add cleanup function
 async fn cleanup_search_resources(trace_id: &str) {
-    SEARCH_REGISTRY.remove(trace_id);
+    WS_SEARCH_REGISTRY.remove(trace_id);
     log::debug!("[WS_HANDLER]: trace_id: {}, Resources cleaned up", trace_id);
 }
