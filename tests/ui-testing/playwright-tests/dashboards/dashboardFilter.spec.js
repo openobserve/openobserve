@@ -245,10 +245,10 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -467,9 +467,9 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -489,6 +489,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -547,6 +548,7 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
+      // await page.waitForTimeout(3000);
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
       await page
       .getByRole("option", { name: "kubernetes_container_image" })
@@ -652,10 +654,10 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -811,9 +813,9 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -927,9 +929,9 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -1063,10 +1065,10 @@ test.describe("dashboard filter testcases", () => {
     );
     await expect(button).toBeVisible();
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await button.click();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
