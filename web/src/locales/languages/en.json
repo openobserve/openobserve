@@ -742,7 +742,8 @@
     "numOfColumns": "Columns per Row",
     "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout",
     "communityDashboard": "Community Dashboards",
-    "trellisTimeShiftTooltip": "Trellis is not supported for Time Shift Comparison (Comparison Against). Please remove Time Shift Comparison to enable Trellis Layout"
+    "trellisTimeShiftTooltip": "Trellis is not supported for Time Shift Comparison (Comparison Against). Please remove Time Shift Comparison to enable Trellis Layout",
+    "editJson": "Edit Dashboard JSON"
   },
   "panel": {
     "header": "Panel",
@@ -818,7 +819,7 @@
     "basic": "Basic",
     "pro": "Pro",
     "business": "Business",
-    "whatIsIncluded": "What’s included",
+    "whatIsIncluded": "What's included",
     "subscribed": "Subscribed",
     "getStarted": "Get started",
     "paymentMethod": "Payment Method",
