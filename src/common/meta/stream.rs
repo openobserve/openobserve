@@ -40,6 +40,7 @@ pub struct Stream {
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
+    pub total_fields: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -65,6 +66,7 @@ pub struct StreamSchema {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStream {
     pub list: Vec<Stream>,
+    pub total: usize,
 }
 
 pub struct SchemaEvolution {
