@@ -43,7 +43,7 @@ const alerts = {
       url += `&folder=${folder_id}`;
     }
     if(query){
-      url += `&name_substring=${query}`;
+      url += `&alert_name_substring=${query}`;
     }
     return http().get(url);
   },
