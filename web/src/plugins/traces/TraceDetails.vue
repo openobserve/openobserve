@@ -700,7 +700,7 @@ export default defineComponent({
             query: req,
             page_type: "traces",
           },
-          "UI"
+          "ui"
         )
         .then((res: any) => {
           if (!res.data?.hits?.length) {
