@@ -327,11 +327,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedTimeDate="dashboardPanelData.meta.dateTime"
           @variablesData="variablesDataUpdated"
           :initialVariableValues="initialVariableValues"
+          class="q-mb-sm"
         />
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
           style="width: 100%; height: 100%;"
-          class="col q-mt-md"
+          class="col"
           :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
@@ -349,11 +350,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedTimeDate="dashboardPanelData.meta.dateTime"
           @variablesData="variablesDataUpdated"
           :initialVariableValues="initialVariableValues"
+          class="q-mb-sm"
         />
         <CustomMarkdownEditor
           v-model="dashboardPanelData.data.markdownContent"
           style="width: 100%; height: 100%"
-          class="col q-mt-md"
+          class="col"
           :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
