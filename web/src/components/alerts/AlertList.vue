@@ -317,8 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-move-across-folders-btn"
             class="flex items-center move-btn"
             color="secondary"
-            icon="folder"
-            :label="'Move Across Folders'"
+            :icon="outlinedDriveFileMove"
+            :label="'Move'"
             @click="moveMultipleAlerts"
           />
           <QTablePagination
@@ -1154,6 +1154,11 @@ export default defineComponent({
 
     const updateActiveFolderId = (newVal: any) => {
       activeFolderId.value = newVal;
+      selected.value = [];
+      allSelected.value = false;
+      alertsRows.value.forEach((alert: any) => {
+        alert.selected = false;
+      }); 
     }
 
     const editAlert = async (row: any) => {
@@ -1406,7 +1411,7 @@ export default defineComponent({
 }
 
 .move-btn {
-  width: 20vw;
+  width: 8vw;
 }
 
 .q-table {
