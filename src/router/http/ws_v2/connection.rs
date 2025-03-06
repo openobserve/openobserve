@@ -41,7 +41,7 @@ type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub trait Connection: Send + Sync {
     async fn connect(&self) -> WsResult<()>;
     async fn disconnect(&self);
-    async fn send_message(&self, message: Message) -> WsResult<()>;
+    async fn send_message(&self, message: StreamMessage) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
     fn get_name(&self) -> &QuerierName;
 }
@@ -59,7 +59,7 @@ pub struct QuerierConnection {
 
 #[derive(Debug, Default)]
 pub struct ResponseRouter {
-    routes: RwAHashMap<TraceId, Sender<Message>>,
+    routes: RwAHashMap<TraceId, Sender<StreamMessage>>,
 }
 
 impl QuerierConnection {
@@ -171,7 +171,7 @@ impl QuerierConnection {
         Ok(conn)
     }
 
-    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<Message>) {
+    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
         self.response_router
             .register_request(trace_id, response_tx)
             .await
@@ -208,7 +208,7 @@ impl ResponseRouter {
         });
     }
 
-    async fn register_request(&self, trace_id: TraceId, response_tx: Sender<Message>) {
+    async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
         self.routes.write().await.insert(trace_id, response_tx);
     }
 
@@ -219,7 +219,7 @@ impl ResponseRouter {
             .retain(|_, response_tx| !response_tx.is_closed());
     }
 
-    pub async fn route_response(&self, message: Message) -> WsResult<()> {
+    pub async fn route_response(&self, message: StreamMessage) -> WsResult<()> {
         let trace_id = message.trace_id.clone();
 
         match self.routes.read().await.get(&trace_id) {
@@ -236,18 +236,18 @@ impl ResponseRouter {
 }
 
 // need protocol exchange from our Message -> tungstenite::protocol::Message
-impl From<Message> for tungstenite::protocol::Message {
-    fn from(value: Message) -> Self {
+impl From<StreamMessage> for tungstenite::protocol::Message {
+    fn from(value: StreamMessage) -> Self {
         tungstenite::protocol::Message::Text("TODO".to_string());
         todo!("protocol exchange needed")
     }
 }
 
-impl From<tungstenite::protocol::Message> for Message {
+impl From<tungstenite::protocol::Message> for StreamMessage {
     fn from(value: tungstenite::protocol::Message) -> Self {
-        Message::new(
+        StreamMessage::new(
             "trace_id".to_string(),
-            MessageType::SearchResponse,
+            StreamMessageType::SearchResponse,
             json::Value::default(),
         );
         todo!("protocol exchange needed")
@@ -281,7 +281,7 @@ impl Connection for QuerierConnection {
         _ = self.shutdown_tx.send(()).await;
     }
 
-    async fn send_message(&self, message: Message) -> WsResult<()> {
+    async fn send_message(&self, message: StreamMessage) -> WsResult<()> {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
             let trace_id = message.trace_id.clone();

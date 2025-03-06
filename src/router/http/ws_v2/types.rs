@@ -25,9 +25,9 @@ pub type QuerierName = String;
 pub type TraceId = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Message {
+pub struct StreamMessage {
     pub trace_id: String,
-    pub message_type: MessageType,
+    pub message_type: StreamMessageType,
     pub payload: serde_json::Value,
     #[serde(skip)]
     pub timestamp: DateTime<Utc>,
@@ -35,7 +35,7 @@ pub struct Message {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MessageType {
+pub enum StreamMessageType {
     Search(Box<SearchEventReq>),
     SearchResponse,
     #[cfg(feature = "enterprise")]
@@ -47,8 +47,12 @@ pub enum MessageType {
     Benchmark,
 }
 
-impl Message {
-    pub fn new(trace_id: String, message_type: MessageType, payload: serde_json::Value) -> Self {
+impl StreamMessage {
+    pub fn new(
+        trace_id: String,
+        message_type: StreamMessageType,
+        payload: serde_json::Value,
+    ) -> Self {
         Self {
             trace_id,
             message_type,
@@ -62,7 +66,7 @@ impl Message {
             WsClientEvents::Search(req) => {
                 let trace_id = req.trace_id.clone();
                 let payload = serde_json::to_value(&req).unwrap_or_default();
-                Self::new(trace_id, MessageType::Search(req), payload)
+                Self::new(trace_id, StreamMessageType::Search(req), payload)
             }
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { trace_id, org_id } => {
@@ -71,11 +75,11 @@ impl Message {
                 } else {
                     serde_json::json!({"trace_id": trace_id})
                 };
-                Self::new(trace_id, MessageType::Cancel, payload)
+                Self::new(trace_id, StreamMessageType::Cancel, payload)
             }
             WsClientEvents::Benchmark { id } => Self::new(
                 id.clone(),
-                MessageType::Benchmark,
+                StreamMessageType::Benchmark,
                 serde_json::json!({"id": id}),
             ),
         }
@@ -83,7 +87,7 @@ impl Message {
 
     pub fn to_server_event(&self) -> Option<WsServerEvents> {
         match self.message_type {
-            MessageType::SearchResponse => {
+            StreamMessageType::SearchResponse => {
                 let response: Box<config::meta::search::Response> =
                     serde_json::from_value(self.payload.clone()).ok()?;
                 Some(WsServerEvents::SearchResponse {
@@ -96,7 +100,7 @@ impl Message {
                     streaming_aggs: false,
                 })
             }
-            MessageType::Error => {
+            StreamMessageType::Error => {
                 let error: ErrorPayload = serde_json::from_value(self.payload.clone()).ok()?;
                 Some(WsServerEvents::Error {
                     code: error.code,
@@ -106,7 +110,7 @@ impl Message {
                     request_id: None,
                 })
             }
-            MessageType::End => Some(WsServerEvents::End {
+            StreamMessageType::End => Some(WsServerEvents::End {
                 trace_id: Some(self.trace_id.clone()),
             }),
             _ => None,

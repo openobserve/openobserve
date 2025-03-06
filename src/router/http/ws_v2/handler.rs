@@ -57,7 +57,7 @@ impl WsHandler {
         self.session_manager.register_client(&client_id).await;
 
         // Setup message channel
-        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<Message>(32);
+        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<StreamMessage>(32);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
@@ -69,13 +69,17 @@ impl WsHandler {
                     match msg {
                         Err(e) => {
                             log::error!(
-                                "[WS::Handler] error receiving websocket message from client {e}"
+                                "[WS::Router::Handler] error receiving websocket message from client {e}"
                             );
                             break;
                         }
                         Ok(msg) => match msg {
                             actix_ws::Message::Text(text) => {
-                                if let Ok(message) = serde_json::from_str::<Message>(&text) {
+                                if let Ok(message) = serde_json::from_str::<StreamMessage>(&text) {
+                                    log::info!(
+                                        "[WS::Router::Handler] received message: {:?}",
+                                        message
+                                    );
                                     let querier_conn = match get_querier_connection(
                                         session_manager.clone(),
                                         connection_pool.clone(),
@@ -86,7 +90,7 @@ impl WsHandler {
                                     {
                                         Err(e) => {
                                             log::error!(
-                                                "[WS::Handler] error getting querier_conn: {e}"
+                                                "[WS::Router::Handler] error getting querier_conn: {e}"
                                             );
                                             break;
                                         }
@@ -101,12 +105,17 @@ impl WsHandler {
 
                                     if let Err(e) = querier_conn.send_message(message).await {
                                         log::error!(
-                                            "[WS::Handler] error forwarding client message via selected querier connection: {e}"
+                                            "[WS::Router::Handler] error forwarding client message via selected querier connection: {e}"
                                         );
                                         // TODO: possibly need to disconnect and remove the
                                         // connection
                                         break;
                                     }
+                                } else {
+                                    log::error!(
+                                        "[WS::Router::Handler] received invalid message: {:?}",
+                                        text
+                                    );
                                 }
                             }
                             actix_ws::Message::Close(_) => break,
@@ -159,7 +168,7 @@ pub async fn get_querier_connection(
     session_manager: Arc<SessionManager>,
     connection_pool: Arc<QuerierConnectionPool>,
     client_id: &ClientId,
-    message: &Message,
+    message: &StreamMessage,
 ) -> WsResult<Arc<QuerierConnection>> {
     loop {
         // Get or assign querier for this trace_id included in message
@@ -169,11 +178,12 @@ pub async fn get_querier_connection(
         {
             Some(querier_name) => querier_name,
             None => {
-                let role_group = if let MessageType::Search(search_req) = &message.message_type {
-                    Some(RoleGroup::from(search_req.search_type.clone()))
-                } else {
-                    None
-                };
+                let role_group =
+                    if let StreamMessageType::Search(search_req) = &message.message_type {
+                        Some(RoleGroup::from(search_req.search_type.clone()))
+                    } else {
+                        None
+                    };
 
                 // use consistent hashing to select querier
                 let querier_name = select_querier(&message.trace_id, role_group).await?;
