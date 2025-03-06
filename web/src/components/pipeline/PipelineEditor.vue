@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="chartContainerRef"
       class="relative-position pipeline-chart-container o2vf_node"
       :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
+      v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
     >
       <PipelineFlow />
     </div>
