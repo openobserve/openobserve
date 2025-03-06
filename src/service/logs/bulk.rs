@@ -379,7 +379,10 @@ pub async fn ingest(
                 continue;
             };
             let (records, doc_ids, originals) = pipeline_inputs.into_parts();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Pipeline] for stream {}/{}: Batch execution error: {}.",
