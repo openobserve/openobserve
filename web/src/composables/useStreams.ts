@@ -149,7 +149,9 @@ const useStreams = () => {
     notify: boolean = true,
     offset: number = 0,
     limit: number = 100,
-    keyword: string = ""
+    keyword: string = "",
+    sort: string = "",
+    asc: boolean = false
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamType = _streamType || "all";
@@ -178,7 +180,9 @@ const useStreams = () => {
           schema,
           offset,
           limit,
-          keyword
+          keyword,
+          sort,
+          asc
         );
         getStreamsPromise.value
           .then((res: any) => {

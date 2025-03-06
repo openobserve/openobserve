@@ -365,12 +365,14 @@ export default defineComponent({
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
     const pagination = ref({
-      sortBy: 'desc',
+      sortBy: 'name',
       descending: false,
       page: 1,
       rowsPerPage: 20,
       rowsNumber: 0,
     });
+    const sortField = ref("name");
+    const sortAsc = ref(true);
 
     const pageOffset = ref(pagination.value.page - 1 * pagination.value.rowsPerPage);
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
@@ -403,7 +405,7 @@ export default defineComponent({
         field: "stream_type",
         label: t("logStream.type"),
         align: "left",
-        sortable: true,
+        sortable: false,
       },
       {
         name: "doc_num",
@@ -430,7 +432,7 @@ export default defineComponent({
         field: (row: any) => formatSizeFromMB(row.compressed_size),
         label: t("logStream.compressedSize"),
         align: "left",
-        sortable: true,
+        sortable: false,
         sort: (a, b, rowA, rowB) =>
           parseInt(rowA.compressed_size) - parseInt(rowB.compressed_size),
       },
@@ -515,7 +517,7 @@ export default defineComponent({
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
         // } else {
-          streamResponse = getPaginatedStreams(selectedStreamType.value || "", false, false, pageOffset.value, pageRecordsPerPage.value, filterQuery.value);
+          streamResponse = getPaginatedStreams(selectedStreamType.value || "", false, false, pageOffset.value, pageRecordsPerPage.value, filterQuery.value, sortField.value, sortAsc.value);
         // }
 
         streamResponse.then((res: any) => {
@@ -844,7 +846,15 @@ export default defineComponent({
 
     const onRequest = async (props: any) => {
       const { page, rowsPerPage, sortBy, descending } = props.pagination
-      const filter = props.filter
+      const filter = props.filter;
+
+      if(sortBy != null) {
+        sortField.value = sortBy;
+        sortAsc.value = !descending;
+      } else {
+        sortField.value = "name";
+        sortAsc.value = true;
+      }
 
       pageOffset.value = (page - 1) * rowsPerPage;
       pageRecordsPerPage.value = rowsPerPage;
