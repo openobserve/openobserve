@@ -522,7 +522,6 @@ test.describe("dashboard filter testcases", () => {
     await page
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click({ force: true });
-    console.log("After click");
 
     await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
 
@@ -549,7 +548,8 @@ test.describe("dashboard filter testcases", () => {
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
       // await page.waitForTimeout(3000);
-      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
+      // await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
+      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().click();
       await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .click();
@@ -589,7 +589,7 @@ test.describe("dashboard filter testcases", () => {
      // Delete dashbaord 
      await page.locator('[data-test="dashboard-back-btn"]').click();
 
-     await deleteDashboard(page, randomDashboardName);
+    //  await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should applly the add group filter with apply the list of value apply successflly ", async ({
