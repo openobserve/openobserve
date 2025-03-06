@@ -13,16 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-};
+use std::io::{Error, ErrorKind};
 
 use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, post, put, web};
 use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{

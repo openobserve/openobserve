@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
     io::{Error, ErrorKind},
     net::{AddrParseError, IpAddr, SocketAddr},
 };
@@ -27,6 +26,7 @@ use config::meta::{
     search::{SearchEventContext, SearchEventType},
     stream::StreamType,
 };
+use hashbrown::{HashMap, HashSet};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 

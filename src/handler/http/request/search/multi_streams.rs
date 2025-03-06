@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http::StatusCode, post, web};
 use chrono::{Duration, Utc};
@@ -29,6 +29,7 @@ use config::{
     metrics,
     utils::{base64, json},
 };
+use hashbrown::HashMap;
 use infra::errors;
 use tracing::{Instrument, Span};
 

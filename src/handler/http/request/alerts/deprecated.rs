@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use core::result::Result::Ok;
-use std::collections::HashMap;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, post, put, web};
 use config::{
@@ -25,6 +24,7 @@ use config::{
     },
     utils::json,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
