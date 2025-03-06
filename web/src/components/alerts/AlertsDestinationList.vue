@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :label="t(`dashboard.import`)"
             @click="importDestination"
-            data-test="alert-import"
+            data-test="destination-import"
           />
           <q-btn
             data-test="alert-destination-list-add-alert-btn"

@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :label="t(`dashboard.import`)"
             @click="importTemplate"
-            data-test="alert-import"
+            data-test="template-import"
           />
           <q-btn
             data-test="alert-template-list-add-alert-btn"

@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outline
             @click="arrowBackFn"
             icon="arrow_back_ios_new"
+            data-test="destination-import-back-btn"
           />
           <div class="text-h6 q-ml-md">Import Destination</div>
         </div>
@@ -38,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="router.back()"
+          data-test="destination-import-cancel-btn"
         />
         <q-btn
           class="text-bold no-border"
@@ -47,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="sm xl"
           no-caps
           @click="importJson"
+          data-test="destination-import-json-btn"
         />
       </div>
     </div>
@@ -56,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex">
     <div class="report-list-tabs flex items-center justify-center q-mx-md">
       <app-tabs
-        data-test="pipeline-list-tabs"
+        data-test="destination-import-tabs"
         class="q-mr-md"
         :tabs="tabs"
         v-model:active-tab="activeTab"
@@ -89,12 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   filled
                   label-slot
+                  data-test="destination-import-url-input"
                 />
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="destination-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="destination-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -124,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('dashboard.dropFileMsg')"
                   accept=".json"
                   multiple
+                  data-test="destination-import-file-input"
                 >
                   <template v-slot:prepend>
                     <q-icon name="cloud_upload" @click.stop.prevent />
@@ -133,15 +138,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="close"
                       @click.stop.prevent="jsonFiles = null"
                       class="cursor-pointer"
+                      data-test="destination-import-file-close-btn"
                     />
                   </template>
                   <template v-slot:hint> .json files only </template>
                 </q-file>
               </div>
               <query-editor
-                data-test="scheduled-alert-sql-editor"
+                data-test="destination-import-sql-editor"
                 ref="queryEditorRef"
-                editor-id="alerts-query-editor"
+                editor-id="destination-import-query-editor"
                 class="monaco-editor"
                 :debounceTime="300"
                 v-model:query="jsonStr"
@@ -162,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #after>
           <div
-            data-test="logs-vrl-function-editor"
+            data-test="destination-import-output-editor"
             style="width: 100%; height: 100%"
           >
             <div
@@ -174,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="text-center text-h6">Output Messages</div>
             <q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
-              <!-- Alert Errors Section -->
+              <!-- Destination Errors Section -->
               <div
                 class="error-section"
                 v-if="destinationErrorsToDisplay.length > 0"
@@ -190,8 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="(errorMessage, errorIndex) in errorGroup"
                       :key="errorIndex"
                       class="error-item"
+                      :data-test="`destination-import-error-${index}-${errorIndex}`"
                     >
                       <span
+                        data-test="destination-import-name-error"
                         class="text-red"
                         v-if="
                           typeof errorMessage === 'object' &&
@@ -202,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
+                            data-test="destination-import-name-input"
                             v-model="userSelectedDestinationName[index]"
                             :label="t('destination.name') + ' *'"
                             color="input-border"
@@ -229,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
+                            data-test="destination-import-url-input"
                             v-model="userSelectedDestinationUrl[index]"
                             :label="'Destination URL *'"
                             color="input-border"
@@ -256,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
+                            data-test="destination-import-type-input"
                             v-model="userSelectedDestinationType[index]"
                             :options="destinationTypes"
                             :label="'Destination Type *'"
@@ -289,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
+                            data-test="destination-import-method-input"
                             v-model="userSelectedDestinationMethod[index]"
                             :options="destinationMethods"
                             :label="'Destination Method *'"
@@ -322,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
+                            data-test="destination-import-template-input"
                             v-model="userSelectedTemplates[index]"
                             :options="filteredTemplates"
                             label="Templates *"
@@ -359,6 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-input
+                            data-test="destination-import-emails-input"
                             v-model="userSelectedEmails[index]"
                             :label="'Emails (comma separated) *'"
                             color="input-border"
@@ -385,6 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-toggle
+                            data-test="destination-import-skip-tls-verify-input"
                             :model-value="userSelectedSkipTlsVerify[index] ?? false"
                             :label="t('alert_destinations.skip_tls_verify')"
                             class="q-mt-sm"
@@ -401,11 +416,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="destinationCreators.length > 0">
-                <div class="section-title text-primary">Alert Creation</div>
+                <div class="section-title text-primary" data-test="destination-import-creation-title">Destination Creation</div>
                 <div
                   class="error-list"
                   v-for="(val, index) in destinationCreators"
                   :key="index"
+                  :data-test="`destination-import-creation-${index}`"
                 >
                   <div
                     :class="{
@@ -413,6 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'text-green ': val.success,
                       'text-red': !val.success,
                     }"
+                    :data-test="`destination-import-creation-${index}-message`"
                   >
                     <pre>{{ val.message }}</pre>
                   </div>
