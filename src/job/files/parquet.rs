@@ -662,7 +662,6 @@ async fn merge_files(
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema.as_ref().clone());
         let latest_schema = generate_schema_for_defined_schema_fields(
-            &stream_name,
             &latest_schema,
             &defined_schema_fields,
             need_original,
