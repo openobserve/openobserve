@@ -349,7 +349,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="userSelectedTimezone[index]"
                             :options="filteredTimezone"
                             :label="'Timezone *'"
-                            :popup-content-style="{ textTransform: 'lowercase' }"
                             color="input-border"
                             bg-color="input-bg"
                             class="q-py-sm showLabelOnTop no-case"
@@ -504,6 +503,13 @@ export default defineComponent({
     });
     const filteredTimezone = ref<any>([]);
       filteredTimezone.value = [...timezoneOptions];
+
+      const browserTime =
+      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+     // Add the UTC option
+      timezoneOptions.unshift("UTC");
+      timezoneOptions.unshift(browserTime);
 
     const updateUserSelectedDestinations = (destinations: string[], index: number) => {
       jsonArrayOfObj.value[index].destinations = destinations;
