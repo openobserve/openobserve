@@ -121,7 +121,6 @@ pub async fn check_for_schema(
             };
             if !defined_schema_fields.is_empty() {
                 let schema = generate_schema_for_defined_schema_fields(
-                    stream_name,
                     schema,
                     &defined_schema_fields,
                     need_original,
@@ -377,7 +376,6 @@ async fn handle_diff_schema(
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(
-        stream_name,
         &final_schema,
         &defined_schema_fields,
         need_original,
@@ -396,7 +394,6 @@ async fn handle_diff_schema(
 // if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
 // then we will use defined_schema_fields
 pub fn generate_schema_for_defined_schema_fields(
-    stream_name: &str,
     schema: &SchemaCache,
     fields: &[String],
     need_original: bool,
@@ -426,12 +423,6 @@ pub fn generate_schema_for_defined_schema_fields(
     for field in fields {
         if let Some(f) = schema.fields_map().get(field) {
             new_fields.push(schema.schema().fields()[*f].clone());
-        } else {
-            log::warn!(
-                "[FIELD_LOST] defined_schema_field: {} not in schema for stream: {}",
-                field,
-                stream_name,
-            );
         }
     }
 
