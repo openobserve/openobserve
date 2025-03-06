@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-input
                             data-test="destination-import-name-input"
                             v-model="userSelectedDestinationName[index]"
-                            :label="t('destination.name') + ' *'"
+                            :label="'Destination Name *'"
                             color="input-border"
                             bg-color="input-bg"
                             class="showLabelOnTop"
@@ -854,11 +854,19 @@ export default defineComponent({
       // Check if 'headers' is required for webhook but not for email
       if (
         input.type == "http" &&
-        Object.keys(input.headers).length === 0
+        input.headers == undefined
       ) {
         destinationErrors.push(
           `Destination - ${index} 'headers' is required for webhook`,
         );
+      }
+
+      if(input.type == 'http' && input.headers != undefined) {
+        if(typeof input.headers !== 'object') {
+          destinationErrors.push(
+            `Destination - ${index} 'headers' should be an object for webhook`,
+          );
+        }
       }
 
 
