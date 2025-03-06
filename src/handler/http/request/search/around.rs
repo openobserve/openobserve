@@ -18,7 +18,7 @@ use std::io::{Error, ErrorKind};
 use actix_web::{HttpResponse, http::StatusCode, web};
 use chrono::{Duration, Utc};
 use config::{
-    DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME, get_config,
+    DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME,
     meta::{
         search::SearchEventType,
         self_reporting::usage::{RequestStats, UsageType},
@@ -55,8 +55,6 @@ pub(crate) async fn around(
     user_id: Option<String>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let cfg = get_config();
-
     let started_at = Utc::now().timestamp_micros();
 
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
@@ -136,7 +134,7 @@ pub(crate) async fn around(
     #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
     #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
+    if !config::get_config().common.feature_query_queue_enabled {
         drop(locker);
     }
     #[cfg(not(feature = "enterprise"))]
