@@ -1261,16 +1261,16 @@ onBeforeMount(async ()=>{
 
 
 onMounted(async ()=>{
-  getStreamList();
+  await getStreamList();
 
-setTimeout(() => {
-  if(tab.value === 'sql' && query.value != ""){
-  const parsedQuery = parser.parse(query.value);
-  selectedStreamName.value = parsedQuery.ast.from[0].table;
+  setTimeout(() => {
+    if(tab.value === 'sql' && query.value != ""){
+    const parsedQuery = parser?.parse(query.value);
+    selectedStreamName.value = parsedQuery.ast.from[0].table;
 
-  getStreamFields();
-}
-}, 100);
+    getStreamFields();
+  }
+  }, 200);
   
 })
 
