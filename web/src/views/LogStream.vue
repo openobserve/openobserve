@@ -842,7 +842,7 @@ export default defineComponent({
       return `${row.name}-${row.stream_type}`; // Unique key by combining `name` and `stream_type`
     };
 
-    const onRequest = async (props) => {
+    const onRequest = async (props: any) => {
       const { page, rowsPerPage, sortBy, descending } = props.pagination
       const filter = props.filter
 
