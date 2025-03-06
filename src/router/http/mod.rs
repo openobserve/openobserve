@@ -33,7 +33,7 @@ pub use ws_v2::remove_querier_from_handler;
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
 mod ws;
-mod ws_v2;
+pub(crate) mod ws_v2;
 
 const QUERIER_ROUTES: [&str; 20] = [
     "/config",

@@ -380,6 +380,7 @@ async fn handle_search_event(
     let trace_id = search_req.trace_id.clone();
     let trace_id_for_task = trace_id.clone();
     let search_req = search_req.clone();
+    let is_v2 = false;
 
     #[cfg(feature = "enterprise")]
     let is_audit_enabled = get_o2_config().common.audit_enabled;
@@ -411,6 +412,7 @@ async fn handle_search_event(
                 &org_id,
                 &user_id,
                 search_req.clone(),
+                is_v2,
             ) => {
                 match search_result {
                     Ok(_) => {

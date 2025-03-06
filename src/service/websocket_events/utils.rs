@@ -17,6 +17,9 @@ use actix_web::http::StatusCode;
 use config::meta::websocket::SearchEventReq;
 use infra::{errors, errors::Error};
 use serde::{Deserialize, Serialize};
+use tokio_tungstenite::tungstenite;
+
+use crate::router::http::ws_v2::types::{StreamMessage, StreamMessageType};
 
 pub mod enterprise_utils {
     #[allow(unused_imports)]
@@ -311,6 +314,78 @@ impl WsClientEvents {
     }
 }
 
+impl TryFrom<StreamMessage> for WsClientEvents {
+    type Error = String;
+
+    fn try_from(msg: StreamMessage) -> Result<Self, Self::Error> {
+        match msg.message_type {
+            StreamMessageType::Search(req) => Ok(WsClientEvents::Search(req)),
+            #[cfg(feature = "enterprise")]
+            StreamMessageType::Cancel => {
+                let payload: serde_json::Value = msg.payload;
+                Ok(WsClientEvents::Cancel {
+                    trace_id: msg.trace_id,
+                    org_id: payload
+                        .get("org_id")
+                        .and_then(|v| v.as_str())
+                        .map(String::from),
+                })
+            }
+            StreamMessageType::Benchmark => Ok(WsClientEvents::Benchmark { id: msg.trace_id }),
+            _ => Err(format!(
+                "Cannot convert {:?} to WsClientEvents",
+                msg.message_type
+            )),
+        }
+    }
+}
+
+impl TryFrom<StreamMessage> for WsServerEvents {
+    type Error = String;
+
+    fn try_from(msg: StreamMessage) -> Result<Self, <Self as TryFrom<StreamMessage>>::Error> {
+        match msg.message_type {
+            StreamMessageType::SearchResponse {
+                trace_id,
+                results,
+                time_offset,
+                streaming_aggs,
+            } => Ok(WsServerEvents::SearchResponse {
+                trace_id: msg.trace_id,
+                results,
+                time_offset,
+                streaming_aggs,
+            }),
+            StreamMessageType::CancelResponse { is_success, .. } => {
+                Ok(WsServerEvents::CancelResponse {
+                    trace_id: msg.trace_id,
+                    is_success,
+                })
+            }
+            StreamMessageType::Error {
+                code,
+                message,
+                error_detail,
+                request_id,
+                ..
+            } => Ok(WsServerEvents::Error {
+                code,
+                message,
+                error_detail,
+                trace_id: Some(msg.trace_id),
+                request_id,
+            }),
+            StreamMessageType::End { trace_id } => Ok(WsServerEvents::End {
+                trace_id: trace_id.clone(),
+            }),
+            _ => Err(format!(
+                "Cannot convert {:?} to WsServerEvents",
+                msg.message_type
+            )),
+        }
+    }
+}
+
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeOffset {
@@ -354,25 +429,55 @@ impl WsServerEvents {
     }
 
     pub fn error_response(
-        err: Error,
+        err: errors::Error,
         request_id: Option<String>,
         trace_id: Option<String>,
     ) -> Self {
         match err {
-            errors::Error::ErrorCode(code) => Self::Error {
+            errors::Error::ErrorCode(code) => WsServerEvents::Error {
                 code: code.get_code(),
                 message: code.get_message(),
                 error_detail: Some(code.get_error_detail()),
                 trace_id: trace_id.clone(),
                 request_id: request_id.clone(),
             },
-            _ => Self::Error {
+            _ => WsServerEvents::Error {
                 code: StatusCode::INTERNAL_SERVER_ERROR.into(),
                 message: err.to_string(),
                 error_detail: None,
                 trace_id,
                 request_id,
             },
+        }
+    }
+}
+
+impl From<WsClientEvents> for tungstenite::protocol::Message {
+    fn from(event: WsClientEvents) -> Self {
+        let payload = serde_json::to_value(&event).unwrap_or_default();
+        tungstenite::protocol::Message::Text(payload.to_string())
+    }
+}
+
+impl From<WsServerEvents> for tungstenite::protocol::Message {
+    fn from(event: WsServerEvents) -> Self {
+        let payload = serde_json::to_value(&event).unwrap_or_default();
+        tungstenite::protocol::Message::Text(payload.to_string())
+    }
+}
+
+impl TryFrom<serde_json::Value> for WsServerEvents {
+    type Error = String;
+
+    fn try_from(
+        value: serde_json::Value,
+    ) -> Result<Self, <Self as TryFrom<serde_json::Value>>::Error> {
+        match value["type"].as_str() {
+            Some("search_response") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("cancel_response") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("error") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            Some("end") => serde_json::from_value(value).map_err(|e| e.to_string()),
+            _ => Err("Unknown message type".to_string()),
         }
     }
 }

@@ -19,8 +19,10 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use config::{RwAHashMap, utils::json};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
+use reqwest::header::{HeaderName, HeaderValue};
 use tokio::{
     net::TcpStream,
     sync::{
@@ -30,10 +32,13 @@ use tokio::{
 };
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{self, protocol::Message as WsMessage},
+    tungstenite::{self, client::IntoClientRequest, protocol::Message as WsMessage},
 };
 
-use crate::router::http::ws_v2::{error::*, types::*};
+use crate::{
+    router::http::ws_v2::{error::*, types::*},
+    service::websocket_events::{WsClientEvents, WsServerEvents},
+};
 
 type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -68,9 +73,39 @@ impl QuerierConnection {
         url: String,
     ) -> WsResult<Arc<Self>> {
         // Connect to querier
-        let (ws_stream, _) = connect_async(&url)
-            .await
-            .map_err(|e| WsError::ConnectionError(e.to_string()))?;
+        // FIXME: This needs req to call connect_async "ws://192.168.1.6:5070/"
+        let url = format!("{}api/default/ws/v2/123456789", url);
+        let mut req = match url.clone().into_client_request() {
+            Ok(req) => req,
+            Err(e) => return Err(WsError::ConnectionError(e.to_string())),
+        };
+
+        // Properly encode credentials
+        let credentials = "root@example.com:Complexpass#123";
+        let auth_header = format!("Basic {}", BASE64.encode(credentials));
+
+        // Add auth header
+        req.headers_mut().insert(
+            HeaderName::from_static("authorization"),
+            HeaderValue::from_str(&auth_header)
+                .map_err(|e| WsError::ConnectionError(e.to_string()))?,
+        );
+        // Add hearder upgrade websocket
+        req.headers_mut().insert(
+            HeaderName::from_static("upgrade"),
+            HeaderValue::from_str("websocket")
+                .map_err(|e| WsError::ConnectionError(e.to_string()))?,
+        );
+
+        // Router -> Querier
+        let (ws_stream, _) = connect_async(req).await.map_err(|e| {
+            log::error!(
+                "[WS::QuerierConnection] error connecting to querier {}: {}",
+                url,
+                e
+            );
+            WsError::ConnectionError(e.to_string())
+        })?;
         let (write, mut read) = ws_stream.split();
         let write = Arc::new(Mutex::new(Some(write)));
 
@@ -84,9 +119,9 @@ impl QuerierConnection {
         let querier_name_cp_t1 = querier_name.clone();
         let querier_name_cp_t2 = querier_name.clone();
 
-        let conn = Arc::new(Self {
+        let conn: Arc<QuerierConnection> = Arc::new(Self {
             querier_name,
-            url,
+            url: url.to_string(),
             write: write.clone(),
             shutdown_tx,
             response_router: response_router.clone(),
@@ -94,24 +129,60 @@ impl QuerierConnection {
             last_active: std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),
         });
 
-        // Spawn task to forward response messages from querier
+        // Receive messages from querier and route them to the client
+        let conn_clone = conn.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     Some(msg) = read.next() => {
                         match msg {
                             Ok(msg) => {
-                                match response_router.route_response(msg.into()).await {
-                                    Err(e) => {
-                                        log::error!(
-                                            "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
-                                            e
-                                        );
+                                match msg {
+                                    tungstenite::protocol::Message::Close(reason) => {
+                                        log::info!("[WS::QuerierConnection] received close message: {:?}", reason);
                                     }
-                                    Ok(_) => {
-                                        log::debug!(
-                                            "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
-                                        );
+                                    tungstenite::protocol::Message::Ping(ping) => {
+                                        log::info!("[WS::QuerierConnection] received ping message: {:?}", ping);
+                                        let pong = tungstenite::protocol::Message::Pong(ping);
+                                        let write_clone = write.clone();
+                                        let mut write_guard = write_clone.lock().await;
+                                        if let Some(write) = write_guard.as_mut() {
+                                            let _ = write.send(pong).await;
+                                        }
+                                        conn_clone.update_last_active();
+                                    }
+                                    tungstenite::protocol::Message::Pong(pong) => {
+                                        log::info!("[WS::QuerierConnection] received pong message: {:?}", pong);
+                                    }
+                                    tungstenite::protocol::Message::Binary(binary) => {
+                                        log::info!("[WS::QuerierConnection] received binary message: {:?}", binary);
+                                    }
+                                    msg => {
+                                            log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
+                                            // Convert `tungstenite::protocol::Message` to `StreamMessage`
+                                            let message: StreamMessage = match msg.try_into() {
+                                                Ok(message) => message,
+                                                Err(e) => {
+                                                    log::error!(
+                                                        "[WS::QuerierConnection] Error converting message to StreamMessage: {}",
+                                                        e
+                                                    );
+                                                    continue;
+                                                }
+                                            };
+                                            match response_router.route_response(message).await {
+                                                Err(e) => {
+                                                    log::error!(
+                                                        "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
+                                                        e
+                                                    );
+                                                }
+                                                Ok(_) => {
+                                                    log::debug!(
+                                                    "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -142,13 +213,14 @@ impl QuerierConnection {
         });
 
         // Spawn health check task
+        let conn_clone = conn.clone();
         tokio::spawn(async move {
             // TODO: configurable duration interval
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
             loop {
                 interval.tick().await;
-                let mut write_guard = write.lock().await;
+                let mut write_guard = conn_clone.write.lock().await;
                 match write_guard.as_mut() {
                     None => {
                         is_connected_health_task.store(false, Ordering::SeqCst);
@@ -235,25 +307,6 @@ impl ResponseRouter {
     }
 }
 
-// need protocol exchange from our Message -> tungstenite::protocol::Message
-impl From<StreamMessage> for tungstenite::protocol::Message {
-    fn from(value: StreamMessage) -> Self {
-        tungstenite::protocol::Message::Text("TODO".to_string());
-        todo!("protocol exchange needed")
-    }
-}
-
-impl From<tungstenite::protocol::Message> for StreamMessage {
-    fn from(value: tungstenite::protocol::Message) -> Self {
-        StreamMessage::new(
-            "trace_id".to_string(),
-            StreamMessageType::SearchResponse,
-            json::Value::default(),
-        );
-        todo!("protocol exchange needed")
-    }
-}
-
 #[async_trait]
 impl Connection for QuerierConnection {
     async fn connect(&self) -> WsResult<()> {
@@ -285,10 +338,16 @@ impl Connection for QuerierConnection {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
             let trace_id = message.trace_id.clone();
-            match write.send(message.into()).await {
+            // Send `WsClientEvents` to querier
+            let message: WsClientEvents = message
+                .try_into()
+                .map_err(|e| WsError::ConnectionError(e))?;
+            // Convert `WsClientEvents` to `tungstenite::protocol::Message`
+            let message = message.into();
+            match write.send(message).await {
                 Ok(_) => {
-                    log::debug!(
-                        "[WS:QuerierConnection] request w/ trace_id {} successfully forwarded to querier {}",
+                    log::info!(
+                        "[WS::QuerierConnection] request w/ trace_id {} successfully forwarded to querier {}",
                         trace_id,
                         self.querier_name
                     );

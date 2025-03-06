@@ -16,6 +16,7 @@
 use chrono::{DateTime, Utc};
 use config::meta::websocket::SearchEventReq;
 use serde::{Deserialize, Serialize};
+use tokio_tungstenite::tungstenite;
 
 use crate::service::websocket_events::{TimeOffset, WsClientEvents, WsServerEvents};
 
@@ -30,21 +31,37 @@ pub struct StreamMessage {
     pub message_type: StreamMessageType,
     pub payload: serde_json::Value,
     #[serde(skip)]
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamMessageType {
     Search(Box<SearchEventReq>),
-    SearchResponse,
     #[cfg(feature = "enterprise")]
     Cancel,
-    #[cfg(feature = "enterprise")]
-    CancelResponse,
-    Error,
-    End,
     Benchmark,
+    SearchResponse {
+        trace_id: String,
+        results: Box<config::meta::search::Response>,
+        time_offset: TimeOffset,
+        streaming_aggs: bool,
+    },
+    #[cfg(feature = "enterprise")]
+    CancelResponse {
+        trace_id: String,
+        is_success: bool,
+    },
+    Error {
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+        trace_id: Option<String>,
+        request_id: Option<String>,
+    },
+    End {
+        trace_id: Option<String>,
+    },
 }
 
 impl StreamMessage {
@@ -57,11 +74,17 @@ impl StreamMessage {
             trace_id,
             message_type,
             payload,
-            timestamp: Utc::now(),
+            timestamp: Utc::now().timestamp_micros(),
         }
     }
 
-    pub fn from_client_event(event: WsClientEvents) -> Self {
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+}
+
+impl From<WsClientEvents> for StreamMessage {
+    fn from(event: WsClientEvents) -> Self {
         match event {
             WsClientEvents::Search(req) => {
                 let trace_id = req.trace_id.clone();
@@ -84,36 +107,93 @@ impl StreamMessage {
             ),
         }
     }
+}
 
-    pub fn to_server_event(&self) -> Option<WsServerEvents> {
-        match self.message_type {
-            StreamMessageType::SearchResponse => {
-                let response: Box<config::meta::search::Response> =
-                    serde_json::from_value(self.payload.clone()).ok()?;
-                Some(WsServerEvents::SearchResponse {
-                    trace_id: self.trace_id.clone(),
-                    results: response,
-                    time_offset: TimeOffset {
-                        start_time: 0,
-                        end_time: 0,
+impl From<WsServerEvents> for StreamMessage {
+    fn from(event: WsServerEvents) -> Self {
+        match event {
+            WsServerEvents::SearchResponse {
+                trace_id,
+                results,
+                time_offset,
+                streaming_aggs,
+            } => {
+                let payload = serde_json::to_value(&results).unwrap_or_default();
+                Self::new(
+                    trace_id.clone(),
+                    StreamMessageType::SearchResponse {
+                        trace_id,
+                        results,
+                        time_offset,
+                        streaming_aggs,
                     },
-                    streaming_aggs: false,
-                })
+                    payload,
+                )
             }
-            StreamMessageType::Error => {
-                let error: ErrorPayload = serde_json::from_value(self.payload.clone()).ok()?;
-                Some(WsServerEvents::Error {
-                    code: error.code,
-                    message: error.message,
-                    error_detail: error.error_detail,
-                    trace_id: Some(self.trace_id.clone()),
-                    request_id: None,
-                })
+            WsServerEvents::CancelResponse {
+                trace_id,
+                is_success,
+            } => {
+                let payload = serde_json::json!({"trace_id": trace_id, "is_success": is_success});
+                Self::new(
+                    trace_id.clone(),
+                    StreamMessageType::CancelResponse {
+                        trace_id,
+                        is_success,
+                    },
+                    payload,
+                )
             }
-            StreamMessageType::End => Some(WsServerEvents::End {
-                trace_id: Some(self.trace_id.clone()),
-            }),
-            _ => None,
+            WsServerEvents::Error {
+                code,
+                message,
+                error_detail,
+                trace_id,
+                request_id,
+            } => {
+                let trace_id = trace_id.unwrap_or_default();
+                let payload = serde_json::json!({"code": code, "message": message, "error_detail": error_detail, "trace_id": trace_id, "request_id": request_id});
+                Self::new(
+                    trace_id.clone(),
+                    StreamMessageType::Error {
+                        code,
+                        message,
+                        error_detail,
+                        trace_id: Some(trace_id),
+                        request_id,
+                    },
+                    payload,
+                )
+            }
+            WsServerEvents::End { trace_id } => {
+                let trace_id = trace_id.unwrap_or_default();
+                let payload = serde_json::json!({"trace_id": trace_id.clone()});
+                Self::new(
+                    trace_id.clone(),
+                    StreamMessageType::End {
+                        trace_id: Some(trace_id),
+                    },
+                    payload,
+                )
+            }
+        }
+    }
+}
+
+impl TryFrom<tungstenite::protocol::Message> for StreamMessage {
+    type Error = String;
+
+    fn try_from(value: tungstenite::protocol::Message) -> Result<Self, Self::Error> {
+        match value {
+            tungstenite::protocol::Message::Text(text) => {
+                let payload =
+                    serde_json::from_str::<serde_json::Value>(&text).map_err(|e| e.to_string())?;
+                let event: WsServerEvents = payload.try_into()?;
+                Ok(Self::from(event))
+            }
+            _ => {
+                todo!("Convert `tungstenite::protocol::Message` to `StreamMessage`")
+            }
         }
     }
 }
@@ -123,4 +203,6 @@ struct ErrorPayload {
     code: u16,
     message: String,
     error_detail: Option<String>,
+    trace_id: Option<String>,
+    request_id: Option<String>,
 }

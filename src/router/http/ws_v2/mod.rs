@@ -27,7 +27,7 @@ mod error;
 mod handler;
 mod pool;
 mod session;
-mod types;
+pub mod types;
 
 // Initialize WsHandler global instance
 static WS_HANDLER: OnceCell<Arc<WsHandler>> = OnceCell::new();

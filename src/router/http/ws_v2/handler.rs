@@ -26,6 +26,7 @@ use super::{
     session::SessionManager,
     types::*,
 };
+use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
 
 #[derive(Debug)]
 pub struct WsHandler {
@@ -75,8 +76,9 @@ impl WsHandler {
                         }
                         Ok(msg) => match msg {
                             actix_ws::Message::Text(text) => {
-                                if let Ok(message) = serde_json::from_str::<StreamMessage>(&text) {
-                                    log::info!(
+                                if let Ok(message) = serde_json::from_str::<WsClientEvents>(&text) {
+                                    let message: StreamMessage = message.into();
+                                    log::debug!(
                                         "[WS::Router::Handler] received message: {:?}",
                                         message
                                     );
@@ -118,7 +120,10 @@ impl WsHandler {
                                     );
                                 }
                             }
-                            actix_ws::Message::Close(_) => break,
+                            actix_ws::Message::Close(_) => {
+                                log::info!("[WS::Router::Handler] client connection closed");
+                                break;
+                            }
                             _ => {}
                         },
                     }
@@ -129,6 +134,13 @@ impl WsHandler {
             // Handle outgoing messages
             let handle_outgoing = async {
                 while let Some(message) = response_rx.recv().await {
+                    let message: WsServerEvents = match message.try_into() {
+                        Ok(message) => message,
+                        Err(e) => {
+                            log::error!("Error converting message to WsServerEvents: {}", e);
+                            continue;
+                        }
+                    };
                     if let Err(e) = ws_session.text(serde_json::to_string(&message)?).await {
                         log::error!("Error sending message to client: {}", e);
                         break;
@@ -170,6 +182,9 @@ pub async fn get_querier_connection(
     client_id: &ClientId,
     message: &StreamMessage,
 ) -> WsResult<Arc<QuerierConnection>> {
+    // Retry max of 3 times to get a valid querier connection
+    let max_retries = 1;
+    let mut retries = 0;
     loop {
         // Get or assign querier for this trace_id included in message
         let querier_name = match session_manager
@@ -204,6 +219,13 @@ pub async fn get_querier_connection(
                 session_manager
                     .remove_querier_connection(&querier_name)
                     .await;
+                retries += 1;
+                if retries >= max_retries {
+                    return Err(WsError::QuerierNotAvailable(format!(
+                        "No querier connection available after {} retries",
+                        max_retries
+                    )));
+                }
             }
         }
     }

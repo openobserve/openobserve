@@ -84,6 +84,7 @@ pub async fn handle_search_request(
     org_id: &str,
     user_id: &str,
     mut req: SearchEventReq,
+    is_v2: bool,
 ) -> Result<(), Error> {
     let cfg = get_config();
     let trace_id = req.trace_id.clone();
@@ -112,7 +113,12 @@ pub async fn handle_search_request(
                 Some(req_id.to_string()),
                 Some(trace_id),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            let res = if is_v2 {
+                err_res.to_json()
+            } else {
+                err_res.to_json()
+            };
+            send_message(req_id, res).await?;
             return Ok(());
         }
     };
@@ -128,7 +134,12 @@ pub async fn handle_search_request(
                 Some(req_id.to_string()),
                 Some(trace_id),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            let res = if is_v2 {
+                err_res.to_json()
+            } else {
+                err_res.to_json()
+            };
+            send_message(req_id, res).await?;
             return Ok(());
         }
     }
@@ -231,6 +242,7 @@ pub async fn handle_search_request(
                 max_query_range,
                 remaining_query_range,
                 &order_by,
+                is_v2,
             )
             .await?;
         } else {
@@ -252,6 +264,7 @@ pub async fn handle_search_request(
                 user_id,
                 accumulated_results,
                 max_query_range,
+                is_v2,
             )
             .await?;
         }
@@ -283,6 +296,7 @@ pub async fn handle_search_request(
             user_id,
             accumulated_results,
             max_query_range,
+            is_v2,
         )
         .await?;
     }
@@ -292,7 +306,12 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(req_id, end_res.to_json().to_string()).await?;
+    let res = if is_v2 {
+        end_res.to_json()
+    } else {
+        end_res.to_json()
+    };
+    send_message(req_id, res).await?;
 
     Ok(())
 }
@@ -353,6 +372,7 @@ async fn handle_cache_responses_and_deltas(
     max_query_range: i64,
     remaining_query_range: i64,
     mut order_by: &OrderBy,
+    is_v2: bool,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -435,6 +455,7 @@ async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                     cached_search_duration,
+                    is_v2,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -448,6 +469,7 @@ async fn handle_cache_responses_and_deltas(
                     accumulated_results,
                     &mut curr_res_size,
                     req.fallback_order_by_col.clone(),
+                    is_v2,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -470,6 +492,7 @@ async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
                 cached_search_duration,
+                is_v2,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -483,6 +506,7 @@ async fn handle_cache_responses_and_deltas(
                 accumulated_results,
                 &mut curr_res_size,
                 req.fallback_order_by_col.clone(),
+                is_v2,
             )
             .await?;
         }
@@ -515,6 +539,7 @@ async fn process_delta(
     user_id: &str,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
+    is_v2: bool,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -639,7 +664,12 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            let res = if is_v2 {
+                ws_search_res.to_json()
+            } else {
+                ws_search_res.to_json().to_string()
+            };
+            send_message(req_id, res).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -661,6 +691,7 @@ async fn process_delta(
                 new_end_time,
                 search_res.order_by,
                 is_streaming_aggs,
+                is_v2,
             )
             .await;
             break;
@@ -726,6 +757,7 @@ async fn send_cached_responses(
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
     fallback_order_by_col: Option<String>,
+    is_v2: bool,
 ) -> Result<(), Error> {
     if let Some(is_cancelled) = search_registry_utils::is_cancelled(trace_id) {
         if is_cancelled {
@@ -794,7 +826,12 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    let res = if is_v2 {
+        ws_search_res.to_json()
+    } else {
+        ws_search_res.to_json().to_string()
+    };
+    send_message(req_id, res).await?;
 
     Ok(())
 }
@@ -810,6 +847,7 @@ async fn do_partitioned_search(
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
+    is_v2: bool,
 ) -> Result<(), Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -923,7 +961,12 @@ async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            let res = if is_v2 {
+                ws_search_res.to_json()
+            } else {
+                ws_search_res.to_json().to_string()
+            };
+            send_message(req_id, res).await?;
         }
 
         // Stop if reached the requested result size
@@ -952,7 +995,12 @@ async fn do_partitioned_search(
             },
             streaming_aggs: is_streaming_aggs,
         };
-        send_message(req_id, ws_search_res.to_json().to_string()).await?;
+        let res = if is_v2 {
+            ws_search_res.to_json()
+        } else {
+            ws_search_res.to_json().to_string()
+        };
+        send_message(req_id, res).await?;
     }
 
     // Remove the streaming_aggs cache
@@ -970,6 +1018,7 @@ async fn send_partial_search_resp(
     new_end_time: i64,
     order_by: Option<OrderBy>,
     is_streaming_aggs: bool,
+    is_v2: bool,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -1000,7 +1049,12 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    let res = if is_v2 {
+        ws_search_res.to_json()
+    } else {
+        ws_search_res.to_json().to_string()
+    };
+    send_message(req_id, res).await?;
 
     Ok(())
 }
