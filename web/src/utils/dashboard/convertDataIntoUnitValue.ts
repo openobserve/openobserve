@@ -698,3 +698,153 @@ export const validateSQLPanelFields = (
     );
   }
 };
+
+/**
+ * Validates the dashboard JSON structure
+ * 
+ * @param dashboardJson The dashboard JSON to validate
+ * @returns Array of validation errors or empty array if valid
+ */
+export const validateDashboardJson = (dashboardJson: any): string[] => {
+  const errors: string[] = [];
+  
+  // Basic structure validation
+  if (!dashboardJson) {
+    errors.push("Dashboard JSON is empty or invalid");
+    return errors;
+  }
+  
+  // Required fields validation
+  if (!dashboardJson.dashboardId) {
+    errors.push("Dashboard ID is required");
+  }
+  
+  if (!dashboardJson.title) {
+    errors.push("Dashboard title is required");
+  }
+  
+  // Version should be present
+  if (!dashboardJson.version) {
+    errors.push("Dashboard version is required");
+  }
+  
+  // Check tabs
+  if (!Array.isArray(dashboardJson.tabs) || dashboardJson.tabs.length === 0) {
+    errors.push("Dashboard must have at least one tab");
+    return errors;
+  }
+  
+  // Check for unique tab IDs
+  const tabIds = new Set<string>();
+  for (const tab of dashboardJson.tabs) {
+    if (!tab.tabId) {
+      errors.push("Each tab must have a tabId");
+    } else if (tabIds.has(tab.tabId)) {
+      errors.push(`Duplicate tab ID found: ${tab.tabId}`);
+    } else {
+      tabIds.add(tab.tabId);
+    }
+    
+    if (!tab.name) {
+      errors.push(`Tab ${tab.tabId} must have a name`);
+    }
+  }
+  
+  // Check for unique panel IDs across all tabs and validate each panel
+  const panelIds = new Set<string>();
+  const layoutIValues = new Map<string, Set<string>>();
+  
+  for (const tab of dashboardJson.tabs) {
+    if (!Array.isArray(tab.panels)) {
+      errors.push(`Tab ${tab.tabId} must have a panels array`);
+      continue;
+    }
+    
+    // Create a set for layout i values for this tab
+    layoutIValues.set(tab.tabId, new Set<string>());
+    
+    for (const panel of tab.panels) {
+      // Check panel ID uniqueness
+      if (!panel.id) {
+        errors.push(`Panel in tab ${tab.tabId} is missing an ID`);
+      } else if (panelIds.has(panel.id)) {
+        errors.push(`Duplicate panel ID found: ${panel.id}`);
+      } else {
+        panelIds.add(panel.id);
+      }
+      
+      // Check layout i value uniqueness within the tab
+      if (!panel.layout || !panel.layout.i) {
+        errors.push(`Panel ${panel.id} is missing a layout.i value`);
+      } else {
+        const tabLayoutValues = layoutIValues.get(tab.tabId);
+        if (tabLayoutValues && tabLayoutValues.has(panel.layout.i.toString())) {
+          errors.push(`Duplicate layout.i value found in tab ${tab.tabId}: ${panel.layout.i}`);
+        } else if (tabLayoutValues) {
+          tabLayoutValues.add(panel.layout.i.toString());
+        }
+      }
+      
+      // Validate panel content
+      const panelErrors = validatePanelContent(panel);
+      errors.push(...panelErrors);
+    }
+  }
+  
+  return errors;
+};
+
+/**
+ * Validates an individual panel's content
+ * 
+ * @param panel The panel object to validate
+ * @returns Array of validation errors
+ */
+const validatePanelContent = (panel: any): string[] => {
+  const errors: string[] = [];
+  
+  // Required fields validation
+  if (!panel.type) {
+    errors.push(`Panel ${panel.id}: Panel type is required`);
+    return errors;
+  }
+  
+  if (!panel.title) {
+    errors.push(`Panel ${panel.id}: Panel title is required`);
+  }
+  
+  // Layout validation
+  if (!panel.layout) {
+    errors.push(`Panel ${panel.id}: Layout is required`);
+  } else {
+    if (typeof panel.layout.x !== 'number') errors.push(`Panel ${panel.id}: Layout x must be a number`);
+    if (typeof panel.layout.y !== 'number') errors.push(`Panel ${panel.id}: Layout y must be a number`);
+    if (typeof panel.layout.w !== 'number') errors.push(`Panel ${panel.id}: Layout w must be a number`);
+    if (typeof panel.layout.h !== 'number') errors.push(`Panel ${panel.id}: Layout h must be a number`);
+  }
+  
+  // Validate queries for chart panels
+  if (panel.type !== 'text' && panel.type !== 'markdown' && panel.type !== 'html') {
+    if (!Array.isArray(panel.queries) || panel.queries.length === 0) {
+      errors.push(`Panel ${panel.id}: Must have at least one query`);
+    } else {
+      // Validate each query using existing validateSQLPanelFields
+      panel.queries.forEach((query: any, index: number) => {
+        // Create dummy data structure for validation
+        // This is based on the structure expected by validateSQLPanelFields
+        const currentXLabel = panel.type == "h-bar" ? "X-Axis" : "Y-Axis";
+        const currentYLabel = panel.type == "h-bar" ? "Y-Axis" : "X-Axis";
+        
+        const panelErrors: string[] = [];
+        // Only validate if we have fields to validate
+        if (query.fields) {
+          validateSQLPanelFields(panel, index, currentXLabel, currentYLabel, panelErrors);
+        }
+        
+        errors.push(...panelErrors);
+      });
+    }
+  }
+  
+  return errors;
+};

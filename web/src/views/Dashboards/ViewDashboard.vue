@@ -227,6 +227,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dashboard.scheduledDashboards") }}
               </q-tooltip></q-btn
             >
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="code"
+              data-test="dashboard-json-edit-btn"
+              @click="openJsonEditor"
+            >
+              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+            </q-btn>
           </div>
         </div>
         <q-separator></q-separator>
@@ -293,6 +305,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tabs="currentDashboardData?.data?.tabs || []"
         />
       </q-dialog>
+
+      <q-dialog
+        v-model="showJsonEditorDialog"
+        position="right"
+        full-height
+        maximized
+      >
+        <DashboardJsonEditor
+          :dashboard-data="currentDashboardData.data"
+          :save-json-dashboard="saveJsonDashboard"
+          @close="showJsonEditorDialog = false"
+        />
+      </q-dialog>
     </div>
   </q-page>
 </template>
@@ -341,7 +366,8 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
-import { panelIdToBeRefreshed } from '@/utils/dashboard/convertCustomChartData';
+import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import DashboardJsonEditor from "./DashboardJsonEditor.vue";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -358,6 +384,7 @@ export default defineComponent({
     RenderDashboardCharts,
     ScheduledDashboards,
     PanelLayoutSettings,
+    DashboardJsonEditor,
   },
   setup() {
     const { t } = useI18n();
@@ -1025,6 +1052,35 @@ export default defineComponent({
       }
     };
 
+    // Add these new refs and methods
+    const showJsonEditorDialog = ref(false);
+
+    const openJsonEditor = () => {
+      showJsonEditorDialog.value = true;
+    };
+
+    const saveJsonDashboard = useLoading(async (updatedJson: any) => {
+      // Update the dashboard data
+      currentDashboardData.data = updatedJson;
+
+      // Add a wait time for state update
+      await nextTick();
+
+      // Save changes using existing renderDashboardChartsRef
+      if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
+        await renderDashboardChartsRef.value.saveDashboardData.execute();
+
+        showJsonEditorDialog.value = false;
+
+        // Reload the dashboard to reflect changes
+        await loadDashboard();
+      } else {
+        showErrorNotification(
+          "Failed to update dashboard JSON: Save method not available",
+        );
+      }
+    });
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -1084,6 +1140,9 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
+      showJsonEditorDialog,
+      openJsonEditor,
+      saveJsonDashboard,
     };
   },
 });
