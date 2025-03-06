@@ -330,8 +330,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
+          style="width: 100%; height: 100%;"
+          class="col q-mt-md"
           :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomMarkdownEditor
           v-model="dashboardPanelData.data.markdownContent"
           style="width: 100%; height: 100%"
-          class="col"
+          class="col q-mt-md"
           :initialVariableValues="updatedVariablesData"
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
