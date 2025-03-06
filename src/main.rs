@@ -607,8 +607,6 @@ async fn init_router_grpc_server(
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -639,7 +637,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             haddr,
             local_id
         );
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -652,6 +650,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -670,6 +669,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)
@@ -715,8 +715,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
 async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    // metrics
-    let prometheus = config::metrics::create_prometheus_handler();
 
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if cfg.http.ipv6_enabled {
@@ -749,7 +747,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             local_id
         );
 
-        let mut app = App::new().wrap(prometheus.clone());
+        let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
                 router::http::create_http_client().expect("Failed to create http tls client");
@@ -762,6 +760,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                             cfg.limit.circuit_breaker_enabled,
                         ))
                         .wrap(from_fn(middlewares::check_keep_alive))
+                        .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
                         .service(router::http::api)
@@ -780,6 +779,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                         cfg.limit.circuit_breaker_enabled,
                     ))
                     .wrap(from_fn(middlewares::check_keep_alive))
+                    .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
                     .configure(get_other_service_routes)

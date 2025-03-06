@@ -160,7 +160,6 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
-                "",
                 &StreamType::Metrics.to_string(),
             ])
             .observe(time);
@@ -169,7 +168,6 @@ pub async fn remote_write(
                 "/prometheus/api/v1/write",
                 "200",
                 org_id,
-                "",
                 &StreamType::Metrics.to_string(),
             ])
             .inc();
@@ -264,7 +262,6 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
-                        "",
                         &StreamType::Metrics.to_string(),
                     ])
                     .observe(time);
@@ -273,7 +270,6 @@ pub async fn remote_write(
                         "/prometheus/api/v1/write",
                         "200",
                         org_id,
-                        "",
                         &StreamType::Metrics.to_string(),
                     ])
                     .inc();
@@ -560,7 +556,6 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
-            "",
             &StreamType::Metrics.to_string(),
         ])
         .observe(time);
@@ -569,7 +564,6 @@ pub async fn remote_write(
             "/prometheus/api/v1/write",
             "200",
             org_id,
-            "",
             &StreamType::Metrics.to_string(),
         ])
         .inc();

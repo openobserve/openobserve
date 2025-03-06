@@ -538,22 +538,10 @@ pub async fn handle_otlp_request(
     }
 
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.to_string().as_str()])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            &traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.to_string().as_str()])
         .inc();
 
     format_response(partial_success, req_type)
@@ -684,22 +672,10 @@ pub async fn ingest_json(
     };
 
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.to_string().as_str()])
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            ep,
-            "200",
-            org_id,
-            traces_stream_name,
-            StreamType::Traces.to_string().as_str(),
-        ])
+        .with_label_values(&[ep, "200", org_id, StreamType::Traces.to_string().as_str()])
         .inc();
 
     format_response(partial_success, req_type)

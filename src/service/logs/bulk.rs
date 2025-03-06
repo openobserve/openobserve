@@ -546,7 +546,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.to_string().as_str(),
         ])
         .observe(took_time);
@@ -555,7 +554,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();

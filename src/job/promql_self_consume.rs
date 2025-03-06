@@ -17,7 +17,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{cluster::get_internal_grpc_token, stream::StreamType},
-    metrics::get_registry,
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
@@ -90,7 +89,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let registry = get_registry();
+    let registry = prometheus::default_registry();
 
     // Set up the interval timer for periodic fetching
     let timeout = zero_or(config.common.self_metrics_consumption_interval, 60);
