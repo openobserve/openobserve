@@ -97,6 +97,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-px-md q-pt-sm">
           {{ t("dashboard.folderLabel") }}
         </div>
+            <!-- Search Input -->
+    <div style="width: 100%;" class="flex folder-item  tw-ps-2">
+          <q-input
+          v-model="folderSearchQuery"   
+          dense
+          filled
+          borderless
+          data-test="folder-search"
+          placeholder="Search Folders"
+          style="width: 100%;"
+          class="q-mr-sm "
+          clearable
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+              <div>
+        </div>
+          </div>
         <div class="dashboards-tabs">
           <q-tabs
             indicator-color="transparent"
@@ -106,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboards-folder-tabs"
           >
             <q-tab
-              v-for="(tab, index) in store.state.organizationData.folders"
+              v-for="(tab, index) in filteredFolders"
               :key="tab.folderId"
               :name="tab.folderId"
               content-class="tab_content full-width"
@@ -432,6 +452,7 @@ export default defineComponent({
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
+    const folderSearchQuery = ref("");
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
       const columns = computed(() => {
@@ -920,6 +941,10 @@ export default defineComponent({
       searchQuery.value = "";
       filteredResults.value = [];
     }
+    const filteredFolders = computed(()=>{
+      if(!folderSearchQuery.value) return store.state.organizationData.folders;
+      return store.state.organizationData.folders?.filter((folder: any)=> folder.name.toLowerCase().includes(folderSearchQuery.value.toLowerCase()));
+    })
 
 
     return {
@@ -988,6 +1013,8 @@ export default defineComponent({
       activeFolderToMove,
       clearSearchHistory,
       dynamicQueryModel,
+      folderSearchQuery,
+      filteredFolders,
     };
   },
   methods: {
