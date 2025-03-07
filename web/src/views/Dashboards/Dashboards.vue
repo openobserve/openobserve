@@ -955,6 +955,8 @@ export default defineComponent({
 
     const updateActiveFolderId = (folderId: any) => {
       activeFolderId.value = folderId;
+      filterQuery.value = "";
+      searchQuery.value = "";
     }
 
 
