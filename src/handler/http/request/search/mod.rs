@@ -86,6 +86,12 @@ async fn can_use_distinct_stream(
         if DISTINCT_FIELDS.contains(f) {
             return true;
         }
+        if f == "count" {
+            // count is reserved field from oo side, so if user has count field
+            // in original stream, it won't actually be in the distinct stream, so
+            // we need to fallback to normal search
+            return false;
+        }
         stream_settings
             .distinct_value_fields
             .iter()
@@ -106,6 +112,12 @@ async fn can_use_distinct_stream(
     let all_query_fields_distinct = query_fields.iter().all(|f| {
         if DISTINCT_FIELDS.contains(f) {
             return true;
+        }
+        if f == "count" {
+            // count is reserved field from oo side, so if user has count field
+            // in original stream, it won't actually be in the distinct stream, so
+            // we need to fallback to normal search
+            return false;
         }
         stream_settings
             .distinct_value_fields
