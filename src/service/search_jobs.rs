@@ -411,7 +411,7 @@ pub async fn merge_response(
         resp.idx_scan_size += r.idx_scan_size;
         resp.scan_records += r.scan_records;
         if !r.function_error.is_empty() {
-            resp.function_error = format!("{} \n {}", resp.function_error, r.function_error);
+            resp.function_error.extend(r.function_error);
             resp.is_partial = true;
         }
     }

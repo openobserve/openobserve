@@ -384,7 +384,10 @@ impl QueryConditionExt for QueryCondition {
         let resp = match resp {
             Ok(v) => {
                 if v.is_partial {
-                    return Err(anyhow::anyhow!("Partial response: {}", v.function_error));
+                    return Err(anyhow::anyhow!(
+                        "Partial response: {}",
+                        v.function_error.join(", ")
+                    ));
                 } else {
                     v
                 }

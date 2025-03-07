@@ -123,7 +123,7 @@ pub async fn search(
                     }
                     Err(err) => {
                         log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                        result.function_error = err.to_string();
+                        result.function_error = vec![err.to_string()];
                         None
                     }
                 };

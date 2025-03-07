@@ -405,7 +405,7 @@ pub async fn search_multi(
                 } else {
                     // Error in subsequent queries, add the error to the response and break
                     // No need to run the remaining queries
-                    multi_res.function_error = format!("{};{:?}", multi_res.function_error, e);
+                    multi_res.function_error.push(e.to_string());
                     multi_res.is_partial = true;
                     break;
                 }
@@ -434,7 +434,8 @@ pub async fn search_multi(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
-                multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
+                multi_res.function_error.push(err.to_string());
+                multi_res.is_partial = true;
                 None
             }
         };
