@@ -20,7 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="text-bold q-px-md q-pt-sm">
        Folders
     </div>
-    <div class="dashboards-tabs">
+    <div class="folders-tabs">
+    <!-- Search Input -->
+    <div style="width: 100%;" class="flex folder-item  tw-ps-2">
+          <q-input
+          v-model="searchQuery"   
+          dense
+          filled
+          borderless
+          data-test="folder-search"
+          placeholder="Search Folders"
+          style="width: 100%;"
+          class="q-mr-sm "
+          clearable
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+              <div>
+        </div>
+          </div>
       <q-tabs
         indicator-color="transparent"
         inline-label
@@ -29,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboards-folder-tabs"
     >
         <q-tab
-        v-for="(tab, index) in store.state.organizationData.foldersByType[type]"
+        v-for="(tab, index) in filteredTabs"
         :key="tab.folderId"
         :name="tab.folderId"
         content-class="tab_content full-width"
@@ -92,15 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row justify-center full-width q-px-xs q-pb-xs"
         style="position: sticky; bottom: 0px"
     >
-        <q-btn
-        class="text-bold no-border full-width"
-        padding="sm lg"
-        color="secondary"
-        no-caps
-        label="Add Folder"
-        @click.stop="addFolder"
-        data-test="dashboard-new-folder-btn"
-        />
+
+       
     </div>
 
       <q-dialog
@@ -207,6 +220,8 @@ export default defineComponent({
       const selectedFolderToEdit = ref(null);
       const selectedFolderDelete = ref(null);
       const confirmDeleteFolderDialog = ref(false);
+      const searchQuery = ref('');
+
 
       const router = useRouter();
 
@@ -272,6 +287,15 @@ export default defineComponent({
       emit("update:activeFolderId", newVal);
     })
 
+    const filteredTabs = computed(() => { 
+      if(!searchQuery.value || searchQuery.value == ""){
+        return store.state.organizationData.foldersByType[props.type]
+      }
+      return store.state.organizationData.foldersByType[props.type]?.filter(tab => {
+        return tab.name.toLowerCase().includes(searchQuery.value.toLowerCase());
+      });
+    });
+
 
 
 
@@ -290,6 +314,8 @@ export default defineComponent({
         confirmDeleteFolderDialog,
         showDeleteFolderDialogFn,
         editFolder,
+        filteredTabs,
+        searchQuery,
 
       };
     },
@@ -297,7 +323,7 @@ export default defineComponent({
   </script>
 
 <style lang="scss" scoped>
-.dashboards-tabs {
+.folders-tabs {
   .test-class {
     min-height: 1.5rem;
     margin-bottom: 6px;
