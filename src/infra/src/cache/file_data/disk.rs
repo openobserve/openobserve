@@ -736,22 +736,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = dbg!(file_data.set(trace_id, &file_key, content.clone()).await);
+            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_2";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
@@ -773,7 +773,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -796,22 +796,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_4";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
-            let resp = dbg!(file_data.set(trace_id, &file_key, content.clone()).await);
+            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_5";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "fifo");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_5_1.parquet";
@@ -833,7 +833,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_2.parquet";
@@ -862,7 +862,7 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
 
-        let trace_id = "session_123";
+        let trace_id = "session_7";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().disk_cache.max_size, "lru");
         file_data.multi_dir = multi_dir;

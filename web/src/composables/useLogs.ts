@@ -3737,6 +3737,7 @@ const useLogs = () => {
           index: streamName,
           key: obj.key,
           size: obj.size,
+          body: obj.body,
           query_context: sqlContext,
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,

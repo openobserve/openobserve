@@ -397,10 +397,11 @@ export default defineComponent({
     ) {
       this.$emit("add:searchterm", field, field_value, action);
     },
-    searchTimeBoxed(rowData: any, size: number) {
+    searchTimeBoxed(rowData: any, size: number) { 
       this.$emit("search:timeboxed", {
         key: rowData[this.store.state.zoConfig.timestamp_column],
         size: size,
+        body: rowData,
       });
     },
   },

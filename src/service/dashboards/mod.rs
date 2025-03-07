@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
@@ -188,6 +188,11 @@ async fn update_distinct_variables(
             for f in fields.iter() {
                 // we ignore full text search no matter what
                 if stream_settings.full_text_search_keys.contains(f) {
+                    continue;
+                }
+
+                if f == "count" || f == TIMESTAMP_COL_NAME {
+                    // these are reserved fields
                     continue;
                 }
                 // we add entry for all the fields, because we need mappings for each individual
