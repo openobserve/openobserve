@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <!-- show variables dependencies if variables exist -->
             <q-btn
-              v-if="dashboardVariablesList.length > 0"
+              v-if="dashboardVariablesList?.variables?.list?.length > 0"
               class="text-bold no-border q-ml-md"
               no-caps
               no-outline
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="header-item">#</div>
           <div class="header-item">{{ t("dashboard.name") }}</div>
           <div class="header-item">{{ t("dashboard.type") }}</div>
+          <div class="header-item">Scope</div>
           <div class="header-item q-ml-lg q-pl-lg">
             {{ t("dashboard.actions") }}
           </div>
@@ -92,6 +93,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="item-name">{{ variable.name }}</div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
+              </div>
+              <div class="item-scope">
+                <div class="scope-info">
+                  <q-badge
+                    color="primary"
+                    v-if="getScopeType(variable) === 'global'"
+                  >
+                    Global
+                  </q-badge>
+                  <q-badge
+                    color="secondary"
+                    v-else-if="getScopeType(variable) === 'tabs'"
+                  >
+                    {{ variable.tabs?.length || 0 }} Tabs
+                  </q-badge>
+                  <q-badge
+                    color="teal"
+                    v-else-if="getScopeType(variable) === 'panels'"
+                  >
+                    {{ variable.panels?.length || 0 }} Panels
+                  </q-badge>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'tabs' && variable.tabs?.length
+                    "
+                  >
+                    <div>Applied to tabs:</div>
+                    <div v-for="tabId in variable.tabs" :key="tabId">
+                      {{ getTabName(tabId) }}
+                    </div>
+                  </q-tooltip>
+
+                  <q-tooltip
+                    v-if="
+                      getScopeType(variable) === 'panels' &&
+                      variable.panels?.length
+                    "
+                  >
+                    <div>Applied to panels:</div>
+                    <div v-for="panelId in variable.panels" :key="panelId">
+                      {{ getPanelName(panelId) }}
+                    </div>
+                  </q-tooltip>
+                </div>
               </div>
               <div class="item-actions">
                 <q-btn
@@ -140,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
-                :variablesList="dashboardVariablesList"
+                :variablesList="dashboardVariablesList?.variables?.list"
                 :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
                 @closePopUp="
                   () => (showVariablesDependenciesGraphPopUp = false)
@@ -190,7 +236,6 @@ export default defineComponent({
     const { t } = useI18n();
     const route = useRoute();
     const isAddVariable = ref(false);
-
     const dashboardVariableData: any = reactive({
       data: {},
     });
@@ -233,6 +278,37 @@ export default defineComponent({
 
     const getVariableTypeLabel = (type: string) => {
       return variableTypes.find((vType) => vType.value === type)?.label || type;
+    };
+
+    // Function to determine the scope type of a variable
+    const getScopeType = (variable: any) => {
+      if (variable.panels && variable.panels.length > 0) {
+        return "panels";
+      } else if (variable.tabs && variable.tabs.length > 0) {
+        return "tabs";
+      } else {
+        return "global";
+      }
+    };
+
+    // Function to get tab name by ID
+    const getTabName = (tabId: string) => {
+      const tab = dashboardVariableData.data.tabs?.find(
+        (t: any) => t.tabId === tabId,
+      );
+      return tab ? tab.name : tabId;
+    };
+
+    // Function to get panel name by ID
+    const getPanelName = (panelId: string) => {
+      // Look through all tabs to find the panel
+      for (const tab of dashboardVariableData.data.tabs || []) {
+        const panel = tab.panels?.find((p: any) => p.id === panelId);
+        if (panel) {
+          return `${tab.name} > ${panel.title || panel.id}`;
+        }
+      }
+      return panelId;
     };
 
     const handleDragEnd = async () => {
@@ -285,6 +361,7 @@ export default defineComponent({
 
       dashboardVariablesList.value =
         dashboardVariableData.data?.variables?.list ?? [];
+      console.log("dashboardVariablesList", dashboardVariablesList.value);
     };
 
     const addVariables = () => {
@@ -363,6 +440,10 @@ export default defineComponent({
       dragOptions,
       handleDragEnd,
       getVariableTypeLabel,
+      // Add these new functions to the return
+      getScopeType,
+      getTabName,
+      getPanelName,
     };
   },
 });
@@ -377,7 +458,7 @@ export default defineComponent({
 
 .variables-list-header {
   display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 48px 80px minmax(150px, 1fr) 150px 120px 120px;
   padding: 8px 0;
   font-weight: 900;
   border-bottom: 1px solid #cccccc70;
@@ -411,11 +492,23 @@ export default defineComponent({
 
 .draggable-content {
   display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 120px;
+  grid-template-columns: 80px minmax(150px, 1fr) 150px 120px 120px;
   align-items: center;
 
   .item-name {
     padding-right: 16px;
+  }
+
+  .item-scope {
+    .scope-info {
+      display: flex;
+      align-items: center;
+
+      .q-badge {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+      }
+    }
   }
 
   .item-actions {
