@@ -193,7 +193,11 @@ async fn get_remote_batch(
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
-    let is_querier = remote_scan_node.is_querier(partition);
+    let is_querier = if remote_scan_node.super_cluster_info.is_super_cluster {
+        true
+    } else {
+        remote_scan_node.is_querier(partition)
+    };
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
