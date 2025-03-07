@@ -383,7 +383,6 @@ export default defineComponent({
       { label: t("logStream.labelTraces"), value: "traces" },
       { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
-      { label: t("logStream.labelAll"), value: "all" },
     ];
     const { getStreams, resetStreams, removeStream, getStream, getPaginatedStreams } = useStreams();
     const columns = ref<QTableProps["columns"]>([
