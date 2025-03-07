@@ -1098,6 +1098,36 @@ const validatePanelContent = (panel: any): string[] => {
     return errors;
   }
 
+  // Check if panel type is in the allowed types list
+  const allowedTypes = [
+    "area",
+    "line",
+    "bar",
+    "scatter",
+    "area-stacked",
+    "donut",
+    "pie",
+    "h-bar",
+    "stacked",
+    "h-stacked",
+    "heatmap",
+    "metric",
+    "gauge",
+    "geomap",
+    "maps",
+    "table",
+    "sankey",
+    "custom_chart",
+    "html",
+    "markdown",
+  ];
+
+  if (!allowedTypes.includes(panel.type)) {
+    errors.push(
+      `Panel ${panel.id}: Chart type "${panel.type}" is not supported.`,
+    );
+  }
+
   if (!panel.title) {
     errors.push(`Panel ${panel.id}: Panel title is required`);
   }
@@ -1117,4 +1147,248 @@ const validatePanelContent = (panel: any): string[] => {
   }
 
   return errors;
+};
+
+/**
+ * Validates a dashboard panel's configuration
+ * @param {object} panelData - The panel data object to validate
+ * @param {array} errors - Array to collect errors
+ * @param {boolean} isFieldsValidationRequired - Whether to validate fields (default: true)
+ * @returns {array} An array of validation error messages
+ */
+export const validatePanel = (
+  panelData: any,
+  errors: string[] = [],
+  isFieldsValidationRequired: boolean = true,
+) => {
+  // Get current query index
+  const currentQueryIndex = panelData.layout?.currentQueryIndex || 0;
+  
+  // Check if panel has promQL query type
+  const isPromQLMode = panelData?.data?.queryType === "promql";
+  
+  // Check each query is empty or not for promql
+  if (panelData?.data?.queryType === "promql") {
+    panelData.data.queries.forEach((q: any, index: number) => {
+      if (q && q.query === "") {
+        errors.push(`Query-${index + 1} is empty`);
+      }
+    });
+  }
+
+  // Check each query is empty or not for geomap
+  if (panelData.data.type === "geomap") {
+    panelData.data.queries.forEach((q: any, index: number) => {
+      if (q && q.query === "") {
+        errors.push(`Query-${index + 1} is empty`);
+      }
+    });
+  }
+
+  // Check content should not be empty for html
+  if (panelData.data.type === "html") {
+    if (panelData.data.htmlContent.trim() === "") {
+      errors.push("Please enter your HTML code");
+    }
+  }
+
+  // Check content should not be empty for markdown
+  if (panelData.data.type === "markdown") {
+    if (panelData.data.markdownContent.trim() === "") {
+      errors.push("Please enter your markdown code");
+    }
+  }
+  
+  // Check query for custom_chart
+  if (panelData.data.type === "custom_chart") {
+    if (panelData.data.queries[0].query.trim() === "") {
+      errors.push("Please enter query for custom chart");
+    }
+  }
+
+  if (isPromQLMode) {
+    // 1. Chart type: only specific chart types are supported for PromQL
+    const allowedChartTypes = [
+      "area",
+      "line",
+      "bar",
+      "scatter",
+      "area-stacked",
+      "metric",
+      "gauge",
+      "html",
+      "markdown",
+    ];
+    if (!allowedChartTypes.includes(panelData.data.type)) {
+      errors.push(
+        "Selected chart type is not supported for PromQL. Only line chart is supported.",
+      );
+    }
+
+    // 2. x axis, y axis, filters should be blank for PromQL
+    if (panelData.data.queries[currentQueryIndex].fields.x.length > 0) {
+      errors.push(
+        "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
+      );
+    }
+
+    if (panelData.data.queries[currentQueryIndex].fields.y.length > 0) {
+      errors.push(
+        "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
+      );
+    }
+
+    if (
+      panelData.data.queries[currentQueryIndex].fields.filter.conditions
+        .length > 0
+    ) {
+      errors.push(
+        "Filters are not supported for PromQL. Remove anything added to the Filters.",
+      );
+    }
+  } else {
+    // Calculate the x and y axis labels based on chart type
+    const currentXLabel =
+      panelData.data.type === "table"
+        ? "First Column"
+        : panelData.data.type === "h-bar"
+          ? "Y-Axis"
+          : "X-Axis";
+
+    const currentYLabel =
+      panelData.data.type === "table"
+        ? "Other Columns"
+        : panelData.data.type === "h-bar"
+          ? "X-Axis"
+          : "Y-Axis";
+
+    // Validate panel fields based on chart type
+    validateSQLPanelFields(
+      panelData.data,
+      currentQueryIndex,
+      currentXLabel,
+      currentYLabel,
+      errors,
+      isFieldsValidationRequired,
+    );
+
+    // Validate fields against streams if field validation is required
+    if (isFieldsValidationRequired) {
+      const isCustomQueryMode =
+        panelData.data.queries[currentQueryIndex].customQueryMode;
+
+      if (isCustomQueryMode) {
+        validateCustomQueryFields(panelData, currentQueryIndex, errors);
+      } else {
+        validateStreamFields(
+          panelData,
+          currentQueryIndex,
+          errors,
+          panelData.meta.stream.userDefinedSchemaFields,
+        );
+      }
+    }
+  }
+  
+  return errors;
+};
+
+/**
+ * Validates fields for custom query mode
+ * @param {object} panelData - The panel data object
+ * @param {number} queryIndex - The current query index
+ * @param {array} errors - Array to collect errors
+ */
+const validateCustomQueryFields = (
+  panelData: any,
+  queryIndex: number,
+  errors: string[],
+) => {
+  const customQueryXFieldError = panelData.data.queries[
+    queryIndex
+  ].fields.x.filter(
+    (it: any) =>
+      ![
+        ...panelData.meta.stream.customQueryFields,
+        ...panelData.meta.stream.vrlFunctionFieldList,
+      ].find((i: any) => i.name === it.column),
+  );
+
+  if (customQueryXFieldError.length) {
+    errors.push(
+      ...customQueryXFieldError.map(
+        (it: any) =>
+          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`,
+      ),
+    );
+  }
+
+  const customQueryYFieldError = panelData.data.queries[
+    queryIndex
+  ].fields.y.filter(
+    (it: any) =>
+      ![
+        ...panelData.meta.stream.customQueryFields,
+        ...panelData.meta.stream.vrlFunctionFieldList,
+      ].find((i: any) => i.name === it.column),
+  );
+
+  if (customQueryYFieldError.length) {
+    errors.push(
+      ...customQueryYFieldError.map(
+        (it: any) =>
+          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`,
+      ),
+    );
+  }
+};
+
+/**
+ * Validates fields for stream selection mode
+ * @param {object} panelData - The panel data object
+ * @param {number} queryIndex - The current query index
+ * @param {array} errors - Array to collect errors
+ * @param {array} streamFields - Fields available in the selected stream
+ */
+const validateStreamFields = (
+  panelData: any,
+  queryIndex: number,
+  errors: string[],
+  streamFields: any[] = [],
+) => {
+  const customQueryXFieldError = panelData.data.queries[
+    queryIndex
+  ].fields.x.filter(
+    (it: any) =>
+      ![...streamFields, ...panelData.meta.stream.vrlFunctionFieldList].find(
+        (i: any) => i.name === it.column,
+      ),
+  );
+
+  if (customQueryXFieldError.length) {
+    errors.push(
+      ...customQueryXFieldError.map(
+        (it: any) =>
+          `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`,
+      ),
+    );
+  }
+
+  const customQueryYFieldError = panelData.data.queries[
+    queryIndex
+  ].fields.y.filter(
+    (it: any) =>
+      ![...streamFields, ...panelData.meta.stream.vrlFunctionFieldList].find(
+        (i: any) => i.name === it.column,
+      ),
+  );
+
+  if (customQueryYFieldError.length) {
+    errors.push(
+      ...customQueryYFieldError.map(
+        (it: any) =>
+          `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`,
+      ),
+    );
+  }
 };
