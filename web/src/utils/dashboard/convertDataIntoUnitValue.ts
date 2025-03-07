@@ -784,65 +784,36 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
           tabLayoutValues.add(panel.layout.i.toString());
         }
       }
-      
-      // Validate panel content
-      const panelErrors = validatePanelContent(panel);
-      errors.push(...panelErrors);
-    }
-  }
-  
-  return errors;
-};
 
-/**
- * Validates an individual panel's content
- * 
- * @param panel The panel object to validate
- * @returns Array of validation errors
- */
-const validatePanelContent = (panel: any): string[] => {
-  const errors: string[] = [];
-  
-  // Required fields validation
-  if (!panel.type) {
-    errors.push(`Panel ${panel.id}: Panel type is required`);
-    return errors;
-  }
-  
-  if (!panel.title) {
-    errors.push(`Panel ${panel.id}: Panel title is required`);
-  }
-  
-  // Layout validation
-  if (!panel.layout) {
-    errors.push(`Panel ${panel.id}: Layout is required`);
-  } else {
-    if (typeof panel.layout.x !== 'number') errors.push(`Panel ${panel.id}: Layout x must be a number`);
-    if (typeof panel.layout.y !== 'number') errors.push(`Panel ${panel.id}: Layout y must be a number`);
-    if (typeof panel.layout.w !== 'number') errors.push(`Panel ${panel.id}: Layout w must be a number`);
-    if (typeof panel.layout.h !== 'number') errors.push(`Panel ${panel.id}: Layout h must be a number`);
-  }
-  
-  // Validate queries for chart panels
-  if (panel.type !== 'text' && panel.type !== 'markdown' && panel.type !== 'html') {
-    if (!Array.isArray(panel.queries) || panel.queries.length === 0) {
-      errors.push(`Panel ${panel.id}: Must have at least one query`);
-    } else {
-      // Validate each query using existing validateSQLPanelFields
-      panel.queries.forEach((query: any, index: number) => {
-        // Create dummy data structure for validation
-        // This is based on the structure expected by validateSQLPanelFields
-        const currentXLabel = panel.type == "h-bar" ? "X-Axis" : "Y-Axis";
-        const currentYLabel = panel.type == "h-bar" ? "Y-Axis" : "X-Axis";
-        
-        const panelErrors: string[] = [];
-        // Only validate if we have fields to validate
-        if (query.fields) {
-          validateSQLPanelFields(panel, index, currentXLabel, currentYLabel, panelErrors);
+      // Validate basic panel structure
+      const panelStructureErrors = validatePanelContent(panel);
+      errors.push(...panelStructureErrors);
+
+      // Validate panel fields but skip stream validation
+      if (
+        panel.type !== "text" &&
+        panel.type !== "markdown" &&
+        panel.type !== "html"
+      ) {
+        try {
+          const panelDetailErrors: string[] = [];
+
+          // Only validate the panel fields (not stream field existence)
+          validatePanelFields(panel, panelDetailErrors);
+
+          // Add panel identifier to each error
+          const prefixedErrors = panelDetailErrors.map(
+            (error) => `Panel ${panel.id || "unknown"}: ${error}`,
+          );
+
+          errors.push(...prefixedErrors);
+        } catch (error) {
+          // If validation fails, add a generic error
+          errors.push(
+            `Panel ${panel.id || "unknown"}: Unable to validate panel configuration`,
+          );
         }
-        
-        errors.push(...panelErrors);
-      });
+      }
     }
   }
   
@@ -850,26 +821,19 @@ const validatePanelContent = (panel: any): string[] => {
 };
 
 /**
- * Validates a dashboard panel's configuration
- * @param {object} panelData - The panel data object to validate
- * @param {array} errors - Optional array to collect errors (if not provided, a new array will be created and returned)
- * @param {boolean} isFieldsValidationRequired - Whether to validate fields (default: true)
- * @returns {array} An array of validation error messages
+ * Validates panel fields without validating stream field existence
+ *
+ * @param panel The panel to validate
+ * @param errors Array to collect error messages
  */
-export const validatePanel = (
-  panelData: any,
-  errors: string[] = [],
-  isFieldsValidationRequired: boolean = true,
-) => {
-  // Get current query index (default to 0 if not available)
-  const currentQueryIndex = panelData.layout?.currentQueryIndex || 0;
-  
+const validatePanelFields = (panel: any, errors: string[] = []) => {
   // Check if panel has promQL query type
-  const isPromQLMode = panelData?.data?.queryType === "promql";
-  
+  const isPromQLMode = panel?.queryType === "promql";
+  const currentQueryIndex = 0; // Default to first query
+
   // Check each query is empty or not for promql
-  if (panelData?.data?.queryType === "promql") {
-    panelData.data.queries.forEach((q: any, index: number) => {
+  if (panel?.queryType === "promql") {
+    panel.queries?.forEach((q: any, index: number) => {
       if (q && q.query === "") {
         errors.push(`Query-${index + 1} is empty`);
       }
@@ -877,8 +841,8 @@ export const validatePanel = (
   }
 
   // Check each query is empty or not for geomap
-  if (panelData.data.type === "geomap") {
-    panelData.data.queries.forEach((q: any, index: number) => {
+  if (panel.type === "geomap") {
+    panel.queries?.forEach((q: any, index: number) => {
       if (q && q.query === "") {
         errors.push(`Query-${index + 1} is empty`);
       }
@@ -886,22 +850,22 @@ export const validatePanel = (
   }
 
   // Check content should not be empty for html
-  if (panelData.data.type === "html") {
-    if (panelData.data.htmlContent.trim() === "") {
+  if (panel.type === "html") {
+    if (panel.htmlContent?.trim() === "") {
       errors.push("Please enter your HTML code");
     }
   }
 
   // Check content should not be empty for markdown
-  if (panelData.data.type === "markdown") {
-    if (panelData.data.markdownContent.trim() === "") {
+  if (panel.type === "markdown") {
+    if (panel.markdownContent?.trim() === "") {
       errors.push("Please enter your markdown code");
     }
   }
-  
+
   // Check query for custom_chart
-  if (panelData.data.type === 'custom_chart') {
-    if (panelData.data.queries[0].query.trim() === "") {
+  if (panel.type === "custom_chart") {
+    if (panel.queries?.[0]?.query?.trim() === "") {
       errors.push("Please enter query for custom chart");
     }
   }
@@ -919,146 +883,238 @@ export const validatePanel = (
       "html",
       "markdown",
     ];
-    if (!allowedChartTypes.includes(panelData.data.type)) {
+    if (!allowedChartTypes.includes(panel.type)) {
       errors.push(
-        "Selected chart type is not supported for PromQL. Only line chart is supported."
+        "Selected chart type is not supported for PromQL. Only line chart is supported.",
       );
     }
 
     // 2. x axis, y axis, filters should be blank for PromQL
-    if (panelData.data.queries[currentQueryIndex].fields.x.length > 0) {
+    if (panel.queries?.[currentQueryIndex]?.fields?.x?.length > 0) {
       errors.push(
-        "X-Axis is not supported for PromQL. Remove anything added to the X-Axis."
+        "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
       );
     }
 
-    if (panelData.data.queries[currentQueryIndex].fields.y.length > 0) {
+    if (panel.queries?.[currentQueryIndex]?.fields?.y?.length > 0) {
       errors.push(
-        "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis."
+        "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
       );
     }
 
-    if (panelData.data.queries[currentQueryIndex].fields.filter.conditions.length > 0) {
+    if (
+      panel.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length > 0
+    ) {
       errors.push(
-        "Filters are not supported for PromQL. Remove anything added to the Filters."
+        "Filters are not supported for PromQL. Remove anything added to the Filters.",
       );
     }
   } else {
-    // Calculate the x and y axis labels based on chart type
-    const currentXLabel = panelData.data.type === "table"
-      ? "First Column"
-      : panelData.data.type === "h-bar"
-        ? "Y-Axis"
-        : "X-Axis";
-    
-    const currentYLabel = panelData.data.type === "table"
-      ? "Other Columns"
-      : panelData.data.type === "h-bar"
-        ? "X-Axis"
-        : "Y-Axis";
-        
-    // Validate SQL panel fields
-    validateSQLPanelFields(
-      panelData.data,
-      currentQueryIndex,
-      currentXLabel,
-      currentYLabel,
-      errors,
-      isFieldsValidationRequired
-    );
+    // Only validate field requirements based on chart type
+    // without validating field-to-stream existence
 
-    if (isFieldsValidationRequired) {
-      // Check if field selection is from the custom query fields when the custom query mode is ON
-      if (panelData.data.queries[currentQueryIndex].customQuery) {
-        validateCustomQueryFields(panelData, currentQueryIndex, errors);
-      } else {
-        // Check if field selection is from the selected stream fields when the custom query mode is OFF
-        validateStreamFields(panelData, currentQueryIndex, errors);
+    switch (panel?.type) {
+      case "donut":
+      case "pie": {
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length > 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0
+        ) {
+          errors.push("Add one value field for donut and pie charts");
+        }
+
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length > 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length === 0
+        ) {
+          errors.push("Add one label field for donut and pie charts");
+        }
+        break;
       }
+      case "metric": {
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length > 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0
+        ) {
+          errors.push("Add one value field for metric charts");
+        }
+
+        if (panel?.queries?.[currentQueryIndex]?.fields?.x?.length) {
+          errors.push("X-Axis field is not allowed for Metric chart");
+        }
+        break;
+      }
+      case "gauge": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.y?.length !== 1) {
+          errors.push("Add one value field for gauge chart");
+        }
+        // gauge can have zero or one label
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length !== 1 &&
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length !== 0
+        ) {
+          errors.push("Add one label field for gauge chart");
+        }
+        break;
+      }
+      case "h-bar":
+      case "area":
+      case "line":
+      case "scatter":
+      case "bar": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.y?.length < 1) {
+          errors.push("Add at least one field for the Y-Axis");
+        }
+
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length > 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length === 0
+        ) {
+          errors.push("Add one field for the X-Axis");
+        }
+        break;
+      }
+      case "table": {
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0 &&
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length === 0
+        ) {
+          errors.push("Add at least one field on X-Axis or Y-Axis");
+        }
+        break;
+      }
+      case "heatmap": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0) {
+          errors.push("Add at least one field for the Y-Axis");
+        }
+
+        if (panel?.queries?.[currentQueryIndex]?.fields?.x?.length === 0) {
+          errors.push("Add one field for the X-Axis");
+        }
+
+        if (panel?.queries?.[currentQueryIndex]?.fields?.z?.length === 0) {
+          errors.push("Add one field for the Z-Axis");
+        }
+        break;
+      }
+      case "stacked":
+      case "h-stacked": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0) {
+          errors.push("Add at least one field for the Y-Axis");
+        }
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length !== 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.breakdown?.length !== 1
+        ) {
+          errors.push(
+            "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts",
+          );
+        }
+        break;
+      }
+      case "area-stacked": {
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length > 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.y?.length === 0
+        ) {
+          errors.push(
+            "Add exactly one field on Y-Axis for area-stacked charts",
+          );
+        }
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.x?.length !== 1 ||
+          panel?.queries?.[currentQueryIndex]?.fields?.breakdown?.length !== 1
+        ) {
+          errors.push(
+            "Add exactly one field on the X-Axis and breakdown for area-stacked charts",
+          );
+        }
+        break;
+      }
+      case "geomap": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.latitude == null) {
+          errors.push("Add one field for the latitude");
+        }
+        if (panel?.queries?.[currentQueryIndex]?.fields?.longitude == null) {
+          errors.push("Add one field for the longitude");
+        }
+        break;
+      }
+      case "sankey": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.source == null) {
+          errors.push("Add one field for the source");
+        }
+        if (panel?.queries?.[currentQueryIndex]?.fields?.target == null) {
+          errors.push("Add one field for the target");
+        }
+        if (panel?.queries?.[currentQueryIndex]?.fields?.value == null) {
+          errors.push("Add one field for the value");
+        }
+        break;
+      }
+      case "maps": {
+        if (panel?.queries?.[currentQueryIndex]?.fields?.name == null) {
+          errors.push("Add one field for the name");
+        }
+        if (
+          panel?.queries?.[currentQueryIndex]?.fields?.value_for_maps == null
+        ) {
+          errors.push("Add one field for the value");
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    // Check filter conditions validity
+    if (
+      panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length
+    ) {
+      // Validate the conditions
+      validateConditions(
+        panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions,
+        errors,
+      );
     }
   }
-  
+
   return errors;
 };
 
 /**
- * Validates fields for custom query mode
- * @param {object} panelData - The panel data object
- * @param {number} queryIndex - The current query index
- * @param {array} errors - Array to collect errors
+ * Validates an individual panel's content
+ * Only checks basic structure, used by validateDashboardJson
+ *
+ * @param panel The panel object to validate
+ * @returns Array of validation errors
  */
-const validateCustomQueryFields = (panelData: any, queryIndex: number, errors: string[]) => {
-  const customQueryXFieldError = panelData.data.queries[queryIndex].fields.x.filter(
-    (it: any) =>
-      ![
-        ...panelData.meta.stream.customQueryFields,
-        ...panelData.meta.stream.vrlFunctionFieldList,
-      ].find((i: any) => i.name === it.column)
-  );
-  
-  if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid`
-      )
-    );
+const validatePanelContent = (panel: any): string[] => {
+  const errors: string[] = [];
+
+  // Required fields validation
+  if (!panel.type) {
+    errors.push(`Panel ${panel.id}: Panel type is required`);
+    return errors;
   }
 
-  const customQueryYFieldError = panelData.data.queries[queryIndex].fields.y.filter(
-    (it: any) =>
-      ![
-        ...panelData.meta.stream.customQueryFields,
-        ...panelData.meta.stream.vrlFunctionFieldList,
-      ].find((i: any) => i.name === it.column)
-  );
-  
-  if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid`
-      )
-    );
-  }
-};
-
-/**
- * Validates fields for stream selection mode
- * @param {object} panelData - The panel data object
- * @param {number} queryIndex - The current query index
- * @param {array} errors - Array to collect errors
- */
-const validateStreamFields = (panelData: any, queryIndex: number, errors: string[]) => {
-  const streamFields = panelData.meta.stream?.userDefinedSchemaFields || [];
-  
-  const customQueryXFieldError = panelData.data.queries[queryIndex].fields.x.filter(
-    (it: any) =>
-      ![
-        ...streamFields,
-        ...panelData.meta.stream.vrlFunctionFieldList,
-      ].find((i: any) => i.name === it.column)
-  );
-  
-  if (customQueryXFieldError.length) {
-    errors.push(
-      ...customQueryXFieldError.map(
-        (it: any) => `Please update X-Axis Selection. Current X-Axis field ${it.column} is invalid for selected stream`
-      )
-    );
+  if (!panel.title) {
+    errors.push(`Panel ${panel.id}: Panel title is required`);
   }
 
-  const customQueryYFieldError = panelData.data.queries[queryIndex].fields.y.filter(
-    (it: any) =>
-      ![
-        ...streamFields,
-        ...panelData.meta.stream.vrlFunctionFieldList,
-      ].find((i: any) => i.name === it.column)
-  );
-  
-  if (customQueryYFieldError.length) {
-    errors.push(
-      ...customQueryYFieldError.map(
-        (it: any) => `Please update Y-Axis Selection. Current Y-Axis field ${it.column} is invalid for selected stream`
-      )
-    );
+  // Layout validation
+  if (!panel.layout) {
+    errors.push(`Panel ${panel.id}: Layout is required`);
+  } else {
+    if (typeof panel.layout.x !== "number")
+      errors.push(`Panel ${panel.id}: Layout x must be a number`);
+    if (typeof panel.layout.y !== "number")
+      errors.push(`Panel ${panel.id}: Layout y must be a number`);
+    if (typeof panel.layout.w !== "number")
+      errors.push(`Panel ${panel.id}: Layout w must be a number`);
+    if (typeof panel.layout.h !== "number")
+      errors.push(`Panel ${panel.id}: Layout h must be a number`);
   }
+
+  return errors;
 };
