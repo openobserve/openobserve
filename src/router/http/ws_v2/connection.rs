@@ -15,7 +15,7 @@
 
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicI64, Ordering},
+    atomic::{AtomicBool, Ordering},
 };
 
 use async_trait::async_trait;
@@ -65,7 +65,6 @@ pub struct QuerierConnection {
     shutdown_tx: Sender<()>,
     response_router: Arc<ResponseRouter>,
     is_connected: Arc<AtomicBool>,
-    last_active: std::sync::atomic::AtomicI64,
 }
 
 #[derive(Debug, Default)]
@@ -90,13 +89,6 @@ impl QuerierConnection {
             .await
     }
 
-    fn update_last_active(&self) {
-        self.last_active.store(
-            chrono::Utc::now().timestamp_micros(),
-            std::sync::atomic::Ordering::SeqCst,
-        );
-    }
-
     async fn listen_to_querier_response(
         &self,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
@@ -119,7 +111,6 @@ impl QuerierConnection {
                                     if let Some(write) = write_guard.as_mut() {
                                         let _ = write.send(pong).await;
                                     }
-                                    self.update_last_active();
                                 }
                                 tungstenite::protocol::Message::Pong(pong) => {
                                     log::debug!("[WS::QuerierConnection] received pong message: {:?}", pong);
@@ -291,7 +282,6 @@ impl Connection for QuerierConnection {
             shutdown_tx,
             response_router,
             is_connected,
-            last_active: AtomicI64::new(chrono::Utc::now().timestamp_micros()),
         });
 
         // Spawn task to listen to querier responses
@@ -335,7 +325,6 @@ impl Connection for QuerierConnection {
                         trace_id,
                         self.querier_name
                     );
-                    self.update_last_active();
                     Ok(())
                 }
                 Err(e) => {
