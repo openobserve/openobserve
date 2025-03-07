@@ -157,7 +157,7 @@ impl Metadata for DistinctValues {
                 DataType::Int64,
                 false,
             ),
-            Field::new("count", DataType::Int64, false),
+            Field::new("count", DataType::Int64, true),
         ]))
     }
 
