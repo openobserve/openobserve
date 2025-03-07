@@ -119,8 +119,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-td>
           
           <q-td v-for="col in columns" :key="col.name" :props="props">
-            <template v-if="col.name  !== 'actions'">
+            <template v-if="col.name  !== 'actions' && col.name !== 'folder_name'">
             {{ props.row[col.field] }}
+          </template>
+          <template v-else-if="col.name  === 'folder_name'">
+           <div  @click.stop="updateActiveFolderId(props.row[col.field].id)">
+              {{ props.row[col.field].name }}
+           </div>
+            
           </template>
           <template v-else>
             <div
@@ -486,6 +492,7 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
+import { nextTick } from "vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -678,10 +685,27 @@ export default defineComponent({
                 data.last_satisfied_at
               ),
               selected: false,
-              type: data.condition.type
+              type: data.condition.type,
+              folder_name: {
+                name: data.folder_name,
+                id: data.folder_id
+              },
             };
           });
 
+          if(searchAcrossFolders.value && columns.value.length < 7){
+            columns.value.splice(2,0,{
+              name: "folder_name",
+              field: "folder_name",
+              label: 'Folder',
+              align: "center",
+              sortable: true,
+              style: "width: 150px",
+            })
+          }
+          else if (columns.value.length == 7){
+            columns.value.splice(2,1);
+          }
           alertsRows.value.forEach((alert: AlertListItem) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
@@ -785,6 +809,11 @@ export default defineComponent({
         filteredResults.value = [];
       }
     });
+    watch(searchAcrossFolders, async (newVal) => {
+      if(!newVal && columns.value.length == 7){
+        columns.value.splice(2,1);
+      }
+    })
     const getDestinations = async () => {
       destinationService
         .list({
@@ -1153,6 +1182,7 @@ export default defineComponent({
     }
 
     const updateActiveFolderId = (newVal: any) => {
+      searchQuery.value = "";
       activeFolderId.value = newVal;
       selected.value = [];
       allSelected.value = false;

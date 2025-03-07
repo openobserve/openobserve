@@ -234,6 +234,9 @@ export default defineComponent({
           activeFolderId.value = "default";
         }
       });
+      watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
+        activeFolderId.value = newVal;
+      })
       const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
