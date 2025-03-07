@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('alert_destinations.header')"
+            :pageTitle="t('pipeline_destinations.header')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"

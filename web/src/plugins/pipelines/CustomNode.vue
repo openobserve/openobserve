@@ -57,9 +57,6 @@ const hanldeMouseOver = () => {
 
 
 const onFunctionClick = (data,event,id) =>{
-  console.log(data,"data")
-  console.log(id,"id")
-  console.log(event,"event")
   pipelineObj.userSelectedNode = data;
   const dataToOpen  =   {
     label: "Function",
@@ -77,7 +74,6 @@ const onFunctionClick = (data,event,id) =>{
 
 const onConditionClick = (data,event,id) =>{
   data.label = id;
-  console.log(data,"data")
   pipelineObj.userSelectedNode = data;
 
   const dataToOpen  =   {
@@ -149,7 +145,6 @@ const editNode = (id) => {
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
     (node) => node.id === id
   );
-  console.log(fullNode,'full node')
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
   pipelineObj.currentSelectedNodeID = id;
