@@ -661,7 +661,7 @@ export const usePanelDataLoader = (
           ),
         },
         stream_type: payload.pageType,
-        search_type: "dashboards",
+        search_type: searchType.value ?? "dashboards",
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
