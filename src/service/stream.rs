@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
 use config::{
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, is_local_disk_storage,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, is_local_disk_storage,
     meta::{
         promql,
         stream::{
@@ -424,6 +424,14 @@ pub async fn update_stream_settings(
 
             if !new_settings.distinct_value_fields.add.is_empty() {
                 for f in &new_settings.distinct_value_fields.add {
+                    if f == "count" || f == TIMESTAMP_COL_NAME {
+                        return Ok(HttpResponse::InternalServerError().json(
+                            MetaHttpResponse::error(
+                                http::StatusCode::BAD_REQUEST.into(),
+                                format!("count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"),
+                            ),
+                        ));
+                    }
                     // we ignore full text search fields
                     if settings.full_text_search_keys.contains(f)
                         || new_settings.full_text_search_keys.add.contains(f)
