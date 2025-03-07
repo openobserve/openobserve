@@ -568,7 +568,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Tab selection section - shown only when scope is tabs or panels -->
-             {{ selectedTabs }}
             <div
               v-if="
                 variableData.scope === 'tabs' || variableData.scope === 'panels'
@@ -684,6 +683,7 @@ import {
   toRaw,
   type Ref,
   computed,
+  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
@@ -712,15 +712,15 @@ export default defineComponent({
   setup(props, { emit }) {
     console.log("props----", props.dashboardVariablesList);
     // Store dashboard data
-    const dashboardData = ref({ tabs: [] });
+    const dashboardData = ref<any>({ tabs: [] });
 
     // Store selected tabs and panels
-    const selectedTabs = ref([]);
-    const selectedPanels = ref([]);
+    const selectedTabs = ref<string[]>([]);
+    const selectedPanels = ref<string[]>([]);
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
-      dashboardData.value.tabs.map((tab) => ({
+      dashboardData.value.tabs.map((tab: any) => ({
         label: tab.name,
         value: tab.tabId,
       })),
@@ -729,10 +729,10 @@ export default defineComponent({
     // Compute grouped panels options with tabs as separators
     const groupedPanelsOptions = computed(() => {
       return dashboardData.value.tabs
-        .filter((tab) => selectedTabs.value.includes(tab.tabId))
-        .flatMap((tab) => [
+        .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+        .flatMap((tab: any) => [
           { label: tab.name, isTab: true },
-          ...(tab.panels || []).map((panel) => ({
+          ...(tab.panels || []).map((panel: any) => ({
             label: panel.title,
             value: panel.id,
           })),
@@ -887,7 +887,7 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Modify the onMounted hook to properly load existing scope, tabs, and panels
+    // Modify the onMounted hook
     onMounted(async () => {
       try {
         const data = await getDashboard(
@@ -904,10 +904,11 @@ export default defineComponent({
 
           const variablesList = data.variables?.list || [];
           const variable = variablesList.find(
-            (v) => v.name === props.variableName,
+            (v: any) => v.name === props.variableName,
           );
 
           if (variable) {
+            // First, set the basic variable data
             Object.assign(variableData, JSON.parse(JSON.stringify(variable)));
 
             // Set scope type correctly
@@ -919,12 +920,16 @@ export default defineComponent({
               variableData.scope = "global";
             }
 
-            // Ensure selected tabs and panels are set correctly
+            // Set initial values synchronously
             selectedTabs.value = variable.tabs ? [...variable.tabs] : [];
             selectedPanels.value = variable.panels ? [...variable.panels] : [];
 
-            console.log("Loaded Tabs:", selectedTabs.value);
-            console.log("Loaded Panels:", selectedPanels.value);
+            // Force update panel options
+            nextTick(() => {
+              if (variableData.scope === "panels") {
+                updatePanels();
+              }
+            });
           }
         }
       } catch (error) {
@@ -933,60 +938,51 @@ export default defineComponent({
       }
     });
 
-    // Add a watcher that updates the panel options when tabs change
+    // Modify the watch on scope
     watch(
-      selectedTabs,
-      (newTabs) => {
-        if (variableData.scope === "panels" && newTabs.length > 0) {
-          // Clear any panels that are no longer in the selected tabs
-          const validPanelIds = dashboardData.value.tabs
-            .filter((tab) => newTabs.includes(tab.tabId))
-            .flatMap((tab) => (tab.panels || []).map((panel) => panel.id));
-
-          selectedPanels.value = selectedPanels.value.filter((id) =>
-            validPanelIds.includes(id),
-          );
+      () => variableData.scope,
+      (newScope) => {
+        if (newScope === "global") {
+          selectedTabs.value = [];
+          selectedPanels.value = [];
+        } else if (newScope === "tabs") {
+          selectedPanels.value = [];
+        } else if (newScope === "panels" && selectedTabs.value.length > 0) {
+          nextTick(() => {
+            updatePanels();
+          });
         }
       },
-      { deep: true },
+      { immediate: true },
     );
 
-    // Add a method to handle tab selection changes
+    // Modify updatePanels function
     const updatePanels = () => {
-      console.log("Selected Tabs:", selectedTabs.value);
-
-      if (variableData.scope === "panels") {
-        // Keep only panels that are in the selected tabs
+      if (variableData.scope === "panels" && selectedTabs.value.length > 0) {
         const validPanelIds = dashboardData.value.tabs
-          .filter((tab) => selectedTabs.value.includes(tab.tabId))
-          .flatMap((tab) => (tab.panels || []).map((panel) => panel.id));
-        console.log("Valid Panel IDs:", validPanelIds);
-        selectedPanels.value = selectedPanels.value.filter((id) =>
+          .filter((tab: any) => selectedTabs.value.includes(tab.tabId))
+          .flatMap((tab: any) =>
+            (tab.panels || []).map((panel: any) => panel.id),
+          );
+
+        // Keep only valid panels from the current selection
+        selectedPanels.value = selectedPanels.value.filter((id: any) =>
           validPanelIds.includes(id),
         );
-      } else if (variableData.scope === "tabs") {
-        // Clear all selected panels when in tabs mode
-        selectedPanels.value = [];
       }
     };
 
-    // Modify the watch on scope to update selectedTabs and selectedPanels appropriately
+    // Add a watch for selectedTabs
     watch(
-      () => variableData.scope,
-      (newScope, oldScope) => {
-        if (newScope === "global") {
-          // Clear all selections when switching to global
-          selectedTabs.value = [];
-          selectedPanels.value = [];
-        } else if (newScope === "tabs" && oldScope === "panels") {
-          // Keep the selected tabs but clear panels when switching from panels to tabs
-          selectedPanels.value = [];
-        } else if (newScope === "panels" && oldScope === "global") {
-          // Start with no tabs or panels when switching from global to panels
-          selectedTabs.value = [];
-          selectedPanels.value = [];
+      selectedTabs,
+      (newTabs) => {
+        if (variableData.scope === "panels") {
+          nextTick(() => {
+            updatePanels();
+          });
         }
       },
+      { deep: true },
     );
 
     // check if type is query_values then get stream list and field list
