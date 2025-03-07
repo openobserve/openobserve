@@ -681,6 +681,7 @@ async fn merge_files(
     // use the shared fields to create a new schema and with empty metadata
     let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
     fields.sort_by(|a, b| a.name().cmp(b.name()));
+    fields.dedup_by(|a, b| a.name() == b.name());
     let schema = Arc::new(Schema::new(fields));
     let schema_key = schema.hash_key();
 
@@ -1158,9 +1159,9 @@ async fn prepare_index_record_batches(
         Field::new("max_ts", DataType::Int64, true),
         Field::new("field", DataType::Utf8, true),
         Field::new("term", DataType::Utf8, true),
-        Field::new("file_name", DataType::Utf8, false),
-        Field::new("_count", DataType::Int64, false),
-        Field::new("deleted", DataType::Boolean, false),
+        Field::new("file_name", DataType::Utf8, true),
+        Field::new("_count", DataType::Int64, true),
+        Field::new("deleted", DataType::Boolean, true),
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 

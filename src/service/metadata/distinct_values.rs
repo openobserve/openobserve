@@ -152,7 +152,7 @@ impl Metadata for DistinctValues {
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("count", DataType::Int64, false),
+            Field::new("count", DataType::Int64, true),
         ]))
     }
 
