@@ -229,6 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </q-td>
           </template>
+          <template #body-cell-folder="props">
+            <q-td :props="props">
+                <div @click.stop="updateActiveFolderId(props.row.folder_id)">
+                  {{ props.row.folder }}
+                </div>
+            </q-td>
+          </template>
           <!-- add delete icon in actions column -->
           <template #body-cell-actions="props">
             <q-td :props="props">
@@ -946,6 +953,10 @@ export default defineComponent({
       return store.state.organizationData.folders?.filter((folder: any)=> folder.name.toLowerCase().includes(folderSearchQuery.value.toLowerCase()));
     })
 
+    const updateActiveFolderId = (folderId: any) => {
+      activeFolderId.value = folderId;
+    }
+
 
     return {
       t,
@@ -1015,6 +1026,7 @@ export default defineComponent({
       dynamicQueryModel,
       folderSearchQuery,
       filteredFolders,
+      updateActiveFolderId
     };
   },
   methods: {
