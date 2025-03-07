@@ -15,7 +15,6 @@
 
 use std::{
     cmp::Ordering,
-    collections::HashMap,
     io::{Error, ErrorKind},
 };
 
