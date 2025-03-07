@@ -84,10 +84,6 @@ pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<Queri
         .await
         .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.clone()))?;
 
-    // // Convert HTTP URL to WebSocket URL
-    // let ws_url = crate::router::http::ws::convert_to_websocket_url(&node.http_addr)
-    //     .map_err(|e| WsError::ConnectionError(e))?;
-
     let conn = QuerierConnection::connect(&node.name, &node.http_addr).await?;
     Ok(conn)
 }
@@ -107,126 +103,116 @@ impl QuerierConnection {
     }
 
     async fn listen_to_querier_response(
-        conn: Arc<QuerierConnection>,
+        &self,
         mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-        write: SocketWriter,
-        response_router: Arc<ResponseRouter>,
-        is_connected: Arc<AtomicBool>,
         mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
-        querier_name: String,
     ) {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    Some(msg) = read.next() => {
-                        match msg {
-                            Ok(msg) => {
-                                match msg {
-                                    tungstenite::protocol::Message::Close(reason) => {
-                                        log::debug!("[WS::QuerierConnection] received close message: {:?}", reason);
+        loop {
+            tokio::select! {
+                Some(msg) = read.next() => {
+                    match msg {
+                        Ok(msg) => {
+                            match msg {
+                                tungstenite::protocol::Message::Close(reason) => {
+                                    log::debug!("[WS::QuerierConnection] received close message: {:?}", reason);
+                                }
+                                tungstenite::protocol::Message::Ping(ping) => {
+                                    log::debug!("[WS::QuerierConnection] received ping message: {:?}", ping);
+                                    let pong = tungstenite::protocol::Message::Pong(ping);
+                                    let write_clone = self.write.clone();
+                                    let mut write_guard = write_clone.lock().await;
+                                    if let Some(write) = write_guard.as_mut() {
+                                        let _ = write.send(pong).await;
                                     }
-                                    tungstenite::protocol::Message::Ping(ping) => {
-                                        log::debug!("[WS::QuerierConnection] received ping message: {:?}", ping);
-                                        let pong = tungstenite::protocol::Message::Pong(ping);
-                                        let write_clone = write.clone();
-                                        let mut write_guard = write_clone.lock().await;
-                                        if let Some(write) = write_guard.as_mut() {
-                                            let _ = write.send(pong).await;
-                                        }
-                                        conn.update_last_active();
-                                    }
-                                    tungstenite::protocol::Message::Pong(pong) => {
-                                        log::debug!("[WS::QuerierConnection] received pong message: {:?}", pong);
-                                    }
-                                    tungstenite::protocol::Message::Binary(binary) => {
-                                        log::debug!("[WS::QuerierConnection] received binary message: {:?}", binary);
-                                    }
-                                    msg => {
-                                            log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
-                                            // Convert `tungstenite::protocol::Message` to `StreamMessage`
-                                            let message: StreamMessage = match msg.try_into() {
-                                                Ok(message) => message,
-                                                Err(e) => {
-                                                    log::error!(
-                                                        "[WS::QuerierConnection] Error converting message to StreamMessage: {}",
-                                                        e
-                                                    );
-                                                    continue;
-                                                }
-                                            };
-                                            match response_router.route_response(message).await {
-                                                Err(e) => {
-                                                    log::error!(
-                                                        "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
-                                                        e
-                                                    );
-                                                }
-                                                Ok(_) => {
-                                                    log::debug!(
-                                                    "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
+                                    self.update_last_active();
+                                }
+                                tungstenite::protocol::Message::Pong(pong) => {
+                                    log::debug!("[WS::QuerierConnection] received pong message: {:?}", pong);
+                                }
+                                tungstenite::protocol::Message::Binary(binary) => {
+                                    log::debug!("[WS::QuerierConnection] received binary message: {:?}", binary);
+                                }
+                                msg => {
+                                        log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
+                                        // Convert `tungstenite::protocol::Message` to `StreamMessage`
+                                        let message: StreamMessage = match msg.try_into() {
+                                            Ok(message) => message,
+                                            Err(e) => {
+                                                log::error!(
+                                                    "[WS::QuerierConnection] Error converting message to StreamMessage: {}",
+                                                    e
+                                                );
+                                                continue;
+                                            }
+                                        };
+                                        match self.response_router.route_response(message).await {
+                                            Err(e) => {
+                                                log::error!(
+                                                    "[WS::QuerierConnection] Error routing response from querier back to client socket: {}",
+                                                    e
                                                 );
                                             }
+                                            Ok(_) => {
+                                                log::debug!(
+                                                "[WS::QuerierConnection] successfully rerouted response from querier back to client socket listener"
+                                            );
                                         }
                                     }
                                 }
                             }
-                            Err(e) => {
-                                log::error!("[WS] Read error: {}", e);
-                                // mark the connection disconnected
-                                is_connected.store(false, Ordering::SeqCst);
-                                // TODO: cleanup resource
-
-                                break;
-                            }
                         }
-                    }
-                    _ = shutdown_rx.recv() => {
-                        log::info!("[WS::QuerierConnection] shutting down. Stop listening from the querier");
-                        // mark the connection disconnected
-                        is_connected.store(false, Ordering::SeqCst);
-                        // TODO: cleanup resource?
+                        Err(e) => {
+                            log::error!("[WS] Read error: {}", e);
+                            // mark the connection disconnected
+                            self.is_connected.store(false, Ordering::SeqCst);
+                            // TODO: cleanup resource
 
-                        break;
-                    }
-                }
-            }
-
-            log::info!(
-                "[WS::QuerierConnection] connection to querier {querier_name} response handler stopped."
-            );
-        });
-    }
-
-    async fn health_check(
-        conn: Arc<QuerierConnection>,
-        is_connected: Arc<AtomicBool>,
-        querier_name: String,
-    ) {
-        tokio::spawn(async move {
-            // TODO: configurable duration interval
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
-
-            loop {
-                interval.tick().await;
-                let mut write_guard = conn.write.lock().await;
-                match write_guard.as_mut() {
-                    None => {
-                        is_connected.store(false, Ordering::SeqCst);
-                        break;
-                    }
-                    Some(w) => {
-                        if w.send(WsMessage::Ping(vec![])).await.is_err() {
-                            is_connected.store(false, Ordering::SeqCst);
                             break;
                         }
                     }
                 }
-            }
+                _ = shutdown_rx.recv() => {
+                    log::info!("[WS::QuerierConnection] shutting down. Stop listening from the querier");
+                    // mark the connection disconnected
+                    self.is_connected.store(false, Ordering::SeqCst);
+                    // TODO: cleanup resource?
 
-            log::warn!(
-                "[WS:QuerierConnection] connection to querier {querier_name} health check failed, marked disconnected"
-            );
-        });
+                    break;
+                }
+            }
+        }
+
+        log::info!(
+            "[WS::QuerierConnection] connection to querier {} response handler stopped.",
+            self.querier_name
+        );
+    }
+
+    async fn health_check(&self) {
+        // TODO: configurable duration interval
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+
+        loop {
+            interval.tick().await;
+            let mut write_guard = self.write.lock().await;
+            match write_guard.as_mut() {
+                None => {
+                    self.is_connected.store(false, Ordering::SeqCst);
+                    break;
+                }
+                Some(w) => {
+                    if w.send(WsMessage::Ping(vec![])).await.is_err() {
+                        self.is_connected.store(false, Ordering::SeqCst);
+                        break;
+                    }
+                }
+            }
+        }
+
+        log::warn!(
+            "[WS:QuerierConnection] connection to querier {} health check failed, disconnecting...",
+            self.querier_name
+        );
     }
 }
 
@@ -294,24 +280,19 @@ impl Connection for QuerierConnection {
             );
             WsError::ConnectionError(e.to_string())
         })?;
-        let (write, mut read) = ws_stream.split();
+        let (write, read) = ws_stream.split();
         let write = Arc::new(Mutex::new(Some(write)));
 
         // Signal to shutdown
-        let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
+        let (shutdown_tx, shutdown_rx) = channel::<()>(1);
 
         // Setting up components needed for the two tasks
         let response_router = ResponseRouter::new();
-        let response_router_t1 = response_router.clone();
         let is_connected = Arc::new(AtomicBool::new(true));
-        let is_connected_t1 = is_connected.clone();
-        let is_connected_t2 = is_connected.clone();
-        let querier_name_cp_t1 = node_name.to_string();
-        let querier_name_cp_t2 = node_name.to_string();
 
         let conn: Arc<QuerierConnection> = Arc::new(Self {
             querier_name: node_name.to_string(),
-            write: write.clone(),
+            write,
             shutdown_tx,
             response_router,
             is_connected,
@@ -319,18 +300,16 @@ impl Connection for QuerierConnection {
         });
 
         // Spawn task to listen to querier responses
-        Self::listen_to_querier_response(
-            conn.clone(),
-            read,
-            write,
-            response_router_t1,
-            is_connected_t1,
-            shutdown_rx,
-            querier_name_cp_t1,
-        );
+        let conn_t1 = conn.clone();
+        tokio::spawn(async move {
+            conn_t1.listen_to_querier_response(read, shutdown_rx);
+        });
 
         // Spawn health check task
-        Self::health_check(conn.clone(), is_connected_t2, querier_name_cp_t2);
+        let conn_t2 = conn.clone();
+        tokio::spawn(async move {
+            conn_t2.health_check();
+        });
 
         Ok(conn)
     }
