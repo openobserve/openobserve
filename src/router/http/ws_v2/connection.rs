@@ -209,31 +209,27 @@ impl ResponseRouter {
         });
 
         // Spawn cleanup task
-        Self::spawn_cleanup_task(response_router.clone());
+        let response_router_cp = response_router.clone();
+        tokio::spawn(async move {
+            response_router_cp.spawn_cleanup_task().await;
+        });
 
         response_router
     }
 
-    fn spawn_cleanup_task(router: Arc<ResponseRouter>) {
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
-
-            loop {
-                interval.tick().await;
-                router.remove_completed_requests().await;
-            }
-        });
+    async fn spawn_cleanup_task(&self) {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            self.routes
+                .write()
+                .await
+                .retain(|_, response_tx| !response_tx.is_closed());
+        }
     }
 
     async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
         self.routes.write().await.insert(trace_id, response_tx);
-    }
-
-    async fn remove_completed_requests(&self) {
-        self.routes
-            .write()
-            .await
-            .retain(|_, response_tx| !response_tx.is_closed());
     }
 
     pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {

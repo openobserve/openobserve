@@ -143,8 +143,18 @@ impl WsHandler {
             // Handle outgoing messages
             let handle_outgoing = async {
                 while let Some(message) = response_rx.recv().await {
-                    if let Err(e) = ws_session.text(serde_json::to_string(&message)?).await {
+                    let should_break = matches!(message, WsServerEvents::End { .. });
+                    let Ok(message_str) = serde_json::to_string(&message) else {
+                        log::error!(
+                            "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
+                        );
+                        continue;
+                    };
+                    if let Err(e) = ws_session.text(message_str).await {
                         log::error!("Error sending message to client: {}", e);
+                        break;
+                    }
+                    if should_break {
                         break;
                     }
                 }
