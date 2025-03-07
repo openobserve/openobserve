@@ -39,7 +39,8 @@ use crate::{
     common::infra::config::WS_SEARCH_REGISTRY,
     // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
+        WsClientEvents, WsServerEvents, handle_search_request,
+        search_registry_utils::{self, SearchState},
         sessions_cache_utils,
     },
 };

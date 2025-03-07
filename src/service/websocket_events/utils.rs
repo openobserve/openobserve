@@ -315,7 +315,7 @@ impl WsClientEvents {
         match &self {
             Self::Search(req) => req.trace_id.clone(),
             #[cfg(feature = "enterprise")]
-            Self::Cancel(trace_id, ..) => trace_id.clone(),
+            Self::Cancel { trace_id, .. } => trace_id.clone(),
             Self::Benchmark { id } => id.clone(),
         }
     }
