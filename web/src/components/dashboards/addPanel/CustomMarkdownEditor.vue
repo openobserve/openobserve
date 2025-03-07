@@ -48,7 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <markdown-renderer :markdown-content="markdownContent" />
+          <markdown-renderer
+            :markdown-content="markdownContent"
+            :variables-data="initialVariableValues"
+          />
         </template>
       </q-splitter>
     </div>
@@ -62,7 +65,7 @@ import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 export default defineComponent({
   components: {
     MonacoMarkdownEditor: defineAsyncComponent(
-      () => import("./MonacoMarkdownEditor.vue")
+      () => import("./MonacoMarkdownEditor.vue"),
     ),
     MarkdownRenderer,
   },
@@ -71,6 +74,10 @@ export default defineComponent({
     modelValue: {
       type: String,
       default: "",
+    },
+    initialVariableValues: {
+      type: Object,
+      default: () => ({}),
     },
   },
   setup(props, { emit }): any {
