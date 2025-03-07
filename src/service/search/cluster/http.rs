@@ -89,7 +89,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let ret = flight::search(&trace_id, sql.clone(), req, query).await;
 
-    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err) = match ret {
+    let (merge_batches, scan_stats, took_wait, is_partial, idx_took, partial_err, time_range_adjusted) = match ret {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
@@ -97,8 +97,12 @@ pub async fn search(
         }
     };
 
-    // final result
+    // Indicate time range adjustments in response if needed
     let mut result = search::Response::new(sql.offset, sql.limit);
+    if time_range_adjusted {
+        log::info!("[trace_id {trace_id}] http->search: time range was adjusted due to scan size limits. setting partial data flag");
+        result.set_partial(is_partial, "Time range adjusted due to scan size limits".to_string());
+    }
 
     // hits
     if !merge_batches.is_empty() {

@@ -78,7 +78,7 @@ pub async fn search(
     sql: Arc<Sql>,
     mut req: Request,
     query: SearchQuery,
-) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String, bool)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
@@ -95,7 +95,7 @@ pub async fn search(
         .iter()
         .any(|(_, schema)| schema.schema().fields().is_empty())
     {
-        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string()));
+        return Ok((vec![], ScanStats::new(), 0, false, 0, "".to_string(), false));
     }
 
     // 1. get file id list
@@ -108,6 +108,67 @@ pub async fn search(
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
+    let total_scan_size = file_id_list_vec.iter().map(|v| v.original_size).sum::<u64>();
+    
+    // Check if scan size exceeds the limit (convert MB to bytes)
+    let max_scan_size_bytes = cfg.limit.max_scan_size * 1024 * 1024;
+    let mut time_range_adjusted = false;
+
+    if total_scan_size > max_scan_size_bytes {
+        log::warn!(
+            "[trace_id {trace_id}] flight->search: total scan size is too large: {} MB, allowed: {} MB",
+            total_scan_size / 1024 / 1024,
+            cfg.limit.max_scan_size
+        );
+
+        // Check if we have a time range we can adjust
+        if let Some((start_time, end_time)) = sql.time_range {
+            // Calculate the reduction percentage needed
+            let reduction_ratio = max_scan_size_bytes as f64 / total_scan_size as f64;
+            let time_range = end_time - start_time;
+            let adjusted_time_range = (time_range as f64 * reduction_ratio) as i64;
+            let new_start_time = end_time - adjusted_time_range;
+            
+            log::info!(
+                "[trace_id {trace_id}] flight->search: reducing time range from {:?} to ({}, {})",
+                sql.time_range,
+                new_start_time,
+                end_time
+            );
+            
+            // Adjust the time range in the SQL object
+            if let Some(sql_mut) = Arc::get_mut(&mut sql) {
+                sql_mut.time_range = Some((new_start_time, end_time));
+                time_range_adjusted = true;
+                
+                // Re-fetch file lists with the new time range
+                let file_id_list = get_file_id_lists(
+                    &sql.org_id,
+                    sql.stream_type,
+                    &sql.stream_names,
+                    sql.time_range,
+                )
+                .await?;
+                
+                let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
+                let adjusted_total_scan_size = file_id_list_vec.iter().map(|v| v.original_size).sum::<u64>();
+                
+                log::info!(
+                    "[trace_id {trace_id}] flight->search: adjusted scan size: {} MB", 
+                    adjusted_total_scan_size / 1024 / 1024
+                );
+            } else {
+                log::warn!(
+                    "[trace_id {trace_id}] flight->search: unable to adjust time range due to multiple references to SQL object"
+                );
+            }
+        } else {
+            log::warn!(
+                "[trace_id {trace_id}] flight->search: cannot adjust time range - no time range specified"
+            );
+        }
+    }
+    
     log::info!(
         "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
         sql.time_range,
@@ -332,6 +393,7 @@ pub async fn search(
         !partial_err.is_empty(),
         idx_took,
         partial_err,
+        time_range_adjusted,
     ))
 }
 
