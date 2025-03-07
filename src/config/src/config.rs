@@ -192,6 +192,35 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 5] = [
+    "k8s_cluster",
+    "k8s_namespace_name",
+    "k8s_pod_name",
+    "kubernetes_namespace_name",
+    "kubernetes_pod_name",
+];
+pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let mut fields = chain(
+        _DEFAULT_SEARCH_AROUND_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .search_around_default_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
+});
+
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
     let mut map = HashMap::default();
     let streams: Vec<String> = get_config()
@@ -707,6 +736,12 @@ pub struct Common {
         help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
     )]
     pub bloom_filter_ndv_ratio: u64,
+    #[env_config(
+        name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
+        default = "",
+        help = "Comma separated list of fields to use for search around"
+    )]
+    pub search_around_default_fields: String,
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
     #[env_config(
