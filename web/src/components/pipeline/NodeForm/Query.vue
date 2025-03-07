@@ -372,7 +372,7 @@ const saveQueryData = async () => {
       promql_condition: null,
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
-      search_event_type: "DerivedStream",
+      search_event_type: "derivedstream",
     },
     trigger_condition: {
       // same as before

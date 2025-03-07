@@ -680,7 +680,7 @@ export default defineComponent({
             query: req,
             page_type: "traces",
           },
-          "UI"
+          "ui"
         )
         .then((res) => {
           searchObj.data.traceDetails.spanList = res.data?.hits || [];

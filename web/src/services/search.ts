@@ -34,7 +34,7 @@ const search = {
       dashboard_id?: string;
       folder_id?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -237,7 +237,7 @@ const search = {
       page_type: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -257,7 +257,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -277,7 +277,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -297,7 +297,7 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -317,7 +317,7 @@ const search = {
       page_type: string;
       traceparent?: string;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -341,7 +341,7 @@ const search = {
       traceparent?: string;
       query: any;
     },
-    search_type: string = "UI",
+    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const { size, from } = query.query;
