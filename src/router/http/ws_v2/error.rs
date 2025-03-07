@@ -42,6 +42,12 @@ pub enum WsError {
     #[error("Querier not available: {0}")]
     QuerierNotAvailable(String),
 
+    #[error("Querier http url {0} not valid")]
+    QuerierUrlInvalid(String),
+
+    #[error("Querier WS url error: {0}")]
+    QuerierWSUrlError(String),
+
     #[error("Circuit breaker open for querier: {0}")]
     CircuitBreakerOpen(String),
 
@@ -60,6 +66,8 @@ impl ResponseError for WsError {
             WsError::SessionError(_) => StatusCode::BAD_REQUEST,
             WsError::SessionNotFound(_) => StatusCode::BAD_REQUEST,
             WsError::MessageError(_) => StatusCode::BAD_REQUEST,
+            WsError::QuerierUrlInvalid(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            WsError::QuerierWSUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::QuerierNotAvailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::CircuitBreakerOpen(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::Timeout(_) => StatusCode::REQUEST_TIMEOUT,

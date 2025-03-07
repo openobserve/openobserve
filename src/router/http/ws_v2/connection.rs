@@ -15,13 +15,16 @@
 
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI64, Ordering},
 };
 
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use config::{RwAHashMap, utils::json};
-use futures_util::{SinkExt, StreamExt, stream::SplitSink};
+use futures_util::{
+    SinkExt, StreamExt,
+    stream::{SplitSink, SplitStream},
+};
 use reqwest::header::{HeaderName, HeaderValue};
 use tokio::{
     net::TcpStream,
@@ -36,6 +39,7 @@ use tokio_tungstenite::{
 };
 
 use crate::{
+    common::infra::cluster,
     router::http::ws_v2::{error::*, types::*},
     service::websocket_events::{WsClientEvents, WsServerEvents},
 };
@@ -44,7 +48,7 @@ type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[async_trait]
 pub trait Connection: Send + Sync {
-    async fn connect(&self) -> WsResult<()>;
+    async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>>;
     async fn disconnect(&self);
     async fn send_message(&self, message: StreamMessage) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
@@ -54,7 +58,6 @@ pub trait Connection: Send + Sync {
 #[derive(Debug)]
 pub struct QuerierConnection {
     querier_name: QuerierName,
-    url: String,
     write: Arc<Mutex<Option<SplitSink<WsStreamType, WsMessage>>>>,
     shutdown_tx: Sender<()>,
     response_router: Arc<ResponseRouter>,
@@ -67,70 +70,51 @@ pub struct ResponseRouter {
     routes: RwAHashMap<TraceId, Sender<StreamMessage>>,
 }
 
+type SocketWriter = Arc<
+    Mutex<
+        Option<
+            SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::protocol::Message>,
+        >,
+    >,
+>;
+
+pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<QuerierConnection>> {
+    // Get querier info from cluster
+    let node = cluster::get_cached_node_by_name(querier_name)
+        .await
+        .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.clone()))?;
+
+    // // Convert HTTP URL to WebSocket URL
+    // let ws_url = crate::router::http::ws::convert_to_websocket_url(&node.http_addr)
+    //     .map_err(|e| WsError::ConnectionError(e))?;
+
+    let conn = QuerierConnection::connect(&node.name, &node.http_addr).await?;
+    Ok(conn)
+}
+
 impl QuerierConnection {
-    pub async fn establish_connection(
-        querier_name: QuerierName,
-        url: String,
-    ) -> WsResult<Arc<Self>> {
-        // Connect to querier
-        // FIXME: This needs req to call connect_async "ws://192.168.1.6:5070/"
-        let url = format!("{}api/default/ws/v2/123456789", url);
-        let mut req = match url.clone().into_client_request() {
-            Ok(req) => req,
-            Err(e) => return Err(WsError::ConnectionError(e.to_string())),
-        };
+    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
+        self.response_router
+            .register_request(trace_id, response_tx)
+            .await
+    }
 
-        // Properly encode credentials
-        let credentials = "root@example.com:Complexpass#123";
-        let auth_header = format!("Basic {}", BASE64.encode(credentials));
-
-        // Add auth header
-        req.headers_mut().insert(
-            HeaderName::from_static("authorization"),
-            HeaderValue::from_str(&auth_header)
-                .map_err(|e| WsError::ConnectionError(e.to_string()))?,
+    fn update_last_active(&self) {
+        self.last_active.store(
+            chrono::Utc::now().timestamp_micros(),
+            std::sync::atomic::Ordering::SeqCst,
         );
-        // Add hearder upgrade websocket
-        req.headers_mut().insert(
-            HeaderName::from_static("upgrade"),
-            HeaderValue::from_str("websocket")
-                .map_err(|e| WsError::ConnectionError(e.to_string()))?,
-        );
+    }
 
-        // Router -> Querier
-        let (ws_stream, _) = connect_async(req).await.map_err(|e| {
-            log::error!(
-                "[WS::QuerierConnection] error connecting to querier {}: {}",
-                url,
-                e
-            );
-            WsError::ConnectionError(e.to_string())
-        })?;
-        let (write, mut read) = ws_stream.split();
-        let write = Arc::new(Mutex::new(Some(write)));
-
-        // Signal to shutdown
-        let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
-
-        // Setting up components needed for the two tasks
-        let response_router = ResponseRouter::new();
-        let is_connected = Arc::new(AtomicBool::new(true));
-        let is_connected_health_task = is_connected.clone();
-        let querier_name_cp_t1 = querier_name.clone();
-        let querier_name_cp_t2 = querier_name.clone();
-
-        let conn: Arc<QuerierConnection> = Arc::new(Self {
-            querier_name,
-            url: url.to_string(),
-            write: write.clone(),
-            shutdown_tx,
-            response_router: response_router.clone(),
-            is_connected: is_connected.clone(),
-            last_active: std::sync::atomic::AtomicI64::new(chrono::Utc::now().timestamp_micros()),
-        });
-
-        // Receive messages from querier and route them to the client
-        let conn_clone = conn.clone();
+    async fn listen_to_querier_response(
+        conn: Arc<QuerierConnection>,
+        mut read: SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+        write: SocketWriter,
+        response_router: Arc<ResponseRouter>,
+        is_connected: Arc<AtomicBool>,
+        mut shutdown_rx: tokio::sync::mpsc::Receiver<()>,
+        querier_name: String,
+    ) {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -139,23 +123,23 @@ impl QuerierConnection {
                             Ok(msg) => {
                                 match msg {
                                     tungstenite::protocol::Message::Close(reason) => {
-                                        log::info!("[WS::QuerierConnection] received close message: {:?}", reason);
+                                        log::debug!("[WS::QuerierConnection] received close message: {:?}", reason);
                                     }
                                     tungstenite::protocol::Message::Ping(ping) => {
-                                        log::info!("[WS::QuerierConnection] received ping message: {:?}", ping);
+                                        log::debug!("[WS::QuerierConnection] received ping message: {:?}", ping);
                                         let pong = tungstenite::protocol::Message::Pong(ping);
                                         let write_clone = write.clone();
                                         let mut write_guard = write_clone.lock().await;
                                         if let Some(write) = write_guard.as_mut() {
                                             let _ = write.send(pong).await;
                                         }
-                                        conn_clone.update_last_active();
+                                        conn.update_last_active();
                                     }
                                     tungstenite::protocol::Message::Pong(pong) => {
-                                        log::info!("[WS::QuerierConnection] received pong message: {:?}", pong);
+                                        log::debug!("[WS::QuerierConnection] received pong message: {:?}", pong);
                                     }
                                     tungstenite::protocol::Message::Binary(binary) => {
-                                        log::info!("[WS::QuerierConnection] received binary message: {:?}", binary);
+                                        log::debug!("[WS::QuerierConnection] received binary message: {:?}", binary);
                                     }
                                     msg => {
                                             log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
@@ -208,27 +192,31 @@ impl QuerierConnection {
             }
 
             log::info!(
-                "[WS::QuerierConnection] connection to querier {querier_name_cp_t1} response handler stopped."
+                "[WS::QuerierConnection] connection to querier {querier_name} response handler stopped."
             );
         });
+    }
 
-        // Spawn health check task
-        let conn_clone = conn.clone();
+    async fn health_check(
+        conn: Arc<QuerierConnection>,
+        is_connected: Arc<AtomicBool>,
+        querier_name: String,
+    ) {
         tokio::spawn(async move {
             // TODO: configurable duration interval
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
 
             loop {
                 interval.tick().await;
-                let mut write_guard = conn_clone.write.lock().await;
+                let mut write_guard = conn.write.lock().await;
                 match write_guard.as_mut() {
                     None => {
-                        is_connected_health_task.store(false, Ordering::SeqCst);
+                        is_connected.store(false, Ordering::SeqCst);
                         break;
                     }
                     Some(w) => {
                         if w.send(WsMessage::Ping(vec![])).await.is_err() {
-                            is_connected_health_task.store(false, Ordering::SeqCst);
+                            is_connected.store(false, Ordering::SeqCst);
                             break;
                         }
                     }
@@ -236,24 +224,9 @@ impl QuerierConnection {
             }
 
             log::warn!(
-                "[WS:QuerierConnection] connection to querier {querier_name_cp_t2} health check failed, marked disconnected"
+                "[WS:QuerierConnection] connection to querier {querier_name} health check failed, marked disconnected"
             );
         });
-
-        Ok(conn)
-    }
-
-    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
-        self.response_router
-            .register_request(trace_id, response_tx)
-            .await
-    }
-
-    fn update_last_active(&self) {
-        self.last_active.store(
-            chrono::Utc::now().timestamp_micros(),
-            std::sync::atomic::Ordering::SeqCst,
-        );
     }
 }
 
@@ -309,16 +282,57 @@ impl ResponseRouter {
 
 #[async_trait]
 impl Connection for QuerierConnection {
-    async fn connect(&self) -> WsResult<()> {
-        let mut write_guard = self.write.lock().await;
-        if write_guard.is_none() {
-            let (ws_stream, _) = connect_async(&self.url)
-                .await
-                .map_err(|e| WsError::ConnectionError(e.to_string()))?;
-            let (write, _) = ws_stream.split();
-            *write_guard = Some(write);
-        }
-        Ok(())
+    async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>> {
+        let ws_req = get_default_querier_request(http_url)?;
+
+        // Router -> Querier
+        let (ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
+            log::error!(
+                "[WS::QuerierConnection] error connecting to querier {}: {}",
+                http_url,
+                e
+            );
+            WsError::ConnectionError(e.to_string())
+        })?;
+        let (write, mut read) = ws_stream.split();
+        let write = Arc::new(Mutex::new(Some(write)));
+
+        // Signal to shutdown
+        let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
+
+        // Setting up components needed for the two tasks
+        let response_router = ResponseRouter::new();
+        let response_router_t1 = response_router.clone();
+        let is_connected = Arc::new(AtomicBool::new(true));
+        let is_connected_t1 = is_connected.clone();
+        let is_connected_t2 = is_connected.clone();
+        let querier_name_cp_t1 = node_name.to_string();
+        let querier_name_cp_t2 = node_name.to_string();
+
+        let conn: Arc<QuerierConnection> = Arc::new(Self {
+            querier_name: node_name.to_string(),
+            write: write.clone(),
+            shutdown_tx,
+            response_router,
+            is_connected,
+            last_active: AtomicI64::new(chrono::Utc::now().timestamp_micros()),
+        });
+
+        // Spawn task to listen to querier responses
+        Self::listen_to_querier_response(
+            conn.clone(),
+            read,
+            write,
+            response_router_t1,
+            is_connected_t1,
+            shutdown_rx,
+            querier_name_cp_t1,
+        );
+
+        // Spawn health check task
+        Self::health_check(conn.clone(), is_connected_t2, querier_name_cp_t2);
+
+        Ok(conn)
     }
 
     async fn disconnect(&self) {
@@ -376,4 +390,59 @@ impl Connection for QuerierConnection {
     fn get_name(&self) -> &QuerierName {
         &self.querier_name
     }
+}
+
+/// Helper function to create a mock request used to establish websocket connection with querier
+fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Request<()>> {
+    let mut parsed_url = match url::Url::parse(http_url) {
+        Ok(url) => url,
+        Err(e) => return Err(WsError::QuerierUrlInvalid(http_url.into())),
+    };
+
+    // Check the scheme and update it accordingly
+    match parsed_url.scheme() {
+        "http" => {
+            parsed_url
+                .set_scheme("ws")
+                .map_err(|_| WsError::QuerierWSUrlError("Failed to set scheme to ws".into()))?;
+        }
+        "https" => {
+            parsed_url
+                .set_scheme("wss")
+                .map_err(|_| WsError::QuerierWSUrlError("Failed to set scheme to wss".into()))?;
+        }
+        other_schema => {
+            return Err(WsError::QuerierWSUrlError(format!(
+                "Unsupported URL scheme: {}",
+                other_schema
+            )));
+        }
+    }
+
+    let parsed_url = parsed_url.to_string() + "api/ws/v2";
+
+    let mut ws_req = parsed_url
+        .into_client_request()
+        .map_err(|e| WsError::ConnectionError(e.to_string()))?;
+
+    let cfg = config::get_config();
+    // TODO: confirm it's okay use root user cred and can always be accepted by querier
+    let credentials = format!(
+        "{}:{}",
+        &cfg.auth.root_user_email, &cfg.auth.root_user_password
+    );
+    let auth_header = format!("Basic {}", BASE64.encode(credentials));
+
+    // additional headers to the req
+    ws_req.headers_mut().insert(
+        HeaderName::from_static("authorization"),
+        HeaderValue::from_str(&auth_header).map_err(|e| WsError::ConnectionError(e.to_string()))?,
+    );
+    // Add hearder upgrade websocket
+    ws_req.headers_mut().insert(
+        HeaderName::from_static("upgrade"),
+        HeaderValue::from_str("websocket").map_err(|e| WsError::ConnectionError(e.to_string()))?,
+    );
+
+    Ok(ws_req)
 }

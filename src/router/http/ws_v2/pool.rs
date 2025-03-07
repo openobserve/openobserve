@@ -23,7 +23,6 @@ use super::{
     error::*,
     types::*,
 };
-use crate::common::infra::cluster;
 
 #[derive(Debug)]
 pub struct QuerierConnectionPool {
@@ -53,29 +52,11 @@ impl QuerierConnectionPool {
         }
 
         // Create new connection
-        // can't use the same name
-        let conn = self.create_connection(querier_name).await?;
+        let conn = super::connection::create_connection(querier_name).await?;
         self.connections
             .write()
             .await
             .insert(querier_name.to_string(), conn.clone());
-        Ok(conn)
-    }
-
-    async fn create_connection(
-        &self,
-        querier_name: &QuerierName,
-    ) -> WsResult<Arc<QuerierConnection>> {
-        // Get querier info from cluster
-        let node = cluster::get_cached_node_by_name(querier_name)
-            .await
-            .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.clone()))?;
-
-        // Convert HTTP URL to WebSocket URL
-        let ws_url = crate::router::http::ws::convert_to_websocket_url(&node.http_addr)
-            .map_err(|e| WsError::ConnectionError(e))?;
-
-        let conn = QuerierConnection::establish_connection(querier_name.clone(), ws_url).await?;
         Ok(conn)
     }
 
