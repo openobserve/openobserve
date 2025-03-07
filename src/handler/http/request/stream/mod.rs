@@ -26,6 +26,7 @@ use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
