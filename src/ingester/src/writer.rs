@@ -64,9 +64,7 @@ pub struct Writer {
 
 // check total memory size
 pub fn check_memtable_size() -> Result<()> {
-    let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
-        .with_label_values(&[])
-        .get();
+    let total_mem_size = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get();
     if total_mem_size >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {
