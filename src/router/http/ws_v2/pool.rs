@@ -21,7 +21,7 @@ use super::{
     config::*,
     connection::{Connection, QuerierConnection},
     error::*,
-    types::*,
+    handler::QuerierName,
 };
 
 #[derive(Debug)]

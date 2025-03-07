@@ -17,7 +17,10 @@ use std::collections::{HashMap, HashSet};
 
 use config::{RwAHashMap, ider};
 
-use super::{error::*, types::*};
+use super::{
+    error::*,
+    handler::{ClientId, QuerierName, SessionId, TraceId},
+};
 
 #[derive(Debug, Default)]
 pub struct SessionManager {

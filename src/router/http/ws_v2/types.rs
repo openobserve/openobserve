@@ -130,6 +130,7 @@ impl From<WsServerEvents> for StreamMessage {
                     payload,
                 )
             }
+            #[cfg(feature = "enterprise")]
             WsServerEvents::CancelResponse {
                 trace_id,
                 is_success,

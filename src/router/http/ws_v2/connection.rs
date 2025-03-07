@@ -20,7 +20,7 @@ use std::sync::{
 
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
-use config::{RwAHashMap, utils::json};
+use config::RwAHashMap;
 use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
@@ -40,7 +40,10 @@ use tokio_tungstenite::{
 
 use crate::{
     common::infra::cluster,
-    router::http::ws_v2::{error::*, types::*},
+    router::http::ws_v2::{
+        error::*,
+        handler::{QuerierName, TraceId},
+    },
     service::websocket_events::{WsClientEvents, WsServerEvents},
 };
 
@@ -50,7 +53,7 @@ type WsStreamType = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub trait Connection: Send + Sync {
     async fn connect(node_name: &str, http_url: &str) -> WsResult<Arc<Self>>;
     async fn disconnect(&self);
-    async fn send_message(&self, message: StreamMessage) -> WsResult<()>;
+    async fn send_message(&self, message: WsClientEvents) -> WsResult<()>;
     async fn is_connected(&self) -> bool;
     fn get_name(&self) -> &QuerierName;
 }
@@ -67,29 +70,21 @@ pub struct QuerierConnection {
 
 #[derive(Debug, Default)]
 pub struct ResponseRouter {
-    routes: RwAHashMap<TraceId, Sender<StreamMessage>>,
+    routes: RwAHashMap<TraceId, Sender<WsServerEvents>>,
 }
-
-type SocketWriter = Arc<
-    Mutex<
-        Option<
-            SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::protocol::Message>,
-        >,
-    >,
->;
 
 pub async fn create_connection(querier_name: &QuerierName) -> WsResult<Arc<QuerierConnection>> {
     // Get querier info from cluster
     let node = cluster::get_cached_node_by_name(querier_name)
         .await
-        .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.clone()))?;
+        .ok_or_else(|| WsError::QuerierNotAvailable(querier_name.to_string()))?;
 
     let conn = QuerierConnection::connect(&node.name, &node.http_addr).await?;
     Ok(conn)
 }
 
 impl QuerierConnection {
-    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
+    pub async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
         self.response_router
             .register_request(trace_id, response_tx)
             .await
@@ -135,7 +130,7 @@ impl QuerierConnection {
                                 msg => {
                                         log::debug!("[WS::QuerierConnection] received message: {:?}", msg);
                                         // Convert `tungstenite::protocol::Message` to `StreamMessage`
-                                        let message: StreamMessage = match msg.try_into() {
+                                        let message: WsServerEvents = match msg.try_into() {
                                             Ok(message) => message,
                                             Err(e) => {
                                                 log::error!(
@@ -239,7 +234,7 @@ impl ResponseRouter {
         });
     }
 
-    async fn register_request(&self, trace_id: TraceId, response_tx: Sender<StreamMessage>) {
+    async fn register_request(&self, trace_id: TraceId, response_tx: Sender<WsServerEvents>) {
         self.routes.write().await.insert(trace_id, response_tx);
     }
 
@@ -250,8 +245,8 @@ impl ResponseRouter {
             .retain(|_, response_tx| !response_tx.is_closed());
     }
 
-    pub async fn route_response(&self, message: StreamMessage) -> WsResult<()> {
-        let trace_id = message.trace_id.clone();
+    pub async fn route_response(&self, message: WsServerEvents) -> WsResult<()> {
+        let trace_id = message.get_trace_id();
 
         match self.routes.read().await.get(&trace_id) {
             None => Err(WsError::ResponseChannelNotFound(trace_id.clone())),
@@ -302,13 +297,13 @@ impl Connection for QuerierConnection {
         // Spawn task to listen to querier responses
         let conn_t1 = conn.clone();
         tokio::spawn(async move {
-            conn_t1.listen_to_querier_response(read, shutdown_rx);
+            conn_t1.listen_to_querier_response(read, shutdown_rx).await;
         });
 
         // Spawn health check task
         let conn_t2 = conn.clone();
         tokio::spawn(async move {
-            conn_t2.health_check();
+            conn_t2.health_check().await;
         });
 
         Ok(conn)
@@ -327,16 +322,12 @@ impl Connection for QuerierConnection {
         _ = self.shutdown_tx.send(()).await;
     }
 
-    async fn send_message(&self, message: StreamMessage) -> WsResult<()> {
+    async fn send_message(&self, message: WsClientEvents) -> WsResult<()> {
         let mut write_guard = self.write.lock().await;
         if let Some(write) = write_guard.as_mut() {
-            let trace_id = message.trace_id.clone();
-            // Send `WsClientEvents` to querier
-            let message: WsClientEvents = message
-                .try_into()
-                .map_err(|e| WsError::ConnectionError(e))?;
+            let trace_id = message.get_trace_id();
             // Convert `WsClientEvents` to `tungstenite::protocol::Message`
-            let message = message.into();
+            let message = tungstenite::protocol::Message::from(message);
             match write.send(message).await {
                 Ok(_) => {
                     log::info!(
@@ -375,7 +366,7 @@ impl Connection for QuerierConnection {
 fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Request<()>> {
     let mut parsed_url = match url::Url::parse(http_url) {
         Ok(url) => url,
-        Err(e) => return Err(WsError::QuerierUrlInvalid(http_url.into())),
+        Err(e) => return Err(WsError::QuerierUrlInvalid(e.to_string())),
     };
 
     // Check the scheme and update it accordingly
@@ -398,7 +389,9 @@ fn get_default_querier_request(http_url: &str) -> WsResult<tungstenite::http::Re
         }
     }
 
-    let parsed_url = parsed_url.to_string() + "api/ws/v2";
+    // TODO: v2 ws endpoint should be agnostic from `org` and `12345678`
+    // let parsed_url = parsed_url.to_string() + "api/ws/v2";
+    let parsed_url = parsed_url.to_string() + "api/default/ws/v2/12345678";
 
     let mut ws_req = parsed_url
         .into_client_request()

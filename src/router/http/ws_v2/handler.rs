@@ -24,9 +24,13 @@ use super::{
     error::*,
     pool::QuerierConnectionPool,
     session::SessionManager,
-    types::*,
 };
 use crate::service::websocket_events::{WsClientEvents, WsServerEvents};
+
+pub type SessionId = String;
+pub type ClientId = String;
+pub type QuerierName = String;
+pub type TraceId = String;
 
 #[derive(Debug)]
 pub struct WsHandler {
@@ -58,7 +62,8 @@ impl WsHandler {
         self.session_manager.register_client(&client_id).await;
 
         // Setup message channel
-        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<StreamMessage>(32);
+        // TODO: decide the buffer size for the channel
+        let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(32);
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
@@ -77,16 +82,23 @@ impl WsHandler {
                         Ok(msg) => match msg {
                             actix_ws::Message::Text(text) => {
                                 if let Ok(message) = serde_json::from_str::<WsClientEvents>(&text) {
-                                    let message: StreamMessage = message.into();
+                                    // let message: StreamMessage = message.into();
                                     log::debug!(
                                         "[WS::Router::Handler] received message: {:?}",
                                         message
                                     );
+                                    let trace_id = message.get_trace_id();
+                                    let role_group = if let WsClientEvents::Search(req) = &message {
+                                        Some(RoleGroup::from(req.search_type.clone()))
+                                    } else {
+                                        None
+                                    };
                                     let querier_conn = match get_querier_connection(
                                         session_manager.clone(),
                                         connection_pool.clone(),
                                         &client_id,
-                                        &message,
+                                        &trace_id,
+                                        role_group,
                                     )
                                     .await
                                     {
@@ -99,10 +111,7 @@ impl WsHandler {
                                         Ok(querier_conn) => querier_conn,
                                     };
                                     querier_conn
-                                        .register_request(
-                                            message.trace_id.clone(),
-                                            response_tx.clone(),
-                                        )
+                                        .register_request(trace_id, response_tx.clone())
                                         .await;
 
                                     if let Err(e) = querier_conn.send_message(message).await {
@@ -134,13 +143,6 @@ impl WsHandler {
             // Handle outgoing messages
             let handle_outgoing = async {
                 while let Some(message) = response_rx.recv().await {
-                    let message: WsServerEvents = match message.try_into() {
-                        Ok(message) => message,
-                        Err(e) => {
-                            log::error!("Error converting message to WsServerEvents: {}", e);
-                            continue;
-                        }
-                    };
                     if let Err(e) = ws_session.text(serde_json::to_string(&message)?).await {
                         log::error!("Error sending message to client: {}", e);
                         break;
@@ -180,30 +182,25 @@ pub async fn get_querier_connection(
     session_manager: Arc<SessionManager>,
     connection_pool: Arc<QuerierConnectionPool>,
     client_id: &ClientId,
-    message: &StreamMessage,
+    trace_id: &TraceId,
+    role_group: Option<RoleGroup>,
 ) -> WsResult<Arc<QuerierConnection>> {
+    // TODO: better handle of this retries?
     // Retry max of 3 times to get a valid querier connection
     let max_retries = 1;
     let mut retries = 0;
     loop {
         // Get or assign querier for this trace_id included in message
         let querier_name = match session_manager
-            .get_querier_for_trace(client_id, &message.trace_id)
+            .get_querier_for_trace(client_id, trace_id)
             .await?
         {
             Some(querier_name) => querier_name,
             None => {
-                let role_group =
-                    if let StreamMessageType::Search(search_req) = &message.message_type {
-                        Some(RoleGroup::from(search_req.search_type.clone()))
-                    } else {
-                        None
-                    };
-
                 // use consistent hashing to select querier
-                let querier_name = select_querier(&message.trace_id, role_group).await?;
+                let querier_name = select_querier(trace_id, role_group).await?;
                 session_manager
-                    .set_querier_for_trace(client_id, &message.trace_id, &querier_name)
+                    .set_querier_for_trace(client_id, trace_id, &querier_name)
                     .await?;
                 querier_name
             }

@@ -37,10 +37,9 @@ use crate::service::self_reporting::audit;
 use crate::service::websocket_events::handle_cancel;
 use crate::{
     common::infra::config::WS_SEARCH_REGISTRY,
-    router::http::ws_v2::types::StreamMessage,
+    // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
-        WsClientEvents, WsServerEvents, handle_search_request,
-        search_registry_utils::{self, SearchState},
+        WsClientEvents, WsServerEvents, handle_search_request, search_registry_utils::SearchState,
         sessions_cache_utils,
     },
 };
@@ -246,13 +245,7 @@ pub async fn handle_text_message(
                     );
 
                     let res = handle_cancel(&trace_id, &org_id).await;
-                    let v2_res: StreamMessage = res.clone().into();
-                    let res = if is_v2 {
-                        v2_res.to_json()
-                    } else {
-                        res.to_json()
-                    };
-                    let _ = send_message(req_id, res).await;
+                    let _ = send_message(req_id, res.to_json()).await;
 
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
@@ -398,11 +391,6 @@ async fn handle_search_event(
     let trace_id = search_req.trace_id.clone();
     let trace_id_for_task = trace_id.clone();
     let search_req = search_req.clone();
-    let is_v2 = if path.contains("/ws/v2/") {
-        true
-    } else {
-        false
-    };
 
     #[cfg(feature = "enterprise")]
     let is_audit_enabled = get_o2_config().common.audit_enabled;
@@ -434,7 +422,6 @@ async fn handle_search_event(
                 &org_id,
                 &user_id,
                 search_req.clone(),
-                is_v2,
             ) => {
                 match search_result {
                     Ok(_) => {
@@ -464,7 +451,7 @@ async fn handle_search_event(
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        let _ = handle_search_error(e, &req_id, &trace_id_for_task, is_v2).await;
+                        let _ = handle_search_error(e, &req_id, &trace_id_for_task).await;
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -525,12 +512,7 @@ async fn handle_cancel_event(trace_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn handle_search_error(
-    e: Error,
-    req_id: &str,
-    trace_id: &str,
-    is_v2: bool,
-) -> Option<CloseReason> {
+async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<CloseReason> {
     // if the error is due to search cancellation, return.
     // the cancel handler will close the session
     if let errors::Error::ErrorCode(errors::ErrorCodes::SearchCancelQuery(_)) = e {
@@ -551,13 +533,7 @@ async fn handle_search_error(
     // Send error response
     let err_res =
         WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
-    let res = if is_v2 {
-        let v2_res: StreamMessage = err_res.into();
-        v2_res.to_json()
-    } else {
-        err_res.to_json()
-    };
-    let _ = send_message(req_id, res).await;
+    let _ = send_message(req_id, err_res.to_json()).await;
 
     // Close with error
     let close_reason = CloseReason {

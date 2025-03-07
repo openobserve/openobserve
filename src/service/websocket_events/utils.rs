@@ -14,12 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::meta::websocket::SearchEventReq;
-use infra::{errors, errors::Error};
+use config::{meta::websocket::SearchEventReq, utils::json};
+use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
-
-use crate::router::http::ws_v2::types::{StreamMessage, StreamMessageType};
 
 pub mod enterprise_utils {
     #[allow(unused_imports)]
@@ -312,76 +310,13 @@ impl WsClientEvents {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Failed to serialize WsClientEvents")
     }
-}
 
-impl TryFrom<StreamMessage> for WsClientEvents {
-    type Error = String;
-
-    fn try_from(msg: StreamMessage) -> Result<Self, Self::Error> {
-        match msg.message_type {
-            StreamMessageType::Search(req) => Ok(WsClientEvents::Search(req)),
+    pub fn get_trace_id(&self) -> String {
+        match &self {
+            Self::Search(req) => req.trace_id.clone(),
             #[cfg(feature = "enterprise")]
-            StreamMessageType::Cancel => {
-                let payload: serde_json::Value = msg.payload;
-                Ok(WsClientEvents::Cancel {
-                    trace_id: msg.trace_id,
-                    org_id: payload
-                        .get("org_id")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                })
-            }
-            StreamMessageType::Benchmark => Ok(WsClientEvents::Benchmark { id: msg.trace_id }),
-            _ => Err(format!(
-                "Cannot convert {:?} to WsClientEvents",
-                msg.message_type
-            )),
-        }
-    }
-}
-
-impl TryFrom<StreamMessage> for WsServerEvents {
-    type Error = String;
-
-    fn try_from(msg: StreamMessage) -> Result<Self, <Self as TryFrom<StreamMessage>>::Error> {
-        match msg.message_type {
-            StreamMessageType::SearchResponse {
-                trace_id,
-                results,
-                time_offset,
-                streaming_aggs,
-            } => Ok(WsServerEvents::SearchResponse {
-                trace_id: msg.trace_id,
-                results,
-                time_offset,
-                streaming_aggs,
-            }),
-            StreamMessageType::CancelResponse { is_success, .. } => {
-                Ok(WsServerEvents::CancelResponse {
-                    trace_id: msg.trace_id,
-                    is_success,
-                })
-            }
-            StreamMessageType::Error {
-                code,
-                message,
-                error_detail,
-                request_id,
-                ..
-            } => Ok(WsServerEvents::Error {
-                code,
-                message,
-                error_detail,
-                trace_id: Some(msg.trace_id),
-                request_id,
-            }),
-            StreamMessageType::End { trace_id } => Ok(WsServerEvents::End {
-                trace_id: trace_id.clone(),
-            }),
-            _ => Err(format!(
-                "Cannot convert {:?} to WsServerEvents",
-                msg.message_type
-            )),
+            Self::Cancel(trace_id, ..) => trace_id.clone(),
+            Self::Benchmark { id } => id.clone(),
         }
     }
 }
@@ -450,12 +385,39 @@ impl WsServerEvents {
             },
         }
     }
+
+    // TODO: what to do when there's no trace_id? @Loaki07
+    pub fn get_trace_id(&self) -> String {
+        match &self {
+            Self::SearchResponse { trace_id, .. } => trace_id.to_string(),
+            #[cfg(feature = "enterprise")]
+            Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
+            Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
+            Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+        }
+    }
 }
 
 impl From<WsClientEvents> for tungstenite::protocol::Message {
     fn from(event: WsClientEvents) -> Self {
         let payload = serde_json::to_value(&event).unwrap_or_default();
         tungstenite::protocol::Message::Text(payload.to_string())
+    }
+}
+
+impl TryFrom<tungstenite::protocol::Message> for WsServerEvents {
+    type Error = String;
+
+    fn try_from(value: tungstenite::protocol::Message) -> Result<Self, String> {
+        match value {
+            tungstenite::protocol::Message::Text(text) => {
+                let event: WsServerEvents = json::from_str(&text).map_err(|e| e.to_string())?;
+                Ok(event)
+            }
+            _ => {
+                todo!("Convert `tungstenite::protocol::Message` to `WsServerEvents`")
+            }
+        }
     }
 }
 
