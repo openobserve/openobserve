@@ -145,13 +145,13 @@ impl RemoteScanNode {
         }
     }
 
-    pub fn is_querier(&self, partition: usize) -> bool {
+    pub fn is_file_list_empty(&self, partition: usize) -> bool {
         let file_id_list = if self.search_infos.file_id_list.is_empty() {
             vec![]
         } else {
             self.search_infos.file_id_list[partition].clone()
         };
-        !file_id_list.is_empty()
+        file_id_list.is_empty()
     }
 
     // used in RemoteScanExec
