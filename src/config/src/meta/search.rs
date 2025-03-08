@@ -62,6 +62,9 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>, // used for search job,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_mode: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -507,6 +510,7 @@ impl SearchHistoryRequest {
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
             use_cache: None,
+            local_mode: None,
         };
         Ok(search_req)
     }
@@ -1038,6 +1042,7 @@ impl MultiStreamRequest {
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
                 use_cache: None,
+                local_mode: None,
             });
         }
         res

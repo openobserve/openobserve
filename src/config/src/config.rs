@@ -1783,7 +1783,6 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
-
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");

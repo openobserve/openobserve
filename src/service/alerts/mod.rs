@@ -374,6 +374,7 @@ impl QueryConditionExt for QueryCondition {
                 search_type,
                 search_event_context,
                 use_cache: None,
+                local_mode: None,
             };
             SearchService::search(&trace_id, org_id, stream_type, None, &req).await
         };
