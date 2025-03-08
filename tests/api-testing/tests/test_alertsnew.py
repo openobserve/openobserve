@@ -5,6 +5,7 @@ import pytest
 import requests
 import logging
 import os
+import json
 # # Setup logging
 # logger = logging.getLogger(__name__)
 
@@ -53,7 +54,12 @@ def delete_alert(session, base_url, org, alert_id):
     resp_verify = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
     assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
 
-
+# Folders
+def create_user(session, base_url, org, email_address):
+    payload = {"organization": org,"email": email_address,"password":"12345678","role":"admin"}
+    response = session.post(f"{base_url}api/{org}/users", json=payload)
+    assert response.status_code == 200, f"Failed to create folder: {response.content}"
+    
 
 def create_folder(session, base_url, org, folder_name):
     payload = {"description": "newfoldernvp", "name": folder_name}
@@ -62,7 +68,7 @@ def create_folder(session, base_url, org, folder_name):
     folder_id = response.json().get("folderId")
     return folder_id
 
-def create_template(session, base_url, org, template_name):
+def create_template_webhook(session, base_url, org, template_name):
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
     payload = {
@@ -73,13 +79,47 @@ def create_template(session, base_url, org, template_name):
     }
     response = session.post(f"{base_url}api/{org}/alerts/templates", json=payload, headers=headers)
     assert response.status_code == 200, f"Failed to create template: {response.content}"
+    return response.json()
 
-def create_destination(session, base_url, org, destination_name, template_alert):
+def create_template_email(session, base_url, org, template_name):
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    payload = {
+        "name": template_name,
+        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}', 
+        "type": "email",
+        "title": "Email Alert"
+    }
+    response = session.post(f"{base_url}api/{org}/alerts/templates", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create template: {response.content}"
+    return response.json()
+
+
+
+import json
+
+def create_destination_webhook(session, base_url, org, destination_name, template_alert):
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
     skip_tls_verify_value = False  # Define the skip_tls_verify_value
     payload = {
         "url": "https://jsonplaceholder.typicode.com/todos",
         "method": "get",
+        "template": template_alert,  
+        "headers": {},  # Ensure this is formatted correctly
+        "name": destination_name,
+        "skip_tls_verify": skip_tls_verify_value
+    }
+    response = session.post(f"{base_url}api/{org}/alerts/destinations", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create destination: {response.content}"
+    return response.json()
+
+def create_destination_email(session, base_url, org, destination_name, template_alert, email_address):
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    skip_tls_verify_value = False  # Define the skip_tls_verify_value
+    payload = {
+        "url": "",
+        "type": "email",
+        "emails": [email_address],
+        "method": "post",
         "template": template_alert,
         "headers": {},
         "name": destination_name,
@@ -88,6 +128,7 @@ def create_destination(session, base_url, org, destination_name, template_alert)
     response = session.post(f"{base_url}api/{org}/alerts/destinations", json=payload, headers=headers)
     assert response.status_code == 200, f"Failed to create destination: {response.content}"
     return response.json()
+
 
 def get_destination(session, base_url, org, destination_name):
     response = session.get(f"{base_url}api/{org}/alerts/destinations/{destination_name}")
@@ -309,8 +350,6 @@ def validate_trigger(session, base_url, org, alert_id):
     assert alert_data["last_triggered_at"] is not None, "Alert was not triggered"
     print(f"Alert data: {alert_data}")
     return alert_data   
-
-
     
 
 
@@ -320,71 +359,46 @@ def delete_alert(session, base_url, org, alert_id):
     response = session.delete(f"{base_url}api/v2/{org}/alerts/{alert_id}", headers=headers)
     assert response.status_code == 200, f"Failed to delete alert: {response.content}"
 
-def test_alert_workflow(create_session, base_url):
+def test_create_workflow(create_session, base_url):
     session = create_session
-    stream_name = "default"
-    org = "default"
+    stream_name = "stream_pytest_data"
+    org = "org_pytest_data"
 
     base_url = ZO_BASE_URL
-    base_url_sc = ZO_BASE_URL_SC
     
     # Create folder
     folder_name = f"newfolder_{random.randint(1000, 9999)}"
 
     folder_id = create_folder(session, base_url, org, folder_name)
-
+    email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
+   
+    create_user(session, base_url, org, email_id)
     # Create template
-    template_name = f"newtemp_{random.randint(10000, 99999)}"
-    create_template(session, base_url, org, template_name)
+    template_name_webhook = f"template_webhook_{random.randint(10000, 99999)}"
+    template_name_email = f"template_email_{random.randint(10000, 99999)}"  
+    template_webhook = create_template_webhook(session, base_url, org, template_name_webhook)
+    template_email = create_template_email(session, base_url, org, template_name_email)
+    time.sleep(5)
 
     # Create destination
-    destination_name = f"newdest_{random.randint(10000, 99999)}"
-    create_destination(session, base_url, org, destination_name, template_name)
+    destination_name_webhook = f"newdest_{random.randint(10000, 99999)}"
+    destination_name_email = f"newdest_{random.randint(10000, 99999)}"
+
+    destination_webhook = create_destination_webhook(session, base_url, org, destination_name_webhook, template_name_webhook)
+    destination_email = create_destination_email(session, base_url, org, destination_name_email, template_name_email, email_id)
+    time.sleep(5)
 
     # Now create the alert
-    alert_name = f"newalert_{random.randint(1000, 9999)}"
-    create_alert(session, base_url, org, folder_id, alert_name, template_name, stream_name, destination_name)
+    alert_name_webhook = f"newalert_{random.randint(1000, 9999)}"
+    alert_name_email = f"newalert_{random.randint(1000, 9999)}"
+
+    alert_webhook = create_alert(session, base_url, org, folder_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
+    alert_email =  create_alert(session, base_url, org, folder_id, alert_name_email, template_name_email, stream_name, destination_name_email)
     time.sleep(5)
-    # Ingest logs
-    ingest_logs(session, base_url, org, stream_name)
-
-    # Get alert IDs
-    alert_ids = get_alertsnew(session, base_url, org)
-    alert_ids_sc = get_alertsnew(session, base_url_sc, org)
-
-    # Print the extracted alert IDs
-    for alert_id in alert_ids:
-        print(f"Extracted alert_id: {alert_id}")
-
-    for alert_id in alert_ids_sc:
-        print(f"Extracted alert_id from SC: {alert_id}")
-
-    # Example of using the first alert ID if needed
-    if alert_ids:
-        first_alert_id = alert_ids[0]  # Accessing the first alert ID
-        # Do something with first_alert_id if needed
-        print(f"First alert ID: {first_alert_id}")
-
-    # time.sleep(5)
-    # # Update alert
-    # update_alert(session, base_url_sc, org, first_alert_id, alert_name, template_name, stream_name, destination_name)
-
-
-
-
-
-
+    
+    
 
     
 
-    # # Trigger alert
-    # alertnew_trigger(session, base_url, org, alert_id, caplog)
-
-    # time.sleep(5)
-    # # Update alert
-    # update_alert(session, base_url, org, alert_id, alert_name, template_name, stream_name, destination_name)
-
-    # # # Delete alert
-    # # delete_alert(session, base_url, org, alert_id)
 
     
