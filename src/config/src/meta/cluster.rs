@@ -20,6 +20,9 @@ use serde::{Deserialize, Serialize};
 use crate::{get_config, get_instance_id, meta::search::SearchEventType};
 
 pub trait NodeInfo: Debug + Send + Sync {
+    fn is_querier(&self) -> bool {
+        true
+    }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
 }
@@ -96,6 +99,10 @@ impl Default for Node {
 }
 
 impl NodeInfo for Node {
+    fn is_querier(&self) -> bool {
+        self.is_querier()
+    }
+
     fn get_auth_token(&self) -> String {
         get_internal_grpc_token()
     }
