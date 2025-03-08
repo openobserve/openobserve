@@ -189,7 +189,7 @@ pub(crate) async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: None,local_mode: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -245,7 +245,7 @@ pub(crate) async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
-        use_cache: None,
+        use_cache: None,local_mode: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)

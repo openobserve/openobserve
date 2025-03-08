@@ -111,6 +111,7 @@ impl RemoteScanNodes {
             user_id: self.req.user_id.clone(),
             work_group: self.req.work_group.clone(),
             search_event_type: self.req.search_event_type.clone(),
+            local_mode: self.req.local_mode,
         };
 
         RemoteScanNode {
