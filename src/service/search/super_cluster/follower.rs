@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use config::{
+    cluster::LOCAL_NODE,
     meta::{
         cluster::{IntoArcVec, RoleGroup},
         search::{ScanStats, SearchEventType},
