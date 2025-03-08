@@ -1253,7 +1253,7 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
-    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
         name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
@@ -1724,7 +1724,7 @@ pub fn init() -> Config {
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {
-        cfg.limit.consistent_hash_vnodes = 100;
+        cfg.limit.consistent_hash_vnodes = 1000;
     }
 
     // check for uds
