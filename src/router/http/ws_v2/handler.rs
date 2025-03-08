@@ -64,6 +64,7 @@ impl WsHandler {
         // Setup message channel
         // TODO: decide the buffer size for the channel
         let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(32);
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
@@ -130,9 +131,18 @@ impl WsHandler {
                                 }
                             }
                             actix_ws::Message::Close(_) => {
-                                log::info!("[WS::Router::Handler] client connection closed");
+                                log::info!(
+                                    "[WS::Router::Handler] disconnect signal received from client. Informing handle_outgoing to stop"
+                                );
+                                if let Err(_) = shutdown_tx.send(()) {
+                                    log::error!(
+                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                    );
+                                };
+                                log::info!("[WS::Router::Handler] Stop handle_incoming");
                                 break;
                             }
+                            // TODO: other message types?
                             _ => {}
                         },
                     }
@@ -142,24 +152,31 @@ impl WsHandler {
 
             // Handle outgoing messages
             let handle_outgoing = async {
-                while let Some(message) = response_rx.recv().await {
-                    let should_break = matches!(message, WsServerEvents::End { .. });
-                    let Ok(message_str) = serde_json::to_string(&message) else {
-                        log::error!(
-                            "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
-                        );
-                        continue;
-                    };
-                    if let Err(e) = ws_session.text(message_str).await {
-                        log::error!("Error sending message to client: {}", e);
-                        break;
-                    }
-                    if should_break {
-                        break;
+                loop {
+                    tokio::select! {
+                        Some(message) = response_rx.recv() => {
+                            let Ok(message_str) = serde_json::to_string(&message) else {
+                                log::error!(
+                                    "[WS::Handler]: error convert WsServerEvents to string before sending back to client "
+                                );
+                                continue;
+                            };
+                            if let Err(e) = ws_session.text(message_str).await {
+                                log::error!("Error sending message to client: {}", e);
+                                break;
+                            }
+                        }
+                        _ = &mut shutdown_rx => {
+                            log::debug!(
+                                "[WS::Handler]: disconnect signal received from client. handle_outgoing stopped"
+                            );
+                            break;
+                        }
                     }
                 }
                 // TODO: need to close client websocket connection?
                 _ = ws_session.close(None).await;
+                log::debug!("[WS::Handler]: client ws closed");
                 Ok::<_, Error>(())
             };
 
