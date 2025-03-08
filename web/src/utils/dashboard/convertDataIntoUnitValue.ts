@@ -632,7 +632,7 @@ const validateChartFieldsConfiguration = (
  * @param {array} errors - Array to collect errors
  * @param {boolean} isFieldsValidationRequired - Whether field validation is required
  */
-const validateSQLPanelFields = (
+export const validateSQLPanelFields = (
   panelData: any,
   queryIndex: number,
   currentXLabel: string,
