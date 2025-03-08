@@ -235,7 +235,7 @@ const defaultObject = {
     functionError: "",
     searchRequestTraceIds: <string[]>[],
     searchWebSocketRequestIdsAndTraceIds: <
-      { requestId: string; traceId: string }[]
+      { traceId: string }[]
     >[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
@@ -4330,17 +4330,16 @@ const useLogs = () => {
       );
   };
 
-  const addRequestId = (requestId: string, traceId: string) => {
+  const addRequestId = (traceId: string) => {
     searchObj.data.searchWebSocketRequestIdsAndTraceIds.push({
-      requestId,
       traceId,
     });
   };
 
-  const removeRequestId = (requestId: string) => {
+  const removeRequestId = (traceId: string) => {
     searchObj.data.searchWebSocketRequestIdsAndTraceIds =
       searchObj.data.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id) => id.requestId !== requestId,
+        (id) => id.traceId !== traceId,
       );
   };
 
@@ -4844,7 +4843,7 @@ const useLogs = () => {
         throw new Error("Failed to initialize WebSocket connection");
       }
 
-      addRequestId(requestId, payload.traceId);
+      addRequestId(payload.traceId);
     } catch (e: any) {
       console.error("Error while getting data through web socket", e);
       searchObj.loading = false;
@@ -4892,10 +4891,10 @@ const useLogs = () => {
     }) as string;
   };
 
-  const sendSearchMessage = (requestId: string, queryReq: any) => {
+  const sendSearchMessage = (queryReq: any) => {
     try {
       if (searchObj.data.isOperationCancelled) {
-        closeSocketBasedOnRequestId(requestId);
+        closeSocketBasedOnRequestId(queryReq.traceId);
         return;
       }
 
@@ -4909,6 +4908,7 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
+          org_id: searchObj.organizationIdentifier,
         },
       };
 
@@ -4920,7 +4920,7 @@ const useLogs = () => {
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
       }
 
-      sendSearchMessageBasedOnRequestId(requestId, payload);
+      sendSearchMessageBasedOnRequestId(payload);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4938,7 +4938,6 @@ const useLogs = () => {
 
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (
-    requestId: string,
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
@@ -4974,7 +4973,7 @@ const useLogs = () => {
     }
 
     if (response.type === "error") {
-      handleSearchError(requestId, payload.traceId, response);
+      handleSearchError(payload.traceId, response);
     }
 
     if (response.type === "cancel_response") {
@@ -5312,7 +5311,7 @@ const useLogs = () => {
         );
         const requestId = initializeWebSocketConnection(payload);
 
-        addRequestId(requestId, payload.traceId);
+        addRequestId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -5378,11 +5377,10 @@ const useLogs = () => {
   }
 
   const handleSearchClose = (
-    requestId: string,
     payload: any,
     response: any,
   ) => {
-    if (requestId) removeRequestId(requestId);
+    if (payload.traceId) removeRequestId(payload.traceId);
 
     // Any case where below logic may end in recursion
     if (payload.traceId) delete searchPartitionMap[payload.traceId];
@@ -5414,12 +5412,12 @@ const useLogs = () => {
         setTimeout(() => {
           const requestId = initializeWebSocketConnection(payload);
 
-          addRequestId(requestId, payload.traceId);
+          addRequestId(payload.traceId);
         }, maxSearchRetries);
 
         return;
       } else {
-        handleSearchError(requestId, payload, {
+        handleSearchError(payload, {
           content: {
             message:
               "WebSocket connection terminated unexpectedly. Please check your network and try again",
@@ -5454,7 +5452,6 @@ const useLogs = () => {
   };
 
   const handleSearchError = (
-    requestId: string,
     request: any,
     err: WebSocketErrorResponse,
   ) => {
@@ -5614,7 +5611,7 @@ const useLogs = () => {
 
     const requestId = initializeWebSocketConnection(payload);
 
-    addRequestId(requestId, payload.traceId);
+    addRequestId(payload.traceId);
   };
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
@@ -5627,8 +5624,8 @@ const useLogs = () => {
       searchObj.data.isOperationCancelled = true;
 
       // loop on all requestIds
-      searchRequests.forEach(({ requestId, traceId }) => {
-        cancelSearchQueryBasedOnRequestId(requestId, traceId);
+      searchRequests.forEach(({ traceId }) => {
+        cancelSearchQueryBasedOnRequestId(traceId);
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
