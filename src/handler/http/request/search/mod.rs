@@ -783,6 +783,7 @@ async fn values_v1(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: Some(use_cache),
+        local_mode: None,
     };
 
     // skip fields which aren't part of the schema

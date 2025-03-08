@@ -18,7 +18,9 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT, get_config,
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
+    cluster::LOCAL_NODE,
+    get_config,
     meta::{
         bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
@@ -143,8 +145,6 @@ pub async fn search(
         nodes = vec![LOCAL_NODE.clone()];
     }
 
-
-    
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
     if querier_num == 0 {
         log::error!("no querier node online");

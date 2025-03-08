@@ -103,7 +103,6 @@ impl Request {
         self.streaming_id = streaming_id;
     }
 
-
     pub fn set_local_mode(&mut self, local_mode: Option<bool>) {
         self.local_mode = local_mode;
     }

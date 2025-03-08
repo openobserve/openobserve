@@ -509,7 +509,8 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
-            use_cache: None,local_mode: None,
+            use_cache: None,
+            local_mode: None,
         };
         Ok(search_req)
     }
@@ -1040,7 +1041,8 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
-                use_cache: None,local_mode: None,
+                use_cache: None,
+                local_mode: None,
             });
         }
         res

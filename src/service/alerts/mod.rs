@@ -376,7 +376,8 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
-                use_cache: None,local_mode: None,
+                use_cache: None,
+                local_mode: None,
             };
             log::debug!(
                 "evaluate_scheduled begin to call SearchService::search, {:?}",

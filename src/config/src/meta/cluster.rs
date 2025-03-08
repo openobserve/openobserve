@@ -132,8 +132,8 @@ impl NodeInfo for Node {
     fn is_querier(&self) -> bool {
         self.is_querier()
     }
-    
-     fn get_auth_token(&self) -> String {
+
+    fn get_auth_token(&self) -> String {
         get_internal_grpc_token()
     }
 

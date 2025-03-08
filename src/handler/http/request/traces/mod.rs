@@ -296,7 +296,8 @@ pub async fn get_latest_traces(
         timeout,
         search_type: None,
         search_event_context: None,
-        use_cache: None,local_mode: None,
+        use_cache: None,
+        local_mode: None,
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req
