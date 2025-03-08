@@ -375,6 +375,7 @@ pub struct Config {
     pub rum: RUM,
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
+    pub health_check: HealthCheck,
 }
 
 #[derive(EnvConfig)]
@@ -1614,6 +1615,24 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
+#[derive(EnvConfig)]
+pub struct HealthCheck {
+    #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_TIMEOUT",
+        default = 5,
+        help = "Health check timeout in seconds"
+    )]
+    pub timeout: u64,
+    #[env_config(
+        name = "ZO_HEALTH_CHECK_FAILED_TIMES",
+        default = 3,
+        help = "The node will be removed from consistent hash if health check failed exceed this times"
+    )]
+    pub failed_times: usize,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1762,6 +1781,12 @@ pub fn init() -> Config {
     // check sns config
     if let Err(e) = check_sns_config(&mut cfg) {
         panic!("sns config error: {e}");
+    }
+
+
+    // check health check config
+    if let Err(e) = check_health_check_config(&mut cfg) {
+        panic!("health check config error: {e}");
     }
 
     cfg
@@ -2309,6 +2334,16 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
 
+    Ok(())
+}
+
+fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.health_check.timeout == 0 {
+        cfg.health_check.timeout = 5;
+    }
+    if cfg.health_check.failed_times == 0 {
+        cfg.health_check.failed_times = 3;
+    }
     Ok(())
 }
 
