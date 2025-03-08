@@ -86,7 +86,7 @@ const useSearchWebSocket = () => {
       org_id: string;
     },
     handlers: {
-      open: (data: any) => void;
+      open: (data: any, response: any) => void;
       message: (data: any, response: any) => void;
       close: (data: any, response: any) => void;
       error: (data: any, response: any) => void;
@@ -109,7 +109,7 @@ const useSearchWebSocket = () => {
       } else if(isCreatingSocket.value){
         openHandlers.push(handlers.open.bind(null, data))
       } else {
-        handlers.open(data);
+        handlers.open(data, null);
       }
  
     
@@ -124,7 +124,7 @@ const useSearchWebSocket = () => {
 
   const sendSearchMessageBasedOnRequestId = (data: any) => {
     try {
-      webSocket.sendMessage(socketId.value, JSON.stringify(data));
+      webSocket.sendMessage(socketId.value as string, JSON.stringify(data));
     } catch (error: any) {
       console.error(
         `Failed to send WebSocket message: ${error instanceof Error ? error.message : String(error)}`,
@@ -135,11 +135,11 @@ const useSearchWebSocket = () => {
   const cancelSearchQueryBasedOnRequestId = (
     trace_id: string,
   ) => {
-    const socket = webSocket.getWebSocketBasedOnSocketId(socketId.value);
+    const socket = webSocket.getWebSocketBasedOnSocketId(socketId.value as string);
     // check state of socket
     if (socket && socket.readyState === WebSocket.OPEN) {
       webSocket.sendMessage(
-        socketId.value,
+        socketId.value as string,
         JSON.stringify({
           type: "cancel",
           content: {
