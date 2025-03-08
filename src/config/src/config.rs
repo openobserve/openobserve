@@ -2540,10 +2540,10 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
-        cfg.health_check.timeout = 10;
+        cfg.health_check.timeout = 5;
     }
     if cfg.health_check.failed_times == 0 {
-        cfg.health_check.failed_times = 5;
+        cfg.health_check.failed_times = 3;
     }
     Ok(())
 }

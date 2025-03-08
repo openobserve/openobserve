@@ -172,7 +172,9 @@ pub async fn search(
     if in_req.query.streaming_output {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
     }
-    log::info!("[{trace_id}] request sql : {}", query.sql.clone());
+    if let Some(v) = in_req.local_mode {
+        request.set_local_mode(Some(v));
+    }
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }

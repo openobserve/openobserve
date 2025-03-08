@@ -2689,6 +2689,9 @@ pub struct SuperClusterInfo {
     /// use for super cluster
     #[prost(string, optional, tag = "4")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
+    /// use for super cluster
+    #[prost(bool, optional, tag = "5")]
+    pub local_mode: ::core::option::Option<bool>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

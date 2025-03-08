@@ -419,6 +419,8 @@ pub async fn around_v1(
     path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -437,16 +439,43 @@ pub async fn around_v1(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
-    around::around(
-        trace_id,
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let ret = around::around(
+        &trace_id,
         http_span,
-        org_id,
-        stream_name,
+        &org_id,
+        &stream_name,
+        stream_type,
         query,
+        None,
         None,
         user_id,
     )
-    .await
+    .await;
+    match ret {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(err) => {
+            http_report_metrics(start, &org_id, stream_type, "500", "_around");
+            log::error!("search around error: {:?}", err);
+            Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_trace_id(
+                            code,
+                            Some(trace_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    ),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            })
+        }
+    }
 }
 
 /// SearchAroundV2
@@ -509,6 +538,8 @@ pub async fn around_v2(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+
     let (org_id, stream_name) = path.into_inner();
     let http_span = if get_config().common.tracing_search_enabled {
         tracing::info_span!(
@@ -527,16 +558,43 @@ pub async fn around_v2(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
-    around::around(
-        trace_id,
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let ret = around::around(
+        &trace_id,
         http_span,
-        org_id,
-        stream_name,
+        &org_id,
+        &stream_name,
+        stream_type,
         query,
+        None,
         Some(body),
         user_id,
     )
-    .await
+    .await;
+    match ret {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(err) => {
+            http_report_metrics(start, &org_id, stream_type, "500", "_around");
+            log::error!("search around error: {:?}", err);
+            Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_trace_id(
+                            code,
+                            Some(trace_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    ),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            })
+        }
+    }
 }
 
 /// SearchTopNValues
@@ -783,6 +841,7 @@ async fn values_v1(
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
         use_cache: Some(use_cache),
+        local_mode: None,
     };
 
     // skip fields which aren't part of the schema
