@@ -199,9 +199,23 @@ export class CipherKeys {
     }
 
       async verifyAlertMessage(expectedText) {
+        await this.alert.waitFor({ state: 'visible' });
+        const timeout = 10000; // Total time to wait
+        const interval = 500; // Interval to check
+        let elapsed = 0;
     
-        await expect(this.alert).toContainText(expectedText);
-      }
+        while (elapsed < timeout) {
+            const alertText = await this.alert.textContent();
+            if (alertText.includes(expectedText)) {
+                return; // Expected text found
+            }
+            await new Promise(resolve => setTimeout(resolve, interval));
+            elapsed += interval;
+        }
+    
+        // If we reach here, the expected text was not found
+        throw new Error(`Expected alert message "${expectedText}" not found within ${timeout}ms.`);
+    }
     
       async signOut() {
         await this.profileButton.click();
