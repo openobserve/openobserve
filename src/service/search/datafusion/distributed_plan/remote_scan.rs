@@ -195,15 +195,13 @@ async fn get_remote_batch(
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
+    let is_querier = node.is_querier();
+    let is_ingester = node.is_ingester();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
-
-    // for a query, the node must be a ingester or querier
-    let is_ingester = node.is_ingester();
-    let is_querier = !is_ingester;
 
     // check timeout for ingester
     let mut timeout = remote_scan_node.search_infos.timeout;
@@ -217,6 +215,7 @@ async fn get_remote_batch(
     // fast return for empty file list querier node
     if !remote_scan_node.super_cluster_info.is_super_cluster
         && is_querier
+        && !is_ingester
         && remote_scan_node.is_file_list_empty(partition)
     {
         return Ok(get_empty_record_batch_stream(
