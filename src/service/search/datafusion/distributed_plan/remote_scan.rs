@@ -195,14 +195,19 @@ async fn get_remote_batch(
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
-    let is_querier = node.is_querier();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
+
+    // for a query, the node must be a ingester or querier
+    let is_ingester = node.is_ingester();
+    let is_querier = !is_ingester;
+
+    // check timeout for ingester
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) && !is_querier {
+    if matches!(search_type, Some(SearchEventType::UI)) && is_ingester {
         timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
     }
     if timeout == 0 {

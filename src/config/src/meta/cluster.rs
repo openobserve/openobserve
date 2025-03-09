@@ -22,8 +22,8 @@ use crate::{
 };
 
 pub trait NodeInfo: Debug + Send + Sync {
-    fn is_querier(&self) -> bool {
-        true
+    fn is_ingester(&self) -> bool {
+        false
     }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
@@ -129,8 +129,8 @@ impl Default for Node {
 }
 
 impl NodeInfo for Node {
-    fn is_querier(&self) -> bool {
-        self.is_querier()
+    fn is_ingester(&self) -> bool {
+        self.is_ingester()
     }
 
     fn get_auth_token(&self) -> String {
