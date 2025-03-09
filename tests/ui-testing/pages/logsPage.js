@@ -485,6 +485,13 @@ async validateDecryResult(cipherName) {
   await expect(decryptTextLocator).toContainText(`decrypt(default.log,Utf8("${cipherName}")):`);
 }
 
+async selectIndexStreamDefault() {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+  await this.page.waitForTimeout(3000);
+  
+}
 
 }
 
