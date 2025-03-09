@@ -194,13 +194,16 @@ async fn get_remote_batch(
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
     let is_querier = node.is_querier();
+    let is_ingester = node.is_ingester();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
+
+    // check timeout for ingester
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) && !is_querier {
+    if matches!(search_type, Some(SearchEventType::UI)) && is_ingester {
         timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
     }
     if timeout == 0 {
@@ -210,6 +213,7 @@ async fn get_remote_batch(
     // fast return for empty file list querier node
     if !remote_scan_node.super_cluster_info.is_super_cluster
         && is_querier
+        && !is_ingester
         && remote_scan_node.is_file_list_empty(partition)
     {
         return Ok(get_empty_record_batch_stream(
