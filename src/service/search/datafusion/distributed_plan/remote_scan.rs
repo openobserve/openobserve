@@ -195,22 +195,38 @@ async fn get_remote_batch(
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
-    let is_querier = if remote_scan_node.super_cluster_info.is_super_cluster {
-        true
-    } else {
-        remote_scan_node.is_querier(partition)
-    };
+    let is_querier = node.is_querier();
+    let is_ingester = node.is_ingester();
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
         .as_ref()
         .and_then(|s| s.as_str().try_into().ok());
+
+    // check timeout for ingester
     let mut timeout = remote_scan_node.search_infos.timeout;
-    if matches!(search_type, Some(SearchEventType::UI)) && !is_querier {
+    if matches!(search_type, Some(SearchEventType::UI)) && is_ingester {
         timeout = std::cmp::min(timeout, cfg.limit.query_ingester_timeout);
     }
     if timeout == 0 {
         timeout = cfg.limit.query_timeout;
+    }
+
+    // fast return for empty file list querier node
+    if !remote_scan_node.super_cluster_info.is_super_cluster
+        && is_querier
+        && !is_ingester
+        && remote_scan_node.is_file_list_empty(partition)
+    {
+        return Ok(get_empty_record_batch_stream(
+            trace_id,
+            schema,
+            node.get_grpc_addr(),
+            is_querier,
+            partial_err,
+            tonic::Status::new(tonic::Code::Ok, ""),
+            start,
+        ));
     }
 
     let mut request = remote_scan_node.get_flight_search_request(partition);
@@ -378,15 +394,17 @@ fn get_empty_record_batch_stream(
     e: tonic::Status,
     start: std::time::Instant,
 ) -> SendableRecordBatchStream {
-    log::info!(
-        "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
-        trace_id,
-        node_addr,
-        is_querier,
-        e.to_string(),
-        start.elapsed().as_millis(),
-    );
-    process_partial_err(partial_err, e);
+    if e.code() != tonic::Code::Ok {
+        log::info!(
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
+            trace_id,
+            node_addr,
+            is_querier,
+            e.to_string(),
+            start.elapsed().as_millis(),
+        );
+        process_partial_err(partial_err, e);
+    }
     let stream = futures::stream::empty::<Result<RecordBatch>>();
     Box::pin(RecordBatchStreamAdapter::new(schema, stream))
 }
