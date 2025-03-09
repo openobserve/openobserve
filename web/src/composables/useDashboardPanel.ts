@@ -383,9 +383,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           ].fields.y.length >= 1
         );
       case "area-stacked":
-      case "stacked":
       case "heatmap":
-      case "h-stacked":
         return (
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -2672,6 +2670,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         errors.push("Please enter your markdown code");
       }
     }
+    if (dashboardPanelData.data.type == 'custom_chart'){
+      if(dashboardPanelData.data.queries[0].query.trim() == ""){
+         errors.push("Please enter query for custom chart")
+      }
+    }
 
     if (promqlMode.value) {
       // 1. chart type: only line chart is supported
@@ -2825,7 +2828,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
-      const regex = new RegExp(`\\$${varName}(?!\\w)`, "g"); // Match $VAR_NAME only
+      const regex = new RegExp(`\\$(?:{${varName}}|${varName})(?!\\w)`, "g");
       return q.replace(regex, replacement);
     };
 
@@ -3022,10 +3025,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].query,
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].customQuery,
+      ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
-    () => {
+    (newVal, oldVal) => {
+      // Check if customQuery mode has changed
+      const customQueryChanged = newVal[1] !== oldVal[1];
+
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
@@ -3035,10 +3041,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         if (parser) updateQueryValue();
-      } else {
+      } else if (customQueryChanged) {
+        // Only clear lists when switching modes
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
       }
       // if (dashboardPanelData.data.queryType == "promql") {
       //     updatePromQLQuery()

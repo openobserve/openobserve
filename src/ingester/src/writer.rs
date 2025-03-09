@@ -16,31 +16,30 @@
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, metrics,
-    utils::hash::{gxhash, Sum64},
-    MEM_TABLE_INDIVIDUAL_STREAMS,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    utils::hash::{Sum64, gxhash},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use wal::Writer as WalWriter;
 
 use crate::{
+    ReadRecordBatchEntry, WriterSignal,
     entry::Entry,
     errors::*,
-    immutable::{Immutable, IMMUTABLES},
+    immutable::{IMMUTABLES, Immutable},
     memtable::MemTable,
     rwmap::RwMap,
-    ReadRecordBatchEntry, WriterSignal,
 };
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
@@ -65,9 +64,7 @@ pub struct Writer {
 
 // check total memory size
 pub fn check_memtable_size() -> Result<()> {
-    let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
-        .with_label_values(&[])
-        .get();
+    let total_mem_size = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get();
     if total_mem_size >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {

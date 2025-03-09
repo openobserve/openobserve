@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,10 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{meta::search::SearchEventType, utils::json::Value};
+use crate::{
+    meta::search::SearchEventType,
+    utils::json::{Map, Value},
+};
 
 pub mod alert;
 
@@ -43,6 +46,13 @@ pub struct TriggerCondition {
     /// (seconds)
     #[serde(default)]
     pub tolerance_in_secs: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct TriggerEvalResults {
+    pub data: Option<Vec<Map<String, Value>>>,
+    pub end_time: i64,
+    pub query_took: Option<i64>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

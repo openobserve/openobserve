@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
-use config::{utils::json, TIMESTAMP_COL_NAME};
+use config::{TIMESTAMP_COL_NAME, utils::json};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {

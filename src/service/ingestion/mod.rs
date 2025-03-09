@@ -18,9 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     ider::SnowflakeIdGenerator,
     meta::{
@@ -33,12 +34,11 @@ use config::{
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
-    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
+    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
     prelude::state,
 };
 
@@ -100,11 +100,21 @@ pub fn apply_vrl_fn(
     stream_name: &[String],
 ) -> (Value, Option<String>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
     let mut target = TargetValueRef {
         value: &mut vrl::value::Value::from(&row),
         metadata: &mut metadata,
         secrets: &mut vrl::value::Secrets::new(),
     };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
     let timezone = vrl::compiler::TimeZone::Local;
     let result = match vrl::compiler::VrlRuntime::default() {
         vrl::compiler::VrlRuntime::Ast => {
@@ -241,6 +251,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             is_partial: None,
             delay_in_secs: None,
             evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -544,7 +556,7 @@ pub fn create_log_ingestion_req(
 
 #[cfg(test)]
 mod tests {
-    use infra::schema::{unwrap_stream_settings, STREAM_SETTINGS};
+    use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
 
     use super::*;
 

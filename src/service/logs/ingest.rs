@@ -22,18 +22,18 @@ use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use flate2::read::GzDecoder;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
-    common::v1::{any_value::Value, AnyValue, KeyValue},
+    common::v1::{AnyValue, KeyValue, any_value::Value},
     metrics::v1::metric::Data,
 };
 use prost::Message;
@@ -271,7 +271,10 @@ pub async fn ingest(
     // batch process records through pipeline
     if let Some(exec_pl) = &executable_pipeline {
         let records_count = pipeline_inputs.len();
-        match exec_pl.process_batch(org_id, pipeline_inputs).await {
+        match exec_pl
+            .process_batch(org_id, pipeline_inputs, Some(stream_name.clone()))
+            .await
+        {
             Err(e) => {
                 log::error!(
                     "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -404,7 +407,6 @@ pub async fn ingest(
             endpoint,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
         ])
         .observe(took_time);
@@ -413,7 +415,6 @@ pub async fn ingest(
             endpoint,
             metric_rpt_status_code,
             org_id,
-            &stream_name,
             StreamType::Logs.as_str(),
         ])
         .inc();

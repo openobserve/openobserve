@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{collections::HashSet, io::Error};
 
-use actix_web::{get, http, post, put, web, HttpResponse, Result};
+use actix_web::{HttpResponse, Result, get, http, post, put, web};
 use infra::schema::STREAM_SCHEMAS_LATEST;
 
 use crate::{
@@ -24,11 +24,11 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+                CUSTOM, DEFAULT_ORG, OrgDetails, OrgUser, Organization, OrganizationResponse,
+                PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
-        utils::auth::{is_root_user, UserEmail},
+        utils::auth::{UserEmail, is_root_user},
     },
     service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };

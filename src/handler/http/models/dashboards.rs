@@ -1,6 +1,21 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use chrono::{DateTime, FixedOffset, Utc};
 use config::meta::{
-    dashboards::{v1, v2, v3, v4, v5, Dashboard as MetaDashboard},
+    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5},
     folder::Folder as MetaFolder,
 };
 use serde::{Deserialize, Serialize};
@@ -96,6 +111,16 @@ pub struct ListDashboardsResponseBodyItem {
 pub struct MoveDashboardRequestBody {
     pub from: String,
     pub to: String,
+}
+
+/// HTTP request body for `MoveDashboards` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct MoveDashboardsRequestBody {
+    /// IDs of the dashboards to move.
+    pub dashboard_ids: Vec<String>,
+
+    /// Indicates the folder to which dashboard should be moved.
+    pub dst_folder_id: String,
 }
 
 /// Version-specific dashboard details and hash.

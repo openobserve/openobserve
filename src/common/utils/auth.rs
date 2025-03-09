@@ -15,11 +15,11 @@
 
 use std::fmt::Debug;
 
-use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
-use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use actix_web::{Error, FromRequest, HttpRequest, dev::Payload};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use base64::Engine;
 use config::utils::json;
-use futures::future::{ready, Ready};
+use futures::future::{Ready, ready};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "enterprise")]
@@ -199,15 +199,14 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let start = std::time::Instant::now();
-
-        use std::collections::HashMap;
-
         use actix_web::web;
         use config::meta::stream::StreamType;
+        use hashbrown::HashMap;
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
+
+        let start = std::time::Instant::now();
 
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         let stream_type = get_stream_type_from_request(&query);

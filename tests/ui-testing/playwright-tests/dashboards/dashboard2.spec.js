@@ -1,6 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -121,7 +122,6 @@ test.describe("dashboard UI testcases", () => {
     await orgNavigation;
   });
 
-
   test("should add the breakdown field to the dashboard using Drag and Drop and +B, and allow the user to cancel the action", async ({
     page,
   }) => {
@@ -166,6 +166,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     // Set the date-time range and apply changes
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-4-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -244,6 +245,7 @@ test.describe("dashboard UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
+    await waitForDateTimeButtonToBeEnabled(page);
 
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
@@ -335,6 +337,7 @@ test.describe("dashboard UI testcases", () => {
       .click();
 
     // Set the date-time range and apply changes
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -382,7 +385,6 @@ test.describe("dashboard UI testcases", () => {
       '[data-test="selected-chart-h-stacked-item"]'
     ); // Replace with the actual selector for the graph
     await expect(graphLocatorHStacked).toBeVisible();
-
     // Stacked chart
     await page.locator('[data-test="selected-chart-stacked-item"] img').click();
     const graphLocatorStacked = page.locator(
@@ -394,14 +396,19 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').click();
     await page.locator('[data-test="dashboard-panel-name"]').fill("Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForTimeout(3000);
     // Switch to Bar chart and apply changes
+    await page
+      .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-edit-panel"]').click();
+
     await page.locator('[data-test="selected-chart-bar-item"] img').click();
+
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.locator('[data-test="dashboard-panel-save"]').click();
-    await page.waitForTimeout(200);
-
+    await page.waitForTimeout(1000);
     // Delete the panel and confirm
     await page
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
@@ -445,6 +452,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-b-data"]'
       )
       .click();
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
@@ -554,6 +562,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -673,6 +682,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page
@@ -756,16 +766,13 @@ test.describe("dashboard UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
-
     // await page.locator('[data-test="date-time-btn"]').click();
     // await page.locator('[data-test="date-time-relative-45-m-btn"]').click();
-
+    await waitForDateTimeButtonToBeEnabled(page);
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     await page.waitForTimeout(100);
-
-    
     await page.locator(".layout-panel-container > .flex").click();
     await page.getByText("expand_allConfig").click();
     await page.locator(".q-pa-none > .q-list > div").first().click();

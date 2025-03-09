@@ -15,14 +15,14 @@
 use std::io::Error;
 
 use actix_http::header::HeaderMap;
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{HttpResponse, get, post, web};
 use itertools::Itertools;
 use o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource};
-use tracing::{span, Level};
+use tracing::{Level, span};
 
 use crate::{
     common::utils::{
-        auth::{check_permissions, UserEmail},
+        auth::{UserEmail, check_permissions},
         http::get_or_create_trace_id,
     },
     handler::http::models::action::TestActionRequest,

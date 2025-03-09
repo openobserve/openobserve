@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, put, web, HttpResponse};
+use actix_web::{HttpResponse, delete, get, put, web};
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;

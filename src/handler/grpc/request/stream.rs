@@ -16,7 +16,7 @@
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
 use proto::cluster_rpc::{
-    streams_server::Streams, StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse,
+    StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
 use tonic::{Request, Response, Status};
 

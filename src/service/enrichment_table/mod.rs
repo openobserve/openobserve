@@ -17,12 +17,13 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
-    http::{self, StatusCode},
     HttpResponse,
+    http::{self, StatusCode},
 };
 use bytes::Bytes;
 use chrono::Utc;
 use config::{
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -30,14 +31,13 @@ use config::{
         stream::{PartitionTimeLevel, StreamType},
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
-    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
     schema::{
-        SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
-        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        SchemaCache,
     },
 };
 
@@ -267,9 +267,6 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
-    w.remove(&key);
-    drop(w);
-    let mut w = STREAM_SCHEMAS_COMPRESSED.write().await;
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;

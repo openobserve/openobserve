@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, delete, get, http, patch, post, put, web};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::dashboards::{
         CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
         ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
-        UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+        MoveDashboardsRequestBody, UpdateDashboardRequestBody, UpdateDashboardResponseBody,
     },
     service::dashboards::{self, DashboardError},
 };
@@ -35,15 +34,35 @@ impl From<DashboardError> for HttpResponse {
         match value {
             DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
             DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
-            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error("Request to update existing dashboard with missing or invalid hash value. BUG"),
-            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict("Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."),
-            DashboardError::PutMissingTitle => MetaHttpResponse::internal_error("Dashboard should have title"),
-            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request("Please specify from & to folder from dashboard movement"),
-            DashboardError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
+            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error(
+                "Request to update existing dashboard with missing or invalid hash value. BUG",
+            ),
+            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict(
+                "Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes.",
+            ),
+            DashboardError::PutMissingTitle => {
+                MetaHttpResponse::internal_error("Dashboard should have title")
+            }
+            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request(
+                "Please specify from & to folder from dashboard movement",
+            ),
+            DashboardError::MoveDestinationFolderNotFound => {
+                MetaHttpResponse::not_found("Folder not found")
+            }
             DashboardError::CreateFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
-            DashboardError::CreateDefaultFolder => MetaHttpResponse::internal_error("Error saving default folder"),
-            DashboardError::DistinctValueError => MetaHttpResponse::internal_error("Error in updating distinct values"),
-            DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => MetaHttpResponse::internal_error(format!("error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"))
+            DashboardError::CreateDefaultFolder => {
+                MetaHttpResponse::internal_error("Error saving default folder")
+            }
+            DashboardError::DistinctValueError => {
+                MetaHttpResponse::internal_error("Error in updating distinct values")
+            }
+            DashboardError::MoveDashboardDeleteOld(dashb_id, folder_id, e) => {
+                MetaHttpResponse::internal_error(format!(
+                    "error deleting the dashboard {dashb_id} from old folder {folder_id} : {e}"
+                ))
+            }
+            DashboardError::ListPermittedDashboardsError(err) => MetaHttpResponse::forbidden(err),
+            DashboardError::UserNotFound => MetaHttpResponse::unauthorized("User not found"),
         }
     }
 }
@@ -161,7 +180,10 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
         return MetaHttpResponse::bad_request("Error parsing query parameters");
     };
     let params = query.into_inner().into(&org_id.into_inner());
-    let dashboards = match dashboards::list_dashboards(params).await {
+    let Some(user_id) = get_user_id(req) else {
+        return MetaHttpResponse::unauthorized("User ID not found in request headers");
+    };
+    let dashboards = match dashboards::list_dashboards(&user_id, params).await {
         Ok(dashboards) => dashboards,
         Err(err) => return err.into(),
     };
@@ -258,7 +280,7 @@ async fn move_dashboard(
     req_body: web::Json<MoveDashboardRequestBody>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.from, &req_body.to).await {
+    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.to).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard moved".to_string(),
@@ -267,7 +289,53 @@ async fn move_dashboard(
     }
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "MoveDashboards",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = MoveDashboardsRequestBody, description = "Identifies dashboards and the destination folder", content_type = "application/json"),    
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[patch("/{org_id}/dashboards/move")]
+async fn move_dashboards(
+    path: web::Path<String>,
+    req_body: web::Json<MoveDashboardsRequestBody>,
+) -> HttpResponse {
+    let org_id = path.into_inner();
+    match dashboards::move_dashboards(&org_id, &req_body.dashboard_ids, &req_body.dst_folder_id)
+        .await
+    {
+        Ok(_) => {
+            let message = if req_body.dashboard_ids.len() == 1 {
+                "Dashboard moved"
+            } else {
+                "Dashboards moved"
+            };
+            MetaHttpResponse::ok(message)
+        }
+        Err(e) => e.into(),
+    }
+}
+
 fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     crate::common::utils::http::get_folder(&query)
+}
+
+/// Tries to get the user ID from the request headers.
+fn get_user_id(req: HttpRequest) -> Option<String> {
+    req.headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
 }

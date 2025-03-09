@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,10 @@
 
 use config::meta::cluster::get_internal_grpc_token;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
-    metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+    metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
 };
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
+use tonic::{Request, Response, Status, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::{grpc::get_ingester_channel, search::MetadataMap};

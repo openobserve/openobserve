@@ -14,15 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    cmp::Ordering,
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
+};
 use config::{
     meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
+use hashbrown::HashMap;
 
 use crate::{
     common::{
@@ -48,6 +51,9 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Stream),
@@ -62,7 +68,54 @@ async fn schema(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    stream::get_stream(&org_id, &stream_name, stream_type).await
+    let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
+    let Some(mut schema) = schema else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            "stream not found".to_string(),
+        )));
+    };
+    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+        let mut schema_fields = schema
+            .schema
+            .iter()
+            .map(|f| (&f.name, f))
+            .collect::<HashMap<_, _>>();
+        schema.uds_schema = Some(
+            uds_fields
+                .iter()
+                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            schema.schema.retain(|f| f.name.contains(keyword));
+        }
+    }
+
+    // set total fields
+    schema.total_fields = schema.schema.len();
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= schema.schema.len() {
+        schema.schema = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, schema.schema.len());
+        schema.schema = schema.schema[offset..end].to_vec();
+    }
+
+    Ok(HttpResponse::Ok().json(schema))
 }
 
 /// CreateStreamSettings
@@ -285,6 +338,10 @@ async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
+        ("sort" = String, Query, description = "Sort"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
@@ -348,8 +405,87 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         _stream_list_from_rbac,
     )
     .await;
-    indices.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(HttpResponse::Ok().json(ListStream { list: indices }))
+
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            indices.retain(|s| s.name.contains(keyword));
+        }
+    }
+
+    // sort by
+    let mut sort = "name".to_string();
+    if let Some(s) = query.get("sort") {
+        let s = s.to_lowercase();
+        if !s.is_empty() {
+            sort = s;
+        }
+    }
+    let asc = if let Some(asc) = query.get("asc") {
+        asc.to_lowercase() == "true" || asc.to_lowercase() == "1"
+    } else {
+        true
+    };
+    indices.sort_by(|a, b| match (sort.as_str(), asc) {
+        ("name", true) => a.name.cmp(&b.name),
+        ("name", false) => b.name.cmp(&a.name),
+        ("doc_num", true) => a.stats.doc_num.cmp(&b.stats.doc_num),
+        ("doc_num", false) => b.stats.doc_num.cmp(&a.stats.doc_num),
+        ("storage_size", true) => a
+            .stats
+            .storage_size
+            .partial_cmp(&b.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("storage_size", false) => b
+            .stats
+            .storage_size
+            .partial_cmp(&a.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", true) => a
+            .stats
+            .compressed_size
+            .partial_cmp(&b.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", false) => b
+            .stats
+            .compressed_size
+            .partial_cmp(&a.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", true) => a
+            .stats
+            .index_size
+            .partial_cmp(&b.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", false) => b
+            .stats
+            .index_size
+            .partial_cmp(&a.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        _ => a.name.cmp(&b.name),
+    });
+
+    // set total streams
+    let total = indices.len();
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= indices.len() {
+        indices = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, indices.len());
+        indices = indices[offset..end].to_vec();
+    }
+    Ok(HttpResponse::Ok().json(ListStream {
+        list: indices,
+        total,
+    }))
 }
 
 #[utoipa::path(

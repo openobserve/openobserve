@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, HashSet},
     io::{Error, ErrorKind},
     net::{AddrParseError, IpAddr, SocketAddr},
 };
@@ -27,6 +26,7 @@ use config::meta::{
     search::{SearchEventContext, SearchEventType},
     stream::StreamType,
 };
+use hashbrown::{HashMap, HashSet};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -232,10 +232,12 @@ mod tests {
             .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
             .collect();
 
-        assert!(parsed_addresses
-            .iter()
-            .zip(valid_addresses)
-            .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
-            .fold(true, |acc, x| { acc | x }));
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addresses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
     }
 }

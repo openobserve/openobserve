@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::{BufRead, BufReader},
     path::PathBuf,
     sync::Arc,
@@ -105,12 +105,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 }
 
 // replay wal files to create immutable
-pub(crate) async fn replay_wal_files() -> Result<()> {
-    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
-    create_dir_all(&wal_dir).context(OpenDirSnafu {
-        path: wal_dir.clone(),
-    })?;
-    let wal_files = wal_scan_files(&wal_dir, "wal").await.unwrap_or_default();
+pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) -> Result<()> {
     if wal_files.is_empty() {
         return Ok(());
     }
@@ -193,15 +188,11 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            let latest_schema = infra::schema::get_cache(
-                org_id,
-                &entry.stream,
-                config::meta::stream::StreamType::Logs,
-            )
-            .await
-            .map_err(|e| Error::ExternalError {
-                source: Box::new(e),
-            })?;
+            let latest_schema = infra::schema::get_cache(org_id, &entry.stream, stream_type.into())
+                .await
+                .map_err(|e| Error::ExternalError {
+                    source: Box::new(e),
+                })?;
             entry.schema_key = latest_schema.hash_key().into();
             let infer_schema = Arc::new(infer_schema.cloned_from(latest_schema.schema()));
             let batch = entry.into_batch(key.stream_type.clone(), infer_schema.clone())?;
@@ -243,7 +234,10 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<PathBuf>> {
+pub(crate) async fn wal_scan_files(
+    root_dir: impl Into<PathBuf>,
+    ext: &str,
+) -> Result<Vec<PathBuf>> {
     Ok(WalkDir::new(root_dir.into())
         .filter_map(|entry| async move {
             let entry = entry.ok()?;
@@ -253,11 +247,7 @@ async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<P
                     .extension()
                     .and_then(|s| s.to_str())
                     .unwrap_or_default();
-                if path_ext == ext {
-                    Some(path)
-                } else {
-                    None
-                }
+                if path_ext == ext { Some(path) } else { None }
             } else {
                 None
             }

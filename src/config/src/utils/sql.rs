@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -106,7 +106,7 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
                 || results.iter().any(is_aggregate_expression)
                 || else_result
                     .as_ref()
-                    .map_or(false, |e| is_aggregate_expression(e))
+                    .is_some_and(|e| is_aggregate_expression(e))
         }
         Expr::Nested(expr) => {
             // Check nested expressions
@@ -151,7 +151,7 @@ fn has_join(query: &Query) -> bool {
             || select
                 .from
                 .first()
-                .map_or(false, |table| !table.joins.is_empty())
+                .is_some_and(|table| !table.joins.is_empty())
     } else {
         false
     }

@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
 use actix_web::web::Query;
 use async_trait::async_trait;
-use config::{meta::search, TIMESTAMP_COL_NAME};
+use config::{TIMESTAMP_COL_NAME, meta::search};
+use hashbrown::HashMap;
 
 use crate::{
-    cli::data::{cli::Cli, Context},
+    cli::data::{Context, cli::Cli},
     common::utils::http::{
         get_search_event_context_from_request, get_search_type_from_request,
         get_stream_type_from_request,

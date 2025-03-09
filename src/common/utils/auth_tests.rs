@@ -1,8 +1,23 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 #[cfg(feature = "enterprise")]
 #[cfg(test)]
 mod tests {
     use actix_http::Method;
-    use actix_web::{test, FromRequest};
+    use actix_web::{FromRequest, test};
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
     use super::super::auth::AuthExtractor;
@@ -2984,6 +2999,13 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
+            websocket: config::WebSocket {
+                enabled: bool::default(),
+                session_idle_timeout_secs: i64::default(),
+                session_max_lifetime_secs: i64::default(),
+                session_gc_interval_secs: i64::default(),
+                ping_interval_secs: i64::default(),
+            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
@@ -3026,6 +3048,9 @@ mod tests {
                 feature_join_match_one_enabled: bool::default(),
                 feature_join_right_side_max_rows: usize::default(),
                 feature_query_skip_wal: bool::default(),
+                wal_write_queue_enabled: bool::default(),
+                wal_write_queue_full_reject: bool::default(),
+                websocket_close_frame_delay: u64::default(),
                 ui_enabled: bool::default(),
                 ui_sql_base64_enabled: bool::default(),
                 metrics_dedup_enabled: bool::default(),
@@ -3086,7 +3111,6 @@ mod tests {
                 report_user_password: String::default(),
                 report_server_url: String::default(),
                 report_server_skip_tls_verify: bool::default(),
-                schema_cache_compress_enabled: bool::default(),
                 skip_formatting_stream_name: bool::default(),
                 bulk_api_response_errors_only: bool::default(),
                 allow_user_defined_schemas: bool::default(),
@@ -3105,8 +3129,6 @@ mod tests {
                 swagger_enabled: bool::default(),
                 fake_es_version: String::default(),
                 min_auto_refresh_interval: u32::default(),
-                websocket_enabled: bool::default(),
-                websocket_close_frame_delay: u64::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3214,6 +3236,11 @@ mod tests {
                 inverted_index_skip_threshold: usize::default(),
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
+                wal_write_queue_size: usize::default(),
+                circuit_breaker_enabled: bool::default(),
+                circuit_breaker_watching_window: i64::default(),
+                circuit_breaker_reset_window_num: i64::default(),
+                circuit_breaker_slow_request_threshold: u64::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    get_config,
+    SIZE_IN_MB, get_config,
     meta::{
         search::{SearchEventContext, SearchEventType},
         stream::{FileMeta, StreamType},
     },
-    SIZE_IN_MB,
 };
 
 pub const USAGE_STREAM: &str = "usage";
@@ -71,6 +70,8 @@ pub struct TriggerData {
     pub is_partial: Option<bool>,
     pub delay_in_secs: Option<i64>,
     pub evaluation_took_in_secs: Option<f64>,
+    pub source_node: Option<String>,
+    pub query_took: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

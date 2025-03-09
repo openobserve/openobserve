@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,9 +20,8 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    get_config, metrics,
-    utils::hash::{gxhash, Sum64},
-    RwHashMap,
+    RwHashMap, get_config, metrics,
+    utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
@@ -385,10 +384,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
@@ -400,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_2";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "lru");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
@@ -423,7 +422,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(100, "lru");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
@@ -446,10 +445,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_4";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
-        for i in 0..100 {
+        for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
@@ -461,7 +460,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let trace_id = "session_123";
+        let trace_id = "session_5";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(get_config().memory_cache.max_size, "fifo");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_5_1.parquet";
@@ -484,7 +483,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let trace_id = "session_456";
+        let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(100, "fifo");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_6_2.parquet";

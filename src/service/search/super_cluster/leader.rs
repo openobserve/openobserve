@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use config::{
     utils::json,
 };
 use datafusion::{
-    common::{tree_node::TreeNode, DataFusionError},
+    common::{DataFusionError, tree_node::TreeNode},
     physical_plan::{displayable, visit_execution_plan},
 };
 use hashbrown::HashMap;
@@ -31,10 +31,11 @@ use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
 use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
 use proto::cluster_rpc;
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
+    DATAFUSION_RUNTIME,
     cluster::flight::{generate_context, register_table},
     datafusion::distributed_plan::{
         remote_scan::RemoteScanExec,
@@ -43,7 +44,6 @@ use crate::service::search::{
     request::Request,
     sql::Sql,
     utils::ScanStatsVisitor,
-    DATAFUSION_RUNTIME,
 };
 
 #[async_recursion]

@@ -22,14 +22,13 @@ use actix_web::web;
 use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{
-    get_config,
+    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
-    BLOCKED_STREAMS, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 
 use super::{ingestion_log_enabled, log_failed_record};
@@ -380,7 +379,10 @@ pub async fn ingest(
                 continue;
             };
             let (records, doc_ids, originals) = pipeline_inputs.into_parts();
-            match exec_pl.process_batch(org_id, records).await {
+            match exec_pl
+                .process_batch(org_id, records, Some(stream_name.clone()))
+                .await
+            {
                 Err(e) => {
                     log::error!(
                         "[Pipeline] for stream {}/{}: Batch execution error: {}.",
@@ -565,7 +567,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.as_str(),
         ])
         .observe(took_time);
@@ -574,7 +575,6 @@ pub async fn ingest(
             "/api/org/ingest/logs/_bulk",
             metric_rpt_status_code,
             org_id,
-            "",
             StreamType::Logs.as_str(),
         ])
         .inc();

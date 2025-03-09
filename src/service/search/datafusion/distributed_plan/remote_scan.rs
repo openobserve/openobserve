@@ -22,8 +22,8 @@ use std::{
 
 use arrow::record_batch::RecordBatch;
 use arrow_flight::{
-    flight_service_client::FlightServiceClient, utils::flight_data_to_arrow_batch, FlightData,
-    Ticket,
+    FlightData, Ticket, flight_service_client::FlightServiceClient,
+    utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
 use config::{
@@ -35,8 +35,9 @@ use datafusion::{
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        stream::RecordBatchStreamAdapter, DisplayAs, DisplayFormatType, ExecutionMode,
-        ExecutionPlan, PlanProperties,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+        execution_plan::{Boundedness, EmissionType},
+        stream::RecordBatchStreamAdapter,
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
@@ -45,9 +46,9 @@ use parking_lot::Mutex;
 use prost::Message;
 use proto::cluster_rpc;
 use tonic::{
+    Streaming,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    Streaming,
 };
 
 use super::{
@@ -108,7 +109,8 @@ impl RemoteScanExec {
             // Output Partitioning
             output_partitioning,
             // Execution Mode
-            ExecutionMode::Bounded,
+            EmissionType::Incremental,
+            Boundedness::Bounded,
         )
     }
 }
@@ -187,12 +189,17 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
 ) -> Result<SendableRecordBatchStream> {
+    let start = std::time::Instant::now();
     let cfg = config::get_config();
     let trace_id = remote_scan_node.query_identifier.trace_id.clone();
     let org_id = remote_scan_node.query_identifier.org_id.clone();
     let context = remote_scan_node.opentelemetry_context.clone();
     let node = remote_scan_node.nodes[partition].clone();
-    let is_querier = remote_scan_node.is_querier(partition);
+    let is_querier = if remote_scan_node.super_cluster_info.is_super_cluster {
+        true
+    } else {
+        remote_scan_node.is_querier(partition)
+    };
     let search_type = remote_scan_node
         .super_cluster_info
         .search_event_type
@@ -249,17 +256,26 @@ async fn get_remote_batch(
         .get_auth_token()
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid token".to_string()))?;
-    let channel = get_cached_channel(&node.get_grpc_addr())
-        .await
-        .map_err(|err| {
+    let channel = match get_cached_channel(&node.get_grpc_addr()).await {
+        Ok(channel) => channel,
+        Err(e) => {
             log::error!(
                 "[trace_id {}] flight->search: node: {}, connect err: {:?}",
                 trace_id.clone(),
                 &node.get_grpc_addr(),
-                err
+                e
             );
-            DataFusionError::Internal("connect search node error".to_string())
-        })?;
+            return Ok(get_empty_record_batch_stream(
+                trace_id,
+                schema,
+                node.get_grpc_addr(),
+                is_querier,
+                partial_err,
+                e,
+                start,
+            ));
+        }
+    };
 
     let mut client =
         FlightServiceClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
@@ -282,7 +298,6 @@ async fn get_remote_batch(
         is_querier,
     );
 
-    let start = std::time::Instant::now();
     let mut stream = match client.do_get(request).await {
         Ok(stream) => stream,
         Err(e) => {
@@ -436,10 +451,16 @@ impl Stream for FlightStream {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         if self.start.elapsed().as_secs() > self.timeout {
-            process_partial_err(
-                self.partial_err.clone(),
-                tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout"),
+            let e = tonic::Status::new(tonic::Code::DeadlineExceeded, "timeout");
+            log::error!(
+                "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
+                self.trace_id,
+                self.node_addr,
+                self.is_querier,
+                self.start.elapsed().as_millis(),
+                e.to_string()
             );
+            process_partial_err(self.partial_err.clone(), e);
             return Poll::Ready(None);
         }
 
