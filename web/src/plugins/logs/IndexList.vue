@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-search-index-list-fields-table"
         v-model="sortedStreamFields"
         :visible-columns="['name']"
-        :rows="streamFieldsRows"
+        :rows="searchObj.data.stream.paginatedSelectedStreamFields"
         :row-key="
           (row: any) => searchObj.data.stream.selectedStream[0] + row.name
         "
@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           (streamFieldsRows.length <= pagination.rowsPerPage ||
             streamFieldsRows.length == 0)
         "
+        @request="onRequest"
       >
         <template #body-cell-name="props">
           <q-tr
@@ -1170,6 +1171,7 @@ export default defineComponent({
     const pagination = ref({
       page: 1,
       rowsPerPage: 25,
+      rowsNumber: 0,
     });
 
     const toggleSchema = async () => {
@@ -1177,6 +1179,7 @@ export default defineComponent({
       selectedFieldsName = [];
       setTimeout(async () => {
         await extractFields();
+        await processStreamFields();
         searchObj.loadingStream = false;
       }, 0);
     };
@@ -1192,6 +1195,69 @@ export default defineComponent({
         ? "Select Stream"
         : "";
     });
+
+    const onRequest = (props: any) => {
+      const { page, rowsPerPage } = props.pagination;
+      const filter = props.filter;
+      console.log("filter", filter);
+      console.log("props", props);
+
+      searchObj.data.stream.paginatedSelectedStreamFields = searchObj.data.stream.processedSelectedStreamFields.slice(
+        (page - 1) * rowsPerPage,
+        page * rowsPerPage,
+      );
+
+      // don't forget to update local pagination object
+      pagination.value.page = page;
+      pagination.value.rowsPerPage = rowsPerPage;
+    };
+
+    const processStreamFields = () => {
+      if(searchObj.data.stream.selectedStream.length == 0) {
+        return [];
+      }
+      
+      let expandKeys = Object.keys(
+        searchObj.data.stream.expandGroupRows,
+      ).reverse();
+
+      let startIndex = 0;
+      // Iterate over the keys in reverse order
+      let selectedStreamFields = cloneDeep(
+        searchObj.data.stream.selectedStreamFields,
+      );
+      let count = 0;
+      for (let key of expandKeys) {
+        if (
+          searchObj.data.stream.expandGroupRows[key] == false &&
+          selectedStreamFields != undefined &&
+          selectedStreamFields?.length > 0
+        ) {
+          startIndex =
+            selectedStreamFields.length -
+            searchObj.data.stream.expandGroupRowsFieldCount[key];
+          if (startIndex > 0) {
+            selectedStreamFields.splice(
+              startIndex - count,
+              searchObj.data.stream.expandGroupRowsFieldCount[key],
+            );
+          }
+        } else {
+          count += searchObj.data.stream.expandGroupRowsFieldCount[key];
+        }
+        count++;
+      }
+
+      pagination.value.rowsNumber = selectedStreamFields.length;
+      searchObj.data.stream.paginatedSelectedStreamFields = selectedStreamFields.slice(
+        (pagination.value.page - 1) * pagination.value.rowsPerPage,
+        pagination.value.page * pagination.value.rowsPerPage,
+      );
+
+      searchObj.data.stream.processedSelectedStreamFields = selectedStreamFields;
+      // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
+      return selectedStreamFields;
+    };
 
     return {
       t,
@@ -1219,50 +1285,12 @@ export default defineComponent({
       pagination,
       toggleSchema,
       streamFieldsRows: computed(() => {
-        let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
-        ).reverse();
-
-        let startIndex = 0;
-        // Iterate over the keys in reverse order
-        let selectedStreamFields = cloneDeep(
-          searchObj.data.stream.selectedStreamFields,
-        );
-        let count = 0;
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        // console.log(searchObj.data.stream.expandGroupRows)
-        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
-        for (let key of expandKeys) {
-          if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
-            selectedStreamFields != undefined &&
-            selectedStreamFields?.length > 0
-          ) {
-            startIndex =
-              selectedStreamFields.length -
-              searchObj.data.stream.expandGroupRowsFieldCount[key];
-            if (startIndex > 0) {
-              // console.log("startIndex", startIndex)
-              // console.log("count", count)
-              // console.log("selectedStreamFields", selectedStreamFields.length)
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
-              // console.log("========")
-              selectedStreamFields.splice(
-                startIndex - count,
-                searchObj.data.stream.expandGroupRowsFieldCount[key],
-              );
-            }
-          } else {
-            count += searchObj.data.stream.expandGroupRowsFieldCount[key];
-          }
-          count++;
-        }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
-        return selectedStreamFields;
+        return processStreamFields();
       }),
       formatLargeNumber,
       sortedStreamFields,
-      placeHolderText
+      placeHolderText,
+      onRequest,
     };
   },
 });

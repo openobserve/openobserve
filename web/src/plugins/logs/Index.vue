@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-index-list"
                     :key="
                       searchObj.data.stream.selectedStream.join(',') ||
-                      'default'
+                      'none'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="

@@ -174,6 +174,8 @@ const defaultObject = {
       streamLists: <object[]>[],
       selectedStream: <any>[],
       selectedStreamFields: <any>[],
+      paginatedSelectedStreamFields: <any>[],
+      processedSelectedStreamFields: <any>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
