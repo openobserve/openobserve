@@ -875,6 +875,8 @@ export default defineComponent({
           `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
         );
       }
+      console.log(input,'input')
+
 
       if (
         isNaN(Number(triggerCondition.frequency)) ||
@@ -969,6 +971,14 @@ export default defineComponent({
           });
         }
       });
+
+      //this condition is added to avoid the error when the updated_at is a number 
+      //with the new alert api the updated_at is a nummer 
+      if( typeof input.updated_at == 'number'){
+        input.updated_at = null;
+      }
+
+
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {

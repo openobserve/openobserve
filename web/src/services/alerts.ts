@@ -28,6 +28,25 @@ const alerts = {
       `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
   },
+  listByFolderId: (
+    page_num: number,
+    page_size: number,
+    sort_by: string,
+    desc: boolean,
+    name: string,
+    org_identifier: string,
+    folder_id?: string,
+    query?: string
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`;
+    if(folder_id){
+      url += `&folder=${folder_id}`;
+    }
+    if(query){
+      url += `&alert_name_substring=${query}`;
+    }
+    return http().get(url);
+  },
   create: (
     org_identifier: string,
     stream_name: string,
@@ -101,6 +120,51 @@ const alerts = {
     )}/preview?type=${stream_type}`;
     return http().get(url);
   },
+  create_by_alert_id: (
+    org_identifier: string,
+    data: any,
+  ) => {
+    return http().post(
+      `/api/v2/${org_identifier}/alerts`,
+      data
+    );
+  },
+  update_by_alert_id: (
+    org_identifier: string,
+    data: any,
+  ) => { 
+    return http().put(
+      `/api/v2/${org_identifier}/alerts/${data.id}`,
+      data
+    );
+  },
+  delete_by_alert_id: (
+    org_identifier: string,
+    alert_id: string
+  ) => {
+    return http().delete(`/api/v2/${org_identifier}/alerts/${alert_id}`);
+  },
+  toggle_state_by_alert_id: (
+    org_identifier: string,
+    alert_id: string,
+    enable: boolean
+  ) => {
+    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/enable?value=${enable}`);
+  },
+  get_by_alert_id: (
+    org_identifier: string,
+    alert_id: string
+  ) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts/${alert_id}`
+    );
+  },
+  move_to_another_folder: (
+    org_identifier: string,
+    data: any
+  ) => {
+    return http().patch(`/api/v2/${org_identifier}/alerts/move`, data);
+  }
 };
 
 export default alerts;
