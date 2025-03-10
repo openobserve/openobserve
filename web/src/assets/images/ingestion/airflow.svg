@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" preserveAspectRatio="xMidYMid">
+    <defs>
+        <radialGradient cx="1.55750275e-05%" cy="99.999994%" fx="1.55750275e-05%" fy="99.999994%" r="120.115697%" gradientTransform="translate(0.000000,1.000000),scale(0.832531,1.000000),scale(1.000000,0.832531),translate(-0.000000,-1.000000)" id="radialGradient-1">
+            <stop stop-color="#00C812" offset="0%">
+</stop>
+            <stop stop-color="#006E00" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="5.95703125e-06%" cy="-0.000385453422%" fx="5.95703125e-06%" fy="-0.000385453422%" r="120.115697%" gradientTransform="translate(0.000000,-0.000004),scale(1.000000,0.832534),rotate(90.000000),scale(1.000000,0.832531),translate(-0.000000,0.000004)" id="radialGradient-2">
+            <stop stop-color="#56AFFD" offset="0%">
+</stop>
+            <stop stop-color="#04A3FF" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="99.9999844%" cy="5.95703126e-06%" fx="99.9999844%" fy="5.95703126e-06%" r="120.115697%" gradientTransform="translate(1.000000,0.000000),scale(0.832531,1.000000),rotate(180.000000),scale(1.000000,0.832531),translate(-1.000000,-0.000000)" id="radialGradient-3">
+            <stop stop-color="#DF1F00" offset="0%">
+</stop>
+            <stop stop-color="#560D00" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="99.999994%" cy="100.000694%" fx="99.999994%" fy="100.000694%" r="120.115697%" gradientTransform="translate(1.000000,1.000007),scale(1.000000,0.832536),rotate(-90.000000),scale(1.000000,0.832531),translate(-1.000000,-1.000007)" id="radialGradient-4">
+            <stop stop-color="#00FFFD" offset="0%">
+</stop>
+            <stop stop-color="#00DAFF" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="0.000354796786%" cy="99.999994%" fx="0.000354796786%" fy="99.999994%" r="99.9996399%" gradientTransform="translate(0.000004,1.000000),scale(1.000000,0.573107),scale(1.000000,1.744881),translate(-0.000004,-1.000000)" id="radialGradient-5">
+            <stop stop-color="#008200" offset="0%">
+</stop>
+            <stop stop-color="#007500" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="5.95703125e-06%" cy="9.08223426e-05%" fx="5.95703125e-06%" fy="9.08223426e-05%" r="99.9999039%" gradientTransform="translate(0.000000,0.000001),scale(0.573105,1.000000),rotate(90.000000),scale(1.000000,1.744881),translate(-0.000000,-0.000001)" id="radialGradient-6">
+            <stop stop-color="#3166D4" offset="0%">
+</stop>
+            <stop stop-color="#1A509E" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="100.000355%" cy="5.95703126e-06%" fx="100.000355%" fy="5.95703126e-06%" r="100.00035%" gradientTransform="translate(1.000004,0.000000),scale(1.000000,0.573103),rotate(180.000000),scale(1.000000,1.744881),translate(-1.000004,-0.000000)" id="radialGradient-7">
+            <stop stop-color="#8E1400" offset="0%">
+</stop>
+            <stop stop-color="#4B0B00" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="99.999994%" cy="100.001042%" fx="99.999994%" fy="100.001042%" r="99.9993325%" gradientTransform="translate(1.000000,1.000010),scale(0.573109,1.000000),rotate(-90.000000),scale(1.000000,1.744881),translate(-1.000000,-1.000010)" id="radialGradient-8">
+            <stop stop-color="#0090C4" offset="0%">
+</stop>
+            <stop stop-color="#005D8C" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="4.88281244e-07%" cy="99.9989015%" fx="4.88281244e-07%" fy="99.9989015%" r="99.9999915%" gradientTransform="translate(0.000000,0.999989),scale(1.000000,0.679068),scale(1.000000,1.472586),translate(-0.000000,-0.999989)" id="radialGradient-9">
+            <stop stop-color="#00CD1C" offset="0%">
+</stop>
+            <stop stop-color="#00E950" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="-6.74214414e-06%" cy="-1.18815104e-05%" fx="-6.74214414e-06%" fy="-1.18815104e-05%" r="99.9999915%" gradientTransform="translate(-0.000000,-0.000000),scale(0.679078,1.000000),rotate(90.000000),scale(1.000000,1.472586),translate(0.000000,0.000000)" id="radialGradient-10">
+            <stop stop-color="#B1C8FD" offset="0%">
+</stop>
+            <stop stop-color="#7EC3FD" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="99.9999871%" cy="-6.74214411e-06%" fx="99.9999871%" fy="-6.74214411e-06%" r="99.9999915%" gradientTransform="translate(1.000000,-0.000000),scale(1.000000,0.679078),rotate(180.000000),scale(1.000000,1.472586),translate(-1.000000,0.000000)" id="radialGradient-11">
+            <stop stop-color="#E12A00" offset="0%">
+</stop>
+            <stop stop-color="#B62F00" offset="100%">
+</stop>
+        </radialGradient>
+        <radialGradient cx="100.000007%" cy="99.9999995%" fx="100.000007%" fy="99.9999995%" r="99.998364%" gradientTransform="translate(1.000000,1.000000),scale(0.679089,1.000000),rotate(-90.000000),scale(1.000000,1.472586),translate(-1.000000,-1.000000)" id="radialGradient-12">
+            <stop stop-color="#00B6DD" offset="0%">
+</stop>
+            <stop stop-color="#00FFFF" offset="100%">
+</stop>
+        </radialGradient>
+    </defs>
+		<g>
+				<path d="M179.2,230.4 L256,230.4 L133.12,128 C131.433,165.193 147.807,201.58 179.2,230.4" fill="url(#radialGradient-1)">
+</path>
+				<path d="M25.6,179.2 L25.6,256 L128,133.12 C126.254,133.041 124.517,133.002 122.775,133.002 C87.415,133.004 53.067,149.281 25.6,179.2" fill="url(#radialGradient-2)">
+</path>
+				<path d="M0,25.6 L122.88,128 C124.567,90.808 108.193,54.42 76.8,25.6 L0,25.6 Z" fill="url(#radialGradient-3)">
+</path>
+				<path d="M230.4,0 L128,122.879 C165.193,124.567 201.58,108.192 230.4,76.799 L230.4,0 Z" fill="url(#radialGradient-4)">
+</path>
+				<path d="M128,128 C116.521,157.755 118.255,188.086 133.12,217.601 C148.48,225.28 161.28,230.4 179.2,230.4 C147.807,201.58 131.433,165.193 133.12,128 L128,128 Z" fill="url(#radialGradient-5)">
+</path>
+				<path d="M38.4,133.12 C30.721,148.481 25.6,161.28 25.6,179.2 C54.419,147.807 90.807,131.434 128,133.12 L128,128 C115.056,123.007 102.006,120.514 88.96,120.514 C72.014,120.515 55.076,124.721 38.4,133.12" fill="url(#radialGradient-6)">
+</path>
+				<path d="M122.88,128 L128,128 C139.478,98.245 137.745,67.913 122.88,38.4 C107.52,30.72 94.721,25.6 76.8,25.6 C108.193,54.42 124.567,90.808 122.88,128" fill="url(#radialGradient-7)">
+</path>
+				<path d="M128,122.879 L128,128 C157.755,139.478 188.086,137.744 217.6,122.879 C225.28,107.521 230.4,94.721 230.4,76.799 C201.58,108.192 165.193,124.567 128,122.879" fill="url(#radialGradient-8)">
+</path>
+				<path d="M71.68,166.4 L133.12,217.601 C118.255,188.086 116.521,157.755 128,128 C126.224,127.408 124.142,127.124 121.842,127.124 C104.243,127.125 73.944,143.759 71.68,166.4" fill="url(#radialGradient-9)">
+</path>
+				<path d="M38.4,133.12 C67.914,118.255 98.245,116.522 128,128 C133.12,112.641 115.2,74.24 89.6,71.68 L38.4,133.12 Z" fill="url(#radialGradient-10)">
+</path>
+				<path d="M128,128 C143.36,133.12 181.759,115.2 184.32,89.6 L122.88,38.4 C137.745,67.913 139.478,98.245 128,128" fill="url(#radialGradient-11)">
+</path>
+				<path d="M128,128 C122.88,143.361 140.8,181.76 166.4,184.32 L217.6,122.879 C188.086,137.744 157.755,139.478 128,128" fill="url(#radialGradient-12)">
+</path>
+				<path d="M127.9998,121.6004 C131.5348,121.6004 134.3998,124.4654 134.3998,127.9994 C134.3998,131.5354 131.5348,134.4004 127.9998,134.4004 C124.4658,134.4004 121.6008,131.5354 121.6008,127.9994 C121.6008,124.4654 124.4658,121.6004 127.9998,121.6004" fill="#000000">
+</path>
+		</g>
+</svg>
