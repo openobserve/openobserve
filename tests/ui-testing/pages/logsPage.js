@@ -448,19 +448,7 @@ export class LogsPage {
     await this.page.waitForTimeout(2000);
     await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
 }
-  async decryptLogSQL(cipherName) {
-    // Construct the SQL query using the passed variable
-    const sqlQuery = `SELECT decrypt(log, '${cipherName}') from "default"`;
-
-    // Fill the query editor with the constructed SQL query
-    await this.page
-        .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByLabel("Editor content;Press Alt+F1")
-        .fill(sqlQuery);
-
-    // Wait for a specified time (consider adjusting this based on your needs)
-    await this.page.waitForTimeout(5000);
-}
+  
 
 async selectIndexDefault() {
   await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
@@ -470,20 +458,6 @@ async selectIndexDefault() {
   
 }
 
-async validateDecryResult(cipherName) {
-  if (!cipherName) {
-    throw new Error("cipherName must be provided and cannot be undefined.");
-  }
-  
-  await this.page.waitForTimeout(10000);
-  
-  const expandMenuLocator = this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
-  await expect(expandMenuLocator).toBeVisible();
-  await expandMenuLocator.click();
-  
-  const decryptTextLocator = this.page.locator(`[data-test="log-expand-detail-key-decrypt\\(default\\.log\\,Utf8\\(\\"${cipherName}\\"\\)\\)-text"]`);
-  await expect(decryptTextLocator).toContainText(`decrypt(default.log,Utf8("${cipherName}")):`);
-}
 
 async selectIndexStreamDefault() {
   await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
