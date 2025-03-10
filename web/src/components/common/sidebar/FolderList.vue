@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useLoading } from "@/composables/useLoading";
 
   const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
-    return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
+    return import("@/components/common/sidebar/MoveAcrossFolders.vue");
   });
 
   const AddDashboard = defineAsyncComponent(() => {
