@@ -29,7 +29,7 @@ use tracing::Instrument;
 
 use super::sort::order_search_results;
 #[allow(unused_imports)]
-use crate::handler::http::request::websocket::utils::enterprise_utils;
+use crate::service::websocket_events::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -40,12 +40,13 @@ use crate::{
             },
         },
     },
-    handler::http::request::websocket::{
-        session::send_message,
-        utils::{TimeOffset, WsServerEvents, search_registry_utils},
-    },
-    service::search::{
-        self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
+    handler::http::request::websocket::session::send_message,
+    service::{
+        search::{
+            self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec,
+            sql::Sql,
+        },
+        websocket_events::{TimeOffset, WsServerEvents, search_registry_utils},
     },
 };
 
@@ -111,7 +112,7 @@ pub async fn handle_search_request(
                 Some(req_id.to_string()),
                 Some(trace_id),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json()).await?;
             return Ok(());
         }
     };
@@ -127,7 +128,7 @@ pub async fn handle_search_request(
                 Some(req_id.to_string()),
                 Some(trace_id),
             );
-            send_message(req_id, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json()).await?;
             return Ok(());
         }
     }
@@ -291,7 +292,7 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(req_id, end_res.to_json().to_string()).await?;
+    send_message(req_id, end_res.to_json()).await?;
 
     Ok(())
 }
@@ -638,7 +639,7 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json()).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -793,7 +794,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json()).await?;
 
     Ok(())
 }
@@ -922,7 +923,7 @@ async fn do_partitioned_search(
                 },
                 streaming_aggs: is_streaming_aggs,
             };
-            send_message(req_id, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json()).await?;
         }
 
         // Stop if reached the requested result size
@@ -951,7 +952,7 @@ async fn do_partitioned_search(
             },
             streaming_aggs: is_streaming_aggs,
         };
-        send_message(req_id, ws_search_res.to_json().to_string()).await?;
+        send_message(req_id, ws_search_res.to_json()).await?;
     }
 
     // Remove the streaming_aggs cache
@@ -999,7 +1000,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(req_id, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json()).await?;
 
     Ok(())
 }

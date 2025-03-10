@@ -36,4 +36,6 @@ pub struct SearchEventReq {
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]
     pub fallback_order_by_col: Option<String>,
+    // TODO: modify this once v1 is deprecated
+    pub org_id: String,
 }

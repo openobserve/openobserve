@@ -21,7 +21,6 @@ use config::{
     get_config,
     meta::websocket::{SearchEventReq, SearchResultType},
 };
-use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
@@ -29,7 +28,6 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
     infra::config::get_config as get_o2_config,
 };
-use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use tokio::sync::mpsc;
 
@@ -39,6 +37,7 @@ use crate::service::self_reporting::audit;
 use crate::service::websocket_events::handle_cancel;
 use crate::{
     common::infra::config::WS_SEARCH_REGISTRY,
+    // router::http::ws_v2::types::StreamMessage,
     service::websocket_events::{
         WsClientEvents, WsServerEvents, handle_search_request,
         search_registry_utils::{self, SearchState},
@@ -211,6 +210,11 @@ pub async fn handle_text_message(
     msg: String,
     path: String,
 ) {
+    let is_v2 = if path.contains("/ws/v2/") {
+        true
+    } else {
+        false
+    };
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             match client_msg {
@@ -218,7 +222,16 @@ pub async fn handle_text_message(
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
                 }
                 #[cfg(feature = "enterprise")]
-                WsClientEvents::Cancel { trace_id, .. } => {
+                WsClientEvents::Cancel { trace_id, org_id } => {
+                    if org_id.is_empty() {
+                        log::error!(
+                            "[WS_HANDLER]: Request Id: {} Node Role: {} Org id not found",
+                            req_id,
+                            get_config().common.node_role
+                        );
+                        return;
+                    };
+
                     // First handle the cancel event
                     // send a cancel flag to the search task
                     if let Err(e) = handle_cancel_event(&trace_id).await {
@@ -232,12 +245,8 @@ pub async fn handle_text_message(
                         search_registry_utils::is_cancelled(&trace_id)
                     );
 
-                    let res = handle_cancel(&trace_id, org_id).await;
-                    let _ = send_message(req_id, res.to_json().to_string()).await;
-                    let close_reason = Some(CloseReason {
-                        code: CloseCode::Normal,
-                        description: None,
-                    });
+                    let res = handle_cancel(&trace_id, &org_id).await;
+                    let _ = send_message(req_id, res.to_json()).await;
 
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
@@ -259,13 +268,11 @@ pub async fn handle_text_message(
                                 path: path.clone(),
                                 message_type: client_msg.get_type(),
                                 content: client_msg.to_json(),
-                                close_reason: format!("{:#?}", close_reason),
+                                close_reason: "".to_string(),
                             }),
                         })
                         .await;
                     }
-
-                    cleanup_and_close_session(req_id, close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
                     // simulate random delay for benchmarking by sleep for 10/20/30/60/90
@@ -300,7 +307,12 @@ pub async fn handle_text_message(
                 e
             );
             let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
-            let _ = send_message(req_id, err_res.to_json().to_string()).await;
+            let res = if is_v2 {
+                err_res.to_json()
+            } else {
+                err_res.to_json()
+            };
+            let _ = send_message(req_id, res).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: None,
@@ -420,11 +432,6 @@ async fn handle_search_event(
                             };
                         }
 
-                        let close_reason = CloseReason {
-                            code: CloseCode::Normal,
-                            description: None,
-                        };
-
                         // Add audit before closing
                         #[cfg(feature = "enterprise")]
                         if is_audit_enabled {
@@ -436,37 +443,33 @@ async fn handle_search_event(
                                     path: path.clone(),
                                     message_type: client_msg.get_type(),
                                     content: client_msg.to_json(),
-                                    close_reason: format!("{:#?}", close_reason),
+                                    close_reason: "".to_string(),
                                 }),
                             })
                             .await;
                         }
 
-                        cleanup_and_close_session(&req_id, Some(close_reason)).await;
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
                     Err(e) => {
-                        if let Some(close_reason) = handle_search_error(e, &req_id, &trace_id_for_task).await {
-                            // Add audit before closing
-                            #[cfg(feature = "enterprise")]
-                            if is_audit_enabled {
-                                audit(AuditMessage {
-                                    user_email: user_id,
-                                    org_id,
-                                    _timestamp: chrono::Utc::now().timestamp(),
-                                    protocol: Protocol::Ws(WsMeta {
-                                        path: path.clone(),
-                                        message_type: client_msg.get_type(),
-                                        content: client_msg.to_json(),
-                                        close_reason: format!("{:#?}", close_reason),
-                                    }),
-                                })
-                                .await;
-                            }
-
-
-                            cleanup_and_close_session(&req_id, Some(close_reason)).await;
+                        let _ = handle_search_error(e, &req_id, &trace_id_for_task).await;
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        if is_audit_enabled {
+                          audit(AuditMessage {
+                                  user_email: user_id,
+                                  org_id,
+                                  _timestamp: chrono::Utc::now().timestamp(),
+                                  protocol: Protocol::Ws(WsMeta {
+                                      path: path.clone(),
+                                      message_type: client_msg.get_type(),
+                                      content: client_msg.to_json(),
+                                      close_reason: "".to_string(),
+                                  }),
+                              })
+                              .await;
                         }
+
                         // Even if the search is cancelled, we need to cleanup the resources
                         cleanup_search_resources(&trace_id_for_task).await;
                     }
@@ -531,7 +534,7 @@ async fn handle_search_error(e: Error, req_id: &str, trace_id: &str) -> Option<C
     // Send error response
     let err_res =
         WsServerEvents::error_response(e, Some(trace_id.to_string()), Some(req_id.to_string()));
-    let _ = send_message(req_id, err_res.to_json().to_string()).await;
+    let _ = send_message(req_id, err_res.to_json()).await;
 
     // Close with error
     let close_reason = CloseReason {

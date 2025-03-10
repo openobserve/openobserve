@@ -145,9 +145,6 @@ export const usePanelDataLoader = (
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <
-      { requestId: string; traceId: string }[]
-    >[],
     isOperationCancelled: false,
   });
 
@@ -322,18 +319,19 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchWebSocketRequestIdsAndTraceIds) {
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
       try {
-        // loop on state.searchWebSocketRequestIdsAndTraceIds
-        state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
-          if (it?.requestId && it?.traceId) {
-            cancelSearchQueryBasedOnRequestId(it?.requestId, it?.traceId);
-          }
+        // loop on state.searchRequestTraceIds
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
         });
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
-        state.searchWebSocketRequestIdsAndTraceIds = [];
+        state.searchRequestTraceIds = [];
       }
     }
     if (abortController) {
@@ -608,11 +606,7 @@ export const usePanelDataLoader = (
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
-  const handleSearchResponse = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchResponse = (payload: any, response: any) => {
     try {
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
@@ -639,15 +633,16 @@ export const usePanelDataLoader = (
     }
   };
 
-  const sendSearchMessage = async (requestId: string, payload: any) => {
+  const sendSearchMessage = async (payload: any) => {
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
-      closeSocketBasedOnRequestId(requestId);
+      //TODO: need to cancel the query based on traceId without closing the socket
+      // closeSocketBasedOnRequestId(payload.traceId);
       state.isOperationCancelled = false;
       return;
     }
 
-    sendSearchMessageBasedOnRequestId(requestId, {
+    sendSearchMessageBasedOnRequestId({
       type: "search",
       content: {
         trace_id: payload.traceId,
@@ -662,6 +657,7 @@ export const usePanelDataLoader = (
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
+        org_id: store?.state?.selectedOrganization?.identifier,
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
@@ -670,15 +666,11 @@ export const usePanelDataLoader = (
     });
   };
 
-  const handleSearchClose = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchClose = (payload: any, response: any) => {
     const MAX_RETRIES = 2;
     const RECONNECT_DELAY = 1000; // 1 second
 
-    removeRequestId(requestId);
+    removeTraceId(payload.traceId);
 
     if (response.code === 1001 || response.code === 1006) {
       const retryCount = searchRetriesCount.value[payload.traceId] || 0;
@@ -690,18 +682,18 @@ export const usePanelDataLoader = (
 
         setTimeout(() => {
           try {
-            const newRequestId = fetchQueryDataWithWebSocket(payload, {
+            fetchQueryDataWithWebSocket(payload, {
               open: sendSearchMessage,
               close: handleSearchClose,
               error: handleSearchError,
               message: handleSearchResponse,
-            }) as string;
+            });
 
-            addRequestId(newRequestId, payload.traceId);
+            addTraceId(payload.traceId);
           } catch (error: any) {
             console.error("Error reconnecting WebSocket:", error);
             cleanupSearchRetries(payload?.traceId);
-            handleSearchError(requestId, payload, {
+            handleSearchError(payload, {
               content: {
                 message: "Failed to reconnect WebSocket",
                 trace_id: payload.traceId,
@@ -716,7 +708,7 @@ export const usePanelDataLoader = (
       } else {
         // remove current traceId
         cleanupSearchRetries(payload?.traceId);
-        handleSearchError(requestId, payload, {
+        handleSearchError(payload, {
           content: {
             message:
               "WebSocket connection terminated unexpectedly. Please check your network and try again",
@@ -743,12 +735,8 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
-  const handleSearchError = (
-    requestId: string,
-    payload: any,
-    response: any,
-  ) => {
-    removeRequestId(requestId);
+  const handleSearchError = (payload: any, response: any) => {
+    removeTraceId(payload.traceId);
 
     cleanupSearchRetries(payload?.traceId);
 
@@ -794,14 +782,15 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-      const requestId = fetchQueryDataWithWebSocket(payload, {
+
+      fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
-      }) as string;
+      });
 
-      addRequestId(requestId, traceId);
+      addTraceId(traceId);
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
@@ -1520,20 +1509,6 @@ export const usePanelDataLoader = (
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
     );
-  };
-
-  const addRequestId = (requestId: string, traceId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds = [
-      ...state.searchWebSocketRequestIdsAndTraceIds,
-      { requestId, traceId },
-    ];
-  };
-
-  const removeRequestId = (requestId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds =
-      state.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id: any) => id.requestId !== requestId,
-      );
   };
 
   const hasAtLeastOneQuery = () =>
