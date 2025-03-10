@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 filled
                 dense
+                debounce="300"
                 class="q-ml-auto q-mb-xs no-border"
                 :placeholder="t('logStream.search')"
               >
