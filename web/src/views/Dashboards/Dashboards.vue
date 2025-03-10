@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.folderLabel") }}
         </div>
             <!-- Search Input -->
-    <div style="width: 100%;" class="flex folder-item  ">
+    <div style="width: 100%;" class="flex folder-item q-py-xs  ">
           <q-input
           v-model="folderSearchQuery"   
           dense
