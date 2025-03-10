@@ -180,9 +180,6 @@ pprof = { version = "0.14", features = [
     "prost-codec",
 ], optional = true }
 
-[build-dependencies]
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-
 [dev-dependencies]
 async-walkdir.workspace = true
 expect-test.workspace = true

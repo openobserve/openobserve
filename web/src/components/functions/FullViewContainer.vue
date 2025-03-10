@@ -7,7 +7,7 @@
       <div class="tw-flex tw-items-center">
         <q-icon
           name="keyboard_arrow_up"
-          @click="expanded = !expanded"
+          @click.stop="expanded = !expanded"
           class="tw-mr-1 tw-cursor-pointer tw-transition-all"
           :class="[
             store.state.theme === 'dark'
@@ -18,6 +18,7 @@
           size="20px"
         />
         <div
+          @click="expanded = !expanded"
           class="tw-text-[14px] tw-font-bold"
           :class="[
             store.state.theme === 'dark'

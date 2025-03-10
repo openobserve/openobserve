@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
-
-use actix_web::{HttpResponse, http::StatusCode, web};
+use actix_web::web;
 use chrono::{Duration, Utc};
 use config::{
     DEFAULT_SEARCH_AROUND_FIELDS, TIMESTAMP_COL_NAME,
@@ -25,39 +23,33 @@ use config::{
         stream::StreamType,
     },
     metrics,
-    utils::{
-        base64,
-        json::{self, get_string_value},
-    },
+    utils::{base64, json},
 };
 use hashbrown::HashMap;
-use infra::errors;
 use tracing::{Instrument, Span};
 
 use crate::{
-    common::{
-        meta,
-        utils::http::{get_stream_type_from_request, get_work_group},
-    },
+    common::utils::http::get_work_group,
     service::{
         search as SearchService,
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn around(
-    trace_id: String,
+    trace_id: &str,
     http_span: Span,
-    org_id: String,
-    stream_name: String,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
     query: web::Query<HashMap<String, String>>,
+    sql: Option<String>,
     body: Option<web::Bytes>,
     user_id: Option<String>,
-) -> Result<HttpResponse, Error> {
+) -> Result<config::meta::search::Response, infra::errors::Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let mut around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
@@ -73,12 +65,16 @@ pub(crate) async fn around(
     }
 
     let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
-    let mut around_sql = match query.get("sql") {
-        None => default_sql,
-        Some(v) => match base64::decode_url(v) {
-            Err(_) => default_sql,
-            Ok(sql) => sql,
-        },
+    let mut around_sql = if let Some(sql) = sql {
+        sql
+    } else {
+        match query.get("sql") {
+            None => default_sql,
+            Some(v) => match base64::decode_url(v) {
+                Err(_) => default_sql,
+                Ok(sql) => sql,
+            },
+        }
     };
 
     // check playload
@@ -96,14 +92,13 @@ pub(crate) async fn around(
                     if value.is_null() {
                         continue;
                     }
-                    filters.insert(field.to_string(), get_string_value(value));
+                    filters.insert(field.to_string(), json::get_string_value(value));
                 }
             }
         }
     }
     if !filters.is_empty() {
-        around_sql = SearchService::sql::add_new_filters_with_and_operator(&around_sql, filters)
-            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
+        around_sql = SearchService::sql::add_new_filters_with_and_operator(&around_sql, filters)?;
     }
 
     let around_size = query
@@ -126,7 +121,7 @@ pub(crate) async fn around(
     });
 
     metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
+        .with_label_values(&[org_id])
         .inc();
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
@@ -146,7 +141,7 @@ pub(crate) async fn around(
         took_wait
     );
     metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[&org_id])
+        .with_label_values(&[org_id])
         .dec();
 
     let timeout = query
@@ -190,34 +185,11 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+    let resp_forward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
-        .await;
-
-    let resp_forward = match search_res {
-        Ok(res) => res,
-        Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_around");
-            log::error!("search around error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+        .await?;
 
     // search backward
     let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
@@ -246,34 +218,11 @@ pub(crate) async fn around(
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
         use_cache: None,
+        local_mode: None,
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+    let resp_backward = SearchService::search(trace_id, org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
-        .await;
-
-    let resp_backward = match search_res {
-        Ok(res) => res,
-        Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "500", "_around");
-            log::error!("search around error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+        .await?;
 
     // merge
     let mut resp = config::meta::search::Response::default();
@@ -293,7 +242,7 @@ pub(crate) async fn around(
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, &org_id, stream_type, "200", "_around");
+    http_report_metrics(start, org_id, stream_type, "200", "_around");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -304,7 +253,7 @@ pub(crate) async fn around(
         min_ts: Some(around_start_time),
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
-        trace_id: Some(trace_id),
+        trace_id: Some(trace_id.to_string()),
         took_wait_in_queue: match (
             resp_forward.took_detail.as_ref(),
             resp_backward.took_detail.as_ref(),
@@ -325,8 +274,8 @@ pub(crate) async fn around(
     let num_fn = req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
-        &org_id,
-        &stream_name,
+        org_id,
+        stream_name,
         StreamType::Logs,
         UsageType::SearchAround,
         num_fn,
@@ -334,5 +283,5 @@ pub(crate) async fn around(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(resp)
 }

@@ -45,6 +45,11 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// global version variables
+pub static VERSION: &str = env!("GIT_VERSION");
+pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
+pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
+
 pub const META_ORG_ID: &str = "_meta";
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
@@ -2540,10 +2545,10 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
-        cfg.health_check.timeout = 10;
+        cfg.health_check.timeout = 5;
     }
     if cfg.health_check.failed_times == 0 {
-        cfg.health_check.failed_times = 5;
+        cfg.health_check.failed_times = 3;
     }
     Ok(())
 }

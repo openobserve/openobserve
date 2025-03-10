@@ -55,6 +55,7 @@ pub fn load_local_node() -> Node {
         broadcasted: false,
         status: NodeStatus::Online,
         metrics: Default::default(),
+        version: crate::VERSION.to_string(),
     }
 }
 

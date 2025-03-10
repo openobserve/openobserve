@@ -45,11 +45,6 @@ use crate::{
     },
 };
 
-// global version variables
-pub static VERSION: &str = env!("GIT_VERSION");
-pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
-pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
-
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static QUERY_FUNCTIONS: Lazy<RwHashMap<String, Transform>> = Lazy::new(DashMap::default);
