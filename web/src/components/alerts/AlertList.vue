@@ -367,11 +367,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <ImportAlert
-      
       :destinations="destinations"
       :templates="templates"
       :alerts="alerts"
-      @update:alerts="getAlertsFn(store, activeFolderId)"
+      @update:alerts="getAlertsFn"
       @update:destinations="refreshDestination"
       @update:templates="getTemplates"
        />
@@ -755,6 +754,7 @@ export default defineComponent({
               }
               if(router.currentRoute.value.query.action == "import"){
                 showImportAlertDialog.value = true;
+
               }
               if (router.currentRoute.value.query.action == "add") {
                 showAddUpdateFn({ row: undefined });
@@ -1230,6 +1230,7 @@ export default defineComponent({
         query: {
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
+          folderId: activeFolderId.value,
         },
       });
     }

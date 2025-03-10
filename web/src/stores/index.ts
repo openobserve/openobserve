@@ -37,6 +37,7 @@ const organizationObj = {
   allDashboardList: {},
   allDashboardData: {},
   allAlertsListByFolderId: {},
+  allAlertsListByNames: {},
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -133,6 +134,9 @@ export default createStore({
     },
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllAlertsListByNames(state, payload) {
+      state.organizationData.allAlertsListByNames = payload;
     },
     setDashboardData(state, payload) {
       state.organizationData.allDashboardData = payload;
@@ -252,6 +256,9 @@ export default createStore({
     },
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
+    },
+    setAllAlertsListByNames(context, payload) {
+      context.commit("setAllAlertsListByNames", payload);
     },
     setDashboardData(context, payload) {
       context.commit("setDashboardData", payload);
