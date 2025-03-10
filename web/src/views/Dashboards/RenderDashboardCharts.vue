@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
+      :current-tab-id="selectedTabId"
+      :current-panel-id="currentPanelId"
     />
     <TabList
       v-if="showTabs && selectedTabId !== null"
@@ -63,10 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             currentTimeObj['__global'] ||
             {}
           "
-          :variablesData="
-            currentVariablesDataRef[panels[0].id] ||
-            currentVariablesDataRef['__global']
-          "
+          :variablesData="getPanelVariables(panels[0].id)"
           :forceLoad="forceLoad"
           :searchType="searchType"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -121,10 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
-              :variablesData="
-                currentVariablesDataRef[item.id] ||
-                currentVariablesDataRef['__global']
-              "
+              :variablesData="getPanelVariables(item.id)"
               :currentVariablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -181,6 +177,7 @@ import {
   provide,
   ref,
   watch,
+  onMounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -265,6 +262,7 @@ export default defineComponent({
 
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
+    const currentPanelId = ref(null);
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
@@ -577,18 +575,107 @@ export default defineComponent({
       };
     };
 
+    // Function to get panel-specific variables
+    const getPanelVariables = (panelId: string) => {
+      if (!variablesData.value?.values)
+        return currentVariablesDataRef.value["__global"];
+
+      const panelSpecificVariables = variablesData.value.values.filter(
+        (variable: any) => {
+          // Global scope variables are always included
+          if (!variable.scope || variable.scope === "global") return true;
+
+          // For tabs scope, check if current tab is in the variable's tabs list
+          if (variable.scope === "tabs") {
+            return variable.tabs?.includes(selectedTabId.value);
+          }
+
+          // For panels scope, check both tab and panel
+          if (variable.scope === "panels") {
+            return (
+              variable.tabs?.includes(selectedTabId.value) &&
+              variable.panels?.includes(panelId)
+            );
+          }
+
+          return true;
+        },
+      );
+
+      return {
+        ...currentVariablesDataRef.value["__global"],
+        values: panelSpecificVariables,
+      };
+    };
+
+    // Update refreshPanelRequest to use panel-specific variables
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
-
       currentVariablesDataRef.value = {
         ...currentVariablesDataRef.value,
-        [panelId]: variablesData.value,
+        [panelId]: getPanelVariables(panelId),
       };
     };
 
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
+
+    // Add new function to initialize panel variables
+    const initializePanelVariables = () => {
+      console.debug("Initializing panel variables");
+      if (panels.value.length > 0) {
+        console.debug(`Initializing ${panels.value.length} panels`);
+
+        // Find the first panel that has variables
+        const panelWithVariables = panels.value.find((panel: any) => {
+          if (!panel.id) return false;
+
+          const variables = variablesData.value?.values || [];
+          return variables.some((variable: any) => {
+            if (!variable.scope || variable.scope === "global") return true;
+            if (variable.scope === "tabs")
+              return variable.tabs?.includes(selectedTabId.value);
+            if (variable.scope === "panels") {
+              return (
+                variable.tabs?.includes(selectedTabId.value) &&
+                variable.panels?.includes(panel.id)
+              );
+            }
+            return false;
+          });
+        });
+
+        // Set currentPanelId to the first panel that has variables
+        if (panelWithVariables) {
+          currentPanelId.value = panelWithVariables.id;
+        }
+
+        // Initialize variables for all panels
+        panels.value.forEach((panel: any) => {
+          if (panel.id) {
+            console.debug(`Initializing panel ${panel.id}`);
+            currentVariablesDataRef.value[panel.id] = getPanelVariables(
+              panel.id,
+            );
+          }
+        });
+      }
+    };
+
+    // Update the watch for panels to initialize variables
+    watch(
+      panels,
+      (newPanels) => {
+        initializePanelVariables();
+      },
+      { immediate: true },
+    );
+
+    // Add initialization in onMounted
+    onMounted(() => {
+      initializePanelVariables();
+    });
 
     return {
       store,
@@ -618,6 +705,8 @@ export default defineComponent({
       openEditLayout,
       saveDashboardData,
       currentVariablesDataRef,
+      currentPanelId,
+      getPanelVariables,
     };
   },
   methods: {
