@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        dense
       >
         <template #no-data>
           <NoData />

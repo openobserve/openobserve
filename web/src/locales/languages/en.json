@@ -916,7 +916,8 @@
     "lastRunAt":"Last Run At",
     "lastSuccessfulAt":"Last Successfull At",
     "status":"Status",
-    "numOfEvents": "Number of Events"
+    "numOfEvents": "Number of Events",
+    "view":"View"
   },
   "alert_templates": {
     "header": "Templates",
