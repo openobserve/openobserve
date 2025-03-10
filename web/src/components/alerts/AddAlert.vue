@@ -1519,8 +1519,6 @@ export default defineComponent({
           payload.folder_id = this.router.currentRoute.value.query.folder || "default";
           callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
             payload,
           );
           callAlert
