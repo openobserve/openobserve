@@ -284,6 +284,7 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import { event } from "quasar";
+import { exportFile } from "quasar";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -461,7 +462,7 @@ export default defineComponent({
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
-    const tableRendererRef = ref(null);
+    const tableRendererRef: any = ref(null);
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -945,7 +946,8 @@ export default defineComponent({
       return offSetValues;
     };
 
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
 
     let parser: any;
     onBeforeMount(async () => {
@@ -1518,6 +1520,113 @@ export default defineComponent({
       return "";
     });
 
+    const downloadDataAsCSV = (title: string) => {
+      // if panel type is table then download data as csv
+      if (panelSchema.value.type == "table") {
+        tableRendererRef?.value?.downloadTableAsCSV(title);
+      } else {
+        // For non-table charts
+        try {
+          // Get the first dataset since that contains our chart data
+          const chartData = data?.value?.[0];
+          if (!chartData || chartData?.length === 0) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          // Collect all possible keys from all objects
+          const allKeys = new Set();
+          chartData?.forEach((row: any) => {
+            Object.keys(row).forEach((key) => allKeys.add(key));
+          });
+
+          // Convert Set to Array and sort for consistent order
+          const headers = Array.from(allKeys).sort();
+
+          // Create CSV content with headers and data rows
+          const content = [
+            headers?.join(","), // Headers row
+            ...chartData?.map((row: any) =>
+              headers
+                ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                .join(","),
+            ),
+          ].join("\r\n");
+
+          const status = exportFile(
+            (title ?? "chart-export") + ".csv",
+            content,
+            "text/csv",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a CSV file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        } catch (error) {
+          console.error("Error downloading CSV:", error);
+          showErrorNotification("Failed to download data as CSV");
+        }
+      }
+    };
+
+    // Helper function to properly wrap CSV values
+    const wrapCsvValue = (val: any): string => {
+      if (val === null || val === undefined) {
+        return "";
+      }
+
+      // Convert to string and escape any quotes
+      const str = String(val).replace(/"/g, '""');
+
+      // Wrap in quotes if the value contains comma, quotes, or newlines
+      const needsQuotes =
+        str.includes(",") ||
+        str.includes('"') ||
+        str.includes("\n") ||
+        str.includes("\r");
+      return needsQuotes ? `"${str}"` : str;
+    };
+
+    const downloadDataAsJSON = (title: string) => {
+      try {
+        // Handle table type charts
+        if (panelSchema?.value?.type === "table") {
+          tableRendererRef?.value?.downloadTableAsJSON(title);
+        } else {
+          // Handle non-table charts
+          const chartData = data.value;
+
+          if (!chartData || !chartData?.[0]?.length) {
+            showErrorNotification("No data available to download");
+            return;
+          }
+
+          const content = JSON.stringify(chartData, null, 2);
+
+          const status = exportFile(
+            (title ?? "data-export") + ".json",
+            content,
+            "application/json",
+          );
+
+          if (status === true) {
+            showPositiveNotification("Chart data downloaded as a JSON file", {
+              timeout: 2000,
+            });
+          } else {
+            showErrorNotification("Browser denied file download...");
+          }
+        }
+      } catch (error) {
+        console.error("Error downloading JSON:", error);
+        showErrorNotification("Failed to download data as JSON");
+      }
+    };
+
     return {
       store,
       chartPanelRef,
@@ -1549,6 +1658,8 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      downloadDataAsCSV,
+      downloadDataAsJSON,
     };
   },
 });
