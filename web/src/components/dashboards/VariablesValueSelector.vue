@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex q-mt-xs q-ml-xs"
   >
     <div
-      v-for="(item, index) in variablesData.values"
+      v-for="(item, index) in filteredVariables"
       :key="
         item.name +
         item.value +
@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :data-test="`dashboard-variable-${item}-selector`"
     >
+      {{ item }}
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
@@ -91,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, ref, watch } from "vue";
+import { getCurrentInstance, onMounted, ref, watch, computed } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -105,12 +106,20 @@ import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/varia
 
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: [
-    "selectedTimeDate",
-    "variablesConfig",
-    "initialVariableValues",
-    "showDynamicFilters",
-  ],
+  props: {
+    selectedTimeDate: Object,
+    variablesConfig: Object,
+    initialVariableValues: Object,
+    showDynamicFilters: Boolean,
+    currentTabId: {
+      type: String,
+      default: null,
+    },
+    currentPanelId: {
+      type: String,
+      default: null,
+    },
+  },
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
@@ -997,12 +1006,56 @@ export default defineComponent({
       emitVariablesData();
     };
 
+    // Add computed property for filtered variables with improved visibility logic
+    const filteredVariables = computed(() => {
+      return variablesData.values.filter((item: any) => {
+        // If variable is hidden on dashboard, don't show it
+        if (item.hideOnDashboard) return false;
+
+        // Global scope variables are always visible
+        if (!item.scope || item.scope === "global") return true;
+
+        // For tabs scope, check if current tab is in the variable's tabs list
+        if (item.scope === "tabs") {
+          return item.tabs?.includes(props.currentTabId);
+        }
+
+        // For panels scope, check both tab and panel
+        if (item.scope === "panels") {
+          // First check if the current tab is in the variable's tabs list
+          const isInCorrectTab = item.tabs?.includes(props.currentTabId);
+          // Then check if the current panel is in the variable's panels list
+          const isInCorrectPanel = item.panels?.includes(props.currentPanelId);
+          // Variable is visible only if both conditions are met
+          return isInCorrectTab && isInCorrectPanel;
+        }
+
+        return true; // Default case for backward compatibility
+      });
+    });
+
+    // Add watchers for debugging (optional)
+    watch(
+      () => props.currentTabId,
+      (newTabId) => {
+        console.debug("Current Tab ID changed:", newTabId);
+      },
+    );
+
+    watch(
+      () => props.currentPanelId,
+      (newPanelId) => {
+        console.debug("Current Panel ID changed:", newPanelId);
+      },
+    );
+
     return {
       props,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
+      filteredVariables,
     };
   },
 });

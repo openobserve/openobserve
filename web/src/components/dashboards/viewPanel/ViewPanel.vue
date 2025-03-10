@@ -113,6 +113,8 @@
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
+                :current-tab-id="dashboardPanelData.data.tabId"
+                :current-panel-id="dashboardPanelData.data.id"
               />
               <div style="flex: 1; overflow: hidden">
                 <div

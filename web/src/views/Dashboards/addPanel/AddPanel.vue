@@ -211,6 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
                         :initialVariableValues="initialVariableValues"
+                        :current-tab-id="dashboardPanelData.data.tabId"
+                        :current-panel-id="dashboardPanelData.data.id"
                       />
 
                       <div v-if="isOutDated" class="tw-p-2">
