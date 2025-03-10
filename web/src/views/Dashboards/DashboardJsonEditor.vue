@@ -186,7 +186,7 @@ export default defineComponent({
   }
 
   :deep(.q-card__section) {
-    padding-left: 0;
+    padding-left: 8px;
     padding-right: 0;
   }
 
