@@ -19,6 +19,8 @@ import dashboardService from "../services/dashboards";
 import { toRaw } from "vue";
 import { date } from "quasar";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
+import commonService from "../services/common";
+
 
 let moment: any;
 let momentInitialized = false;
@@ -164,6 +166,39 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     });
   } catch (error) {
     // handle error
+    throw error;
+  }
+};
+export const getFoldersListByType = async (store: any, type: any) => {
+  try {
+    let folders = (
+      await commonService.list_Folders(
+        store.state.selectedOrganization.identifier,
+        type
+      )
+    ).data.list;
+
+    // get default folder and append it to top
+    let defaultFolder = folders.find((it: any) => it.folderId == "default");
+    folders = folders.filter((it: any) => it.folderId != "default");
+
+    if (!defaultFolder) {
+      defaultFolder = {
+        name: "default",
+        folderId: "default",
+        description: "default",
+      };
+    }
+
+    store.dispatch("setFoldersByType", {
+      [type]: [
+        defaultFolder,
+        ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
+      ],
+    });
+
+    return store.state.organizationData.folders;
+  } catch (error) {
     throw error;
   }
 };
@@ -829,6 +864,19 @@ export const deleteFolderById = async (store: any, folderId: any) => {
   }
 };
 
+export const deleteFolderByIdByType = async (store: any, folderId: any, type: any) => {
+  try {
+    await commonService.delete_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      folderId,
+    );
+    await getFoldersListByType(store, type);
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const createFolder = async (store: any, data: any) => {
   try {
     const newFolder = await dashboardService.new_Folder(
@@ -836,6 +884,20 @@ export const createFolder = async (store: any, data: any) => {
       data,
     );
     await getFoldersList(store);
+    return newFolder;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const createFolderByType = async (store: any, data: any, type: any) => {
+  try {
+    const newFolder = await commonService.new_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      data,
+    );
+    await getFoldersListByType(store,type);
     return newFolder;
   } catch (error) {
     throw error;
@@ -850,6 +912,20 @@ export const updateFolder = async (store: any, folderId: any, data: any) => {
       data,
     );
     await getFoldersList(store);
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateFolderByType = async (store: any, folderId: any, data: any, type: any) => {
+  try {
+    await commonService.edit_Folder(
+      store.state.selectedOrganization.identifier,
+      type,
+      folderId,
+      data,
+    );
+    await getFoldersListByType(store, type);
   } catch (error) {
     throw error;
   }
@@ -875,6 +951,24 @@ export const moveDashboardToAnotherFolder = async (
     //update both folders dashboard
     await getAllDashboards(store, to);
     await getAllDashboards(store, from);
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const moveModuleToAnotherFolder = async (
+  store: any,
+  data: any,
+  type: any,
+) => {
+  try {
+    //move dashboard
+    await commonService.move_across_folders(
+      store.state.selectedOrganization.identifier,
+      type,
+      data
+    );
+
   } catch (error) {
     throw error;
   }

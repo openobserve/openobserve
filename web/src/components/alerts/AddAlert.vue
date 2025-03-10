@@ -547,6 +547,7 @@ const defaultValue: any = () => {
     updatedAt: "",
     owner: "",
     lastEditedBy: "",
+    folder_id : "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -907,6 +908,8 @@ export default defineComponent({
       let whereClause = formData.value.query_condition.conditions
         .map((condition: any) => {
           if (condition.column && condition.operator && condition.value) {
+            console.log(streamFieldsMap.value,'streamFieldsMap')
+            console.log(condition.column,'condition.column')
             // If value is string then add single quotes
             const value =
               streamFieldsMap.value[condition.column].type === "Int64" ||
@@ -1513,7 +1516,8 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
-          callAlert = alertsService.update(
+          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
+          callAlert = alertsService.update_by_alert_id(
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
             payload.stream_type,
@@ -1544,10 +1548,9 @@ export default defineComponent({
           });
           return;
         } else {
-          callAlert = alertsService.create(
+          payload.folder_id = this.router.currentRoute.value.query.folder || "default";
+          callAlert = alertsService.create_by_alert_id(
             this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
             payload,
           );
 
