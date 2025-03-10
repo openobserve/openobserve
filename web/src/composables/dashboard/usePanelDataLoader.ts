@@ -323,7 +323,10 @@ export const usePanelDataLoader = (
       try {
         // loop on state.searchRequestTraceIds
         state.searchRequestTraceIds.forEach((traceId) => {
-          cancelSearchQueryBasedOnRequestId(traceId);
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
         });
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
@@ -654,6 +657,7 @@ export const usePanelDataLoader = (
         },
         stream_type: payload.pageType,
         search_type: searchType.value ?? "dashboards",
+        org_id: store?.state?.selectedOrganization?.identifier,
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,

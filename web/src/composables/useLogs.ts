@@ -234,9 +234,7 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <
-      { traceId: string }[]
-    >[],
+    searchWebSocketRequestIdsAndTraceIds: <{ traceId: string }[]>[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
   },
@@ -602,8 +600,9 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
     if (
-      Object.hasOwn(query, "type") &&
-      query.type == "search_history_re_apply" || query.type == "search_scheduler"
+      (Object.hasOwn(query, "type") &&
+        query.type == "search_history_re_apply") ||
+      query.type == "search_scheduler"
     ) {
       delete query.type;
     }
@@ -1626,7 +1625,6 @@ const useLogs = () => {
           JSON.stringify(queryReq),
         );
 
-
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1697,7 +1695,6 @@ const useLogs = () => {
           searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
             if (searchObj.data.stream.selectedStream.length > 1) {
-
               searchObj.data.histogram = {
                 xData: [],
                 yData: [],
@@ -1807,7 +1804,6 @@ const useLogs = () => {
           }
 
           if (searchObj.data.stream.selectedStream.length > 1) {
-
             searchObj.data.histogram = {
               xData: [],
               yData: [],
@@ -1892,37 +1888,37 @@ const useLogs = () => {
         }
         delete queryReq.aggs;
       }
-              searchObj.data.queryResults.subpage = 1;
-            if (searchObj.meta.jobId == "" ) {
-              searchService
-              .schedule_search(
-              {
-                org_identifier: searchObj.organizationIdentifier,
-                query: queryReq,
-                page_type: searchObj.data.stream.streamType,
-              },
-              "UI",
-            ).then((res: any) => {
-              $q.notify({
-                type: "positive",
-                message: "Job Added Succesfully",
-                timeout: 2000,
-                actions: [
-                  {
-                    label: "Go To Job Scheduler",
-                    color: "white",
-                    handler: () => routeToSearchSchedule(),
-                  },
-                ],
-              });
-            })
-            }
-            else {
-              await getPaginatedData(queryReq);
-            }
-          if (searchObj.meta.jobId == ""){
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
-          }
+      searchObj.data.queryResults.subpage = 1;
+      if (searchObj.meta.jobId == "") {
+        searchService
+          .schedule_search(
+            {
+              org_identifier: searchObj.organizationIdentifier,
+              query: queryReq,
+              page_type: searchObj.data.stream.streamType,
+            },
+            "UI",
+          )
+          .then((res: any) => {
+            $q.notify({
+              type: "positive",
+              message: "Job Added Succesfully",
+              timeout: 2000,
+              actions: [
+                {
+                  label: "Go To Job Scheduler",
+                  color: "white",
+                  handler: () => routeToSearchSchedule(),
+                },
+              ],
+            });
+          });
+      } else {
+        await getPaginatedData(queryReq);
+      }
+      if (searchObj.meta.jobId == "") {
+        searchObj.data.histogram.chartParams.title = getHistogramTitle();
+      }
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -1934,7 +1930,6 @@ const useLogs = () => {
   };
 
   function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
-
     searchObj.data.histogram = {
       xData: [],
       yData: [],
@@ -1966,7 +1961,6 @@ const useLogs = () => {
   }
 
   function generateHistogramSkeleton() {
-
     if (
       searchObj.data.queryResults.hasOwnProperty("aggs") &&
       searchObj.data.queryResults.aggs
@@ -2077,12 +2071,12 @@ const useLogs = () => {
         delete queryReq.query.from;
         delete queryReq.query.quick_mode;
         queryReq.query["sql_mode"] = "full";
-  
+
         queryReq.query.track_total_hits = true;
-  
+
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
-  
+
         searchService
           .search(
             {
@@ -2119,8 +2113,7 @@ const useLogs = () => {
                 }
               }
             }
-  
-  
+
             let regeratePaginationFlag = false;
             if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
               regeratePaginationFlag = true;
@@ -2136,11 +2129,11 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loading = false;
             searchObj.loadingCounter = false;
-  
-          // Reset cancel query on search error
-          searchObj.data.isOperationCancelled = false;
 
-          let trace_id = "";
+            // Reset cancel query on search error
+            searchObj.data.isOperationCancelled = false;
+
+            let trace_id = "";
             searchObj.data.countErrorMsg =
               "Error while retrieving total events: ";
             if (err.response != undefined) {
@@ -2152,17 +2145,17 @@ const useLogs = () => {
                 trace_id = err?.trace_id;
               }
             }
-  
+
             const customMessage = logsErrorMessage(err?.response?.data.code);
             searchObj.data.errorCode = err?.response?.data.code;
-  
+
             notificationMsg.value = searchObj.data.countErrorMsg;
-  
+
             if (err?.request?.status >= 429) {
               notificationMsg.value = err?.response?.data?.message;
               searchObj.data.countErrorMsg += err?.response?.data?.message;
             }
-  
+
             if (trace_id) {
               searchObj.data.countErrorMsg += " TraceID:" + trace_id;
               notificationMsg.value += " TraceID:" + trace_id;
@@ -2177,7 +2170,6 @@ const useLogs = () => {
         searchObj.loadingCounter = false;
         reject(false);
       }
-
     });
   };
 
@@ -2191,8 +2183,7 @@ const useLogs = () => {
     updateGridColumns();
 
     filterHitsColumns();
-      searchObj.data.histogram.chartParams.title = getHistogramTitle();
-
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
   const getPaginatedData = async (
@@ -2220,7 +2211,7 @@ const useLogs = () => {
         showCancelSearchNotification();
         return;
       }
-      if (searchObj.meta.jobId != ""){
+      if (searchObj.meta.jobId != "") {
         searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
       }
       const parsedSQL: any = fnParsedSQL();
@@ -2254,15 +2245,15 @@ const useLogs = () => {
         ? "get_scheduled_search_result"
         : "search";
       searchService[decideSearch](
-          {
-            org_identifier: searchObj.organizationIdentifier,
-            query: queryReq,
-            jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
-            page_type: searchObj.data.stream.streamType,
-            traceparent,
-          },
-          "UI",
-        )
+        {
+          org_identifier: searchObj.organizationIdentifier,
+          query: queryReq,
+          jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
+          page_type: searchObj.data.stream.streamType,
+          traceparent,
+        },
+        "UI",
+      )
         .then(async (res) => {
           if (
             res.data.hasOwnProperty("function_error") &&
@@ -2304,7 +2295,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
-          if (searchObj.meta.jobId == ""){
+          if (searchObj.meta.jobId == "") {
             for (const [
               index,
               item,
@@ -2379,9 +2370,8 @@ const useLogs = () => {
               );
               searchObj.data.queryResults.hits = res.data.hits;
             } else {
-              if (searchObj.meta.jobId != ""){
+              if (searchObj.meta.jobId != "") {
                 searchObj.data.queryResults.total = res.data.total;
-                
               }
               if (!queryReq.query.hasOwnProperty("track_total_hits")) {
                 delete res.data.total;
@@ -2424,7 +2414,7 @@ const useLogs = () => {
             searchObj.data.queryResults.subpage++;
 
             setTimeout(async () => {
-                processPostPaginationData();
+              processPostPaginationData();
 
               // searchObj.data.functionError = "";
               // if (
@@ -2436,7 +2426,7 @@ const useLogs = () => {
             }, 0);
             await getPaginatedData(queryReq, true);
           }
-          if (searchObj.meta.jobId != ""){
+          if (searchObj.meta.jobId != "") {
             searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
             searchObj.data.queryResults.pagination = [];
             refreshJobPagination(true);
@@ -2546,13 +2536,13 @@ const useLogs = () => {
 
   const routeToSearchSchedule = () => {
     router.push({
-      query:{
+      query: {
         action: "search_scheduler",
         org_identifier: store.state.selectedOrganization.identifier,
-        type: "search_scheduler_list"
-      }
+        type: "search_scheduler_list",
+      },
     });
-  }
+  };
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
@@ -3898,18 +3888,14 @@ const useLogs = () => {
       // await getSavedViews();
       await getFunctions();
       await extractFields();
-      if (searchObj.meta.jobId == ""){
+      if (searchObj.meta.jobId == "") {
         await getQueryData();
-      }
-      else{
-
+      } else {
         await getJobData();
-
       }
       refreshData();
     } catch (e: any) {
       searchObj.loading = false;
-
     }
   };
   const loadJobData = async () => {
@@ -3957,7 +3943,7 @@ const useLogs = () => {
         }
       }, 120000);
       await getQueryData();
-      clearTimeout(queryTimeout); 
+      clearTimeout(queryTimeout);
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
@@ -4574,10 +4560,10 @@ const useLogs = () => {
 
   const extractValueQuery = () => {
     try {
-      if(searchObj.meta.sqlMode == false || searchObj.data.query == "") {
+      if (searchObj.meta.sqlMode == false || searchObj.data.query == "") {
         return {};
       }
-      
+
       const orgQuery: string = searchObj.data.query
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
@@ -5376,10 +5362,7 @@ const useLogs = () => {
     return searchObj.data.queryResults.aggs === undefined;
   }
 
-  const handleSearchClose = (
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchClose = (payload: any, response: any) => {
     if (payload.traceId) removeRequestId(payload.traceId);
 
     // Any case where below logic may end in recursion
@@ -5451,10 +5434,7 @@ const useLogs = () => {
     searchObj.data.isOperationCancelled = false;
   };
 
-  const handleSearchError = (
-    request: any,
-    err: WebSocketErrorResponse,
-  ) => {
+  const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -5510,7 +5490,8 @@ const useLogs = () => {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
 
-      if(searchObj.meta.jobId != "") searchObj.meta.resultGrid.rowsPerPage = 100;
+      if (searchObj.meta.jobId != "")
+        searchObj.meta.resultGrid.rowsPerPage = 100;
 
       let total = 0;
       let totalPages = 0;
@@ -5625,7 +5606,10 @@ const useLogs = () => {
 
       // loop on all requestIds
       searchRequests.forEach(({ traceId }) => {
-        cancelSearchQueryBasedOnRequestId(traceId);
+        cancelSearchQueryBasedOnRequestId({
+          trace_id: traceId,
+          org_id: store?.state?.selectedOrganization?.identifier,
+        });
       });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
