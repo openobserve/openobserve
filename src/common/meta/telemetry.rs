@@ -107,7 +107,7 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
         get_config().common.instance_name.clone().into(),
     );
 
-    data.insert("zo_version".to_string(), VERSION.to_owned().into());
+    data.insert("zo_version".to_string(), config::VERSION.to_owned().into());
 
     data.clone()
 }

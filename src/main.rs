@@ -34,7 +34,7 @@ use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{self as common_infra, cluster, config::VERSION},
+        infra::{self as common_infra, cluster},
         meta, migration,
         utils::zo_logger,
     },
@@ -140,7 +140,7 @@ async fn main() -> Result<(), anyhow::Error> {
             [
                 ("role", cfg.common.node_role.as_str()),
                 ("instance", cfg.common.instance_name.as_str()),
-                ("version", VERSION),
+                ("version", config::VERSION),
             ]
             .to_vec(),
         )
@@ -180,7 +180,7 @@ async fn main() -> Result<(), anyhow::Error> {
         Some(setup_logs())
     };
 
-    log::info!("Starting OpenObserve {}", VERSION);
+    log::info!("Starting OpenObserve {}", config::VERSION);
     log::info!(
         "System info: CPU cores {}, MEM total {:.2} GB, Disk total {:.2} GB, free {:.2} GB",
         cfg.limit.real_cpu_num,
@@ -242,7 +242,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // check version upgrade
             let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-            if let Err(e) = migration::check_upgrade(&old_version, VERSION).await {
+            if let Err(e) = migration::check_upgrade(&old_version, config::VERSION).await {
                 job_init_tx.send(false).ok();
                 panic!("check upgrade failed: {}", e);
             }
@@ -961,7 +961,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             Resource::new(vec![
                 KeyValue::new("service.name", cfg.common.node_role.to_string()),
                 KeyValue::new("service.instance", cfg.common.instance_name.to_string()),
-                KeyValue::new("service.version", VERSION),
+                KeyValue::new("service.version", config::VERSION),
             ]),
         ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;

@@ -54,6 +54,7 @@ pub fn load_local_node() -> Node {
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
+        version: crate::VERSION.to_string(),
     }
 }
 

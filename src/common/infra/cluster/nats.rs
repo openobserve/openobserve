@@ -153,6 +153,7 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        version: config::VERSION.to_string(),
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -230,6 +231,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            version: config::VERSION.to_string(),
         },
     };
     let val = json::to_string(&node).unwrap();

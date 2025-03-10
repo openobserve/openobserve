@@ -75,3 +75,6 @@ vrl.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
+
+[build-dependencies]
+chrono.workspace = true

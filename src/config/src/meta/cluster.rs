@@ -46,6 +46,8 @@ pub struct Node {
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
+    #[serde(default)]
+    pub version: String,
 }
 
 impl Node {
@@ -62,6 +64,7 @@ impl Node {
             status: NodeStatus::Prepare,
             scheduled: false,
             broadcasted: false,
+            version: crate::VERSION.to_string(),
         }
     }
     pub fn is_single_node(&self) -> bool {

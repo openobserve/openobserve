@@ -41,10 +41,7 @@ use o2_enterprise::enterprise::openfga::add_init_ofga_tuples;
 use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
 
 use crate::{
-    common::{
-        infra::config::VERSION,
-        utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
-    },
+    common::utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     service::db,
 };
 
@@ -294,7 +291,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
     if let Err(e) = db
         .put(
             META_MIGRATION_VERSION_KEY,
-            VERSION.to_string().into(),
+            config::VERSION.to_string().into(),
             NO_NEED_WATCH,
             None,
         )
