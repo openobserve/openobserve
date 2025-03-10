@@ -21,16 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw-prose tw-prose-sm tw-max-w-none',
         store.state?.theme === 'dark' && 'tw-prose-invert',
       ]"
-      v-html="DOMPurify.sanitize(htmlContent)"
+      v-html="DOMPurify.sanitize(processedContent)"
       data-test="html-renderer"
     ></div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
-import DOMPurify from "dompurify";
+import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
+import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
+import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "HTMLRenderer",
@@ -39,12 +40,22 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    variablesData: {
+      type: Object,
+      default: () => ({}),
+    },
   },
-  setup(): any {
+  setup(props): any {
     const store = useStore();
+
+    const processedContent = computed(() => {
+      return processVariableContent(props.htmlContent, props.variablesData);
+    });
+
     return {
       DOMPurify,
       store,
+      processedContent,
     };
   },
 });
