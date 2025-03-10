@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.folderLabel") }}
         </div>
             <!-- Search Input -->
-    <div style="width: 100%;" class="flex folder-item  tw-ps-2">
+    <div style="width: 100%;" class="flex folder-item  ">
           <q-input
           v-model="folderSearchQuery"   
           dense
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="folder-search"
           placeholder="Search Folders"
           style="width: 100%;"
-          class="q-mr-sm "
+          class=" "
           clearable
         >
           <template #prepend>
