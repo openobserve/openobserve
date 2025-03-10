@@ -242,7 +242,7 @@ pub async fn handle_text_message(
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
                         trace_id,
-                        org_id: Some(org_id.to_string()),
+                        org_id: org_id.to_string(),
                     };
 
                     // Add audit before closing

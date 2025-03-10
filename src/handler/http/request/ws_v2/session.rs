@@ -223,7 +223,7 @@ pub async fn handle_text_message(
                 }
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel { trace_id, org_id } => {
-                    let Some(org_id) = org_id else {
+                    if org_id.is_empty() {
                         log::error!(
                             "[WS_HANDLER]: Request Id: {} Node Role: {} Org id not found",
                             req_id,
@@ -251,7 +251,7 @@ pub async fn handle_text_message(
                     #[cfg(feature = "enterprise")]
                     let client_msg = WsClientEvents::Cancel {
                         trace_id,
-                        org_id: Some(org_id.to_string()),
+                        org_id: org_id.to_string(),
                     };
 
                     // Add audit before closing
