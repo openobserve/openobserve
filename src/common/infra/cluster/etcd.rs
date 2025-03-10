@@ -153,6 +153,7 @@ async fn register() -> Result<()> {
         scheduled: true,
         broadcasted: false,
         metrics: Default::default(),
+        version: config::VERSION.to_string(),
     };
     let val = json::to_string(&node).unwrap();
 
@@ -244,6 +245,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             scheduled: true,
             broadcasted: false,
             metrics: Default::default(),
+            version: config::VERSION.to_string(),
         },
     };
 

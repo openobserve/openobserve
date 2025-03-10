@@ -107,6 +107,7 @@ mod tests {
                 tcp_conns_close_wait: 3,
                 tcp_conns_time_wait: 5,
             },
+            version: config::VERSION.to_string(),
         }
     }
 

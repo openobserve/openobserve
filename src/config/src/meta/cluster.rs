@@ -50,6 +50,8 @@ pub struct Node {
     pub status: NodeStatus,
     #[serde(default)]
     pub metrics: NodeMetrics,
+    #[serde(default)]
+    pub version: String,
 }
 
 impl Node {
@@ -67,6 +69,7 @@ impl Node {
             broadcasted: false,
             status: NodeStatus::Prepare,
             metrics: Default::default(),
+            version: crate::VERSION.to_string(),
         }
     }
 
