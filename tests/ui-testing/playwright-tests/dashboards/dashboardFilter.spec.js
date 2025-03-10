@@ -118,6 +118,7 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -268,6 +269,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -697,6 +699,7 @@ test.describe("dashboard filter testcases", () => {
       )
       .click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -838,6 +841,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -954,6 +958,7 @@ test.describe("dashboard filter testcases", () => {
       .click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
@@ -1098,6 +1103,7 @@ test.describe("dashboard filter testcases", () => {
 
     await page.locator('[data-test="dashboard-apply"]').click();
 
+    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 5000 });
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="date-time-apply-btn"]').click();
