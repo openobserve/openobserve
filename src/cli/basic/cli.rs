@@ -28,7 +28,7 @@ use crate::{
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
     let app = clap::Command::new("openobserve")
-        .version(env!("GIT_VERSION"))
+        .version(config::VERSION)
         .about(clap::crate_description!())
         .subcommands(&[
             clap::Command::new("reset")
