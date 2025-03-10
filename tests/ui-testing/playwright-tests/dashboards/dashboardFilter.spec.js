@@ -550,6 +550,9 @@ test.describe("dashboard filter testcases", () => {
       // await page.waitForTimeout(3000);
       // await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().click();
+
+        await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').fill('kubernetes_container_image');
+
       await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .click();
