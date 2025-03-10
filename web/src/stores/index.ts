@@ -36,6 +36,8 @@ const organizationObj = {
   organizationPasscode: "",
   allDashboardList: {},
   allDashboardData: {},
+  allAlertsListByFolderId: {},
+  allAlertsListByNames: {},
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -44,6 +46,7 @@ const organizationObj = {
   functions: [],
   streams: {},
   folders: [],
+  foldersByType: [],
   organizationSettings: {
     scrape_interval: 15,
     trace_id_field_name: "trace_id",
@@ -129,6 +132,12 @@ export default createStore({
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
     },
+    setAllAlertsListByFolderId(state, payload) {
+      state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllAlertsListByNames(state, payload) {
+      state.organizationData.allAlertsListByNames = payload;
+    },
     setDashboardData(state, payload) {
       state.organizationData.allDashboardData = payload;
     },
@@ -164,6 +173,9 @@ export default createStore({
     },
     setFolders(state, payload) {
       state.organizationData.folders = payload;
+    },
+    setFoldersByType(state, payload) {
+      state.organizationData.foldersByType = payload;
     },
     appTheme(state, payload) {
       state.theme = payload;
@@ -242,6 +254,12 @@ export default createStore({
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
     },
+    setAllAlertsListByFolderId(context, payload) {
+      context.commit("setAllAlertsListByFolderId", payload);
+    },
+    setAllAlertsListByNames(context, payload) {
+      context.commit("setAllAlertsListByNames", payload);
+    },
     setDashboardData(context, payload) {
       context.commit("setDashboardData", payload);
     },
@@ -253,6 +271,9 @@ export default createStore({
     },
     setFolders(context, payload) {
       context.commit("setFolders", payload);
+    },
+    setFoldersByType(context, payload) {
+      context.commit("setFoldersByType", payload);
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
