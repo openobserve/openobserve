@@ -336,11 +336,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn
                 v-if="selected.length > 0"
                 data-test="alert-list-move-across-folders-btn"
-                class="flex items-center move-btn"
+                class="flex items-center move-btn q-mr-md"
                 color="secondary"
                 :icon="outlinedDriveFileMove"
                 :label="'Move'"
                 @click="moveMultipleAlerts"
+              />
+              <q-btn
+                v-if="selected.length > 0"
+                data-test="alert-list-export-alerts-btn"
+                class="flex items-center export-btn"
+                color="secondary"
+                icon="download"
+                :label="'Export'"
+                @click="multipleExportAlert"
               />
               <QTablePagination
                 :scope="scope"
@@ -1245,7 +1254,6 @@ export default defineComponent({
 
   // Ensure that the alert exists before proceeding
   if (alertToBeExported) {
-    console.log(alertToBeExported, 'row');
 
     // Convert the alert object to a JSON string
     const alertJson = JSON.stringify(alertToBeExported, null, 2);
@@ -1407,6 +1415,53 @@ const updateActiveFolderId = (newVal: any) => {
       event.stopPropagation();
     };
 
+    const multipleExportAlert = async () => {
+      try {
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Exporting alerts...",
+          timeout: 0 // Set timeout to 0 to keep it showing until dismissed
+        });
+
+        const alertToBeExported = [];
+        const selectedAlerts = selected.value.map((alert: any) => alert.alert_id);
+        
+        const alertsData = await Promise.all(
+          selectedAlerts.map(async (alertId: string) => {
+            const alertData = await getAlertById(alertId);
+            return alertData;
+          })
+        );
+        alertToBeExported.push(...alertsData);
+
+        // Create and download the JSON file
+        const jsonData = JSON.stringify(alertToBeExported, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `alerts-${new Date().toISOString().split('T')[0]}-${activeFolderId.value}.json`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        
+        dismiss();
+        $q.notify({
+          type: 'positive',
+          message: `Successfully exported ${selectedAlerts.length} alert${selectedAlerts.length > 1 ? 's' : ''}`,
+          timeout: 2000
+        });
+
+      } catch (error) {
+        console.error('Error exporting alerts:', error);
+        $q.notify({
+          type: 'negative',
+          message: 'Error exporting alerts. Please try again.',
+          timeout: 2000
+        });
+      }
+    };
+
 
 
     return {
@@ -1525,7 +1580,9 @@ const updateActiveFolderId = (newVal: any) => {
       openMenu,
       outlinedMoreVert,
       getAlertsFn,
+      multipleExportAlert
     };
+
   },
 });
 </script>
@@ -1540,8 +1597,13 @@ const updateActiveFolderId = (newVal: any) => {
 }
 
 .move-btn {
-  width: 8vw;
+  width: 10vw;
 }
+
+.export-btn {
+  width: 10vw;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
