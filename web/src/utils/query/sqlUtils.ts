@@ -108,6 +108,14 @@ export const addLabelToSQlQuery = async (
         operator = "NOT LIKE";
         value = "%" + escapeSingleQuotes(value) + "%";
         break;
+      case "Starts With":
+        operator = "LIKE";
+        value = escapeSingleQuotes(value) + "%";
+        break;
+      case "Ends With":
+        operator = "LIKE";
+        value = "%" + escapeSingleQuotes(value);
+        break;
       case "Is Null":
         operator = "IS NULL";
         break;
@@ -117,6 +125,14 @@ export const addLabelToSQlQuery = async (
       case "IN":
         operator = "IN";
         // add brackets if not present in "IN" conditions
+        value = splitQuotedString(value).map((it: any) => ({
+          type: "single_quote_string",
+          value: escapeSingleQuotes(it),
+        }));
+        break;
+      case "NOT IN":
+        operator = "NOT IN";
+        // add brackets if not present in "NOT IN" conditions
         value = splitQuotedString(value).map((it: any) => ({
           type: "single_quote_string",
           value: escapeSingleQuotes(it),
@@ -166,7 +182,10 @@ export const addLabelToSQlQuery = async (
               column: label,
             },
             right: {
-              type: operator === "IN" ? "expr_list" : "string",
+              type:
+                operator === "IN" || operator === "NOT IN"
+                  ? "expr_list"
+                  : "string",
               value: value,
             },
           };
