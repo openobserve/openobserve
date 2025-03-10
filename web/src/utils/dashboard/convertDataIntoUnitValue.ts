@@ -803,6 +803,7 @@ export const validatePanel = (
   panelData: any,
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
+  allStreamFields: any[] = [],
 ) => {
   // Get current query index
   const currentQueryIndex = panelData.layout?.currentQueryIndex || 0;
@@ -927,7 +928,7 @@ export const validatePanel = (
           panelData,
           currentQueryIndex,
           errors,
-          panelData.meta.stream.userDefinedSchemaFields,
+          allStreamFields,
         );
       }
     }
@@ -997,15 +998,12 @@ const validateStreamFields = (
   panelData: any,
   queryIndex: number,
   errors: string[],
-  streamFields: any[] = [],
+  allStreamFields: any[] = [],
 ) => {
   const customQueryXFieldError = panelData.data.queries[
     queryIndex
   ].fields.x.filter(
-    (it: any) =>
-      ![...streamFields, ...panelData.meta.stream.vrlFunctionFieldList].find(
-        (i: any) => i.name === it.column,
-      ),
+    (it: any) => !allStreamFields.find((i: any) => i.name == it.column),
   );
 
   if (customQueryXFieldError.length) {
@@ -1020,10 +1018,7 @@ const validateStreamFields = (
   const customQueryYFieldError = panelData.data.queries[
     queryIndex
   ].fields.y.filter(
-    (it: any) =>
-      ![...streamFields, ...panelData.meta.stream.vrlFunctionFieldList].find(
-        (i: any) => i.name === it.column,
-      ),
+    (it: any) => !allStreamFields.find((i: any) => i.name == it.column),
   );
 
   if (customQueryYFieldError.length) {
