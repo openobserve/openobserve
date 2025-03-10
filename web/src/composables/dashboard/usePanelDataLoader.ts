@@ -145,9 +145,6 @@ export const usePanelDataLoader = (
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
-    searchWebSocketRequestIdsAndTraceIds: <
-      { traceId: string }[]
-    >[],
     isOperationCancelled: false,
   });
 
@@ -322,18 +319,16 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    if (isWebSocketEnabled() && state.searchWebSocketRequestIdsAndTraceIds) {
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
       try {
-        // loop on state.searchWebSocketRequestIdsAndTraceIds
-        state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
-          if (it?.traceId) {
-            cancelSearchQueryBasedOnRequestId(it?.traceId);
-          }
+        // loop on state.searchRequestTraceIds
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId(traceId);
         });
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {
-        state.searchWebSocketRequestIdsAndTraceIds = [];
+        state.searchRequestTraceIds = [];
       }
     }
     if (abortController) {
@@ -608,10 +603,7 @@ export const usePanelDataLoader = (
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
-  const handleSearchResponse = (
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchResponse = (payload: any, response: any) => {
     try {
       if (response.type === "search_response") {
         handleHistogramResponse(payload, response);
@@ -633,6 +625,7 @@ export const usePanelDataLoader = (
     } catch (error: any) {
       // set loading to false
       state.loading = false;
+      2;
       state.isOperationCancelled = false;
       state.errorDetail = error?.message || "Unknown error in search response";
     }
@@ -641,7 +634,8 @@ export const usePanelDataLoader = (
   const sendSearchMessage = async (payload: any) => {
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
-      closeSocketBasedOnRequestId(payload.traceId);
+      //TODO: need to cancel the query based on traceId without closing the socket
+      // closeSocketBasedOnRequestId(payload.traceId);
       state.isOperationCancelled = false;
       return;
     }
@@ -669,14 +663,11 @@ export const usePanelDataLoader = (
     });
   };
 
-  const handleSearchClose = (
-    payload: any,
-    response: any,
-  ) => {
+  const handleSearchClose = (payload: any, response: any) => {
     const MAX_RETRIES = 2;
     const RECONNECT_DELAY = 1000; // 1 second
 
-    removeRequestId(payload.traceId);
+    removeTraceId(payload.traceId);
 
     if (response.code === 1001 || response.code === 1006) {
       const retryCount = searchRetriesCount.value[payload.traceId] || 0;
@@ -693,9 +684,9 @@ export const usePanelDataLoader = (
               close: handleSearchClose,
               error: handleSearchError,
               message: handleSearchResponse,
-            }) as string;
+            });
 
-            addRequestId(payload.traceId);
+            addTraceId(payload.traceId);
           } catch (error: any) {
             console.error("Error reconnecting WebSocket:", error);
             cleanupSearchRetries(payload?.traceId);
@@ -741,11 +732,8 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
-  const handleSearchError = (
-    payload: any,
-    response: any,
-  ) => {
-    removeRequestId(payload?.traceId);
+  const handleSearchError = (payload: any, response: any) => {
+    removeTraceId(payload.traceId);
 
     cleanupSearchRetries(payload?.traceId);
 
@@ -791,14 +779,15 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-      const requestId = fetchQueryDataWithWebSocket(payload, {
+
+      fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
-      }) as string;
+      });
 
-      addRequestId(traceId);
+      addTraceId(traceId);
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
@@ -1517,20 +1506,6 @@ export const usePanelDataLoader = (
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
     );
-  };
-
-  const addRequestId = (traceId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds = [
-      ...state.searchWebSocketRequestIdsAndTraceIds,
-      { traceId },
-    ];
-  };
-
-  const removeRequestId = (traceId: string) => {
-    state.searchWebSocketRequestIdsAndTraceIds =
-      state.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id: any) => id.traceId !== traceId,
-      );
   };
 
   const hasAtLeastOneQuery = () =>
