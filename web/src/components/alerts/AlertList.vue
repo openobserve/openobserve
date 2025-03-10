@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   flat
                   :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-                  @click="toggleAlertState(props.row)"
+                  @click.stop="toggleAlertState(props.row)"
                 />
                 <q-btn
                   :data-test="`alert-list-${props.row.name}-update-alert`"
