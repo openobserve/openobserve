@@ -625,7 +625,6 @@ export const usePanelDataLoader = (
     } catch (error: any) {
       // set loading to false
       state.loading = false;
-      2;
       state.isOperationCancelled = false;
       state.errorDetail = error?.message || "Unknown error in search response";
     }
