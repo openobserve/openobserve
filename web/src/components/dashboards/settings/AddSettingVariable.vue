@@ -1330,7 +1330,7 @@ export default defineComponent({
     };
 
     const dashboardVariablesFilterItems = computed(() =>
-      props.dashboardVariablesList?.variables?.list
+      props.dashboardVariablesList
         .map((it: any) => ({
           label: it.name,
           value: "$" + it.name,
