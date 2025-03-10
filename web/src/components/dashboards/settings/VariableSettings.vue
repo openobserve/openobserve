@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <!-- show variables dependencies if variables exist -->
             <q-btn
-              v-if="dashboardVariablesList?.variables?.list?.length > 0"
+              v-if="dashboardVariablesList.length > 0"
               class="text-bold no-border q-ml-md"
               no-caps
               no-outline
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
-                :variablesList="dashboardVariablesList?.variables?.list"
+                :variablesList="dashboardVariablesList"
                 :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
                 @closePopUp="
                   () => (showVariablesDependenciesGraphPopUp = false)
