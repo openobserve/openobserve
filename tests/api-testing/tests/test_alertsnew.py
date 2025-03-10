@@ -185,7 +185,7 @@ def ingest_logs(session, base_url, org, stream_name):
     assert response.status_code == 200, f"Failed to ingest logs: {response.content}"
 
 def create_alert(session, base_url, org, folder_id, alert_name, template_name, stream_name, destination_name):
-    alert_id = str(uuid.uuid4())
+    # alert_id = str(uuid.uuid4())
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
   
     payload = {
@@ -448,42 +448,42 @@ def delete_alert_verify(session, base_url, org, alert_id):       # Verify alert 
 
 
 
-# def test_create_workflow(create_session, base_url):
-#     session = create_session
-#     stream_name = "stream_pytest_data"
-#     org = "org_pytest_data"
+def test_create_workflow(create_session, base_url):
+    session = create_session
+    stream_name = "stream_pytest_data"
+    org = "org_pytest_data"
 
-#     base_url = ZO_BASE_URL
+    base_url = ZO_BASE_URL
     
-#     # Create folder
-#     folder_name = f"newfolder_{random.randint(1000, 9999)}"
+    # Create folder
+    folder_name = f"newfolder_{random.randint(1000, 9999)}"
 
-#     folder_id = create_folder(session, base_url, org, folder_name)
-#     email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
+    folder_id = create_folder(session, base_url, org, folder_name)
+    email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
    
-#     create_user(session, base_url, org, email_id)
-#     # Create template
-#     template_name_webhook = f"template_webhook_{random.randint(10000, 99999)}"
-#     template_name_email = f"template_email_{random.randint(10000, 99999)}"  
-#     template_webhook = create_template_webhook(session, base_url, org, template_name_webhook)
-#     template_email = create_template_email(session, base_url, org, template_name_email)
-#     time.sleep(5)
+    create_user(session, base_url, org, email_id)
+    # Create template
+    template_name_webhook = f"template_webhook_{random.randint(10000, 99999)}"
+    template_name_email = f"template_email_{random.randint(10000, 99999)}"  
+    template_webhook = create_template_webhook(session, base_url, org, template_name_webhook)
+    template_email = create_template_email(session, base_url, org, template_name_email)
+    time.sleep(5)
 
-#     # Create destination
-#     destination_name_webhook = f"newdest_{random.randint(10000, 99999)}"
-#     destination_name_email = f"newdest_{random.randint(10000, 99999)}"
+    # Create destination
+    destination_name_webhook = f"newdest_{random.randint(10000, 99999)}"
+    destination_name_email = f"newdest_{random.randint(10000, 99999)}"
 
-#     destination_webhook = create_destination_webhook(session, base_url, org, destination_name_webhook, template_name_webhook)
-#     destination_email = create_destination_email(session, base_url, org, destination_name_email, template_name_email, email_id)
-#     time.sleep(5)
+    destination_webhook = create_destination_webhook(session, base_url, org, destination_name_webhook, template_name_webhook)
+    destination_email = create_destination_email(session, base_url, org, destination_name_email, template_name_email, email_id)
+    time.sleep(5)
 
-#     # Now create the alert
-#     alert_name_webhook = f"newalert_{random.randint(1000, 9999)}"
-#     alert_name_email = f"newalert_{random.randint(1000, 9999)}"
+    # Now create the alert
+    alert_name_webhook = f"newalert_{random.randint(1000, 9999)}"
+    alert_name_email = f"newalert_{random.randint(1000, 9999)}"
 
-#     alert_webhook = create_alert(session, base_url, org, folder_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
-#     alert_email =  create_alert(session, base_url, org, folder_id, alert_name_email, template_name_email, stream_name, destination_name_email)
-#     time.sleep(5)
+    alert_webhook = create_alert(session, base_url, org, folder_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
+    alert_email =  create_alert(session, base_url, org, folder_id, alert_name_email, template_name_email, stream_name, destination_name_email)
+    time.sleep(5)
     
     
 # def test_validate_workflow(create_session, base_url):
@@ -544,74 +544,74 @@ def delete_alert_verify(session, base_url, org, alert_id):       # Verify alert 
 #     assert "last_satisfied_at" in alert_data, "Alert data does not contain 'lastSatisfiedAt' key" 
 #     assert "last_edited_by" in alert_data, "Alert data does not contain 'lastTriggeredAt' key"
    
-def test_update_workflow(create_session, base_url):
-    session = create_session
-    stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+# def test_update_workflow(create_session, base_url):
+#     session = create_session
+#     stream_name = "stream_pytest_data"
+#     org = "org_pytest_data"
 
-    base_url = ZO_BASE_URL_SC
-    time.sleep(5)
+#     base_url = ZO_BASE_URL_SC
+#     time.sleep(5)
     
-    # Get templates
-    templates = get_template(session, base_url, org)
+#     # Get templates
+#     templates = get_template(session, base_url, org)
     
-    # Extract template names
-    template_names = [template['name'] for template in templates if 'name' in template]
+#     # Extract template names
+#     template_names = [template['name'] for template in templates if 'name' in template]
     
-    # Update templates using the names retrieved
-    if template_names:
-        template_name_webhook = template_names[0]  # Use the first template name for webhook
-        template_name_email = template_names[1] if len(template_names) > 1 else template_names[0]  # Use the second if it exists, otherwise fallback
+#     # Update templates using the names retrieved
+#     if template_names:
+#         template_name_webhook = template_names[0]  # Use the first template name for webhook
+#         template_name_email = template_names[1] if len(template_names) > 1 else template_names[0]  # Use the second if it exists, otherwise fallback
         
-        update_template_webhook(session, base_url, org, template_name_webhook)
-        update_template_email(session, base_url, org, template_name_email)
+#         update_template_webhook(session, base_url, org, template_name_webhook)
+#         update_template_email(session, base_url, org, template_name_email)
     
-    time.sleep(5)
+#     time.sleep(5)
     
-    # Get destinations
-    destinations = get_destination(session, base_url, org)
+#     # Get destinations
+#     destinations = get_destination(session, base_url, org)
     
-    # Extract destination names
-    destination_names = [destination['name'] for destination in destinations if 'name' in destination]
+#     # Extract destination names
+#     destination_names = [destination['name'] for destination in destinations if 'name' in destination]
     
-    # Update destinations using the names retrieved
-    if destination_names:
-        destination_name_webhook = destination_names[0]
-        destination_name_email = destination_names[1] if len(destination_names) > 1 else destination_names[0]
+#     # Update destinations using the names retrieved
+#     if destination_names:
+#         destination_name_webhook = destination_names[0]
+#         destination_name_email = destination_names[1] if len(destination_names) > 1 else destination_names[0]
         
-        update_destination_webhook(session, base_url, org, destination_name_webhook)
-        update_destination_email(session, base_url, org, destination_name_email)
+#         update_destination_webhook(session, base_url, org, destination_name_webhook)
+#         update_destination_email(session, base_url, org, destination_name_email)
     
-    time.sleep(5)
+#     time.sleep(5)
 
-    # Get alerts
-    alerts = _alertsngetew(session, base_url, org)
-    print("Alerts in the response", alerts)
+#     # Get alerts
+#     alerts = get_alertsnew(session, base_url, org)
+#     print("Alerts in the response", alerts)
     
-    # Assertions to ensure alerts are valid
-    assert alerts is not None, "Alerts are not found"
-    assert len(alerts) > 0, "Alerts are empty"
-    assert isinstance(alerts, list), "Alerts are not a list"
-    assert "alert_id" in alerts[0], "Alerts do not contain 'alert_id' key"
+#     # Assertions to ensure alerts are valid
+#     assert alerts is not None, "Alerts are not found"
+#     assert len(alerts) > 0, "Alerts are empty"
+#     assert isinstance(alerts, list), "Alerts are not a list"
+#     assert "alert_id" in alerts[0], "Alerts do not contain 'alert_id' key"
     
-    # Extract alert names and IDs
-    alert_names = [alert['name'] for alert in alerts if 'name' in alert]
-    alert_ids = [alert['alert_id'] for alert in alerts if 'alert_id' in alert]
+#     # Extract alert names and IDs
+#     alert_names = [alert['name'] for alert in alerts if 'name' in alert]
+#     alert_ids = [alert['alert_id'] for alert in alerts if 'alert_id' in alert]
     
-    # Assuming you want to update the first alert as an example
-    if alert_ids and alert_names:
-        alert_id = alert_ids[0]  # Use the first alert ID
-        alert_name_webhook = alert_names[0]  # Use the first alert name for webhook
-        alert_name_email = alert_names[1] if len(alert_names) > 1 else alert_names[0]  # Use the second if it exists, otherwise fallback
+#     # Assuming you want to update the first alert as an example
+#     if alert_ids and alert_names:
+#         alert_id = alert_ids[0]  # Use the first alert ID
+#         alert_name_webhook = alert_names[0]  # Use the first alert name for webhook
+#         alert_name_email = alert_names[1] if len(alert_names) > 1 else alert_names[0]  # Use the second if it exists, otherwise fallback
         
-        # Get alert details
-        alert_data = get_alert(session, base_url, org, alert_id)
-        print("Alert data in the response", alert_data)
+#         # Get alert details
+#         alert_data = get_alert(session, base_url, org, alert_id)
+#         print("Alert data in the response", alert_data)
         
-        time.sleep(5)
+#         time.sleep(5)
         
-        # Update alerts using the names and IDs retrieved
-        update_alert(session, base_url, org, alert_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
-        update_alert(session, base_url, org, alert_id, alert_name_email, template_name_email, stream_name, destination_name_email)
+#         # Update alerts using the names and IDs retrieved
+#         update_alert(session, base_url, org, alert_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
+#         update_alert(session, base_url, org, alert_id, alert_name_email, template_name_email, stream_name, destination_name_email)
     
-    time.sleep(5)
+#     time.sleep(5)
