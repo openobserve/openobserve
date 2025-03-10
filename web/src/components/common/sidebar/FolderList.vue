@@ -112,8 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row justify-center full-width q-px-xs q-pb-xs"
         style="position: sticky; bottom: 0px"
     >
-
-
+      <q-btn
+          class="text-bold no-border full-width"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          label="New Folder"
+          @click.stop="addFolder"
+          data-test="dashboard-new-folder-btn"
+        />
     </div>
 
       <q-dialog

@@ -505,6 +505,7 @@ import {
   getUUID,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
+import { getFoldersListByType } from "@/utils/commons";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
@@ -754,7 +755,6 @@ export default defineComponent({
               }
               if(router.currentRoute.value.query.action == "import"){
                 showImportAlertDialog.value = true;
-
               }
               if (router.currentRoute.value.query.action == "add") {
                 showAddUpdateFn({ row: undefined });
@@ -804,13 +804,17 @@ export default defineComponent({
       getDestinations();
     });
     onActivated(() => getDestinations());
-    onMounted (async () => {
+    onMounted(async () => {
+      if(!store.state.organizationData.foldersByType){
+        await getFoldersListByType(store, "alerts");
+      }
       if (
         router.currentRoute.value.query.folder &&
         store.state.organizationData.foldersByType.find(
           (it: any) => it.folderId === router.currentRoute.value.query.folder,
         )
       ) {
+        console.log(router.currentRoute.value.query.folder,'router.currentRoute.value.query.folder')
         activeFolderId.value = router.currentRoute.value.query.folder as string;
       } else {
         activeFolderId.value = "default";
@@ -825,13 +829,16 @@ export default defineComponent({
         filteredResults.value = [];
       }
       await  getAlertsByFolderId(store,newVal);
-      router.push({
+      if(router.currentRoute.value.query.folder != newVal){
+        router.push({
         name: "alertList",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: activeFolderId.value,
         },
       });
+      }
+
 
     })
 
@@ -1213,6 +1220,7 @@ export default defineComponent({
         query: {
           action: "add",
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
         },
       });
     };
@@ -1230,7 +1238,7 @@ export default defineComponent({
         query: {
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
-          folderId: activeFolderId.value,
+          folder: activeFolderId.value,
         },
       });
     }
