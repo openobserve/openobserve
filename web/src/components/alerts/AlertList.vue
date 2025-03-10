@@ -796,9 +796,6 @@ export default defineComponent({
         throw error;
        }
     };
-    if (!alerts.value.length) {
-      getAlertsByFolderId(store, activeFolderId.value);
-    }
     onBeforeMount(async () => {
       await getTemplates();
       getDestinations();
