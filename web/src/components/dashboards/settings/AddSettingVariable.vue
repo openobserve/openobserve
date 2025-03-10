@@ -254,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         '>',
                         '<',
                         'IN',
+                        'NOT IN',
                         'str_match',
                         'str_match_ignore_case',
                         'match_all',
@@ -263,6 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         're_not_match',
                         'Contains',
                         'Not Contains',
+                        'Starts With',
+                        'Ends With',
                         'Is Null',
                         'Is Not Null',
                       ]"
