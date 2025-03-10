@@ -29,7 +29,7 @@ pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::
 }
 
 #[inline(always)]
-pub async fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+pub async fn get_file_size(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
     let file = File::open(path).await?;
     file.metadata().await.map(|m| m.len())
 }

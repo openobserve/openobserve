@@ -155,7 +155,7 @@ impl FileData {
 
     async fn get_size(&self, file: &str) -> Option<usize> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        match get_file_len(&file_path) {
+        match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
         }
