@@ -2638,7 +2638,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     errors: string[],
     isFieldsValidationRequired: boolean = true,
   ) => {
-    validatePanel(dashboardPanelData, errors, isFieldsValidationRequired);
+    validatePanel(dashboardPanelData, errors, isFieldsValidationRequired, [
+      ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
+      ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
+    ]);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
