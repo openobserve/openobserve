@@ -553,9 +553,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="q-mt-md">
-            <div class="text-body1 text-bold">Variable Scope</div>
             <div class="q-mb-md">
               <q-select
+                hint="Variables will be applied to all tabs and panels if global is selected."
                 v-model="variableData.scope"
                 :options="scopeOptions"
                 label="Select variable scope"
@@ -563,6 +563,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 emit-value
                 map-options
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-scope-select"
               />
             </div>
@@ -574,22 +581,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="q-mt-md"
             >
-              <div class="text-body1 text-bold">Select Tabs</div>
               <q-select
+                hint="Variables will be available only in the selected tabs."
                 v-model="selectedTabs"
                 :options="tabsOptions"
-                label="Select tabs for this variable"
+                label="Select tabs"
                 multiple
+                stack-label
                 outlined
                 dense
                 emit-value
                 map-options
                 @update:model-value="updatePanels"
+                filled
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-tabs-select"
-              />
-              <div class="q-mt-sm text-caption">
-                Variable will be available only in the selected tabs.
-              </div>
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
+                  >
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
             </div>
 
             <!-- Panel selection section - shown only when scope is panels -->
@@ -597,41 +632,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="variableData.scope === 'panels' && selectedTabs.length > 0"
               class="q-mt-md"
             >
-              <div class="text-body1 text-bold">Select Panels</div>
-              <div class="q-mt-sm">
-                <q-list bordered separator>
-                  <template
-                    v-for="option in groupedPanelsOptions"
-                    :key="option.value || option.label"
+              <q-select
+                hint="Variables will be available only in the selected panels."
+                v-model="selectedPanels"
+                :options="groupedPanelsOptions"
+                label="Select panels"
+                stack-label
+                multiple
+                filled
+                outlined
+                dense
+                input-debounce="0"
+                behavior="menu"
+                use-input
+                class="showLabelOnTop"
+                popup-no-route-dismiss
+                popup-content-style="z-index: 10001"
+                emit-value
+                map-options
+                data-test="dashboard-variable-panels-select"
+              >
+                <template v-slot:option="{ opt, selected, toggleOption }">
+                  <q-item
+                    v-if="opt.isTab"
+                    class="bg-grey-3 text-bold text-dark"
+                    style="pointer-events: none"
                   >
-                    <!-- Tab separator -->
-                    <q-item v-if="option.isTab" class="bg-grey-2">
-                      <q-item-section>
-                        <q-item-label class="text-weight-bold">
-                          {{ option.label }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-
-                    <!-- Panel option -->
-                    <q-item v-else clickable v-ripple>
-                      <q-item-section>
-                        <q-item-label>{{ option.label }}</q-item-label>
-                      </q-item-section>
-                      <q-item-section side>
-                        <q-checkbox
-                          v-model="selectedPanels"
-                          :val="option.value"
-                          data-test="dashboard-variable-panel-checkbox"
-                        />
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-list>
-                <div class="q-mt-sm text-caption">
-                  Variable will be available only in the selected panels.
-                </div>
-              </div>
+                    <q-item-section>{{ opt.label }}</q-item-section>
+                  </q-item>
+                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
+                    <q-item-section side>
+                      <q-checkbox
+                        :model-value="selected"
+                        @update:model-value="() => toggleOption(opt)"
+                        dense
+                        class="q-ma-none"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
             </div>
           </div>
           <!-- hide on dashboard toggle -->
@@ -661,8 +704,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 padding="sm xl"
                 no-caps
                 data-test="dashboard-variable-save-btn"
-                >Save</q-btn
-              >
+                :label="editMode ? 'Update' : 'Save'"
+              ></q-btn>
             </div>
           </div>
         </q-form>
@@ -809,7 +852,7 @@ export default defineComponent({
     });
 
     const scopeOptions = computed(() => [
-      { label: "Global (All Tabs and Panels)", value: "global" },
+      { label: "Global", value: "global" },
       { label: "Selected Tabs", value: "tabs" },
       { label: "Selected Panels", value: "panels" },
     ]);
@@ -1403,6 +1446,7 @@ export default defineComponent({
       tabsOptions,
       groupedPanelsOptions,
       scopeOptions,
+      editMode,
     };
   },
 });
