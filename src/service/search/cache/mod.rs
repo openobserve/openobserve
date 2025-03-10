@@ -366,7 +366,7 @@ pub async fn search(
     let mut should_cache_results =
         res.new_start_time.is_some() || res.new_end_time.is_some() || res.function_error.is_empty();
 
-    if !res.function_error.is_empty() {
+    if !res.function_error.is_empty() && !range_error.is_empty() {
         res.function_error.retain(|err| !err.contains(&range_error));
         should_cache_results = should_cache_results && res.function_error.is_empty();
     }

@@ -355,10 +355,12 @@ impl Response {
 
     pub fn set_partial(&mut self, is_partial: bool, msg: String) {
         self.is_partial = is_partial;
-        if self.function_error.is_empty() {
-            self.function_error = vec![msg];
-        } else {
-            self.function_error.push(msg);
+        if !msg.is_empty() {
+            if self.function_error.is_empty() {
+                self.function_error = vec![msg];
+            } else {
+                self.function_error.push(msg);
+            }
         }
     }
 
