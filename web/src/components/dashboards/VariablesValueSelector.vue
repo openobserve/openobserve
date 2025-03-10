@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :data-test="`dashboard-variable-${item}-selector`"
     >
-      {{ item }}
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector
           class="q-mr-lg q-mt-xs"
