@@ -644,11 +644,73 @@ export const validateSQLPanelFields = (
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
       panelData?.type,
-      panelData?.queries?.[queryIndex]?.fields ?? [],
+      panelData?.queries?.[queryIndex]?.fields ?? {},
       errors,
       currentXLabel,
       currentYLabel,
     );
+  }
+};
+
+/**
+ * Validates that queries aren't empty
+ * @param queries Array of queries to validate
+ * @param errors Array to collect error messages
+ * @param customMessage Optional custom error message
+ */
+const validateQueriesNotEmpty = (
+  queries: any[] = [],
+  errors: string[],
+  customMessage?: string
+) => {
+  queries.forEach((q: any, index: number) => {
+    if (q && q?.query === "") {
+      errors.push(customMessage || `Query-${index + 1} is empty`);
+    }
+  });
+};
+
+/**
+ * Validates that a content field isn't empty
+ * @param content Content field to validate
+ * @param errors Array to collect error messages
+ * @param errorMessage Error message to add if validation fails
+ */
+const validateContentNotEmpty = (
+  content: string = "",
+  errors: string[],
+  errorMessage: string
+) => {
+  if (content.trim() === "") {
+    errors.push(errorMessage);
+  }
+};
+
+/**
+ * Validates panel content based on panel type
+ * @param panel The panel to validate
+ * @param errors Array to collect error messages
+ */
+const validatePanelContentByType = (panel: any, errors: string[]) => {
+  // Check for promQL query type
+  if (panel?.queryType === "promql") {
+    validateQueriesNotEmpty(panel?.queries, errors);
+  }
+
+  // Check by panel type
+  switch (panel?.type) {
+    case "geomap":
+      validateQueriesNotEmpty(panel?.queries, errors);
+      break;
+    case "html":
+      validateContentNotEmpty(panel?.htmlContent, errors, "Please enter your HTML code");
+      break;
+    case "markdown":
+      validateContentNotEmpty(panel?.markdownContent, errors, "Please enter your markdown code");
+      break;
+    case "custom_chart":
+      validateQueriesNotEmpty([panel?.queries?.[0]], errors, "Please enter query for custom chart");
+      break;
   }
 };
 
@@ -663,50 +725,14 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
   const isPromQLMode = panel?.queryType === "promql";
   const currentQueryIndex = 0; // Default to first query
 
-  // Check each query is empty or not for promql
-  if (panel?.queryType === "promql") {
-    panel?.queries?.forEach((q: any, index: number) => {
-      if (q && q?.query === "") {
-        errors.push(`Query-${index + 1} is empty`);
-      }
-    });
-  }
-
-  // Check each query is empty or not for geomap
-  if (panel?.type === "geomap") {
-    panel?.queries?.forEach((q: any, index: number) => {
-      if (q && q?.query === "") {
-        errors.push(`Query-${index + 1} is empty`);
-      }
-    });
-  }
-
-  // Check content should not be empty for html
-  if (panel?.type === "html") {
-    if (panel?.htmlContent?.trim() === "") {
-      errors.push("Please enter your HTML code");
-    }
-  }
-
-  // Check content should not be empty for markdown
-  if (panel?.type === "markdown") {
-    if (panel?.markdownContent?.trim() === "") {
-      errors.push("Please enter your markdown code");
-    }
-  }
-
-  // Check query for custom_chart
-  if (panel?.type === "custom_chart") {
-    if (panel?.queries?.[0]?.query?.trim() === "") {
-      errors.push("Please enter query for custom chart");
-    }
-  }
+  // Validate panel content based on type
+  validatePanelContentByType(panel, errors);
 
   if (!isPromQLMode && panel.queries?.[currentQueryIndex]?.fields) {
     // Validate fields configuration based on chart type
     validateChartFieldsConfiguration(
       panel?.type,
-      panel?.queries?.[currentQueryIndex]?.fields ?? [],
+      panel?.queries?.[currentQueryIndex]?.fields ?? {},
       errors,
     );
 
@@ -811,44 +837,8 @@ export const validatePanel = (
   // Check if panel has promQL query type
   const isPromQLMode = panelData?.data?.queryType === "promql";
 
-  // Check each query is empty or not for promql
-  if (panelData?.data?.queryType === "promql") {
-    panelData?.data?.queries?.forEach((q: any, index: number) => {
-      if (q && q?.query === "") {
-        errors.push(`Query-${index + 1} is empty`);
-      }
-    });
-  }
-
-  // Check each query is empty or not for geomap
-  if (panelData?.data?.type === "geomap") {
-    panelData?.data?.queries?.forEach((q: any, index: number) => {
-      if (q && q?.query === "") {
-        errors.push(`Query-${index + 1} is empty`);
-      }
-    });
-  }
-
-  // Check content should not be empty for html
-  if (panelData?.data?.type === "html") {
-    if (panelData?.data?.htmlContent?.trim() === "") {
-      errors.push("Please enter your HTML code");
-    }
-  }
-
-  // Check content should not be empty for markdown
-  if (panelData?.data?.type === "markdown") {
-    if (panelData?.data?.markdownContent?.trim() === "") {
-      errors.push("Please enter your markdown code");
-    }
-  }
-
-  // Check query for custom_chart
-  if (panelData?.data?.type === "custom_chart") {
-    if (panelData?.data?.queries?.[0]?.query?.trim() === "") {
-      errors.push("Please enter query for custom chart");
-    }
-  }
+  // Validate panel content based on type
+  validatePanelContentByType(panelData?.data, errors);
 
   if (isPromQLMode) {
     // 1. Chart type: only specific chart types are supported for PromQL
