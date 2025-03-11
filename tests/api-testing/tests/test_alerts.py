@@ -505,14 +505,17 @@ def create_dashboard(session, base_url, org_id, dashboard_name, folder_id):
         ],
         "version": 3
     }
-    # Debugging output
-    print("Payload:", json.dumps(payload, indent=2))
-    print("Headers:", headers)
+    
+    # print("Payload:", json.dumps(payload, indent=2))
+    # print("Headers:", headers)
 
     response = session.post(f"{base_url}api/{org_id}/dashboards?folder={folder_id}", json=payload, headers=headers)
     
     # Improved error handling
     assert response.status_code == 200, f"Failed to create dashboard: {response.content.decode()}"
+    # Extract the dashboardId from the correct location in the response
+    dashboard_id = response.json()["v3"]["dashboardId"]
+    return dashboard_id
 
 def create_function(session, base_url, org_id, function_name):
     """Create a dashboard."""
@@ -607,21 +610,246 @@ def create_enrichment_table(session, base_url, org_id, enrichment_table_name):
 
     # Check the response
     assert response.status_code == 200, f"Failed to enrich table: {response.content.decode()}"
-    print("Response:", response.json())  # Print the response for debugging
+    # print("Response:", response.json())  # Print the response for debugging
 
-# def create_enrichment(session, base_url, org_id, enrichment_table_name):
-#     """Create an enrichment."""
-#     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    return response
 
-#     # Open the json data file and read it
-#     with open(root_dir / "test-data/protocols.csv") as f:
-#         data = f.read()
+def create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name):
+    """Create a realTime pipeline."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
+    payload = {
+        "name": realTime_pipeline_name,
+        "description": "",
+        "source": {"source_type": "realtime"},
+        "nodes": [
+            {
+                "id": "1e1fa129-cfbd-4082-8d39-c4dc418a670f",
+                "type": "input",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 169.83333, "y": 55},
+                "io_type": "input",
+            },
+            {
+                "id": "8e0ed123-7737-4801-9466-bd909c425c72",
+                "type": "output",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": stream_name,
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                },
+                "position": {"x": 305.33334, "y": 276},
+                "io_type": "output",
+            },
+        ],
+        "edges": [
+            {
+                "id": "e1e1fa129-cfbd-4082-8d39-c4dc418a670f-8e0ed123-7737-4801-9466-bd909c425c72",
+                "source": "1e1fa129-cfbd-4082-8d39-c4dc418a670f",
+                "target": "8e0ed123-7737-4801-9466-bd909c425c72",
+            }
+        ],
+        "org": org_id,
+    }
+    
+    response = session.post(f"{base_url}api/{org_id}/pipelines", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create scheduled pipeline: {response.content.decode()}"
+    return response
+    
+        
+def create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name):
+    """Create a scheduled pipeline."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
-#     response = session.post(f"{base_url}api/{org_id}/enrichment_tables/{enrichment_table_name}?append=false", json=data, headers=headers)
-#     assert response.status_code == 200, f"Failed to create enrichment: {response.content.decode()}"
-#     return response
+    payload = {
+        "name": scheduled_pipeline_name,
+        "description": "",
+        "source": {"source_type": "scheduled"},
+        "nodes": [
+            {
+                "id": "8b03771c-2e94-4c2f-b902-8fb8b8e66df2",
+                "type": "input",
+                "dimensions": {"width": 140, "height": 42},
+                "computedPosition": {"x": 212.1047849020086, "y": 93.00563781047852, "z": 0},
+                "handleBounds": {
+                    "source": [{"id": "output", "position": "bottom", "x": 55.03916432328342, "y": 36.00006521998462, "width": 30, "height": 10}],
+                    "target": []
+                },
+                "position": {"x": 212.1047849020086, "y": 93.00563781047852},
+                "data": {
+                    "label": "8b03771c-2e94-4c2f-b902-8fb8b8e66df2",
+                    "node_type": "query",
+                    "stream_type": "logs",
+                    "org_id": org_id,
+                    "query_condition": {
+                        "type": "sql",
+                        "conditions": None,
+                        "sql": "select * from default",
+                        "promql": None,
+                        "promql_condition": None,
+                        "aggregation": None,
+                        "vrl_function": None,
+                        "search_event_type": "DerivedStream"
+                    },
+                    "trigger_condition": {
+                        "period": 15,
+                        "operator": "=",
+                        "threshold": 0,
+                        "frequency": 15,
+                        "cron": "",
+                        "frequency_type": "minutes",
+                        "silence": 0
+                    }
+                },
+                "io_type": "input"
+            },
+            {
+                "id": "cfa476a0-24f3-4ca3-a14f-b56b04729922",
+                "type": "output",
+                "dimensions": {"width": 250, "height": 42},
+                "computedPosition": {"x": 269.2781219770897, "y": 161.6932759313432, "z": 0},
+                "handleBounds": {
+                    "source": [],
+                    "target": [{"id": "input", "position": "top", "x": 110.11741720560622, "y": -4.000002219844093, "width": 30, "height": 10}]
+                },
+                "position": {"x": 269.2781219770897, "y": 161.6932759313432},
+                "data": {
+                    "label": "cfa476a0-24f3-4ca3-a14f-b56b04729922",
+                    "node_type": "stream",
+                    "stream_type": "logs",
+                    "stream_name": stream_name,
+                    "org_id": org_id
+                },
+                "io_type": "output"
+            }
+        ],
+        "edges": [
+            {
+                "id": "e8b03771c-2e94-4c2f-b902-8fb8b8e66df2-cfa476a0-24f3-4ca3-a14f-b56b04729922",
+                "type": "custom",
+                "source": "8b03771c-2e94-4c2f-b902-8fb8b8e66df2",
+                "target": "cfa476a0-24f3-4ca3-a14f-b56b04729922",
+                "data": {},
+                "markerEnd": {"type": "arrowclosed", "width": 20, "height": 20},
+                "style": {"strokeWidth": 2},
+                "animated": True
+            }
+        ],
+        "org": org_id,
+        "schedule": {
+            "enabled": True,
+            "frequency": "daily",  # Example frequency, adjust as needed
+            "time": "02:00",       # Example time, adjust as needed
+        }
+    }
 
+    response = session.post(f"{base_url}api/{org_id}/pipelines", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create scheduled pipeline: {response.content.decode()}"
+    return response
+
+def create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id):
+    """Create a scheduled report."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+    "dashboards": [
+        {
+            "folder": folder_id,                        
+            "dashboard": dashboard_id,
+            "tabs": ["default"],
+            "variables": [],
+            "timerange": {
+                "type": "relative",
+                "period": "30m",
+                "from": 1741687525799000,
+                "to": 1741689325799000
+            }
+        }
+    ],
+    "description": "",
+    "destinations": [
+        {
+            "email": ZO_ROOT_USER_EMAIL
+        }
+    ],
+    "enabled": True,
+    "media_type": "Pdf",
+    "name": scheduled_report_name,
+    "title": scheduled_report_name,
+    "message": "hi",
+    "orgId": org_id,
+    "start": 1741689360000000,
+    "frequency": {
+        "interval": 1,
+        "type": "once",
+        "cron": ""
+    },
+    "user": "",
+    "password": "",
+    "timezone": "Asia/Calcutta",
+    "timezoneOffset": 330,
+    "owner": ZO_ROOT_USER_EMAIL,
+    "lastEditedBy": ZO_ROOT_USER_EMAIL,
+    "report_type": "PDF"
+}
+
+    response = session.post(f"{base_url}api/{org_id}/reports", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create scheduled report: {response.content.decode()}"
+    return response
+
+def create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id):
+    """Create a cached report."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+    "dashboards": [
+        {
+            "folder": folder_id,
+            "dashboard": dashboard_id,
+            "tabs": ["default"],
+            "variables": [],
+            "timerange": {
+                "type": "relative",
+                "period": "30m",
+                "from": 1741687525799000,
+                "to": 1741689325799000
+            }
+        }
+    ],
+    "description": "",
+    "destinations": [
+        
+    ],
+    "enabled": True,
+    "media_type": "Pdf",
+    "name": cached_report_name,
+    "title": cached_report_name,
+    "message": "hi",
+    "orgId": org_id,
+    "start": 1741689360000000,
+    "frequency": {
+        "interval": 1,
+        "type": "once",
+        "cron": ""
+    },
+    "user": "",
+    "password": "",
+    "timezone": "Asia/Calcutta",
+    "timezoneOffset": 330,
+    "owner": ZO_ROOT_USER_EMAIL,
+    "lastEditedBy": ZO_ROOT_USER_EMAIL,
+    "report_type": "PDF"
+}
+
+    response = session.post(f"{base_url}api/{org_id}/reports", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create cached report: {response.content.decode()}"
+    return response
 
 def test_create_workflow(create_session, base_url):
     session = create_session
@@ -674,7 +902,7 @@ def test_create_workflow(create_session, base_url):
         folder_id = create_folder(session, base_url, org_id, folder_name)
 
         dashboard_name = f"dashboard_{i + 1}_{random.randint(100000, 999999)}"
-        create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
+        dashboard_id = create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
 
         function_name = f"function_{i + 1}_{random.randint(100000, 999999)}"
         create_function(session, base_url, org_id, function_name)   
@@ -682,64 +910,18 @@ def test_create_workflow(create_session, base_url):
         enrichment_table_name = f"enrichment_{i + 1}_{random.randint(100000, 999999)}"
         create_enrichment_table(session, base_url, org_id, enrichment_table_name)
 
-        # # Optionally print or log the created names for tracking
-        # print(f"Created: {template_name_webhook}, {template_name_email}, {destination_name_webhook}, {destination_name_email}, {destination_name_pipeline}, {alert_webhook}, {alert_email}, {alert_cron}, {alert_real_time}, {alert_sql}, {savedview_name}, {folder_name}")
+        realTime_pipeline_name = f"realTime_pipeline_{i + 1}_{random.randint(100000, 999999)}"
+        create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name)  
 
-    # Ingest logs
+        scheduled_pipeline_name = f"scheduled_pipeline_{i + 1}_{random.randint(100000, 999999)}"
+        create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name)    
+
+        scheduled_report_name = f"scheduled_report_{i + 1}_{random.randint(100000, 999999)}"
+        create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
+
+        cached_report_name = f"cached_report_{i + 1}_{random.randint(100000, 999999)}"
+        create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)     
+
+        # Ingest logs
+        ingest_logs(session, base_url, org_id, stream_name)
     
-   
-    ingest_logs(session, base_url, org_id, stream_name)
-
-# def test_validate_workflow(create_session, base_url):
-#     session = create_session
-#     base_url = ZO_BASE_URL
-#     org_id = "org_pytest_data"
-#     stream_name = "stream_pytest_data"
-
-
-    # # If alert creation failed due to existing alert, you can choose to skip the rest of the test or handle it
-    # if not alert_created:
-    #     print(f"Skipping further tests for alert: {alert_name}")
-    #     return
-
-    # # Assert alert creation in the first server
-    # get_alert(session, base_url, org_id, alert_name, stream_name)
-
-    # # Assert alert creation in the second server
-    # session.base_url = ZO_BASE_URL_SC
-    # get_alert(session, base_url, org_id, alert_name, stream_name)
-
-    # # Update alert in the second server
-    # session.base_url = ZO_BASE_URL_SC
-    # update_payload = {
-    #     "name": alert_name,
-    #     "stream_type": "logs",
-    #     "stream_name": stream_name,
-    #     "query_condition": {"type": "sql", "sql": "SELECT * FROM newpy_tests WHERE condition"},
-    #     "trigger_condition": {"period": 10, "operator": ">=", "threshold": 5, "silence": 10},
-    #     "destinations": [destination_name],
-    #     "enabled": True
-    # }
-    # create_alert(session, session.base_url, org_id, stream_name, update_payload)
-
-
-    # # Assert updated alert in the second server
-    # get_alert(session, session.base_url, org_id, alert_name, stream_name)
-
-    # # # Delete alert in the first server
-    # # delete_alert(session, base_url, org_id, alert_name, stream_name)
-
-    # # # Assert deletion in the first server
-    # # with pytest.raises(AssertionError):
-    # #     get_alert(session, base_url, org_id, alert_name, stream_name)
-
-    # # # Delete alert in the second server
-    # # delete_alert(session, session.base_url, org_id, alert_name, stream_name)
-
-    # # # Assert deletion in the second server
-    # # with pytest.raises(AssertionError):
-    # #     get_alert(session, session.base_url, org_id, alert_name, stream_name)
-
-    # # # Clean up: Delete destination and template
-    # # delete_destination(session, base_url, org_id, destination_name)
-    # # delete_template(session, base_url, org_id, template_name)
