@@ -751,5 +751,109 @@ test.describe("Pipeline testcases", () => {
     
   });
 
+
+
+  test("should add an enrichment table under functions", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+   
+  
+    await page.locator('[data-test="stream-pipelines-tab"]').click();
+
+    // Add a new pipeline
+    await pipelinePage.addPipeline();
+
+    // Drag and drop the stream to target
+    await pipelinePage.dragStreamToTarget(pipelinePage.queryButton);
+
+    // Select logs from the list
+    await page
+      .locator('div').filter({ hasText: /^Stream Type \*$/ }).first().click();
+    await page.getByLabel('Stream Type *').click();
+
+    // Click on the editor to type the query
+    await page.locator(".view-lines").first().click();
+    const sqlQuery = 'select * from "e2e_automate1" ';
+
+    // Locate the editor and type the SQL query if it's not already typed
+    await page.click('[data-test="scheduled-pipeline-sql-editor"]');
+    await page.keyboard.type(sqlQuery);
+
+    // Wait for a moment to ensure the query is properly typed
+    await page.waitForTimeout(1000);
+
+    // Check if the query exists in the editor (using `hasText` to ensure it's typed)
+    const queryTyped = await page
+      .locator("code")
+      .locator("div")
+      .filter({ hasText: sqlQuery })
+      .count();
+
+    // If the query is found, click the frequency unit
+    if (queryTyped > 0) {
+      await page
+        .locator('[data-test="scheduled-pipeline-frequency-unit"]')
+        .click(); // Click frequency unit
+    }
+    await page.locator('[data-test="scheduled-pipeline-frequency-input-field"]').fill('1')
+
+    await pipelinePage.saveQuery();
+    await page.waitForTimeout(2000);
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole('img', { name: 'Output Stream' }).click();
+    await page.locator('div').filter({ hasText: /^logs$/ }).click();
+    await page.getByRole('option', { name: 'enrichment_tables' }).click();
+    // await page.getByRole('switch', { name: 'Append data to existing' }).locator('div').nth(2).click();
+    await page.getByRole('combobox', { name: 'Stream Name *' }).click();
+    
+  
+    await page.getByRole('combobox', { name: 'Stream Name *' }).fill('enrichtable28')
+    await page.waitForTimeout(2000);
+
+    // await page.getByText('enrichment_info_276e9113_3b48_4ebf_8408_35634eeb6f00_csv').click
+  
+  await page.locator('[data-test="input-node-stream-save-btn"]').click();
+ 
+  await page.waitForTimeout(3000);
+  await page.getByRole('textbox', { name: 'Enter Pipeline Name' }).click();
+  await page.getByRole('textbox', { name: 'Enter Pipeline Name' }).fill('enrichment');
+await page.locator('[data-test="add-pipeline-save-btn"]').click();
+await page.waitForTimeout(5000);
+await ingestion(page);
+await page.waitForTimeout(3000);
+
+
+
+
+await page.locator('[data-test="function-enrichment-table-tab"]').click();
+
+await page.waitForTimeout(7000);
+    await page.getByPlaceholder("Search Enrichment Table").fill('enrichtable28');
+    await page.waitForTimeout(2000);
+  
+    // Explore the uploaded table
+    await page.getByRole("button", { name: "Explore" }).click();
+
+// // Explore the uploaded table
+
+// await page.waitForTimeout(3000);
+// await page.locator('[data-test="date-time-btn"]').click();
+// await page.locator('[data-test="date-time-btn"]').click();
+// await page.locator('[data-test="date-time-relative-tab"]').click();
+// await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+// await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+// await page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+// await page.getByText('{ arrow_drop_down_timestamp:').click();
+// await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+// await page.locator('[data-test="function-enrichment-table-tab"]').click();
+// await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+// await pipelinePage.deleteEnrichmentTableByName(fileName)
+
+
+   
+  });
+
   
 });
