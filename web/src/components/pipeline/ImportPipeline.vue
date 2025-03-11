@@ -250,7 +250,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :input-debounce="400"
                             @update:model-value="updateStreamFields(userSelectedStreamName[index], index)"
                             behavior="menu"
-                          />
+                          >
+                            <template v-slot:option="scope">
+                              <q-item v-bind="scope.itemProps">
+                                <q-item-section>
+                                  <q-item-label :class="{ 'text-grey-6': scope.opt.disable }">
+                                    {{ scope.opt.label }}
+                                  </q-item-label>
+                                </q-item-section>
+                              </q-item>
+                            </template>
+                          </q-select>
                         </div>
                       </span>
                       <!-- source stream type should be one of the valid stream types -->
@@ -342,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   import AppTabs from "../common/AppTabs.vue";
   import { error } from "console";
+import jstransform from "@/services/jstransform";
   
   export default defineComponent({
     name: "ImportPipeline",
@@ -396,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const userSelectedStreamName = ref<string[]>([]);
       const userSelectedStreamType = ref<string[]>([]);
       const jsonFiles = ref(null);
+
       const url = ref("");
       const jsonArrayOfObj: any = ref([{}]);
       const streams = ref<any>({});
@@ -403,6 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const splitterModel = ref(60);
       const filteredDestinations = ref<string[]>([]);
       const streamTypes = ["logs", "metrics", "traces"];
+      const existingFunctions = ref<any>([]);
       const getFormattedDestinations: any = computed(() => {
         return props.destinations.map((destination: any) => {
           return destination.name;
@@ -430,16 +443,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
       }
   
-      const updateStreamFields = (stream_name: string, index: number) => {
+      const updateStreamFields = (streamName: any, index: number) => {
+        console.log(streamName, 'streamName')
+        const stream_name = streamName.value
         jsonArrayOfObj.value[index].source.stream_name = stream_name;
         jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
           if(node.io_type == "input"){
             node.data.stream_name = stream_name;
           }
         });
-        jsonArrayOfObj.value[index].edges.forEach((edge: any) => {
-          edge.sourceNode.data.stream_name = stream_name;
-        });
+        // jsonArrayOfObj.value[index].edges.forEach((edge: any) => {
+        //   if(edge.hasOwnProperty('sourceNode')){
+        //     edge.sourceNode.data.stream_name = stream_name;
+        //   }
+        // });
         jsonArrayOfObj.value[index].stream_name = stream_name;
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
         
@@ -547,7 +564,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         jsonArrayOfObj.value = [{}];
       };
   
-      onMounted(() => {});
+      onMounted(async () => {
+        await getFunctions();
+      });
+
+      const getFunctions = async () => {
+        const functions = await jstransform.list(1, 100, "created_at", true, "", store.state.selectedOrganization.identifier);
+        existingFunctions.value = functions.data.list.map((fun: any)=>{
+          return fun.name;
+        });
+      }
   
       const importJson = async () => {
         pipelineErrorsToDisplay.value = [];
@@ -624,7 +650,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         const response = await pipelinesService.getPipelineStreams(store.state.selectedOrganization.identifier);
         const usedStreams = response.data.list;
         if(streamName && streamList.length == 0){
-
         return usedStreams.some((stream: any) => { 
           return stream.stream_name === streamName});
         }
@@ -634,6 +659,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           return filteredStreamList;
         }
       }
+
+      const validateDestinationStream = async (streamType: string, streamName: string) => {
+        try {
+          console.log(streamType, streamName, 'streamType, streamName');
+          
+          // Fetch streams
+          const response: any = await getStreams(streamType, false);
+          console.log(response,'responss')
+          
+          // Ensure response contains the expected data
+          if (response && Array.isArray(response.list)) {
+            const streams = response.list;
+
+            // Check if the stream with the given name exists
+            return streams.some((stream: any) => stream.name === streamName);
+          } else {
+            // If the response structure is not as expected
+            console.error("Invalid response structure", response);
+            return false;
+          }
+        } catch (error) {
+          // Handle error, e.g., if the API call fails
+          console.error("Error fetching streams:", error);
+          return false;
+        }
+      };
+
+
+      const validateScheduledPipelineNodes = async (input: any, sqlQuery: string) => {
+        if(input.source.source_type == 'realtime'){
+          return true;
+        }
+        if (sqlQuery) {
+          // Using `some()` to return `false` if condition is met
+          return input.nodes.some((node: any) => {
+            return node.io_type == "input" && 
+                  node.data.query_condition.type == 'sql' && 
+                  node.data.query_condition.sql !== sqlQuery;
+          }) ? false : true; // If condition is met (returns true), return false, otherwise return true
+        } else {
+          // Check for nodes with "input" type and missing sql query
+          if (input.nodes.some((node: any) => {
+            return node.io_type === "input" && 
+                  node.data.query_condition.type === 'sql' && 
+                  !node.data.query_condition.sql;
+          })) {
+            return false;
+          }
+          return true;
+        }
+      };
+
+
   
       const validatePipelineInputs = async (input: any, index: number) => {
         console.log("input", input);
@@ -654,18 +732,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             );
           }
         //3. validate source stream name it should not be empty 
-        if(input.source.source_type == "realtime" && !input.source.stream_name.trim()){
+        if((input.source.source_type == "realtime" && !input.source.stream_name.trim()) || input.source.source_type == "realtime" && await validateSourceStream(input.source.stream_name,[]) ){
           pipelineErrors.push({ message: "Source stream name is required", field: "source_stream_name" });
         }
-        //3. validate source stream name it should not be empty  && same source stream name is not allowed for realtime pipeline
-        if(input.source.source_type == "realtime" && await validateSourceStream(input.source.stream_name,[])){
-
-          pipelineErrors.push({ message: "Pipeline with same source stream already exists", field: "source_stream_name" });
+        //4. validate source stream type it should be one of the valid stream types
+        if(!validStreamTypes.includes(input.source.stream_type)){
+          pipelineErrors.push({ message: "Stream type is required", field: "stream_type" });
         }
+
         //call getStreamsList to update the stream list
         if(input.source.stream_type && validStreamTypes.includes(input.source.stream_type)){
           await getStreamsList(input.source.stream_type, -1);
         }
+        const isValidScheduledPipeline = await validateScheduledPipelineNodes(input, "");
+        //5. validate source node sql query
+        if(
+          (input.source.source_type == "scheduled" 
+          && 
+        (input.source.query_condition.type == "sql" && !input.source.query_condition.sql
+         || !isValidScheduledPipeline || !input.sql_query)
+        )){
+          pipelineErrors.push({ message: "SQL query is required", field: "sql_query_missing" } );
+        }
+
+
+        const isValidQuery = await validateScheduledPipelineNodes(input, input.sql_query);
+        if(input.source.source_type == 'scheduled' && (input.sql_query != input.source.query_condition.sql) || !isValidQuery ){
+          pipelineErrors.push({ message: "SQL query should be same as the query in the nodes", field: "sql_query_match" } );
+        }
+
+
+        // validate destination node in scheduled pipeline 
+        if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
+          const validationPromises = input.nodes.map(async (node: any) => {
+ 
+            if (node.io_type == "output") {
+              const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
+              if(!isValidDestinationStream){
+              pipelineErrors.push({ message: "Destination stream name is required", field: "destination_stream_name" });
+            }
+          }
+            else if (node.io_type == "output" && !validStreamTypes.includes(node.data.stream_type)){
+              pipelineErrors.push({ message: "Stream type is required", field: "destination_stream_type" });
+            }
+          });
+
+          // Wait for all validation to complete
+          await Promise.all(validationPromises);
+        }
+
+        //validate function node in pipeline
+        const validateFunctionNode = async (input: any) => {
+          const isValid = !input.nodes.some((node: any) => {
+            return node.io_type == "default" && 
+                  node.data.node_type == "function" && 
+                  (!node.data.name || !existingFunctions.value.includes(node.data.name));
+          });
+          return isValid; 
+        }
+        const validateConditionNode = (input: any) => {
+          const isValid = !input.nodes.some((node: any) => {
+            return node.io_type == "default" && 
+                  node.data.node_type == "condition" && 
+                  (!node.data.conditions || node.data.conditions.length === 0);
+          });
+          return isValid; 
+        }
+
+        const isValidFunctionNode = await validateFunctionNode(input);
+        if(!isValidFunctionNode){
+          pipelineErrors.push({ message: "Function name is required and should be in the existing functions list", field: "function_name" });
+        }
+
+
+        //validate condition node 
+        if(!validateConditionNode(input)){
+          pipelineErrors.push({ message: "Condition is required", field: "empty_condition" });
+        }
+        
+
         // Log all pipeline errors at the end
         if (pipelineErrors.length > 0) {
           pipelineErrorsToDisplay.value.push(pipelineErrors);
@@ -734,7 +879,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (stream: any) => stream.name,
           );
           const usedStreams = await pipelinesService.getPipelineStreams(store.state.selectedOrganization.identifier);
-          
+          const usedStreamNames = usedStreams.data.list.map(stream => stream.stream_name);
+          streamList.value = streamList.value.map(stream => {
+            return {
+              label: stream,
+              value: stream,
+              disable: usedStreamNames.includes(stream),
+            };
+          });
         } catch (error) {
           console.error('Error fetching streams:', error);
         }
