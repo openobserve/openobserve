@@ -52,6 +52,7 @@ enum Role {
   ROUTER = 4;
   ALERT_MANAGER = 5;
   FLATTEN_COMPACTOR = 6;
+  SCRIPT_SERVER = 7;
 }
 
 // Role group enum

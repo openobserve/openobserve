@@ -2807,6 +2807,7 @@ pub enum Role {
     Router = 4,
     AlertManager = 5,
     FlattenCompactor = 6,
+    ScriptServer = 7,
 }
 impl Role {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -2822,6 +2823,7 @@ impl Role {
             Role::Router => "ROUTER",
             Role::AlertManager => "ALERT_MANAGER",
             Role::FlattenCompactor => "FLATTEN_COMPACTOR",
+            Role::ScriptServer => "SCRIPT_SERVER",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -2834,6 +2836,7 @@ impl Role {
             "ROUTER" => Some(Self::Router),
             "ALERT_MANAGER" => Some(Self::AlertManager),
             "FLATTEN_COMPACTOR" => Some(Self::FlattenCompactor),
+            "SCRIPT_SERVER" => Some(Self::ScriptServer),
             _ => None,
         }
     }

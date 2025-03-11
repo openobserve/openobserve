@@ -39,6 +39,7 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
             Role::Router => ProtoRole::Router as i32,
             Role::AlertManager => ProtoRole::AlertManager as i32,
             Role::FlattenCompactor => ProtoRole::FlattenCompactor as i32,
+            Role::ScriptServer => ProtoRole::ScriptServer as i32,
         })
         .collect();
 
@@ -83,6 +84,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
             r if r == ProtoRole::Router as i32 => Some(Role::Router),
             r if r == ProtoRole::AlertManager as i32 => Some(Role::AlertManager),
             r if r == ProtoRole::FlattenCompactor as i32 => Some(Role::FlattenCompactor),
+            r if r == ProtoRole::ScriptServer as i32 => Some(Role::ScriptServer),
             _ => None,
         })
         .collect();
@@ -114,6 +116,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
         scheduled: node.scheduled,
         broadcasted: node.broadcasted,
         version: node.version,
+        metrics: config::utils::sysinfo::NodeMetrics::default(),
     }
 }
 
@@ -144,10 +147,10 @@ pub async fn get_node_list(node: Arc<dyn NodeInfo>) -> Result<Vec<ConfigNode>, a
     // Create a task to fetch nodes from this cluster node
     let task: tokio::task::JoinHandle<Result<Vec<NodeDetails>, infra::errors::Error>> =
         tokio::task::spawn(async move {
-            let mut client =
-                super::grpc::make_grpc_node_client(&mut Request::new(EmptyRequest {}), &node)
-                    .await?;
-            let nodes = match client.get_nodes(Request::new(EmptyRequest {})).await {
+            let empty_request = EmptyRequest {};
+            let mut request = Request::new(empty_request.clone());
+            let mut client = super::grpc::make_grpc_node_client(&mut request, &node).await?;
+            let nodes = match client.get_nodes(Request::new(empty_request)).await {
                 Ok(remote_nodes) => remote_nodes.into_inner().nodes,
                 Err(err) => {
                     log::error!(
