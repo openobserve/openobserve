@@ -1,4 +1,5 @@
 import { date } from "quasar";
+import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 const units: any = {
   bytes: [
@@ -661,7 +662,7 @@ export const validateSQLPanelFields = (
 const validateQueriesNotEmpty = (
   queries: any[] = [],
   errors: string[],
-  customMessage?: string
+  customMessage?: string,
 ) => {
   queries.forEach((q: any, index: number) => {
     if (q && q?.query === "") {
@@ -679,7 +680,7 @@ const validateQueriesNotEmpty = (
 const validateContentNotEmpty = (
   content: string = "",
   errors: string[],
-  errorMessage: string
+  errorMessage: string,
 ) => {
   if (content.trim() === "") {
     errors.push(errorMessage);
@@ -703,13 +704,25 @@ const validatePanelContentByType = (panel: any, errors: string[]) => {
       validateQueriesNotEmpty(panel?.queries, errors);
       break;
     case "html":
-      validateContentNotEmpty(panel?.htmlContent, errors, "Please enter your HTML code");
+      validateContentNotEmpty(
+        panel?.htmlContent,
+        errors,
+        "Please enter your HTML code",
+      );
       break;
     case "markdown":
-      validateContentNotEmpty(panel?.markdownContent, errors, "Please enter your markdown code");
+      validateContentNotEmpty(
+        panel?.markdownContent,
+        errors,
+        "Please enter your markdown code",
+      );
       break;
     case "custom_chart":
-      validateQueriesNotEmpty([panel?.queries?.[0]], errors, "Please enter query for custom chart");
+      validateQueriesNotEmpty(
+        [panel?.queries?.[0]],
+        errors,
+        "Please enter query for custom chart",
+      );
       break;
   }
 };
@@ -1045,9 +1058,13 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
     errors.push("Dashboard title is required");
   }
 
-  // Version should be present
+  // Version should be present and match current schema version
   if (!dashboardJson?.version) {
     errors.push("Dashboard version is required");
+  } else if (dashboardJson.version !== CURRENT_DASHBOARD_SCHEMA_VERSION) {
+    errors.push(
+      `Dashboard version must be ${CURRENT_DASHBOARD_SCHEMA_VERSION}.`,
+    );
   }
 
   // Check tabs
