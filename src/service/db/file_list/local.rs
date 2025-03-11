@@ -56,10 +56,6 @@ pub async fn exist_pending_delete(file: &str) -> bool {
 }
 
 pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
-    // add to memory cache
-    {
-        PENDING_DELETE_FILES.write().await.insert(file.to_string());
-    }
     // add to local db for persistence
     let ts = config::utils::time::now_micros();
     infra::file_list::LOCAL_CACHE
@@ -72,18 +68,20 @@ pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
                 flattened: false,
             }],
         )
-        .await
+        .await?;
+    // add to memory cache
+    PENDING_DELETE_FILES.write().await.insert(file.to_string());
+    Ok(())
 }
 
 pub async fn remove_pending_delete(file: &str) -> Result<()> {
-    // remove from memory cache
-    {
-        PENDING_DELETE_FILES.write().await.remove(file);
-    }
     // remove from local db for persistence
     infra::file_list::LOCAL_CACHE
         .batch_remove_deleted(&[file.to_string()])
-        .await
+        .await?;
+    // remove from memory cache
+    PENDING_DELETE_FILES.write().await.remove(file);
+    Ok(())
 }
 
 pub async fn get_pending_delete() -> Vec<String> {
