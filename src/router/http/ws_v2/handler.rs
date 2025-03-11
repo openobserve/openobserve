@@ -16,7 +16,8 @@
 use std::sync::Arc;
 
 use actix_web::{Error, HttpRequest, HttpResponse, web};
-use config::meta::cluster::RoleGroup;
+use actix_ws::{CloseCode, CloseReason};
+use config::{meta::cluster::RoleGroup, utils::json};
 use futures_util::StreamExt;
 
 use super::{
@@ -64,7 +65,7 @@ impl WsHandler {
         // Setup message channel
         // TODO: decide the buffer size for the channel
         let (response_tx, mut response_rx) = tokio::sync::mpsc::channel::<WsServerEvents>(32);
-        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<Option<String>>();
         let session_manager = self.session_manager.clone();
         let connection_pool = self.connection_pool.clone();
 
@@ -78,63 +79,95 @@ impl WsHandler {
                             log::error!(
                                 "[WS::Router::Handler] error receiving websocket message from client {e}"
                             );
+                            if let Err(_) = shutdown_tx
+                                .send(Some(format!("Error receiving message from client: {e}")))
+                            {
+                                log::error!(
+                                    "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                );
+                            };
                             break;
                         }
                         Ok(msg) => match msg {
                             actix_ws::Message::Text(text) => {
-                                if let Ok(message) = serde_json::from_str::<WsClientEvents>(&text) {
-                                    // let message: StreamMessage = message.into();
-                                    log::debug!(
-                                        "[WS::Router::Handler] received message: {:?}",
-                                        message
-                                    );
-                                    let trace_id = message.get_trace_id();
-                                    let role_group = if let WsClientEvents::Search(req) = &message {
-                                        Some(RoleGroup::from(req.search_type.clone()))
-                                    } else {
-                                        None
-                                    };
-                                    let querier_conn = match get_querier_connection(
-                                        session_manager.clone(),
-                                        connection_pool.clone(),
-                                        &client_id,
-                                        &trace_id,
-                                        role_group,
-                                    )
-                                    .await
-                                    {
-                                        Err(e) => {
-                                            log::error!(
-                                                "[WS::Router::Handler] error getting querier_conn: {e}"
-                                            );
-                                            break;
-                                        }
-                                        Ok(querier_conn) => querier_conn,
-                                    };
-                                    querier_conn
-                                        .register_request(trace_id, response_tx.clone())
-                                        .await;
-
-                                    if let Err(e) = querier_conn.send_message(message).await {
+                                match json::from_str::<WsClientEvents>(&text) {
+                                    Err(e) => {
                                         log::error!(
-                                            "[WS::Router::Handler] error forwarding client message via selected querier connection: {e}"
+                                            "[WS::Router::Handler] received invalid message: {:?}",
+                                            e
                                         );
-                                        // TODO: possibly need to disconnect and remove the
-                                        // connection
+                                        if let Err(_) = shutdown_tx
+                                            .send(Some(format!("Invalid message: {:?}", e)))
+                                        {
+                                            log::error!(
+                                                "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                            );
+                                        }
                                         break;
                                     }
-                                } else {
-                                    log::error!(
-                                        "[WS::Router::Handler] received invalid message: {:?}",
-                                        text
-                                    );
+                                    Ok(message) => {
+                                        log::debug!(
+                                            "[WS::Router::Handler] received message: {:?}",
+                                            message
+                                        );
+                                        let trace_id = message.get_trace_id();
+                                        let role_group =
+                                            if let WsClientEvents::Search(req) = &message {
+                                                Some(RoleGroup::from(req.search_type.clone()))
+                                            } else {
+                                                None
+                                            };
+                                        let querier_conn = match get_querier_connection(
+                                            session_manager.clone(),
+                                            connection_pool.clone(),
+                                            &client_id,
+                                            &trace_id,
+                                            role_group,
+                                        )
+                                        .await
+                                        {
+                                            Err(e) => {
+                                                log::error!(
+                                                    "[WS::Router::Handler] error getting querier_conn: {e}"
+                                                );
+                                                if let Err(_) = shutdown_tx.send(Some(format!(
+                                                    "Error getting a querier connection: {:?}",
+                                                    e
+                                                ))) {
+                                                    log::error!(
+                                                        "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                    );
+                                                }
+                                                break;
+                                            }
+                                            Ok(querier_conn) => querier_conn,
+                                        };
+                                        querier_conn
+                                            .register_request(trace_id, response_tx.clone())
+                                            .await;
+
+                                        if let Err(e) = querier_conn.send_message(message).await {
+                                            log::error!(
+                                                "[WS::Router::Handler] error forwarding client message via selected querier connection: {e}"
+                                            );
+                                            if let Err(_) = shutdown_tx.send(Some(format!(
+                                                "Error forwarding client message to querier: {:?}",
+                                                e
+                                            ))) {
+                                                log::error!(
+                                                    "[WS::Router::Handler] Error informing handle_outgoing to stop"
+                                                );
+                                            }
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                             actix_ws::Message::Close(_) => {
                                 log::info!(
-                                    "[WS::Router::Handler] disconnect signal received from client. Informing handle_outgoing to stop"
+                                    "[WS::Router::Handler] disconnect signal received from client."
                                 );
-                                if let Err(_) = shutdown_tx.send(()) {
+                                if let Err(_) = shutdown_tx.send(None) {
                                     log::error!(
                                         "[WS::Router::Handler] Error informing handle_outgoing to stop"
                                     );
@@ -166,7 +199,11 @@ impl WsHandler {
                                 break;
                             }
                         }
-                        _ = &mut shutdown_rx => {
+                        msg = &mut shutdown_rx => {
+                            if let Ok(Some(err)) = msg  {
+                                _ = ws_session.close(Some(CloseReason::from((CloseCode::Error, err.to_string())))).await;
+                                return Ok(());
+                            }
                             log::debug!(
                                 "[WS::Handler]: disconnect signal received from client. handle_outgoing stopped"
                             );
@@ -174,8 +211,10 @@ impl WsHandler {
                         }
                     }
                 }
-                // TODO: need to close client websocket connection?
-                _ = ws_session.close(None).await;
+                // TODO: need to
+                _ = ws_session
+                    .close(Some(CloseReason::from(CloseCode::Normal)))
+                    .await;
                 log::debug!("[WS::Handler]: client ws closed");
                 Ok::<_, Error>(())
             };
