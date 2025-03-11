@@ -1428,8 +1428,6 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
-    #[env_config(name = "ZO_DISK_CACHE_NEW_HASH_FORMAT", default = false)]
-    pub new_hash_format: bool,
 }
 
 #[derive(EnvConfig)]
