@@ -1899,6 +1899,23 @@ export const usePanelDataLoader = (
       observer.disconnect();
     }
 
+    // for websocket
+    if (isWebSocketEnabled() && state.searchRequestTraceIds) {
+      try {
+        // loop on state.searchRequestTraceIds
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelSearchQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
+        });
+      } catch (error) {
+        console.error("Error during WebSocket cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
+    }
+
     // remove cancelquery event
     window.removeEventListener("cancelQuery", cancelQueryAbort);
   });
