@@ -683,6 +683,14 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
+    #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
+    pub parquet_compression: String,
+    #[env_config(
+        name = "ZO_TIMESTAMP_COMPRESSION_DISABLED",
+        default = false,
+        help = "Disable timestamp field compression"
+    )]
+    pub timestamp_compression_disabled: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -2594,6 +2602,19 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+#[inline]
+pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+    match compression.to_lowercase().as_str() {
+        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
+        "snappy" => parquet::basic::Compression::SNAPPY,
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
+    }
 }
 
 #[cfg(test)]
