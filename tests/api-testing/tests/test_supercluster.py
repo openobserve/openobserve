@@ -851,6 +851,26 @@ def create_cached_report(session, base_url, org_id, cached_report_name, dashboar
     assert response.status_code == 200, f"Failed to create cached report: {response.content.decode()}"
     return response
 
+def create_user(session, base_url, org_id, email_address):
+    """Create a cached report."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "organization": org_id,
+        "email": email_address,
+        "password": "12345678",
+        "first_name": "Shyam",
+        "last_name": "P",
+        "role": "admin",
+    }
+
+    response = session.post(f"{base_url}api/{org_id}/users", json=payload, headers=headers)
+
+
+    assert (
+        response.status_code == 200
+    ), f"Creating a user 200, but got {response.status_code} {response.content}"
+
 def test_create_workflow(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL
@@ -920,7 +940,12 @@ def test_create_workflow(create_session, base_url):
         create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
 
         cached_report_name = f"cached_report_{i + 1}_{random.randint(100000, 999999)}"
-        create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)     
+        create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
+
+        email_address = f"user_email_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_user(session, base_url, org_id, email_address)
+
+
 
         # Ingest logs
         ingest_logs(session, base_url, org_id, stream_name)
