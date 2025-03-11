@@ -2,6 +2,12 @@ import os
 import pytest
 import random
 import uuid
+from datetime import datetime
+import json
+from pathlib import Path
+import base64
+import requests
+import io
 
 # Constants for WebSocket URL and user credentials
 ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
@@ -9,7 +15,8 @@ ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
 ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 
- 
+root_dir = Path(__file__).parent.parent.parent
+
 def create_template_webhook(session, base_url, org_id, template_name):
     """Create a Webhook template."""
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
@@ -374,10 +381,249 @@ def ingest_logs(session, base_url, org_id, stream_name):
     assert response.status_code == 200, f"Failed to ingest logs: {response.content}"
     return response
 
+def create_savedView(session, base_url, org_id, savedview_name, stream_name):
+    """Create a saved view."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+            "organizationIdentifier": org_id,
+            "runQuery": False,
+            "loading": False,
+            "loadingHistogram": False,
+            "loadingCounter": False,
+            "loadingStream": False,
+            "loadingSavedView": False,
+            "shouldIgnoreWatcher": False,
+            "communicationMethod": "http",
+            "config": {
+                "splitterModel": 20,
+                "lastSplitterPosition": 0,
+                "splitterLimit": [0, 40],
+                "fnSplitterModel": 60,
+                "fnLastSplitterPosition": 0,
+                "fnSplitterLimit": [40, 100],
+                "refreshTimes": [
+                    [{"label": "5 sec", "value": 5}, {"label": "1 min", "value": 60}, {"label": "1 hr", "value": 3600}],
+                    [{"label": "10 sec", "value": 10}, {"label": "5 min", "value": 300}, {"label": "2 hr", "value": 7200}],
+                    [{"label": "15 sec", "value": 15}, {"label": "15 min", "value": 900}, {"label": "1 day", "value": 86400}],
+                    [{"label": "30 sec", "value": 30}, {"label": "30 min", "value": 1800}]
+                ]
+            },
+            "meta": {
+                # Include the rest of the meta fields as needed
+                "logsVisualizeToggle": "logs",
+                "refreshInterval": 0,
+                "refreshIntervalLabel": "Off",
+                "refreshHistogram": False,
+                "showFields": True,
+                "showQuery": True,
+                "showHistogram": True,
+                "showDetailTab": False,
+                "toggleFunction": True,
+                "searchApplied": True,
+                "toggleSourceWrap": False,
+                "histogramDirtyFlag": False,
+                "sqlMode": True,
+                "quickMode": False,
+                "queryEditorPlaceholderFlag": True,
+                "functionEditorPlaceholderFlag": True,
+                "resultGrid": {
+                    "rowsPerPage": 50,
+                    "wrapCells": False,
+                    "manualRemoveFields": False,
+                    "chartInterval": "30 second",
+                    "chartKeyFormat": "HH:mm:ss",
+                    "navigation": {"currentRowIndex": 0},
+                    "showPagination": True
+                },
+                "jobId": "",
+                "jobRecords": "100",
+                "pageType": "logs",
+                "regions": [],
+                "clusters": [],
+                "useUserDefinedSchemas": "user_defined_schema",
+                "hasUserDefinedSchemas": False,
+                "selectedTraceStream": "",
+                "showSearchScheduler": False
+            },
+            "data": {
+                "query": f"SELECT * FROM \"{stream_name}\"",
+                # Add the rest of the data fields as needed
+            },
+            "view_name": savedview_name
+        }
+    
+    response = session.post(f"{base_url}api/{org_id}/savedviews", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create saved view: {response.content}"
+    return response
+
+def create_folder(session, base_url, org_id, folder_name):
+    """Create a folder."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "description": folder_name,
+        "folderId": "",
+        "name": folder_name
+    }
+
+    response = session.post(f"{base_url}api/{org_id}/folders", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create folder: {response.content}"
+    folder_id = response.json()["folderId"]
+    return folder_id
+
+def create_dashboard(session, base_url, org_id, dashboard_name, folder_id):
+    """Create a dashboard."""
+    headers = {
+        "Content-Type": "application/json", 
+        "Custom-Header": "value"
+    }
+    # created_time = datetime.now().isoformat()   
+    payload = {
+        "title": dashboard_name,
+        "dashboardId": "",
+        "description": "",
+        "variables": {
+            "list": [],
+            "showDynamicFilters": True
+        },
+        "defaultDatetimeDuration": {
+            "startTime": None,
+            "endTime": None,
+            "relativeTimePeriod": "15m",
+            "type": "relative"
+        },
+        "role": "",
+        "owner": ZO_ROOT_USER_EMAIL,
+    #    "created": created_time + "Z",  # Append "Z" to indicate UTC
+        "tabs": [
+            {
+                "panels": [],
+                "name": "Default",
+                "tabId": "default"
+            }
+        ],
+        "version": 3
+    }
+    # Debugging output
+    print("Payload:", json.dumps(payload, indent=2))
+    print("Headers:", headers)
+
+    response = session.post(f"{base_url}api/{org_id}/dashboards?folder={folder_id}", json=payload, headers=headers)
+    
+    # Improved error handling
+    assert response.status_code == 200, f"Failed to create dashboard: {response.content.decode()}"
+
+def create_function(session, base_url, org_id, function_name):
+    """Create a dashboard."""
+    headers = {
+        "Content-Type": "application/json", 
+        "Custom-Header": "value"
+    }
+    # created_time = datetime.now().isoformat()   
+    payload = {
+        "function": ".a=190025552",
+        "name": function_name,
+        "params": "row",
+        "transType": 0,
+    }
+    response = session.post(f"{base_url}api/{org_id}/functions", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create function: {response.content.decode()}"
+    return response
+
+
+# Define the boundary as a constant
+BOUNDARY = "----WebKitFormBoundaryaQgmYHuE6dQrlLss"
+
+def create_multipart_data(fields, boundary):
+    """Create multipart form data with a specified boundary."""
+    boundary_str = f"--{boundary}"
+    lines = []
+
+    # Add the fields to the multipart data
+    for key, value in fields.items():
+        if isinstance(value, tuple):
+            # This is the file field
+            filename, file_obj, content_type = value
+            lines.append(f"{boundary_str}")
+            lines.append(f'Content-Disposition: form-data; name="{key}"; filename="{filename}"')
+            lines.append(f'Content-Type: {content_type}')
+            lines.append("")
+            # Read the file content as binary
+            lines.append(file_obj.read())  # Read as binary data
+        else:
+            # Regular fields
+            lines.append(f"{boundary_str}")
+            lines.append(f'Content-Disposition: form-data; name="{key}"')
+            lines.append("")
+            lines.append(value)
+
+    # End the multipart data
+    lines.append(f"{boundary_str}--")
+    
+    return b"\r\n".join(line.encode('utf-8') if isinstance(line, str) else line for line in lines)
 
 
 
-def test_create_workflow_old(create_session, base_url):
+def create_enrichment_table(session, base_url, org_id, enrichment_table_name):
+    """Create an enrichment table."""
+    # Define headers
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Content-Type': f'multipart/form-data; boundary={BOUNDARY}',
+        'Pragma': 'no-cache',
+        'Custom-Header': 'value'
+    }
+
+    # Define cookies
+    cookies = {
+        'auth_ext': '{"auth_ext":"","refresh_token":"","request_time":0,"expires_in":0}',
+        'auth_tokens': f'{{"access_token":"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ":" + ZO_ROOT_USER_PASSWORD).encode()).decode()}","refresh_token":""}}'
+        }
+
+    # Open the json data file and read it
+    with open(root_dir / "test-data/protocols.csv") as f:
+        data = f.read()
+
+    # Prepare the fields for multipart data
+    with open(root_dir / "test-data/protocols.csv", 'rb') as file_obj:
+        file_content = file_obj.read()  # Read the content into memory
+        file_like_object = io.BytesIO(file_content)  # Create an in-memory file-like object
+
+    fields = {
+        'file': ('protocols.csv', file_like_object, 'text/csv')  # Pass the in-memory object
+    }
+    
+    # Now call your function that uses fields
+    multipart_data = create_multipart_data(fields, BOUNDARY)
+
+    url = f"{base_url}api/{org_id}/enrichment_tables/{enrichment_table_name}?append=false"
+
+    # Make the POST request
+    response = session.post(url, headers=headers, cookies=cookies, data=multipart_data)
+
+    # Check the response
+    assert response.status_code == 200, f"Failed to enrich table: {response.content.decode()}"
+    print("Response:", response.json())  # Print the response for debugging
+
+# def create_enrichment(session, base_url, org_id, enrichment_table_name):
+#     """Create an enrichment."""
+#     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+#     # Open the json data file and read it
+#     with open(root_dir / "test-data/protocols.csv") as f:
+#         data = f.read()
+
+
+#     response = session.post(f"{base_url}api/{org_id}/enrichment_tables/{enrichment_table_name}?append=false", json=data, headers=headers)
+#     assert response.status_code == 200, f"Failed to create enrichment: {response.content.decode()}"
+#     return response
+
+
+def test_create_workflow(create_session, base_url):
     session = create_session
     base_url = ZO_BASE_URL
     org_id = "org_pytest_data"
@@ -386,7 +632,7 @@ def test_create_workflow_old(create_session, base_url):
     
 
    # Loop to create 500 templates, destinations, and alerts
-    for i in range(5):
+    for i in range(2):
         # Create unique template names
         template_name_webhook = f"template_webhook_{i + 1}_{random.randint(100000, 999999)}"
         template_name_email = f"template_email_{i + 1}_{random.randint(100000, 999999)}"
@@ -421,8 +667,23 @@ def test_create_workflow_old(create_session, base_url):
         alert_sql = f"alert_sql_{i + 1}_{random.randint(100000, 999999)}"
         alert_sql_created = create_standard_alert_sql(session, base_url, org_id, alert_sql, template_name_email, stream_name, destination_name_email)
 
-        # Optionally print or log the created names for tracking
-        print(f"Created: {template_name_webhook}, {template_name_email}, {destination_name_webhook}, {destination_name_email}, {destination_name_pipeline}, {alert_webhook}, {alert_email}, {alert_cron}, {alert_real_time}, {alert_sql}")
+        savedview_name = f"savedview_{i + 1}_{random.randint(100000, 999999)}"      
+        create_savedView(session, base_url, org_id, savedview_name, stream_name)
+
+        folder_name = f"folder_{i + 1}_{random.randint(100000, 999999)}"
+        folder_id = create_folder(session, base_url, org_id, folder_name)
+
+        dashboard_name = f"dashboard_{i + 1}_{random.randint(100000, 999999)}"
+        create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
+
+        function_name = f"function_{i + 1}_{random.randint(100000, 999999)}"
+        create_function(session, base_url, org_id, function_name)   
+
+        enrichment_table_name = f"enrichment_{i + 1}_{random.randint(100000, 999999)}"
+        create_enrichment_table(session, base_url, org_id, enrichment_table_name)
+
+        # # Optionally print or log the created names for tracking
+        # print(f"Created: {template_name_webhook}, {template_name_email}, {destination_name_webhook}, {destination_name_email}, {destination_name_pipeline}, {alert_webhook}, {alert_email}, {alert_cron}, {alert_real_time}, {alert_sql}, {savedview_name}, {folder_name}")
 
     # Ingest logs
     
