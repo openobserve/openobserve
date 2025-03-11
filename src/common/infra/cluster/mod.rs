@@ -63,9 +63,14 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role, group: Option
         Role::FlattenCompactor => FLATTEN_COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
+    let config = get_config();
     let mut h = config::utils::hash::gxhash::new();
-    for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
+    for i in 0..config.limit.consistent_hash_vnodes {
+        let key = if config.disk_cache.new_hash_format {
+            format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i)
+        } else {
+            format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i)
+        };
         let hash = h.sum64(&key);
         nodes.insert(hash, node.name.clone());
     }
