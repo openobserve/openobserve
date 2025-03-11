@@ -358,6 +358,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::create_user_rumtoken)
         .service(organization::org::get_user_rumtoken)
         .service(organization::org::update_user_rumtoken)
+        .service(organization::org::node_list)
         .service(organization::es::org_index)
         .service(organization::es::org_license)
         .service(organization::es::org_xpack)

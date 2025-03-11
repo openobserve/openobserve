@@ -64,6 +64,7 @@ fn main() -> Result<()> {
                 "proto/cluster/ingest.proto",
                 "proto/cluster/querycache.proto",
                 "proto/cluster/plan.proto",
+                "proto/cluster/node.proto",
             ],
             &["proto"],
         )

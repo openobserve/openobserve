@@ -18,7 +18,6 @@ use std::{fmt::Debug, str::FromStr, sync::Arc};
 use serde::{Deserialize, Serialize};
 
 use crate::{get_config, get_instance_id, meta::search::SearchEventType};
-
 pub trait NodeInfo: Debug + Send + Sync {
     fn is_querier(&self) -> bool {
         true
@@ -28,6 +27,8 @@ pub trait NodeInfo: Debug + Send + Sync {
     }
     fn get_grpc_addr(&self) -> String;
     fn get_auth_token(&self) -> String;
+    fn get_region(&self) -> String;
+    fn get_cluster_name(&self) -> String;
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -107,6 +108,14 @@ impl Default for Node {
 impl NodeInfo for Node {
     fn is_querier(&self) -> bool {
         self.is_querier()
+    }
+
+    fn get_region(&self) -> String {
+        "local".to_string()
+    }
+
+    fn get_cluster_name(&self) -> String {
+        "local".to_string()
     }
 
     fn is_ingester(&self) -> bool {
