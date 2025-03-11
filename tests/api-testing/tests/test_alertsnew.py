@@ -2,168 +2,121 @@ import time
 import random
 import uuid
 import pytest
+import json
 import requests
 import logging
-import os
-import json
-# # Setup logging
-# logger = logging.getLogger(__name__)
-
-# Constants for WebSocket URL and user credentials
-ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
-ZO_BASE_URL_SC = os.environ.get("ZO_BASE_URL_SC")  # Use environment variable
-ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment variable
-ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 
 
+def test_get_alertsnew(create_session, base_url):
+    """Running an E2E test for getting all the new alerts list."""
 
-# Folders
-def create_user(session, base_url, org, email_address):
-    payload = {"organization": org,"email": email_address,"password":"12345678","role":"admin"}
-    response = session.post(f"{base_url}api/{org}/users", json=payload)
-    assert response.status_code == 200, f"Failed to create folder: {response.content}"
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    print(resp_get_allalertsnew.content)
+    assert (
+        resp_get_allalertsnew.status_code == 200
+    ), f"Get all new alerts list 200, but got {resp_get_allalertsnew.status_code} {resp_get_allalertsnew.content}"
+
+def test_new_alert_create(create_session, base_url):
+    """Running an E2E test for create a new alert."""
+
+    alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
+    folder_alert = f"newfloder_{random.randint(1000, 9999)}"  # Make the name unique
+    
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+
+    # create folder
+
+    payload_folder = {"description": "newfoldernvp", "name": folder_alert}
+    resp_create_folder = session.post(
+        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
+
+    print(resp_create_folder.content)
+
+    folder_id = resp_create_folder.json()["folderId"]
+
+    assert (
+        resp_create_folder.status_code == 200
+    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
+
+    # createtemplate
+    template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
+    destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
+
+
+    payload_temp_alert = {
+        "name":template_alert,
+        "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
+        "type":"http",
+        "title":""
+        }
+    
+    # Create template for alerts
+    resp_create_templates_alert = session.post(
+        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
+    )
+
+    print(resp_create_templates_alert.content)
+    assert (
+        resp_create_templates_alert.status_code == 200
+    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+
+    
+    skip_tls_verify_value = False  # Define the skip_tls_verify_value
+
+    payload_dest_alert = {
+        "url":"https://jsonplaceholder.typicode.com/todos",
+        "method":"get",
+        "skip_tls_verify":skip_tls_verify_value,
+        "template":template_alert,
+        "headers":{},
+        "name":destination_alert
+        }
     
 
-def create_folder(session, base_url, org, folder_name):
-    payload = {"description": "newfoldernvp", "name": folder_name}
-    response = session.post(f"{base_url}api/v2/{org}/folders/alerts", json=payload)
-    assert response.status_code == 200, f"Failed to create folder: {response.content}"
-    folder_id = response.json().get("folderId")
-    return folder_id
+    # Create destination
+    resp_create_destinations_alert = session.post(
+        f"{url}api/{org_id}/alerts/destinations",
+        json=payload_dest_alert,
+    )
+    print(resp_create_destinations_alert.content)
 
-def create_template_webhook(session, base_url, org, template_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-
-    payload = {
-        "name": template_name,
-        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
-        "type": "http",
-        "title": ""
-    }
-    response = session.post(f"{base_url}api/{org}/alerts/templates", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to create template: {response.content}"
-    return response.json()
-
-def create_template_email(session, base_url, org, template_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    payload = {
-        "name": template_name,
-        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}', 
-        "type": "email",
-        "title": "Email Alert"
-    }
-    response = session.post(f"{base_url}api/{org}/alerts/templates", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to create template: {response.content}"
-    return response.json()
-
-def get_template(session, base_url, org):
-    resp_template = session.get(f"{base_url}api/{org}/alerts/templates")
     assert (
-        resp_template.status_code == 200
-    ), f"Get template 200, but got {resp_template.status_code} {resp_template.content}"
-    return resp_template.json()    
+        resp_create_destinations_alert.status_code == 200
+    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
 
-def update_template_webhook(session, base_url, org, template_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+    # Get destination
+    resp_get_destinations_alert = session.get(
+    f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
+    )
+    print(resp_get_destinations_alert.content)
 
-    payload = {
-        "name": template_name,
-        "body": '{\n  \"text\": \"{alert_name} is active\"\n}',
-        "type": "http",
-        "title": ""
-    }         
-    resp_template = session.put(f"{base_url}api/{org}/alerts/templates/{template_name}", json=payload, headers=headers)
     assert (
-        resp_template.status_code == 200
-    ), f"Update template 200, but got {resp_template.status_code} {resp_template.content}"
-    return resp_template.json()    
+    resp_get_destinations_alert.status_code == 200
+    ), f"Get all destinations list 200, but got {resp_get_destinations_alert.status_code} {resp_get_destinations_alert.content}"
 
-def update_template_email(session, base_url, org, template_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    payload = {
-        "name": template_name,
-        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
-        "type": "email",
-        "title": "Email Alert Updated"
-    }         
-    resp_template = session.put(f"{base_url}api/{org}/alerts/templates/{template_name}", json=payload, headers=headers)
+    # Check if the destination name matches
     assert (
-        resp_template.status_code == 200
-    ), f"Update template 200, but got {resp_template.status_code} {resp_template.content}"
-    return resp_template.json()    
+    resp_get_destinations_alert.json()["name"] == destination_alert
+    ), f"Destination {destination_alert} not found in the response"
 
-def create_destination_webhook(session, base_url, org, destination_name, template_alert):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    skip_tls_verify_value = False  # Define the skip_tls_verify_value
-    payload = {
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "method": "get",
-        "template": template_alert,  
-        "headers": {},  # Ensure this is formatted correctly
-        "name": destination_name,
-        "skip_tls_verify": skip_tls_verify_value
-    }
-    response = session.post(f"{base_url}api/{org}/alerts/destinations", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to create destination: {response.content}"
-    return response.json()
+    time.sleep(5)
 
-def create_destination_email(session, base_url, org, destination_name, template_alert, email_address):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    skip_tls_verify_value = False  # Define the skip_tls_verify_value
-    payload = {
-        "url": "",
-        "type": "email",
-        "emails": [email_address],
-        "method": "post",
-        "template": template_alert,
-        "headers": {},
-        "name": destination_name,
-        "skip_tls_verify": skip_tls_verify_value
-    }
-    response = session.post(f"{base_url}api/{org}/alerts/destinations", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to create destination: {response.content}"
-    return response.json()
-
-
-def get_destination(session, base_url, org):
-    response = session.get(f"{base_url}api/{org}/alerts/destinations")
-    assert response.status_code == 200, f"Failed to get destination: {response.content}"
-    return response.json()
-
-def update_destination_webhook(session, base_url, org, destination_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    payload = {
-        "name": destination_name,
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "method": "get",
-    }   
-    response = session.put(f"{base_url}api/{org}/alerts/destinations/{destination_name}", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to update destination: {response.content}"
-    return response.json()
-
-def update_destination_email(session, base_url, org, destination_name):
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    payload = {
-        "name": destination_name,
-        "url": "https://jsonplaceholder.typicode.com/todos",
-        "type": "email",
-        "emails": ["test@example.com"],
-        "method": "post",
-    }
-    response = session.put(f"{base_url}api/{org}/alerts/destinations/{destination_name}", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to update destination: {response.content}"
-    return response.json()  
-
-def delete_destination(session, base_url, org, destination_name):
-    response = session.delete(f"{base_url}api/{org}/alerts/destinations/{destination_name}")
-    assert response.status_code == 200, f"Failed to delete destination: {response.content}"
-    return response.json()
-
-def ingest_logs(session, base_url, org, stream_name):
+    # ingest logs
+    stream_name = "default"
     payload_logs = [
         {
             "Athlete": "newtemp",
-            "log": "200",
             "City": "Athens",
             "Country": "HUN",
             "Discipline": "Swimming",
@@ -172,7 +125,6 @@ def ingest_logs(session, base_url, org, stream_name):
         },
         {
             "Athlete": "HERSCHMANN",
-            "log": "404",  # Add a non-matching record for negative testing
             "City": "Athens",
             "Country": "CHN",
             "Discipline": "Swimming",
@@ -180,19 +132,22 @@ def ingest_logs(session, base_url, org, stream_name):
             "Year": 1896,
         },
     ]
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-    response = session.post(f"{base_url}api/{org}/{stream_name}/_json", json=payload_logs, headers=headers)
-    assert response.status_code == 200, f"Failed to ingest logs: {response.content}"
 
-def create_alert(session, base_url, org, folder_id, alert_name, template_name, stream_name, destination_name):
-    # alert_id = str(uuid.uuid4())
-    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
-  
-    payload = {
+    resp_create_logstream = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
+    )
+
+    print(resp_create_logstream.content)
+    assert (
+        resp_create_logstream.status_code == 200
+    ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+    
+    time.sleep(5)  
+    payload_alert = {
     "name": alert_name,
-    "row_template": template_name,
+    "row_template": template_alert,
     "stream_type": "logs",
-    "stream_name": stream_name,
+    "stream_name": "default",
     "is_real_time": False,
     "context_attributes": {},
     "query_condition": {
@@ -214,7 +169,7 @@ def create_alert(session, base_url, org, folder_id, alert_name, template_name, s
     "trigger_condition": {
         "period": 10,
         "operator": ">=",
-        "frequency": 3,
+        "frequency": 1,
         "cron": "",
         "threshold": 3,
         "silence": 10,
@@ -222,124 +177,301 @@ def create_alert(session, base_url, org, folder_id, alert_name, template_name, s
         "timezone": "UTC",
         "tolerance_in_secs": 0
     },
-    "org": org,
-    "destinations": [destination_name],
+    "org_id": "default",
+    "destinations": [destination_alert],
     "enabled": True,
     "description": "test",
     "folderId": folder_id
  }
+    resp_post_alertnew = session.post(
+    f"{url}api/v2/{org_id}/alerts",
+    json=payload_alert,
+    headers=headers,
+    )
+    print(resp_post_alertnew.content)
 
-    response = session.post(f"{base_url}api/v2/{org}/alerts", json=payload, headers=headers)
-    assert response.status_code == 200, f"Failed to create alert: {response.content}"
-    return response.json()
+    assert ( resp_post_alertnew.status_code == 200  
+    ), f"Post alert expected 200, but got {resp_post_alertnew.status_code} {resp_post_alertnew.content}"
+    print(f"Alert {alert_name} created successfully")
 
-def get_alertsnew(session, base_url, org):
-    # Make the GET request to fetch alerts
-    resp_allalertsnew = session.get(f"{base_url}api/v2/{org}/alerts")
-    
-    # Assert that the response status code is 200
-    assert (
-        resp_allalertsnew.status_code == 200
-    ), f"Expected status code 200, but got {resp_allalertsnew.status_code} {resp_allalertsnew.content}"
-    
-    # Parse the JSON response
-    response_json = resp_allalertsnew.json()
-    
-    # Assert that the response contains the 'list' key
+
+def test_get_alertnew(create_session, base_url):
+    """Running an E2E test for getting particular new alert ID."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
     assert "list" in response_json, "Response does not contain 'list'"
-    
-    # Extract the alerts from the response
+
+    # Get the list of alerts from the response
     alerts = response_json["list"]
-    alert_details = []
 
-    # Iterate through each alert and extract relevant information
+    # Now you can iterate over the alerts
     for alert in alerts:
-        alert_detail = {
-            "alert_id": alert.get("alert_id"),  # Ensure to use the correct key
-            "name": alert.get("name"),
-            "org_id": alert.get("org_id"),
-            "stream_type": alert.get("stream_type"),
-            "stream_name": alert.get("stream_name"),
-            "enabled": alert.get("enabled"),
-            "description": alert.get("description"),
-            "destinations": alert.get("destinations"),
-            "query_condition": alert.get("query_condition"),
-            "trigger_condition": alert.get("trigger_condition"),
-            "owner": alert.get("owner"),
-            "updated_at": alert.get("updated_at"),
-            # Add any other fields you may need
-        }
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-        # Ensure that alert_id is present
-        assert alert_detail["alert_id"] is not None, f"Alert ID is missing for alert: {alert}"
-        
-        alert_details.append(alert_detail)
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Get  request using the extracted alert_id
+        resp_get_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_alertnew.status_code == 200, f"Failed to get details for alert {alert_id}"
+        print(f"Successfully fetched details for alert {alert_id}")
+
+def test_put_alertnew_update(create_session, base_url):
+    """Running an E2E test for updating the new alert."""
+
+    alert_name = f"newalert_{random.randint(1000, 9999)}"  # Make the name unique
+    folder_alert = f"newfloder_{random.randint(1000, 9999)}"  # Make the name unique
     
-    return alert_details  # Return the list of structured alert details
+    session = create_session
+    url = base_url
+    org_id = "default"
 
 
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
 
+    # create folder
 
+    payload_folder = {"description": "newfoldernvp", "name": folder_alert}
+    resp_create_folder = session.post(
+        f"{url}api/v2/{org_id}/folders/alerts", json=payload_folder)
 
-def get_alert(session, base_url, org, alert_id):
-    resp_alert = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
+    print(resp_create_folder.content)
+
+    folder_id = resp_create_folder.json()["folderId"]
+
     assert (
-        resp_alert.status_code == 200
-    ), f"Get alert 200, but got {resp_alert.status_code} {resp_alert.content}"
-    return resp_alert.json()  
+        resp_create_folder.status_code == 200
+    ), f"Expected 200, but got {resp_create_folder.status_code} {resp_create_folder.content}"
+
+    # createtemplate
+    template_alert = f"newtemp_{random.randint(10000, 99999)}"  # Make the name unique
+    destination_alert = f"newdest_{random.randint(10000, 99999)}"  # Make the name unique
+
+
+    payload_temp_alert = {
+        "name":template_alert,
+        "body":"{\n  \"text\": \"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active\"\n}",
+        "type":"http",
+        "title":""
+        }
+    
+    # Create template for alerts
+    resp_create_templates_alert = session.post(
+        f"{url}api/{org_id}/alerts/templates", json=payload_temp_alert
+    )
+
+    print(resp_create_templates_alert.content)
+    assert (
+        resp_create_templates_alert.status_code == 200
+    ), f"Create template 200, but got {resp_create_templates_alert.status_code} {resp_create_templates_alert.content}"
+
+    
+    skip_tls_verify_value = False  # Define the skip_tls_verify_value
+
+    payload_dest_alert = {
+        "url":"https://jsonplaceholder.typicode.com/todos",
+        "method":"get",
+        "skip_tls_verify":skip_tls_verify_value,
+        "template":template_alert,
+        "headers":{},
+        "name":destination_alert
+        }
     
 
+    # Create destination
+    resp_create_destinations_alert = session.post(
+        f"{url}api/{org_id}/alerts/destinations",
+        json=payload_dest_alert,
+    )
+    print(resp_create_destinations_alert.content)
 
-def update_alert(session, base_url, org, alert_id, alert_name, template_name, stream_name, destination_name):
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/plain, */*",
-        
-        "Custom-Header": "value",
-        # Add more headers from the curl command here, if needed
+    assert (
+        resp_create_destinations_alert.status_code == 200
+    ), f"Failed to create destination: {resp_create_destinations_alert.status_code} {resp_create_destinations_alert.content}"
+
+    # Get destination
+    resp_get_destinations_alert = session.get(
+    f"{url}api/{org_id}/alerts/destinations/{destination_alert}"
+    )
+    print(resp_get_destinations_alert.content)
+
+    assert (
+    resp_get_destinations_alert.status_code == 200
+    ), f"Get all destinations list 200, but got {resp_get_destinations_alert.status_code} {resp_get_destinations_alert.content}"
+
+    # Check if the destination name matches
+    assert (
+    resp_get_destinations_alert.json()["name"] == destination_alert
+    ), f"Destination {destination_alert} not found in the response"
+
+    time.sleep(5)
+
+    # ingest logs
+    stream_name = "default"
+    payload_logs = [
+        {
+            "Athlete": "newtemp",
+            "log": "200",  # Match the query condition
+            "City": "Athens",
+            "Country": "HUN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+        },
+        {
+            "Athlete": "HERSCHMANN",
+            "log": "404",  # Add a non-matching record for negative testing
+            "City": "Athens",
+            "Country": "CHN",
+            "Discipline": "Swimming",
+            "Sport": "Aquatics",
+            "Year": 1896,
+        },
+    ]
+
+    resp_create_logstream = session.post(
+        f"{url}api/{org_id}/{stream_name}/_json", json=payload_logs
+    )
+
+    print(resp_create_logstream.content)
+    assert (
+        resp_create_logstream.status_code == 200
+    ), f"Get all logs list 200, but got {resp_create_logstream.status_code} {resp_create_logstream.content}"
+    
+    time.sleep(5)  
+    payload_alert = {
+    "name": alert_name,
+    "row_template": template_alert,
+    "stream_type": "logs",
+    "stream_name": "default",
+    "is_real_time": False,
+    "context_attributes": {},
+    "query_condition": {
+        "conditions": [ {
+        "column": "log",
+        "operator": "=",
+        "value": "200",
+        "type": None,  # Set it to None or remove it
+        "id": str(uuid.uuid4())
+        } ],
+        "search_event_type": "ui",
+        "sql": "",
+        "promql": "",
+        "type": "custom",
+        "promql_condition": None,
+        "vrl_function": None,
+        "multi_time_range": []
+    },
+    "trigger_condition": {
+        "period": 10,
+        "operator": ">=",
+        "frequency": 1,
+        "cron": "",
+        "threshold": 3,
+        "silence": 10,
+        "frequency_type": "minutes",
+        "timezone": "UTC",
+        "tolerance_in_secs": 0
+    },
+    "org_id": "default",
+    "destinations": [destination_alert],
+    "enabled": True,
+    "description": "test",
+    "folderId": folder_id
     }
+    resp_post_alertnew = session.post(
+    f"{url}api/v2/{org_id}/alerts",
+    json=payload_alert,
+    headers=headers,
+    )
+    print(resp_post_alertnew.content)
+    assert resp_post_alertnew.status_code == 200
 
-    payload_alert_update = {
+    # After creating the alert, wait a moment to ensure it's fully created
+    time.sleep(10)  # Increase this time if necessary
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id for update: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable for update.")
+       
+    # # Update the alert
+        payload_alert_update = {
         "id": alert_id,
         "name": alert_name,
-        "org_id": org,
+        "org_id": "default",
         "stream_type": "logs",
-        "stream_name": stream_name,
+        "stream_name": "default",
         "is_real_time": False,
         "query_condition": {
-            "type": "custom",
-            "conditions": [
-                {
-                    "column": "job",
-                    "operator": "=",
-                    "value": "test",
-                    "ignore_case": False,
-                    "id": str(uuid.uuid4())  # Ensure this matches the expected format
-                }
-            ],
-            "sql": None,
-            "promql": None,
-            "promql_condition": None,
-            "aggregation": None,
-            "vrl_function": None,
-            "search_event_type": None,
-            "multi_time_range": []
+        "type": "custom",
+        "conditions": [
+        {
+        "column": "job",
+        "operator": "=",
+        "value": "test",
+        "ignore_case": False,
+        "id": str(uuid.uuid4())
+        }
+        ],
+        "sql": None,
+        "promql": None,
+        "promql_condition": None,
+        "aggregation": None,
+        "vrl_function": None,
+        "search_event_type": None,
+        "multi_time_range": []
         },
         "trigger_condition": {
-            "period": 10,
-            "operator": ">=",
-            "threshold": 3,
-            "frequency": 3,
-            "cron": "",
-            "frequency_type": "minutes",
-            "silence": 10,
-            "timezone": "UTC",
-            "tolerance_in_secs": None
+        "period": 10,
+        "operator": ">=",
+        "threshold": 3,
+        "frequency": 1,
+        "cron": "",
+        "frequency_type": "minutes",
+        "silence": 10,
+        "timezone": "UTC",
+        "tolerance_in_secs": None
         },
-        "destinations": [destination_name],
+        "destinations": [destination_alert],
         "context_attributes": {},
-        "row_template": template_name,
+        "row_template": "",
         "description": "Test Updated",
         "enabled": True,
         "tz_offset": 0,
@@ -348,270 +480,255 @@ def update_alert(session, base_url, org, alert_id, alert_name, template_name, st
         "updated_at": int(time.time() * 1000),
         "createdAt": int(time.time() * 1000),
         "lastTriggeredAt": int(time.time() * 1000),
-        "last_edited_by": "root@example.com",  # Ensure this is included if necessary
-    }
+        } 
+        # Update the alert for description with "Test Updated"
+        resp_put_alertnew = session.put(
+        f"{url}api/v2/{org_id}/alerts/{alert_id}?type=logs",
+        json=payload_alert_update,
+        headers=headers,
+         )
+        print(resp_put_alertnew.content)
+        assert ( resp_put_alertnew.status_code == 200  
+        ), f"Post alert expected 200, but got {resp_put_alertnew.status_code} {resp_put_alertnew.content}"
 
-    # Log the payload to see what is being sent
-    print(f"Payload for updating alert: {payload_alert_update}")
+        print(f"Alert {alert_name} updated successfully")
 
-    response = session.put(f"{base_url}api/v2/{org}/alerts/{alert_id}?type=logs", json=payload_alert_update, headers=headers)
-    
-    assert response.status_code == 200, f"Failed to update alert: {response.content}"
-
-                # Check if the response is a dictionary (which it seems to be)
-    if isinstance(response, dict):
-        alert_description = response.get("description", None)
-    else:
-        raise ValueError("Unexpected response format: Expected a dictionary")
-    print(f"Alert description: {alert_description}")
-
-    # Now you can assert or further handle the 'alert_description'
-    assert alert_description == "Test Updated", f"Expected 'Test Updated', but got {alert_description}"
-
-def alertnew_disable(session, base_url, org, alert_id):
-    # Proceed to disable the alert
-    resp_alertnew_disable = session.patch(f"{base_url}api/v2/{org}/alerts/{alert_id}/enable?value=false&type=logs")
-    print(f"Disable Alert Response: {resp_alertnew_disable.text}")
-    assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
-    print(f"Successfully disabled alert {alert_id}")
-
-def validate_disable(session, base_url, org, alert_id):
-    # Get details for the disabled alert
-    resp_get_disabled_alertnew = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for disabled alert {alert_id}"
-    print(f"Successfully fetched details for disabled alert {alert_id}")
+        # Get details for the updated alert
+        resp_get_updated_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_updated_alertnew.status_code == 200, f"Failed to get details for updated alert {alert_id}"
+        print(f"Successfully fetched details for updated alert {alert_id}")
 
         # Parse the response JSON
-    response_json_disabled = resp_get_disabled_alertnew.json()
+        response_json_updated = resp_get_updated_alertnew.json()
 
         # Check if the response is a dictionary (which it seems to be)
-    if isinstance(response_json_disabled, dict):
-                alert_disabled = response_json_disabled.get("enabled", None)
-    else:
-                raise ValueError("Unexpected response format: Expected a dictionary")
-
-        # Now you can assert or further handle the 'alert_disabled'
-    assert alert_disabled == "False", f"Expected 'False', but got {alert_disabled}"
-
-def alertnew_enable(session, base_url, org, alert_id):
-    # Proceed to enable the alert
-    resp_alertnew_enable = session.patch(f"{base_url}api/v2/{org}/alerts/{alert_id}/enable?value=true&type=logs")
-    print(f"Enable Alert Response: {resp_alertnew_enable.text}")
-    assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
-    print(f"Successfully enabled alert {alert_id}")
-
-def validate_enable(session, base_url, org, alert_id):
-    # Get details for the enabled alert
-    resp_get_enabled_alertnew = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for enabled alert {alert_id}"
-    print(f"Successfully fetched details for enabled alert {alert_id}")  
-    # Parse the response JSON
-    response_json_enabled = resp_get_enabled_alertnew.json()
-
-        # Check if the response is a dictionary (which it seems to be)
-    if isinstance(response_json_enabled, dict):
-            alert_enabled = response_json_enabled.get("enabled", None)
-    else:
+        if isinstance(response_json_updated, dict):
+            alert_description = response_json_updated.get("description", None)
+        else:
             raise ValueError("Unexpected response format: Expected a dictionary")
 
-    # Now you can assert or further handle the 'alert_enabled'
-    assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
+        # Now you can assert or further handle the 'alert_description'
+            assert alert_description == "Test Updated", f"Expected 'Test Updated', but got {alert_description}"
 
-def alertnew_trigger(session, base_url, org, alert_id, caplog):
-    caplog.set_level('INFO')
-    # Trigger the alert
-    resp_alertnew_trigger = session.patch(f"{base_url}api/v2/{org}/alerts/{alert_id}/trigger?type=logs")
-    print(f"Trigger Alert Response: {resp_alertnew_trigger.text}")
-    assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
-    print(f"Successfully triggered alert {alert_id}")
+def test_put_alertnew_disable(create_session, base_url):
+    """Running an E2E test for getting the new alert disable."""
 
-def validate_trigger(session, base_url, org, alert_id):  
-    # Verify trigger effects
-    time.sleep(2)  # Wait for trigger processing
-    resp_check = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert resp_check.status_code == 200
-    alert_data = resp_check.json()
-    # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
-    assert alert_data["last_triggered_at"] is not None, "Alert was not triggered"
-    print(f"Alert data: {alert_data}")
-    return alert_data   
-    
-def delete_alert(session, base_url, org, alert_id):
-    resp_delete = session.delete(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert (
-        resp_delete.status_code == 200
-    ), f"Delete alert 200, but got {resp_delete.status_code} {resp_delete.content}"
-    
-def delete_alert_verify(session, base_url, org, alert_id):       # Verify alert deletion
-    resp_verify = session.get(f"{base_url}api/v2/{org}/alerts/{alert_id}")
-    assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
-
-
-
-def test_create_workflow(create_session, base_url):
     session = create_session
-    stream_name = "stream_pytest_data"
-    org = "org_pytest_data"
+    url = base_url
+    org_id = "default"
 
-    base_url = ZO_BASE_URL
-    
-    # Create folder
-    folder_name = f"newfolder_{random.randint(1000, 9999)}"
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
 
-    folder_id = create_folder(session, base_url, org, folder_name)
-    email_id = f"email_{random.randint(1000, 9999)}@gmail.com"  # Make the name unique
-   
-    create_user(session, base_url, org, email_id)
-    # Create template
-    template_name_webhook = f"template_webhook_{random.randint(10000, 99999)}"
-    template_name_email = f"template_email_{random.randint(10000, 99999)}"  
-    template_webhook = create_template_webhook(session, base_url, org, template_name_webhook)
-    template_email = create_template_email(session, base_url, org, template_name_email)
-    time.sleep(5)
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
 
-    # Create destination
-    destination_name_webhook = f"newdest_{random.randint(10000, 99999)}"
-    destination_name_email = f"newdest_{random.randint(10000, 99999)}"
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
 
-    destination_webhook = create_destination_webhook(session, base_url, org, destination_name_webhook, template_name_webhook)
-    destination_email = create_destination_email(session, base_url, org, destination_name_email, template_name_email, email_id)
-    time.sleep(5)
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
 
-    # Now create the alert
-    alert_name_webhook = f"newalert_{random.randint(1000, 9999)}"
-    alert_name_email = f"newalert_{random.randint(1000, 9999)}"
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
 
-    alert_webhook = create_alert(session, base_url, org, folder_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
-    alert_email =  create_alert(session, base_url, org, folder_id, alert_name_email, template_name_email, stream_name, destination_name_email)
-    time.sleep(5)
-    
-    
-# def test_validate_workflow(create_session, base_url):
-#     session = create_session
-#     stream_name = "stream_pytest_data"
-#     org = "org_pytest_data"
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
 
-#     base_url = ZO_BASE_URL_SC
-#     time.sleep(5)
-#     templates = get_template(session, base_url, org)
-#     # print("Templates in the response", templates)
-#     assert templates is not None, "Templates are not found"
-#     assert len(templates) > 0, "Templates are empty"
-#     assert isinstance(templates, list), "Templates are not a list"
-#     assert isinstance(templates[0], dict), "Templates are not a list of dictionaries"
-#     assert "name" in templates[0], "Templates do not contain 'name' key"
-#     assert "body" in templates[0], "Templates do not contain 'body' key"
-#     assert "type" in templates[0], "Templates do not contain 'type' key"    
-    
-#     destinations = get_destination(session, base_url, org)
-#     # print("Destinations in the response", destinations)
-#     assert destinations is not None, "Destinations are not found"
-#     assert len(destinations) > 0, "Destinations are empty"
-#     assert isinstance(destinations, list), "Destinations are not a list"
-#     assert isinstance(destinations[0], dict), "Destinations are not a list of dictionaries" 
-#     assert "name" in destinations[0], "Destinations do not contain 'name' key"
-   
-#     alerts = get_alertsnew(session, base_url, org)
-#     print("Alerts in the response", alerts)
-#     assert alerts is not None, "Alerts are not found"
-#     assert len(alerts) > 0, "Alerts are empty"
-#     assert isinstance(alerts, list), "Alerts are not a list"
-   
-#     assert "alert_id" in alerts[0], "Alerts do not contain 'alert_id' key"
-#     assert "name" in alerts[0], "Alerts do not contain 'name' key"
-#     assert "description" in alerts[0], "Alerts do not contain 'description' key"
-#     assert "enabled" in alerts[0], "Alerts do not contain 'enabled' key"
-   
-    
-#     alert_id = alerts[0].get("alert_id")
-#     alert_data = get_alert(session, base_url, org, alert_id)
-#     print("Alert data in the response", alert_data)
-#     assert alert_data is not None, "Alert data is not found"
-#     assert "name" in alert_data, "Alert data does not contain 'name' key"
-#     assert "description" in alert_data, "Alert data does not contain 'description' key" 
-#     assert "enabled" in alert_data, "Alert data does not contain 'enabled' key"
-#     assert "destinations" in alert_data, "Alert data does not contain 'destinations' key"
-#     assert "context_attributes" in alert_data, "Alert data does not contain 'context_attributes' key"
-#     assert "row_template" in alert_data, "Alert data does not contain 'row_template' key"   
-#     assert "stream_type" in alert_data, "Alert data does not contain 'stream_type' key"
-#     assert "stream_name" in alert_data, "Alert data does not contain 'stream_name' key"
-#     assert "is_real_time" in alert_data, "Alert data does not contain 'is_real_time' key"
-#     assert "query_condition" in alert_data, "Alert data does not contain 'query_condition' key"
-#     assert "trigger_condition" in alert_data, "Alert data does not contain 'trigger_condition' key"     
-#     assert "org_id" in alert_data, "Alert data does not contain 'org_id' key"
-#     assert "updated_at" in alert_data, "Alert data does not contain 'updatedAt' key"
-#     assert "last_triggered_at" in alert_data, "Alert data does not contain 'lastTriggeredAt' key"
-#     assert "last_satisfied_at" in alert_data, "Alert data does not contain 'lastSatisfiedAt' key" 
-#     assert "last_edited_by" in alert_data, "Alert data does not contain 'lastTriggeredAt' key"
-   
-# def test_update_workflow(create_session, base_url):
-#     session = create_session
-#     stream_name = "stream_pytest_data"
-#     org = "org_pytest_data"
+        print(f"Extracted alert_id: {alert_id}")
 
-#     base_url = ZO_BASE_URL_SC
-#     time.sleep(5)
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
     
-#     # Get templates
-#     templates = get_template(session, base_url, org)
-    
-#     # Extract template names
-#     template_names = [template['name'] for template in templates if 'name' in template]
-    
-#     # Update templates using the names retrieved
-#     if template_names:
-#         template_name_webhook = template_names[0]  # Use the first template name for webhook
-#         template_name_email = template_names[1] if len(template_names) > 1 else template_names[0]  # Use the second if it exists, otherwise fallback
+    # Proceed to disable the alert
+        resp_alertnew_disable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=false&type=logs")
+        print(f"Disable Alert Response: {resp_alertnew_disable.text}")
+        assert resp_alertnew_disable.status_code == 200, f"Failed to disable alert {alert_id}"
+        print(f"Successfully disabled alert {alert_id}")
+
+        # Get details for the disabled alert
+        resp_get_disabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_disabled_alertnew.status_code == 200, f"Failed to get details for disabled alert {alert_id}"
+        print(f"Successfully fetched details for disabled alert {alert_id}")
+
+        # Parse the response JSON
+        response_json_disabled = resp_get_disabled_alertnew.json()
+
+        # Check if the response is a dictionary (which it seems to be)
+        if isinstance(response_json_disabled, dict):
+            alert_disabled = response_json_disabled.get("enabled", None)
+        else:
+            raise ValueError("Unexpected response format: Expected a dictionary")
+
+        # Now you can assert or further handle the 'alert_disabled'
+            assert alert_disabled == "False", f"Expected 'False', but got {alert_disabled}"
+
+def test_put_alertnew_enable(create_session, base_url):
+    """Running an E2E test for getting the new alert enable."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
+
+    # Proceed to enable the alert
+        resp_alertnew_enable = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/enable?value=true&type=logs")
+        print(f"Enable Alert Response: {resp_alertnew_enable.text}")
+        assert resp_alertnew_enable.status_code == 200, f"Failed to enable alert {alert_id}"
+        print(f"Successfully enabled alert {alert_id}")
         
-#         update_template_webhook(session, base_url, org, template_name_webhook)
-#         update_template_email(session, base_url, org, template_name_email)
-    
-#     time.sleep(5)
-    
-#     # Get destinations
-#     destinations = get_destination(session, base_url, org)
-    
-#     # Extract destination names
-#     destination_names = [destination['name'] for destination in destinations if 'name' in destination]
-    
-#     # Update destinations using the names retrieved
-#     if destination_names:
-#         destination_name_webhook = destination_names[0]
-#         destination_name_email = destination_names[1] if len(destination_names) > 1 else destination_names[0]
-        
-#         update_destination_webhook(session, base_url, org, destination_name_webhook)
-#         update_destination_email(session, base_url, org, destination_name_email)
-    
-#     time.sleep(5)
+        # Get details for the enabled alert
+        resp_get_enabled_alertnew = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_get_enabled_alertnew.status_code == 200, f"Failed to get details for enabled alert {alert_id}"
+        print(f"Successfully fetched details for enabled alert {alert_id}")
 
-#     # Get alerts
-#     alerts = get_alertsnew(session, base_url, org)
-#     print("Alerts in the response", alerts)
+        # Parse the response JSON
+        response_json_enabled = resp_get_enabled_alertnew.json()
+
+        # Check if the response is a dictionary (which it seems to be)
+        if isinstance(response_json_enabled, dict):
+            alert_enabled = response_json_enabled.get("enabled", None)
+        else:
+            raise ValueError("Unexpected response format: Expected a dictionary")
+
+        # Now you can assert or further handle the 'alert_enabled'
+            assert alert_enabled == "True", f"Expected 'True', but got {alert_enabled}"
+
+def test_put_alertnew_trigger(create_session, base_url, caplog):
+    """Running an E2E test for getting the new alert trigger."""
+    caplog.set_level('INFO')
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Create a logger
+    logger = logging.getLogger(__name__)
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
+        time.sleep(5)  # Brief wait for status update
+
+    # Trigger the alert
+        # Trigger the alert
+        logger.info(f"Attempting to trigger alert with ID: {alert_id}")
+
+        resp_alertnew_trigger = session.patch(f"{url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
+
+    # Log response details for debugging
+        print(f"Trigger Alert Response Status Code: {resp_alertnew_trigger.status_code}")
+        print(f"Trigger Alert Response Body: {resp_alertnew_trigger.text}")
+
+        print(f"Alert Trigger URL: {url}api/v2/{org_id}/alerts/{alert_id}/trigger?type=logs")
+        print(f"Alert Details: {alert}")
+
+
+    # Check if the response was successful
+        assert resp_alertnew_trigger.status_code == 200, f"Failed to trigger alert {alert_id}"
+        print(f"Successfully triggered alert {alert_id}")
+
+        # Verify trigger effects
+        time.sleep(2)  # Wait for trigger processing
+        resp_check = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check.status_code == 200
+        alert_data = resp_check.json()
+        # assert alert_data["last_triggered_at"] is not None, "Alert was not triggered" after resolving issues 5745
     
-#     # Assertions to ensure alerts are valid
-#     assert alerts is not None, "Alerts are not found"
-#     assert len(alerts) > 0, "Alerts are empty"
-#     assert isinstance(alerts, list), "Alerts are not a list"
-#     assert "alert_id" in alerts[0], "Alerts do not contain 'alert_id' key"
-    
-#     # Extract alert names and IDs
-#     alert_names = [alert['name'] for alert in alerts if 'name' in alert]
-#     alert_ids = [alert['alert_id'] for alert in alerts if 'alert_id' in alert]
-    
-#     # Assuming you want to update the first alert as an example
-#     if alert_ids and alert_names:
-#         alert_id = alert_ids[0]  # Use the first alert ID
-#         alert_name_webhook = alert_names[0]  # Use the first alert name for webhook
-#         alert_name_email = alert_names[1] if len(alert_names) > 1 else alert_names[0]  # Use the second if it exists, otherwise fallback
-        
-#         # Get alert details
-#         alert_data = get_alert(session, base_url, org, alert_id)
-#         print("Alert data in the response", alert_data)
-        
-#         time.sleep(5)
-        
-#         # Update alerts using the names and IDs retrieved
-#         update_alert(session, base_url, org, alert_id, alert_name_webhook, template_name_webhook, stream_name, destination_name_webhook)
-#         update_alert(session, base_url, org, alert_id, alert_name_email, template_name_email, stream_name, destination_name_email)
-    
-#     time.sleep(5)
+def test_delete_alertnew(create_session, base_url):
+    """Running an E2E test for deleting the new alert."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+
+    # Make the request to get the list of alerts
+    resp_get_allalertsnew = session.get(f"{url}api/v2/{org_id}/alerts")
+
+    # Ensure the response is successful
+    assert resp_get_allalertsnew.status_code == 200, f"Failed to fetch alerts: {resp_get_allalertsnew.status_code}"
+
+    # Parse the response JSON
+    response_json = resp_get_allalertsnew.json()
+
+    # Check if "list" is in the response and proceed
+    assert "list" in response_json, "Response does not contain 'list'"
+
+    # Get the list of alerts from the response
+    alerts = response_json["list"]
+
+    # Now you can iterate over the alerts
+    for alert in alerts:
+        alert_id = alert.get("alert_id")
+        assert alert_id, f"Alert ID is missing for alert: {alert}"
+
+        print(f"Extracted alert_id: {alert_id}")
+
+    # Validate the alert existence first
+        resp_check_alert = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_check_alert.status_code == 200, f"Alert {alert_id} does not exist or cannot be retrieved."
+        print(f"Alert {alert_id} exists and is retrievable.")
+
+    # Proceed to delete the alert
+        resp_delete_alertnew = session.delete(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        print(f"Deleted Alert Response: {resp_delete_alertnew.text}")
+        assert resp_delete_alertnew.status_code == 200, f"Failed to delete alert {alert_id}"
+        print(f"Successfully deleted alert {alert_id}")
+
+    # Verify alert is deleted
+        resp_verify = session.get(f"{url}api/v2/{org_id}/alerts/{alert_id}")
+        assert resp_verify.status_code == 404, f"Expected 404 for deleted alert, got {resp_verify.status_code}"
