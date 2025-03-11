@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-select
                             data-test="pipeline-import-destination-stream-type-input"
                             v-model="userSelectedDestinationStreamType[index]"
-                            :options="streamTypes"
+                            :options="destinationStreamTypes"
                             :label="t('alerts.streamType') + ' *'"
                             :popup-content-style="{ textTransform: 'lowercase' }"
                             color="input-border"
@@ -629,6 +629,7 @@ import jstransform from "@/services/jstransform";
       const splitterModel = ref(60);
       const filteredDestinations = ref<string[]>([]);
       const streamTypes = ["logs", "metrics", "traces"];
+      const destinationStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
       const existingFunctions = ref<any>([]);
       const pipelineDestinations = ref<any>([]);
       const alertDestinations = ref<any>([]);
@@ -1056,7 +1057,9 @@ import jstransform from "@/services/jstransform";
               pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
             }
           }
-            if (node.io_type == "output" && node.data.node_type == "stream" && !validStreamTypes.includes(node.data.stream_type)){
+          const validDestinationStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
+
+            if (node.io_type == "output" && node.data.node_type == "stream" && !validDestinationStreamTypes.includes(node.data.stream_type)){
               pipelineErrors.push({ message: `Pipeline - ${index}: Destination Stream type is required`, field: "destination_stream_type" });
             }
           });
@@ -1324,6 +1327,7 @@ import jstransform from "@/services/jstransform";
         pipelineDestinations,
         userSelectedRemoteDestination,
         updateRemoteDestination,
+        destinationStreamTypes,
       };
     },
     components: {
