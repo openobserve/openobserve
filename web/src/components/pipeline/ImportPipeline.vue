@@ -748,11 +748,11 @@ import jstransform from "@/services/jstransform";
           }
         //3. validate source stream name it should not be empty 
         if((input.source.source_type == "realtime" && !input.source.stream_name.trim()) || input.source.source_type == "realtime" && await validateSourceStream(input.source.stream_name,[]) ){
-          pipelineErrors.push({ message: "Source stream name is required", field: "source_stream_name" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Source stream name is required`, field: "source_stream_name" });
         }
         //4. validate source stream type it should be one of the valid stream types
         if(!validStreamTypes.includes(input.source.stream_type)){
-          pipelineErrors.push({ message: "Stream type is required", field: "stream_type" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Stream type is required`, field: "stream_type" });
         }
 
         //call getStreamsList to update the stream list
@@ -767,13 +767,13 @@ import jstransform from "@/services/jstransform";
         (input.source.query_condition.type == "sql" && !input.source.query_condition.sql
          || !isValidScheduledPipeline || !input.sql_query)
         )){
-          pipelineErrors.push({ message: "SQL query is required", field: "sql_query_missing" } );
+          pipelineErrors.push({ message: `Pipeline - ${index}: SQL query is required`, field: "sql_query_missing" } );
         }
 
 
         const isValidQuery = await validateScheduledPipelineNodes(input, input.sql_query);
         if(input.source.source_type == 'scheduled' && (input.sql_query != input.source.query_condition.sql) || !isValidQuery ){
-          pipelineErrors.push({ message: "SQL query should be same as the query in the nodes", field: "sql_query_match" } );
+          pipelineErrors.push({ message: `Pipeline - ${index}: SQL query should be same as the query in the nodes`, field: "sql_query_match" } );
         }
 
 
@@ -784,11 +784,11 @@ import jstransform from "@/services/jstransform";
             if (node.io_type == "output" && node.data.node_type == "stream") {
               const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
               if(!isValidDestinationStream){
-              pipelineErrors.push({ message: "Destination stream name is required", field: "destination_stream_name" });
+              pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
             }
           }
             else if (node.io_type == "output" && node.data.node_type == "stream" && !validStreamTypes.includes(node.data.stream_type)){
-              pipelineErrors.push({ message: "Stream type is required", field: "destination_stream_type" });
+              pipelineErrors.push({ message: `Pipeline - ${index}: Stream type is required`, field: "destination_stream_type" });
             }
           });
 
@@ -816,16 +816,16 @@ import jstransform from "@/services/jstransform";
 
         const isValidFunctionNode = await validateFunctionNode(input);
         if(!isValidFunctionNode){
-          pipelineErrors.push({ message: "Function name is required and should be in the existing functions list", field: "function_name" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Function name is required and should be in the existing functions list`, field: "function_name" });
         }
         //validate condition node 
         if(!validateConditionNode(input)){
-          pipelineErrors.push({ message: "Condition is required", field: "empty_condition" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Condition is required`, field: "empty_condition" });
         }   
         const isValidRemoteDestination = validateRemoteDestination(input);
         console.log(isValidRemoteDestination,'isValidRemoteDestination')
         if(!isValidRemoteDestination){
-          pipelineErrors.push({ message: "Remote destination is required", field: "remote_destination" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Remote destination is required`, field: "remote_destination" });
         }
         // Log all pipeline errors at the end
         if (pipelineErrors.length > 0) {
