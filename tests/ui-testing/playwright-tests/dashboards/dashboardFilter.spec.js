@@ -553,14 +553,20 @@ test.describe("dashboard filter testcases", () => {
       // await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().click();
 
-        await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').fill('kubernetes_container_image');
-
+      await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().fill('kubernetes_container_image');
+      
       await page
       .getByRole("option", { name: "kubernetes_container_image" })
       .click();
+    // await page
+    //   .locator('[data-test="dashboard-add-condition-condition-0"]')
+    //   .click();
+
     await page
-      .locator('[data-test="dashboard-add-condition-condition-0"]')
-      .click();
+  .locator('[data-test="dashboard-add-condition-condition-0"]')
+  .first()
+  .click();
+
       await page.locator('[data-test="dashboard-add-condition-operator"]').click();
       await page
       .getByRole("option", { name: "<>" })
@@ -593,8 +599,7 @@ test.describe("dashboard filter testcases", () => {
 
      // Delete dashbaord 
      await page.locator('[data-test="dashboard-back-btn"]').click();
-
-     await deleteDashboard(page, randomDashboardName);
+  await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should applly the add group filter with apply the list of value apply successflly ", async ({
