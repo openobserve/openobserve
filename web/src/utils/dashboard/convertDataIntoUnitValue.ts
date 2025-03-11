@@ -539,7 +539,7 @@ const validateChartFieldsConfiguration = (
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        errors.push(`Add one field for the ${xAxisLabel}`);
+        errors.push(`Add one fields for the ${xAxisLabel}`);
       }
       break;
     }
