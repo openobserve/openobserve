@@ -1455,7 +1455,7 @@ pub struct MemoryCache {
     pub release_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 50)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
     #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
     pub skip_disk_check: bool,
@@ -1491,7 +1491,7 @@ pub struct DiskCache {
     pub release_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 100)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
+    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,

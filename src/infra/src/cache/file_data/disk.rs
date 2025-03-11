@@ -216,7 +216,7 @@ impl FileData {
         loop {
             let item = self.data.remove();
             if item.is_none() {
-                log::error!(
+                log::warn!(
                     "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
                 );
                 break;
@@ -631,7 +631,6 @@ async fn gc() -> Result<(), anyhow::Error> {
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
-            drop(r);
             continue;
         }
         drop(r);
