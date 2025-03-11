@@ -39,3 +39,16 @@ pub struct SearchEventReq {
     // TODO: modify this once v1 is deprecated
     pub org_id: String,
 }
+
+impl SearchEventReq {
+    pub fn is_valid(&self) -> bool {
+        // TODO: add event payload validation in the future
+        if self.trace_id.is_empty() {
+            return false;
+        }
+        if self.org_id.is_empty() {
+            return false;
+        }
+        true
+    }
+}

@@ -130,10 +130,9 @@ impl WsHandler {
                                                 log::error!(
                                                     "[WS::Router::Handler] error getting querier_conn: {e}"
                                                 );
-                                                if let Err(_) = shutdown_tx.send(Some(format!(
-                                                    "Error getting a querier connection: {:?}",
-                                                    e
-                                                ))) {
+                                                if let Err(_) =
+                                                    shutdown_tx.send(Some(e.to_string()))
+                                                {
                                                     log::error!(
                                                         "[WS::Router::Handler] Error informing handle_outgoing to stop"
                                                     );
@@ -201,7 +200,16 @@ impl WsHandler {
                         }
                         msg = &mut shutdown_rx => {
                             if let Ok(Some(err)) = msg  {
-                                _ = ws_session.close(Some(CloseReason::from((CloseCode::Error, err.to_string())))).await;
+                                let err_res = WsServerEvents::error_response(
+                                    infra::errors::Error::Message(err.to_string()),
+                                    Some(client_id.to_string()),
+                                    None,
+                                );
+                                let message = err_res.to_json();
+                                _ = ws_session.text(message).await;
+                                if let Err(e) = ws_session.close(Some(CloseReason::from(CloseCode::Error))).await {
+                                    log::error!("Error closing websocket session: {}", e);
+                                };
                                 return Ok(());
                             }
                             log::debug!(

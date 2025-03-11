@@ -318,6 +318,15 @@ impl WsClientEvents {
             Self::Benchmark { id } => id.clone(),
         }
     }
+
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::Search(req) => req.is_valid(),
+            #[cfg(feature = "enterprise")]
+            Self::Cancel { trace_id, org_id } => !trace_id.is_empty() && !org_id.is_empty(),
+            Self::Benchmark { id } => !id.is_empty(),
+        }
+    }
 }
 
 /// To represent the query start and end time based of partition or cache

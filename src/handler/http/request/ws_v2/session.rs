@@ -217,6 +217,18 @@ pub async fn handle_text_message(
     };
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
+            // Validate the events
+            if !client_msg.is_valid() {
+                log::error!("[WS_HANDLER]: Invalid event: {:?}", client_msg);
+                let err_res = WsServerEvents::error_response(
+                    errors::Error::Message("Invalid event".to_string()),
+                    Some(req_id.to_string()),
+                    None,
+                );
+                let _ = send_message(req_id, err_res.to_json()).await;
+                return;
+            }
+
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
                     handle_search_event(search_req, org_id, user_id, req_id, path.clone()).await;
