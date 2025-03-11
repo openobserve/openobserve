@@ -89,11 +89,17 @@ use crate::{
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    // add the pending delete files to processing list
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    for file in pending_delete_files {
+        PROCESSING_FILES.write().await.insert(file);
+    }
+
+    // start worker threads
     let cfg = get_config();
     let (tx, rx) =
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(cfg.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
-    // move files
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
@@ -123,11 +129,73 @@ pub async fn run() -> Result<(), anyhow::Error> {
             cfg.limit.file_push_interval,
         ))
         .await;
+        // check pending delete files
+        if let Err(e) = scan_pending_delete_files().await {
+            log::error!("[INGESTER:JOB] Error scan pending delete files: {}", e);
+        }
+        // scan wal files
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
+    Ok(())
+}
+
+// check if the file is still in pending delete
+async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let files_num = pending_delete_files.len();
+    for file_key in pending_delete_files {
+        if wal::lock_files_exists(&file_key) {
+            continue;
+        }
+        log::warn!(
+            "[INGESTER:JOB] the file was released, delete it: {}",
+            file_key
+        );
+        let file = wal_dir.join(&file_key);
+        let Ok(file_size) = get_file_size(&file) else {
+            continue;
+        };
+        if let Err(e) = remove_file(&file) {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
+                file_key,
+                e
+            );
+        }
+
+        // delete metadata from cache
+        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        // need release the file
+        PROCESSING_FILES.write().await.remove(&file_key);
+        // delete from pending delete list
+        if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove pending delete file: {}, {}",
+                file_key,
+                e
+            );
+        }
+        // deleted successfully then update metrics
+        let (org_id, stream_type, ..) = split_perfix(&file_key);
+        metrics::INGEST_WAL_USED_BYTES
+            .with_label_values(&[&org_id, stream_type.as_str()])
+            .sub(file_size as i64);
+    }
+
+    if files_num > 0 {
+        log::debug!(
+            "[INGESTER:JOB] scan pending delete files total: {}, took: {} ms",
+            files_num,
+            start.elapsed().as_millis()
+        );
+    }
     Ok(())
 }
 
@@ -224,38 +292,6 @@ async fn prepare_files(
         };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
-            // check if the file is still in pending delete
-            if db::file_list::local::exist_pending_delete(&file_key).await
-                && !wal::lock_files_exists(&file_key)
-            {
-                log::warn!(
-                    "[INGESTER:JOB] the file was released, delete it: {}",
-                    file_key
-                );
-                let file = wal_dir.join(&file_key);
-                let Ok(file_size) = get_file_size(&file) else {
-                    continue;
-                };
-                if remove_file(&file).is_ok() {
-                    // delete metadata from cache
-                    WAL_PARQUET_METADATA.write().await.remove(&file_key);
-                    // need release all the files
-                    PROCESSING_FILES.write().await.remove(&file_key);
-                    // delete from skip list
-                    if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
-                        log::error!(
-                            "[INGESTER:JOB] Failed to remove pending delete file: {}, {}",
-                            file_key,
-                            e
-                        );
-                    }
-                    // deleted successfully then update metrics
-                    let (org_id, stream_type, ..) = split_perfix(&file_key);
-                    metrics::INGEST_WAL_USED_BYTES
-                        .with_label_values(&[&org_id, stream_type.as_str()])
-                        .sub(file_size as i64);
-                }
-            }
             continue;
         }
 
@@ -291,13 +327,8 @@ async fn prepare_files(
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
-        // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    // log::debug!(
-    //     "[INGESTER:JOB] move files get partitions: {}",
-    //     partition_files_with_size.len()
-    // );
 
     Ok(partition_files_with_size)
 }

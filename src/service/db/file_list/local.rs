@@ -86,6 +86,10 @@ pub async fn remove_pending_delete(file: &str) -> Result<()> {
         .await
 }
 
+pub async fn get_pending_delete() -> Vec<String> {
+    PENDING_DELETE_FILES.read().await.iter().cloned().collect()
+}
+
 pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
     let r = PENDING_DELETE_FILES.read().await;
     files.retain(|file| !r.contains(file));
