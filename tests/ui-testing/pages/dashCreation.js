@@ -29,8 +29,10 @@ export const applyQueryButton = async function (page) {
 export async function deleteDashboard(page, dashboardName) {
   console.log(`Deleting dashboard with name: ${dashboardName}`);
 
-  const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
+  // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
+  const dashboardRow = page.locator('//tr').filter({ hasText: dashboardName }).first();
+
 
   const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
