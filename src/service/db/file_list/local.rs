@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::{FileKey, FileListDeleted, FileMeta};
+use config::meta::stream::FileListDeleted;
 use hashbrown::HashSet;
 use infra::errors::Result;
 use once_cell::sync::Lazy;
@@ -21,35 +21,6 @@ use tokio::sync::RwLock;
 
 static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
-
-/// use queue to batch send broadcast to other nodes
-pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
-    Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
-
-pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
-    let file_data = FileKey::new(key.to_string(), meta.clone().unwrap_or_default(), deleted);
-
-    // write into file_list storage
-    // retry 5 times
-    for _ in 0..5 {
-        if let Err(e) = super::progress(key, meta.as_ref(), deleted).await {
-            log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        } else {
-            break;
-        }
-    }
-
-    let cfg = config::get_config();
-
-    // notify other nodes
-    if cfg.memory_cache.cache_latest_files {
-        let mut q = BROADCAST_QUEUE.write().await;
-        q.push(file_data);
-    }
-
-    Ok(())
-}
 
 pub async fn exist_pending_delete(file: &str) -> bool {
     PENDING_DELETE_FILES.read().await.contains(file)

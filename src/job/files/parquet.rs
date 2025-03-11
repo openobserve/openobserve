@@ -529,7 +529,7 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::local::set(&new_file_name, Some(new_file_meta), false).await;
+        let ret = db::file_list::set(&new_file_name, Some(new_file_meta), false).await;
         if let Err(e) = ret {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
