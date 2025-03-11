@@ -20,6 +20,8 @@ pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
 pub const THRESHOLD: i64 = 9383939382;
 
+use config::meta::cluster::Node;
+
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct Organization {
     pub identifier: String,
@@ -187,4 +189,35 @@ impl Default for OrganizationSetting {
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingResponse {
     pub data: OrganizationSetting,
+}
+
+/// Request struct for node listing with region filtering
+///
+/// Regions can be provided in the request body to filter nodes by region.
+/// If no regions are provided, all nodes will be returned.
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListRequest {
+    /// List of region names to filter by
+    pub regions: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct NodeListResponse {
+    pub nodes: Vec<FederatedNode>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct FederatedNode {
+    #[serde(flatten)]
+    pub node: Node,
+    pub region: String,
+    pub cluster_name: String,
+}
+
+pub fn to_federated_node(node: Node, region: String, cluster_name: String) -> FederatedNode {
+    FederatedNode {
+        node,
+        region,
+        cluster_name,
+    }
 }

@@ -32,6 +32,7 @@ pub mod kv;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
+pub mod node;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;

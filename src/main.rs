@@ -60,7 +60,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
+    service::{db, metadata, node::NodeService, search::SEARCH_SERVER, self_reporting, tls::http_tls_config},
 };
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
@@ -72,7 +72,8 @@ use opentelemetry_proto::tonic::collector::{
 use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use proto::cluster_rpc::{
     event_server::EventServer, ingest_server::IngestServer, metrics_server::MetricsServer,
-    query_cache_server::QueryCacheServer, search_server::SearchServer,
+    node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
+    search_server::SearchServer,
     streams_server::StreamsServer,
 };
 #[cfg(feature = "profiling")]
@@ -537,6 +538,12 @@ async fn init_common_grpc_server(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    let node_svc = NodeServiceServer::new(NodeService)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -563,6 +570,7 @@ async fn init_common_grpc_server(
         .add_service(ingest_svc)
         .add_service(streams_svc)
         .add_service(flight_svc)
+        .add_service(node_svc)
         .serve_with_shutdown(gaddr, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");

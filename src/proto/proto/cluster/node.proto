@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.openobserve.cluster";
+option java_outer_classname = "nodeProto";
+
+package cluster;
+
+import "cluster/common.proto";
+
+// Node Service for fetching node information
+service NodeService {
+  // Get list of nodes from a cluster
+  rpc GetNodes(EmptyRequest) returns (GetNodesResponse) {}
+}
+
+// Response message for GetNodes
+message GetNodesResponse {
+  // List of nodes
+  repeated NodeDetails nodes = 1;
+}
+
+// Node representation
+message NodeDetails {
+  int32 id = 1;
+  string uuid = 2;
+  string name = 3;
+  string http_addr = 4;
+  string grpc_addr = 5;
+  repeated Role roles = 6;
+  RoleGroup role_group = 7;
+  uint64 cpu_num = 8;
+  NodeStatus status = 9;
+  bool scheduled = 10;
+  bool broadcasted = 11;
+  string version = 12;
+}
+
+// Node status enum
+enum NodeStatus {
+  PREPARE = 0;
+  ONLINE = 1;
+  OFFLINE = 2;
+}
+
+// Role enum
+enum Role {
+  ALL = 0;
+  INGESTER = 1;
+  QUERIER = 2;
+  COMPACTOR = 3;
+  ROUTER = 4;
+  ALERT_MANAGER = 5;
+  FLATTEN_COMPACTOR = 6;
+}
+
+// Role group enum
+enum RoleGroup {
+  NONE = 0;
+  INTERACTIVE = 1;
+  BACKGROUND = 2;
+}
