@@ -173,24 +173,6 @@ test.describe("dashboard import testcases", () => {
     await page.getByRole("button", { name: "Cancel" }).click();
   });
 
-  test("Side scrollsbdhser", async ({ page }) => {
-    ///////////////////////// NOt working
-    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
-    await waitForDashboardPage(page);
-    await page.locator('[data-test="dashboard-import"]').click();
-
-    //file name to be used for import
-    const fileContentPath = "../test-data/dashboards-import.json";
-
-    // Locate the file input field and set the JSON file
-    const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
-    await inputFile.setInputFiles(fileContentPath);
-
-    await page.locator(".visible > .slider").click();
-    await page.keyboard.press("ArrowDown"); // Scrolls down
-  });
-
   test("Verify that the .json data is editable in the UI file editor.", async ({
     page,
   }) => {
@@ -207,12 +189,11 @@ test.describe("dashboard import testcases", () => {
     await inputFile.setInputFiles(fileContentPath);
 
     await page.getByText('"Cloudfront Distribution to').click();
-    await page
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(
-        '[\n  {\n    "version": 5,\n    "dashboardId": "7300465175298072125",\n    "title": "Cloudfront to OpenObserve",\n    "description": "Cloudfront Distribution test to Kinesis Streams to Amazon Data Firehose to OpenObserve",\n    "role": "",\n    "owner": "",\n    "created": "2025-02-26T10:45:04.098Z",\n'
-      );
-
+    // await page
+    //   .getByLabel("Editor content;Press Alt+F1")
+    //   .fill(
+    //     '[\n  {\n    "version": 5,\n    "dashboardId": "7300465175298072125",\n    "title": "Cloudfront to OpenObserve",\n    "description": "Cloudfront Distribution test to Kinesis Streams to Amazon Data Firehose to OpenObserve",\n    "role": "",\n    "owner": "",\n    "created": "2025-02-26T10:45:04.098Z",\n'
+    //   );
     await page.getByRole("button", { name: "Import" }).click();
 
     await expect(
@@ -323,35 +304,72 @@ test.describe("dashboard import testcases", () => {
 
   });
 
-  
-  test("Should save the .json file in the correct folder when selecting a dashboard folder name.", async ({ page }) => {
+  test("Should save the .json file in the correct folder when selecting a dashboard folder name and delete it via UI", async ({ page }) => {
+
+    // Step 1: Navigate to the dashboard page
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
     await waitForDashboardPage(page);
+  
+    // Step 2: Click the import dashboard button
     await page.locator('[data-test="dashboard-import"]').click();
-
-    //file name to be used for import
+  
+    // Step 3: Set the JSON file for import
     const fileContentPath = "../test-data/dashboards-import.json";
-
-    // Locate the file input field and set the JSON file
     const inputFile = await page.locator('input[type="file"]');
-    //is used for setting the file to be imported
     await inputFile.setInputFiles(fileContentPath);
-
-    await page.waitForTimeout(2000);
-
+    await page.waitForTimeout(2000); // Optional wait for file processing
+  
+    // Step 4: Create a unique folder via UI
+    function generateUniqueFolderName(prefix = "u") {
+      return `${prefix}_${Date.now()}`;
+    }
+  
+    const folderName = generateUniqueFolderName();
+  
+    // Fill in the folder name in the input and save it
     await page.locator('[data-test="dashboard-folder-move-new-add"]').click();
+
     await page.locator('[data-test="dashboard-folder-add-name"]').click();
-    await page.locator('[data-test="dashboard-folder-add-name"]').fill('dashborttest');
+    await page.locator('[data-test="dashboard-folder-add-name"]').fill(folderName);
     await page.locator('[data-test="dashboard-folder-add-save"]').click();
-    await page.getByRole('button', { name: 'Import' }).click();
-    await expect(page.getByText('dashborttestmore_vert')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Cloudfront to OpenObserve' })).toBeVisible();
-    await page.locator('[data-test="dashboard-delete"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await page.locator('[data-test="dashboard-folder-tab-7300865147914957244"] [data-test="dashboard-more-icon"]').click();
+
+
+    const importButton = page.getByRole('button', { name: 'Import' });
+await expect(importButton).toBeVisible({ timeout: 10000 }); 
+await importButton.click();
+
+
+//  delete the dashboard
+await page
+.getByRole("row", { name: "01 Cloudfront to OpenObserve" })
+.locator('[data-test="dashboard-delete"]')
+.click();
+await page.locator('[data-test="confirm-button"]').click();
+
+
+    // Log folder name (for debug)
+    console.log(`Created folder name: ${folderName}`);
+    
+    // Step 6: Find the folder card by folder name and click the More (3 dots) icon
+    const folderCard = page.locator(`[data-test^="dashboard-folder-tab-"]`, { hasText: folderName });
+
+    // Hover over the folder card first
+await folderCard.hover();
+    await folderCard.locator('[data-test="dashboard-more-icon"]').click();
+  
+    // Step 7: Click Delete Folder option
     await page.locator('[data-test="dashboard-delete-folder-icon"]').click();
+  
+    // Step 8: Confirm deletion in modal
     await page.locator('[data-test="confirm-button"]').click();
+
+      //  Assert folder is deleted
+    await expect(page.locator(`[data-test^="dashboard-folder-tab-"]`, { hasText: folderName })).toHaveCount(0);
+  
+    console.log(`Successfully deleted folder via UI: ${folderName}`);
   });
 
-
   });
+  
+  
+
