@@ -416,6 +416,7 @@ import jstransform from "@/services/jstransform";
       const filteredDestinations = ref<string[]>([]);
       const streamTypes = ["logs", "metrics", "traces"];
       const existingFunctions = ref<any>([]);
+      const pipelineDestinations = ref<any>([]);
       const getFormattedDestinations: any = computed(() => {
         return props.destinations.map((destination: any) => {
           return destination.name;
@@ -566,12 +567,26 @@ import jstransform from "@/services/jstransform";
   
       onMounted(async () => {
         await getFunctions();
+        await getPipelineDestinations();
       });
 
       const getFunctions = async () => {
         const functions = await jstransform.list(1, 100, "created_at", true, "", store.state.selectedOrganization.identifier);
         existingFunctions.value = functions.data.list.map((fun: any)=>{
           return fun.name;
+        });
+      }
+      const getPipelineDestinations = async () => {
+        const destinations = await destinationService.list({
+          page_num: 1,
+          page_size: 100000,
+          sort_by: "name",
+          desc: false,
+          org_identifier: store.state.selectedOrganization.identifier,
+          module: "pipeline",
+        });
+        pipelineDestinations.value = destinations.data.map((dest: any)=>{
+          return dest.name;
         });
       }
   
@@ -766,13 +781,13 @@ import jstransform from "@/services/jstransform";
         if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
           const validationPromises = input.nodes.map(async (node: any) => {
  
-            if (node.io_type == "output") {
+            if (node.io_type == "output" && node.data.node_type == "stream") {
               const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
               if(!isValidDestinationStream){
               pipelineErrors.push({ message: "Destination stream name is required", field: "destination_stream_name" });
             }
           }
-            else if (node.io_type == "output" && !validStreamTypes.includes(node.data.stream_type)){
+            else if (node.io_type == "output" && node.data.node_type == "stream" && !validStreamTypes.includes(node.data.stream_type)){
               pipelineErrors.push({ message: "Stream type is required", field: "destination_stream_type" });
             }
           });
@@ -803,14 +818,15 @@ import jstransform from "@/services/jstransform";
         if(!isValidFunctionNode){
           pipelineErrors.push({ message: "Function name is required and should be in the existing functions list", field: "function_name" });
         }
-
-
         //validate condition node 
         if(!validateConditionNode(input)){
           pipelineErrors.push({ message: "Condition is required", field: "empty_condition" });
+        }   
+        const isValidRemoteDestination = validateRemoteDestination(input);
+        console.log(isValidRemoteDestination,'isValidRemoteDestination')
+        if(!isValidRemoteDestination){
+          pipelineErrors.push({ message: "Remote destination is required", field: "remote_destination" });
         }
-        
-
         // Log all pipeline errors at the end
         if (pipelineErrors.length > 0) {
           pipelineErrorsToDisplay.value.push(pipelineErrors);
@@ -818,6 +834,17 @@ import jstransform from "@/services/jstransform";
         }
         return true;
       };
+
+      const validateRemoteDestination = (input: any) => {
+
+
+
+        return !input.nodes.some((node: any) => {
+          return node.io_type == "output" && 
+                node.data.node_type == "remote_stream" && 
+                !pipelineDestinations.value.includes(node.data.destination_name);
+        });
+      }
 
   
       const checkDestinationInList = (
