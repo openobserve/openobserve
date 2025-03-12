@@ -107,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="folder-search"
           placeholder="Search Folders"
           style="width: 100%;"
-          class=" "
           clearable
         >
           <template #prepend>
