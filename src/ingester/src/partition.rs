@@ -58,7 +58,7 @@ impl Partition {
             .or_insert_with(PartitionFile::new);
 
         let schema = batch.data.schema();
-        let mut schema_change_size = 0;
+        let mut old_schema_size = self.schema.size();
         if self.schema_fields.is_empty() {
             self.schema = schema.clone();
             self.schema_fields = self
@@ -67,7 +67,8 @@ impl Partition {
                 .iter()
                 .map(|f| f.name().to_string())
                 .collect();
-            schema_change_size = self.schema.size();
+            // old schema is empty
+            old_schema_size = 0;
         } else {
             let new_fields = schema
                 .fields()
@@ -83,7 +84,6 @@ impl Partition {
             if !new_fields.is_empty() {
                 self.schema_fields
                     .extend(new_fields.iter().map(|f| f.name().to_string()));
-                let old_schema_size = self.schema.size();
                 let schema_fields = self
                     .schema
                     .fields()
@@ -92,14 +92,24 @@ impl Partition {
                     .chain(new_fields)
                     .collect::<Vec<_>>();
                 self.schema = Arc::new(Schema::new(schema_fields));
-                let new_schema_size = self.schema.size();
-                schema_change_size = new_schema_size - old_schema_size;
             }
         }
-        if schema_change_size > 0 {
-            metrics::INGEST_MEMTABLE_ARROW_BYTES
-                .with_label_values(&[])
-                .add(schema_change_size as i64);
+
+        let new_schema_size = self.schema.size();
+        match new_schema_size.cmp(&old_schema_size) {
+            std::cmp::Ordering::Greater => {
+                let diff = new_schema_size - old_schema_size;
+                metrics::INGEST_MEMTABLE_ARROW_BYTES
+                    .with_label_values(&[])
+                    .add(diff as i64);
+            }
+            std::cmp::Ordering::Less => {
+                let diff = old_schema_size - new_schema_size;
+                metrics::INGEST_MEMTABLE_ARROW_BYTES
+                    .with_label_values(&[])
+                    .sub(diff as i64);
+            }
+            std::cmp::Ordering::Equal => {}
         }
 
         partition.write(batch)
