@@ -676,7 +676,7 @@
  <style lang="scss" scoped >
 .expanded-content {
   padding: 0  0.5rem 0rem 1rem;
-  min-width: calc(95vw - 40px);
+  width: calc(95vw - 40px);
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
