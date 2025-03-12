@@ -934,8 +934,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           return stream.stream_name === streamName});
         }
         else{
-          const usedStreamNames = usedStreams.map(stream => stream.stream_name);
-          const filteredStreamList = streamList.filter(stream => usedStreamNames.includes(stream));
+          const usedStreamNames = usedStreams.map((stream: any) => stream.stream_name);
+          const filteredStreamList = streamList.filter((stream: any) => usedStreamNames.includes(stream));
           return filteredStreamList;
         }
       }
@@ -1210,9 +1210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (stream: any) => stream.name,
           );
           const usedStreams = await pipelinesService.getPipelineStreams(store.state.selectedOrganization.identifier);
-          const usedStreamNames = usedStreams.data.list.map(stream => stream.stream_name);
+          const usedStreamNames = usedStreams.data.list.map((stream: any) => stream.stream_name);
           //this is used to disable the stream names which are already used in the source stream
-          streamList.value = streamsNames.map(stream => {
+          streamList.value = streamsNames.map((stream: any) => {
             return {
               label: stream,
               value: stream,
