@@ -102,13 +102,7 @@ impl NatsDb {
 
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
-        let bucket_name = bucket
-            .status()
-            .await
-            .map_err(|e| {
-                Error::Message(format!("[NATS:get_key_value] bucket.status error: {}", e))
-            })?
-            .bucket;
+        let bucket_name = bucket.name.clone();
         let en_key = key_encode(new_key);
         if let Some(v) = bucket
             .get(&en_key)
@@ -360,13 +354,8 @@ impl super::Db for NatsDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
+        let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self.prefix);
         let bucket = &bucket;
-        let bucket_name = bucket
-            .status()
-            .await
-            .map_err(|e| Error::Message(format!("[NATS:list] bucket.status error: {}", e)))?
-            .bucket;
-        let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
         let keys = bucket
             .keys()
             .await
@@ -410,19 +399,11 @@ impl super::Db for NatsDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
+        let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self.prefix);
         let bucket = &bucket;
-        let bucket_name = bucket
-            .status()
+        let keys = keys(bucket)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:list_keys] bucket.status error: {}", e)))?
-            .bucket;
-        let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
-        let keys = bucket
-            .keys()
-            .await
-            .map_err(|e| Error::Message(format!("[NATS:list_keys] bucket.keys error: {}", e)))?
-            .try_collect::<Vec<String>>()
-            .await?;
+            .map_err(|e| Error::Message(format!("[NATS:list_keys] bucket.keys error: {}", e)))?;
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
@@ -435,47 +416,25 @@ impl super::Db for NatsDb {
             })
             .collect::<Vec<String>>();
         keys.sort();
+        keys.dedup();
         Ok(keys)
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
-        let bucket = &bucket;
-        let keys = bucket
-            .keys()
-            .await
-            .map_err(|e| Error::Message(format!("[NATS:list_values] bucket.keys error: {}", e)))?
-            .try_collect::<Vec<String>>()
-            .await?;
-        if prefix.starts_with("/clusters") {
-            log::debug!("list_values prefix: {}, keys: {:?}", prefix, keys);
-        }
-        let mut keys = keys
-            .into_iter()
-            .filter_map(|k| {
-                let key = key_decode(&k);
-                if key.starts_with(new_key) {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<String>>();
+        let keys = self.list_keys(prefix).await?;
         let keys_len = keys.len();
         if keys_len == 0 {
             return Ok(vec![]);
         }
-        keys.sort();
-        if prefix.starts_with("/clusters") {
-            log::debug!("list_values prefix: {}, keys decoded: {:?}", prefix, keys);
-            let status = bucket.status().await.map_err(|e| {
-                Error::Message(format!("[NATS:list_values] bucket.status error: {}", e))
-            })?;
-            log::debug!("list_values prefix: {}, status: {:?}", prefix, status);
-        }
+        log::info!("list_values prefix: {}, keys: {:?}", prefix, keys);
+        let (bucket, _new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
+        let bucket = &bucket;
+        let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self.prefix);
+        let bucket_prefix = bucket_prefix.as_str();
         let values = futures::stream::iter(keys)
             .map(|key| async move {
-                let encoded_key = key_encode(&key);
+                let key = key.trim_start_matches(bucket_prefix);
+                let encoded_key = key_encode(key);
                 let value = bucket.get(&encoded_key).await.map_err(|e| {
                     Error::Message(format!("[NATS:list_values] bucket.get error: {}", e))
                 })?;
@@ -486,13 +445,6 @@ impl super::Db for NatsDb {
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         let result: Vec<Bytes> = values.into_iter().flatten().collect();
-        if prefix.starts_with("/clusters") {
-            log::debug!(
-                "list_values prefix: {}, values: {:?}",
-                prefix,
-                result.iter().map(|v| v.len()).collect::<Vec<usize>>()
-            );
-        }
         Ok(result)
     }
 
@@ -589,20 +541,8 @@ impl super::Db for NatsDb {
                         continue;
                     }
                 };
-                let bucket_name = match bucket.status().await {
-                    Ok(v) => v.bucket,
-                    Err(e) => {
-                        log::error!(
-                            "[NATS:watch] prefix: {}, bucket.status error: {}",
-                            prefix,
-                            e
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self_prefix);
-                log::debug!("[NATS:watch] bucket: {}, prefix: {}", bucket_name, prefix);
+                let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self_prefix);
+                log::debug!("[NATS:watch] bucket: {}, prefix: {}", bucket.name, prefix);
                 let mut entries = match bucket.watch_all().await {
                     Ok(v) => v,
                     Err(e) => {
@@ -715,6 +655,40 @@ pub async fn connect() -> async_nats::Client {
             panic!("NATS connect failed");
         }
     }
+}
+
+pub async fn keys(kv: &jetstream::kv::Store) -> Result<Vec<String>> {
+    let consumer = kv
+        .stream
+        .create_consumer(jetstream::consumer::push::OrderedConfig {
+            deliver_subject: ider::generate(),
+            description: Some("kv history consumer".to_string()),
+            headers_only: true,
+            replay_policy: jetstream::consumer::ReplayPolicy::Instant,
+            // We only need to know the latest state for each key, not the whole history
+            deliver_policy: jetstream::consumer::DeliverPolicy::All,
+            ..Default::default()
+        })
+        .await?;
+
+    let mut keys = Vec::new();
+    let mut messages = consumer.messages().await?;
+    while let Ok(Some(message)) = messages.try_next().await {
+        keys.push(
+            message
+                .subject
+                .split(kv.prefix.as_str())
+                .last()
+                .unwrap()
+                .to_string(),
+        );
+        if let Ok(info) = message.info() {
+            if info.pending == 0 {
+                break;
+            }
+        }
+    }
+    Ok(keys)
 }
 
 // global locker for nats
