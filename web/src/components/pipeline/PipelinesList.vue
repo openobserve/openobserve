@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('alerts.edit')"
+              :title="t('pipeline.edit')"
               @click.stop="editPipeline(props.row)"
             ></q-btn>
             <q-btn
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('alerts.export')"
+              :title="t('pipeline.export')"
               @click.stop="exportPipeline(props.row)"
             ></q-btn>
             <q-btn
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('alerts.delete')"
+              :title="t('pipeline.delete')"
               @click.stop="openDeleteDialog(props.row)"
             ></q-btn>
             <q-btn
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              :title="t('alerts.view')"
+              :title="t('pipeline.view')"
             >
             <q-tooltip position="bottom">
               <PipelineView :pipeline="props.row" />
