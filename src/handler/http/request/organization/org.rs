@@ -27,9 +27,8 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, DEFAULT_ORG, NodeListRequest, NodeListResponse, OrgDetails, OrgUser,
-                Organization, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
-                THRESHOLD,
+                CUSTOM, DEFAULT_ORG, NodeListResponse, OrgDetails, OrgUser, Organization,
+                OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -383,18 +382,20 @@ async fn create_org(
         ("Authorization"= [])
     ),
     params(
-        ("org_id" = String, Path, description = "Must be '_meta'")
+        ("org_id" = String, Path, description = "Must be '_meta'"),
+        ("regions" = String, Query, description = "Optional comma-separated list of regions to filter by (e.g., 'us-east-1,us-west-2')")
     ),
-    request_body(content = NodeListRequest, description = "Request with regions to filter by", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = NodeListResponse),
         (status = 403, description = "Forbidden - Not the _meta organization", content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Bad Request - Invalid JSON body", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/node/list")]
-async fn node_list(org_id: web::Path<String>, payload: web::Bytes) -> Result<HttpResponse, Error> {
+async fn node_list(
+    org_id: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
 
     // Ensure this API is only available for the "_meta" organization
@@ -405,17 +406,20 @@ async fn node_list(org_id: web::Path<String>, payload: web::Bytes) -> Result<Htt
         )));
     }
 
-    // Parse the request body
-    let req = match serde_json::from_slice::<NodeListRequest>(&payload) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    // Extract regions from query params
+    let regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
+        regions_str
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    });
 
     // Configure and populate the response based on environment
     #[cfg(feature = "enterprise")]
     let response = if get_o2_config().super_cluster.enabled {
         // Super cluster is enabled, get nodes from super cluster
-        match get_super_cluster_nodes(&req).await {
+        match get_super_cluster_nodes(&regions).await {
             Ok(response) => response,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }
@@ -447,13 +451,13 @@ async fn get_local_nodes() -> NodeListResponse {
 
 #[cfg(feature = "enterprise")]
 /// Helper function to collect nodes from all clusters in a super cluster
-async fn get_super_cluster_nodes(req: &NodeListRequest) -> Result<NodeListResponse, anyhow::Error> {
+async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse, anyhow::Error> {
     let mut response = NodeListResponse::new();
 
     // Get all nodes in the super cluster
     let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
         "list_nodes",
-        req.regions.clone(),
+        regions.to_vec(),
         vec![],
     )
     .await
