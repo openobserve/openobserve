@@ -55,9 +55,9 @@
         row-key="trace_id"
         :rows-per-page-options="[]"
         class="custom-table"
-        style="width: 100%;"
         :sort-method="sortMethod"
-      >
+        :wrap-cells='true'
+        >
 
 
       <template v-slot:body="props">
@@ -73,7 +73,7 @@
               flat
               size="xs"
               :icon="
-                expandedRow != props.row.trace_id
+                expandedRow != convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)
                   ? 'expand_more'
                   : 'expand_less'
               "
@@ -84,111 +84,85 @@
           {{ props.row[col.field] }}
         </q-td>
         </q-tr>
-  <!-- <q-tr :props="props" @click="triggerExpand(props)">
-    <q-td 
-      :class="`column-${col.name}`"
-      v-for="col in props.cols"
-      :key="col.name"
-      :props="props"
-    >
-      {{ col.value }}
-    </q-td>
-    
-  </q-tr> -->
-  <q-tr v-show="expandedRow === props.row.trace_id" :props="props" >
+        <q-tr v-show="expandedRow === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)" :props="props" >
 
-    <q-td  colspan="100%">
+          <q-td  colspan="100%">
+            <div class="app-tabs-schedule-list report-list-tabs">
+              <app-tabs
+                data-test="expanded-list-tabs"
+                class="q-mr-md"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+              />
+            </div>
+            <div v-show="activeTab === 'query'">
+              <div class="text-left tw-px-2 q-mb-sm  expanded-content">
+            <div class="tw-flex tw-items-center q-py-sm  ">
+              <strong >SQL Query : <span>  <q-btn
+                  @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
+                  size="xs"
+                  dense
+                  flat
+                  icon="content_copy"
+                  class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
+                /></span></strong>
+                <q-btn
+                  @click.stop="goToLogs(props.row)"
+                  size="xs"
+                  label="Logs"
+                  dense
+                  class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
+                  icon="search"
+                  flat
+                  style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
+                />
+            </div>
+              <div class="tw-flex tw-items-start  tw-justify-center" >
+            
+              <div class="scrollable-content  expanded-sql ">
+                <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
 
-      <div class="text-left tw-px-2 q-mb-sm  expanded-content">
-       <div class="tw-flex tw-items-center q-py-sm  ">
-        <strong >SQL Query : <span>  <q-btn
-            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
-            size="xs"
-            dense
-            flat
-            icon="content_copy"
-            class="copy-btn-sql tw-ml-2  tw-py-2 tw-px-2 "
-          /></span></strong>
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Logs"
-            dense
-            class="copy-btn tw-py-2 tw-mx-2 tw-px-2"
-            icon="search"
-            flat
-            style="color: #F2452F; border: #F2452F 1px solid;font-weight:bolder;"
-          />
-       </div>
-        <div class="tw-flex tw-items-start  tw-justify-center" >
-       
-         <div class="scrollable-content  expanded-sql ">
-          <pre style="text-wrap: wrap;">{{ props.row?.sql }}</pre>
+              </div>
+              </div>
+            </div>
+            <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
+              <div class="tw-flex tw-items-center q-py-sm ">
+              <strong >Function Definition : <span>  <q-btn
+                  @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
+                  size="xs"
+                  dense
+                  flat
+                  icon="content_copy"
+                  class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
+                /></span></strong>
 
-         </div>
+            </div>
 
-         <!-- <div class="tw-pl-2">
-          <q-btn
-            @click.stop="copyToClipboard(props.row.sql)"
-            size="xs"
-            icon="content_copy"
-            class="copy-btn tw-py-3"
-          />
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Go To Logs"
-            class="copy-btn tw-py-3 tw-mx-2"
-          />
-         </div> -->
-        
-         
-        </div>
-      </div>
-      <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
-        <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >Function Definition : <span>  <q-btn
-            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
-            size="xs"
-            dense
-            flat
-            icon="content_copy"
-            class="copy-btn-function tw-ml-2 tw-py-2 tw-px-2 "
-          /></span></strong>
+              <div class="tw-flex tw-items-start tw-justify-center" >
+            
+              <div class="scrollable-content expanded-function  ">
+                <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
 
-       </div>
+              </div>              
+              
+              </div>
+            </div>
+            </div>
+            <div v-show="activeTab === 'more_details'">
+              <query-editor
+                style="height: 200px"
+                :ref="`QueryEditorRef${props.row.trace_id + props.row.sql + Math.random(10)}`"
+                :editor-id="`search-query-editor${props.row.trace_id}`"
+                class="monaco-editor"
+                :debounceTime="600"
+                v-model:query="moreDetailsToDisplay"
+                language="json"
+                read-only
+              />
+            </div>
 
-        <div class="tw-flex tw-items-start tw-justify-center" >
-       
-         <div class="scrollable-content expanded-function  ">
-          <pre style="text-wrap: wrap;">{{ props.row?.function }}</pre>
-
-         </div>
-<!-- 
-         <div class="tw-pl-2 tw-flex tw-my-auto">
-          <q-btn
-            @click.stop="copyToClipboard(props.row.function)"
-            size="xs"
-            icon="content_copy"
-            class="copy-btn tw-py-3"
-          />
-          <q-btn
-            @click.stop="goToLogs(props.row)"
-            size="xs"
-            label="Go To Logs"
-            class="copy-btn tw-py-3 tw-mx-2"
-          />
-         </div> -->
-        
-         
-        </div>
-
-
-
-      </div>
-
-    </q-td>
-  </q-tr>
+          </q-td>
+        </q-tr>
       </template>
       <template #bottom="scope">
         <div class="tw-ml-auto tw-mr-2">
@@ -232,7 +206,7 @@
   </template>
   <script lang="ts">
   //@ts-nocheck
-  import { ref, watch, onMounted  , nextTick,computed} from 'vue';
+  import { ref, watch, onMounted  , nextTick,computed, onUnmounted} from 'vue';
   import {
     timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
@@ -247,6 +221,9 @@
   import { date , QTable , useQuasar } from 'quasar';
   import type { Ref } from "vue";
   import QTablePagination from "@/components/shared/grid/Pagination.vue";
+  import AppTabs from '@/components/common/AppTabs.vue';
+
+  const QueryEditor = defineAsyncComponent(() => import('@/components/QueryEditor.vue'));
 
 
   export default defineComponent({
@@ -255,6 +232,8 @@
       DateTime,
       NoData,
       QTablePagination,
+      AppTabs,
+      QueryEditor
     },
     props: {
       isClicked: {
@@ -288,6 +267,25 @@
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
       const isDateTimeChanged = ref(false);
+      const moreDetailsToDisplay = ref('hiii');
+
+      const activeTab = ref('query');
+      const tabs = ref([
+        {
+          label: 'Query / Function',
+          value: 'query',
+        },
+        {
+          label: 'More Details',
+          value: 'more_details',
+        },
+
+        
+      ])
+
+
+      onUnmounted(()=>{
+      })
 
 
       const perPageOptions: any = [
@@ -308,68 +306,33 @@
       const selectedPerPage = ref(pagination.value.rowsPerPage);
 
       const generateColumns = (data: any) => {
-     if (data.length === 0) return [];
+        if (data.length === 0) return [];
 
-  // Define the desired column order and names
-  const desiredColumns = [
-    {key : '#' , label : '#',align: 'center',sortable: false},
-    { key: 'trace_id', label: 'Trace ID' },
-    { key: 'executed_time', label: 'Executed At' },
+      // Define the desired column order and names
+      const desiredColumns = [
+        { key: '#', label: '#' },
+        { key: 'executed_time', label: 'Executed At' },
 
-    { key: 'start_time', label: 'Start Time' },
-    { key: 'end_time', label: 'End Time' },
-    { key: 'duration', label: 'Duration' },
-    { key: 'took', label: 'Took' },
-    { key: 'scan_size', label: 'Scan Size' },
-    { key: 'scan_records', label: 'Scan Records' },
-    { key: 'cached_ratio', label: 'Cached Ratio' },
-    { key: 'sql', label: 'SQL Query' },
+        { key: 'sql', label: 'SQL Query' },
+        ];
+        let aligin = 'left'
 
-  ];
 
-  return desiredColumns.map(({ key, label }) => {
-    let columnWidth = 200;
 
-    let align = "center";
-    let sortable = true;
-    if(key == "scan_records" || key == "cached_ratio" || key == "took"){
-      columnWidth = 80
-
-    }
-    if(key == "scan_size"){
-      columnWidth = 100
-    }
-    if(key == "duration"){
-      align='left'
-      columnWidth = 100
-    }
-    if( key == 'start_time' || key == 'end_time'){
-      columnWidth = 200
-    }
-    if(key == 'sql'){
-      columnWidth = 300
-      sortable = false;
-    }
-    if(key == "trace_id"){
-      columnWidth = 250
-      sortable = false;
-    }
-    if(key == "#"){
-      columnWidth = 100
-      sortable = false;
-      align = "left"
-    }
-   // Custom width for each column
-    return {
-      name: key,        // Field name
-      label: label,     // Column label
-      field: key,       // Field accessor
-      align: align,
-      sortable: sortable,
-      style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
-    };
-  });
-};
+        return desiredColumns.map(({ key, label }) => {
+          if(key == "sql"){
+          aligin = 'left'
+        }
+        // Custom width for each column
+          return {
+            name: key,        // Field name
+            label: label,     // Column label
+            field: key,       // Field accessor
+            align: aligin,
+            sortable: true,
+          };
+        });
+      };
 
       const fetchSearchHistory = async () => {
 
@@ -527,7 +490,7 @@
       const  formatTime = (took)  => {
       return `${took.toFixed(2)} sec`;
       }
-    const calculateDuration = (startTime, endTime) => {
+      const calculateDuration = (startTime, endTime) => {
         const durationMicroseconds = endTime - startTime;
         const durationSeconds = durationMicroseconds / 1e6;
 
@@ -576,18 +539,20 @@
         }
 
       return { formatted: result, raw: rawDuration };
-};
+      };
 
 
 
       const triggerExpand = (props) =>{
-        if (expandedRow.value === props.row.trace_id) {
+        console.log(props, "props")
+        // moreDetailsToDisplay.value[props.row.trace_id] = JSON.stringify(filterRow(props.row), null, 2);
+        if (expandedRow.value === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)) {
             expandedRow.value = null;
           } else {
             // Otherwise, expand the clicked row and collapse any other row
-            expandedRow.value = props.row.trace_id;
-  }
-      }
+            expandedRow.value = convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql);
+          }
+        }
       const   goToLogs = ( row) => {
         const duration_suffix = row.duration.split(" ")[1];
         // emit('closeSearchHistory');
@@ -646,6 +611,29 @@
           fetchSearchHistory();
         }
       });
+
+      function filterRow(row) {
+      const desiredColumns = [
+        { key: "trace_id", label: "Trace ID" },
+        { key: 'start_time', label: 'Start Time' },
+        { key: 'end_time', label: 'End Time' },
+        { key: 'duration', label: 'Duration' },
+        { key: 'took', label: 'Took' },
+        { key: 'scan_size', label: 'Scan Size' },
+        { key: 'scan_records', label: 'Scan Records' },
+        { key: 'cached_ratio', label: 'Cached Ratio' },
+
+      ];
+      return desiredColumns.reduce((filtered, column) => {
+        if (row[column.key] !== undefined) {
+          filtered[column.key] = row[column.key];
+        }
+        return filtered;
+      }, {});
+    }
+    const convertTraceIdAndSqlToKey = (traceId, sql) => {
+      return `${traceId}-${sql}`;
+    }
       return {
         searchObj,
         store,
@@ -671,6 +659,10 @@
         perPageOptions,
         changePagination,
         selectedPerPage,
+        activeTab,
+        tabs,
+        moreDetailsToDisplay,
+        convertTraceIdAndSqlToKey
       };
       // Watch the searchObj for changes
       
@@ -680,7 +672,7 @@
  <style lang="scss" scoped >
 .expanded-content {
   padding: 0  3rem;
-  min-width: 100vw;
+  min-width: 80vw;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
@@ -701,8 +693,14 @@
 
 .q-td {
   overflow: hidden;
-  white-space: nowrap;
   text-overflow: ellipsis;
+  white-space: nowrap;
+
+
+}
+
+.custom-table .q-tr > .q-td:nth-child(3){
+  white-space: wrap;
 }
 
 .custom-table .q-tr > .q-td:nth-child(2){
@@ -731,6 +729,54 @@ color: #0A7EBC;
 }
 .expanded-function{
   border-left: #0A7EBC 3px solid;
+}
+
+
+.report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+
+.report-list-tabs {
+  padding: 0 1rem;
+  height: fit-content;
+  width: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
 }
 
  </style>
