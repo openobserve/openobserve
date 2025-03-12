@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="getStreamsList(userSelectedStreamType[index],index)"
+                            @update:model-value="getSourceStreamsList(userSelectedStreamType[index],index)"
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
@@ -332,35 +332,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-item>
                             </template>
                           </q-select>
-                        </div>
-                      </span>
-                      <!-- source stream type should be one of the valid stream types -->
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          (errorMessage.field == 'source_stream_type')
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-source-stream-type-input"
-                            v-model="userSelectedStreamType[index]"
-                            :options="streamTypes"
-                            :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{ textTransform: 'lowercase' }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="getStreamsList(userSelectedStreamType[index],index)"
-                            :rules="[(val: any) => !!val || 'Field is required!']"
-                            style="width: 300px"
-                          />
                         </div>
                       </span>
                       <!-- sql query should be same across all nodes as well try to match the query in the nodes -->
@@ -469,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="getStreamsList(userSelectedDestinationStreamType[index],index)"
+                            @update:model-value="getDestinationStreamsList(userSelectedDestinationStreamType[index],index)"
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
@@ -1022,9 +993,9 @@ import jstransform from "@/services/jstransform";
           pipelineErrors.push({ message: `Pipeline - ${index}: Source stream name is required`, field: "source_stream_name" });
         }
 
-        //call getStreamsList to update the stream list
+        //call getStreamsList to update the stream list //not neded as we are updating the stream list while selecting the stream type
         if(input.source.stream_type && validStreamTypes.includes(input.source.stream_type)){
-          await getStreamsList(input.source.stream_type, -1);
+          await getSourceStreamsList(input.source.stream_type, -1);
         }
         const isValidScheduledPipeline = await validateScheduledPipelineNodes(input, "");
         //5. validate source node sql query
@@ -1167,9 +1138,9 @@ import jstransform from "@/services/jstransform";
       const onSubmit = (e: any) => {
         e.preventDefault();
       };
-      const getStreamsList = async (streamType: string, index: number,isInput: boolean = false) => { 
+      const getSourceStreamsList = async (streamType: string, index: number,isInput: boolean = false) => { 
         //update the stream type if user selects a different stream type
-        if(index != -1 ){
+        if(index != -1){
           jsonArrayOfObj.value[index].source.stream_type = streamType;
           jsonArrayOfObj.value[index].stream_type = streamType;
           jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
@@ -1177,24 +1148,44 @@ import jstransform from "@/services/jstransform";
               node.data.stream_type = streamType;
             }
           });
-
           jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-
         }
         try {
           const streamResponse: any = await getStreams(streamType, false);
-          streamData.value = streamResponse.list.map(
+          //these will be used for destination stream
+          const streamsNames = streamResponse.list.map(
             (stream: any) => stream.name,
           );
           const usedStreams = await pipelinesService.getPipelineStreams(store.state.selectedOrganization.identifier);
           const usedStreamNames = usedStreams.data.list.map(stream => stream.stream_name);
-          streamList.value = streamData.value.map(stream => {
+          //this is used to disable the stream names which are already used in the source stream
+          streamList.value = streamsNames.map(stream => {
             return {
               label: stream,
               value: stream,
               disable: usedStreamNames.includes(stream),
             };
           });
+        } catch (error) {
+          console.error('Error fetching streams:', error);
+        }
+      };
+      const getDestinationStreamsList = async (streamType: string, index: number,isInput: boolean = false) => { 
+        //update the stream type if user selects a different stream type
+        if(index != -1){
+          jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+            if(node.io_type == "output"){
+              node.data.stream_type = streamType;
+            }
+          });
+          jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        }
+        try {
+          const streamResponse: any = await getStreams(streamType, false);
+          //these will be used for destination stream
+          streamData.value = streamResponse.list.map(
+            (stream: any) => stream.name,
+          );
         } catch (error) {
           console.error('Error fetching streams:', error);
         }
@@ -1305,7 +1296,8 @@ import jstransform from "@/services/jstransform";
         streamTypes,
         userSelectedStreamType,
         userSelectedDestinationStreamType,
-        getStreamsList,
+        getSourceStreamsList,
+        getDestinationStreamsList,
         getOutputStreamsList,
         streams,
         filterDestinations,
