@@ -247,7 +247,7 @@ pub async fn make_grpc_node_client<T>(
         .await
         .map_err(|err| {
             log::error!(
-                "search->grpc: node: {}, connect err: {:?}",
+                "node->grpc: node: {}, connect err: {:?}",
                 &node.get_grpc_addr(),
                 err
             );
