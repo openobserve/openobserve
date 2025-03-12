@@ -1051,6 +1051,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `Pipeline - ${index}: Frequency should be greater than 0`,
           );
         }
+        if(input.source.source_type == 'scheduled' && input.source.trigger_condition.frequency_type == 'cron' && input.source.trigger_condition.period < 1){
+          pipelineErrors.push(
+            `Pipeline - ${index}: Period should be greater than 0`,
+          );
+        }
         // validate destination node in scheduled pipeline 
         if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
           const validationPromises = input.nodes.map(async (node: any) => {
