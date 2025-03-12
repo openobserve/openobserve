@@ -362,6 +362,7 @@ impl super::Db for NatsDb {
         if keys.is_empty() {
             return Ok(vec![]);
         }
+        log::debug!("list_values prefix: {}, keys: {:?}", prefix, keys);
 
         let values = futures::stream::iter(keys)
             .map(|key| async move {
