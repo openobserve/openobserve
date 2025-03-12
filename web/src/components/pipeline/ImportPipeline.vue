@@ -1056,6 +1056,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `Pipeline - ${index}: Period should be greater than 0`,
           );
         }
+        //should match in source as well as in nodes as well 
+
+        if(input.source.source_type == 'scheduled' && input.source.trigger_condition.frequency_type == 'cron'){
+          input.nodes.forEach((node: any) => {
+            if(node.io_type == "input" && node.data.node_type == "query"){
+              if(node.data.trigger_condition.frequency_type != 'cron'){
+                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be cron and should match in source as well as in nodes`);
+              }
+              if(node.data.trigger_condition.cron != input.source.trigger_condition.cron){
+                pipelineErrors.push(`Pipeline - ${index}: Cron should be same as in source and should match in all nodes`);
+              }
+              if(node.data.trigger_condition.period != input.source.trigger_condition.period){
+                pipelineErrors.push(`Pipeline - ${index}: Period should be same as in source and should match in all nodes`);
+              }
+              if(node.data.trigger_condition.timezone != input.source.trigger_condition.timezone){
+                pipelineErrors.push(`Pipeline - ${index}: Timezone should be same as in source and should match in all nodes`);
+              }
+            }
+          });
+        }
+        if(input.source.source_type == 'scheduled' && input.source.trigger_condition.frequency_type == 'minutes'){
+          input.nodes.forEach((node: any) => {
+            if(node.io_type == "input" && node.data.node_type == "query"){
+              if(node.data.trigger_condition.frequency_type != 'minutes'){
+                pipelineErrors.push(`Pipeline - ${index}: Frequency type should be minutes and should match in source as well as in nodes`);
+              }
+              if(node.data.trigger_condition.frequency != input.source.trigger_condition.frequency){
+                pipelineErrors.push(`Pipeline - ${index}: Frequency should be same as in source and should match in all nodes`);
+              }
+            }
+          });
+        }
+
         // validate destination node in scheduled pipeline 
         if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
           const validationPromises = input.nodes.map(async (node: any) => {
