@@ -447,6 +447,9 @@ impl super::Db for NatsDb {
             .map_err(|e| Error::Message(format!("[NATS:list_values] bucket.keys error: {}", e)))?
             .try_collect::<Vec<String>>()
             .await?;
+        if prefix.starts_with("/clusters") {
+            log::debug!("list_values prefix: {}, keys: {:?}", prefix, keys);
+        }
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
@@ -463,6 +466,13 @@ impl super::Db for NatsDb {
             return Ok(vec![]);
         }
         keys.sort();
+        if prefix.starts_with("/clusters") {
+            log::debug!("list_values prefix: {}, keys decoded: {:?}", prefix, keys);
+            let status = bucket.status().await.map_err(|e| {
+                Error::Message(format!("[NATS:list_values] bucket.status error: {}", e))
+            })?;
+            log::debug!("list_values prefix: {}, status: {:?}", prefix, status);
+        }
         let values = futures::stream::iter(keys)
             .map(|key| async move {
                 let encoded_key = key_encode(&key);
@@ -475,7 +485,14 @@ impl super::Db for NatsDb {
             .try_collect::<Vec<Option<Bytes>>>()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
-        let result = values.into_iter().flatten().collect();
+        let result: Vec<Bytes> = values.into_iter().flatten().collect();
+        if prefix.starts_with("/clusters") {
+            log::debug!(
+                "list_values prefix: {}, values: {:?}",
+                prefix,
+                result.iter().map(|v| v.len()).collect::<Vec<usize>>()
+            );
+        }
         Ok(result)
     }
 
