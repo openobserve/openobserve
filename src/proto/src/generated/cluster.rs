@@ -2737,6 +2737,27 @@ pub struct GetNodesResponse {
     #[prost(message, repeated, tag = "1")]
     pub nodes: ::prost::alloc::vec::Vec<NodeDetails>,
 }
+/// Node metrics representation
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NodeMetrics {
+    #[prost(uint64, tag = "1")]
+    pub cpu_total: u64,
+    #[prost(float, tag = "2")]
+    pub cpu_usage: f32,
+    #[prost(uint64, tag = "3")]
+    pub memory_total: u64,
+    #[prost(uint64, tag = "4")]
+    pub memory_usage: u64,
+    #[prost(uint64, tag = "5")]
+    pub tcp_conns: u64,
+    #[prost(uint64, tag = "6")]
+    pub tcp_conns_established: u64,
+    #[prost(uint64, tag = "7")]
+    pub tcp_conns_close_wait: u64,
+    #[prost(uint64, tag = "8")]
+    pub tcp_conns_time_wait: u64,
+}
 /// Node representation
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2765,6 +2786,8 @@ pub struct NodeDetails {
     pub broadcasted: bool,
     #[prost(string, tag = "12")]
     pub version: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "13")]
+    pub metrics: ::core::option::Option<NodeMetrics>,
 }
 /// Node status enum
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]

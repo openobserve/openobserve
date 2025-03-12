@@ -17,8 +17,8 @@ use std::sync::Arc;
 
 use config::meta::cluster::{Node as ConfigNode, NodeInfo, NodeStatus, Role, RoleGroup};
 use proto::cluster_rpc::{
-    EmptyRequest, GetNodesResponse, NodeDetails, NodeStatus as ProtoNodeStatus, Role as ProtoRole,
-    RoleGroup as ProtoRoleGroup,
+    EmptyRequest, GetNodesResponse, NodeDetails, NodeMetrics as ProtoNodeMetrics,
+    NodeStatus as ProtoNodeStatus, Role as ProtoRole, RoleGroup as ProtoRoleGroup,
 };
 use tonic::{Request, Response, Status};
 
@@ -55,6 +55,18 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
         NodeStatus::Offline => ProtoNodeStatus::Offline as i32,
     };
 
+    // Convert the metrics
+    let metrics = ProtoNodeMetrics {
+        cpu_total: node.metrics.cpu_total as u64,
+        cpu_usage: node.metrics.cpu_usage,
+        memory_total: node.metrics.memory_total as u64,
+        memory_usage: node.metrics.memory_usage as u64,
+        tcp_conns: node.metrics.tcp_conns as u64,
+        tcp_conns_established: node.metrics.tcp_conns_established as u64,
+        tcp_conns_close_wait: node.metrics.tcp_conns_close_wait as u64,
+        tcp_conns_time_wait: node.metrics.tcp_conns_time_wait as u64,
+    };
+
     NodeDetails {
         id: node.id,
         uuid: node.uuid,
@@ -68,6 +80,7 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
         scheduled: node.scheduled,
         broadcasted: node.broadcasted,
         version: node.version,
+        metrics: Some(metrics),
     }
 }
 
@@ -103,6 +116,22 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
         _ => NodeStatus::Prepare,
     };
 
+    // Convert the metrics or use default if not provided
+    let metrics = node
+        .metrics
+        .map_or_else(config::utils::sysinfo::NodeMetrics::default, |m| {
+            config::utils::sysinfo::NodeMetrics {
+                cpu_total: m.cpu_total as usize,
+                cpu_usage: m.cpu_usage,
+                memory_total: m.memory_total as usize,
+                memory_usage: m.memory_usage as usize,
+                tcp_conns: m.tcp_conns as usize,
+                tcp_conns_established: m.tcp_conns_established as usize,
+                tcp_conns_close_wait: m.tcp_conns_close_wait as usize,
+                tcp_conns_time_wait: m.tcp_conns_time_wait as usize,
+            }
+        });
+
     ConfigNode {
         id: node.id,
         uuid: node.uuid,
@@ -116,7 +145,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
         scheduled: node.scheduled,
         broadcasted: node.broadcasted,
         version: node.version,
-        metrics: config::utils::sysinfo::NodeMetrics::default(),
+        metrics,
     }
 }
 

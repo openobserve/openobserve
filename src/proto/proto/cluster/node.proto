@@ -20,6 +20,18 @@ message GetNodesResponse {
   repeated NodeDetails nodes = 1;
 }
 
+// Node metrics representation
+message NodeMetrics {
+  uint64 cpu_total = 1;
+  float cpu_usage = 2;
+  uint64 memory_total = 3;
+  uint64 memory_usage = 4;
+  uint64 tcp_conns = 5;
+  uint64 tcp_conns_established = 6;
+  uint64 tcp_conns_close_wait = 7;
+  uint64 tcp_conns_time_wait = 8;
+}
+
 // Node representation
 message NodeDetails {
   int32 id = 1;
@@ -34,6 +46,7 @@ message NodeDetails {
   bool scheduled = 10;
   bool broadcasted = 11;
   string version = 12;
+  NodeMetrics metrics = 13;
 }
 
 // Node status enum
