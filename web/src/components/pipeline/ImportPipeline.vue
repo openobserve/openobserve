@@ -475,6 +475,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          (errorMessage.field == 'source_timezone')
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div>
+                          <q-select
+                            data-test="pipeline-import-destination-stream-type-input"
+                            v-model="userSelectedTimezone[index]"
+                            :options="timezoneOptions"
+                            :label="'Timezone'"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            @update:model-value="updateTimezone(userSelectedTimezone[index],index)"
+                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            style="width: 300px"
+                          />
+                        </div>
+                      </span>
                         <span v-else>{{ errorMessage }}</span>
                       </div>
                     </div>
@@ -525,16 +552,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import router from "@/router";
   import { useQuasar } from "quasar";
   import pipelinesService from "../../services/pipelines";
-  
   import QueryEditor from "../QueryEditor.vue";
-  import { json } from "stream/consumers";
   import useStreams from "@/composables/useStreams";
-  import templateService from "@/services/alert_templates";
   import destinationService from "@/services/alert_destination";
-  
   import AppTabs from "../common/AppTabs.vue";
-  import { error } from "console";
-import jstransform from "@/services/jstransform";
+  import jstransform from "@/services/jstransform";
   
   export default defineComponent({
     name: "ImportPipeline",
@@ -1011,6 +1033,7 @@ import jstransform from "@/services/jstransform";
 
 
         const isValidQuery = await validateScheduledPipelineNodes(input, input.sql_query);
+        //validate sql query in scheduled pipeline
         if(input.source.source_type == 'scheduled' && (input.sql_query != input.source.query_condition.sql) || !isValidQuery ){
           pipelineErrors.push(  `Pipeline - ${index}: SQL query should be same across all nodes as well try to match the query in the nodes \n 
           input.sql_query: ${input.sql_query} \n 
@@ -1018,7 +1041,16 @@ import jstransform from "@/services/jstransform";
           );
         }
 
-
+        //validate timezone in scheduled pipeline if the frequency type is cron
+        if(input.source.source_type == 'scheduled' && input.source.trigger_condition.frequency_type == 'cron' && !input.source.trigger_condition.timezone){
+          pipelineErrors.push({ message: `Pipeline - ${index}: Timezone is required`, field: "source_timezone" });
+        }
+        //validate if frequnecy type is minutes then the frequency should be in minutes
+        if(input.source.source_type == 'scheduled' && input.source.trigger_condition.frequency_type == 'minutes' && input.source.trigger_condition.frequency < 1){
+          pipelineErrors.push(
+            `Pipeline - ${index}: Frequency should be greater than 0`,
+          );
+        }
         // validate destination node in scheduled pipeline 
         if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
           const validationPromises = input.nodes.map(async (node: any) => {
@@ -1224,7 +1256,12 @@ import jstransform from "@/services/jstransform";
       };
   
       const updateTimezone = (timezone: string, index: number) => {
-        jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
+        jsonArrayOfObj.value[index].source.trigger_condition.timezone = timezone;
+        jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+          if(node.data.node_type == "query"){
+            node.data.trigger_condition.timezone = timezone;
+          }
+        });
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
       };
   
@@ -1300,6 +1337,7 @@ import jstransform from "@/services/jstransform";
         userSelectedRemoteDestination,
         updateRemoteDestination,
         destinationStreamTypes,
+        timezoneOptions,
       };
     },
     components: {
