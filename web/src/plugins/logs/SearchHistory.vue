@@ -18,6 +18,9 @@
         </div>
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
+          <div>
+            <q-toggle v-model="wrapText" label="Wrap Text"  class="q-mr-md" />
+          </div>
           <div class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md  ">
             <q-icon name="info" class="q-mr-xs " size="16px" />
              <div>
@@ -56,7 +59,7 @@
         :rows-per-page-options="[]"
         class="custom-table"
         :sort-method="sortMethod"
-        :wrap-cells='true'
+        :wrap-cells='wrapText'
         >
 
 
@@ -80,7 +83,7 @@
             />
           </q-td>
           
-          <q-td v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
+          <q-td :style="{whiteSpace: wrapText && col.name === 'sql' ? 'wrap' : 'nowrap'}" v-for="col in columnsToBeRendered.slice(1)" :key="col.name" :props="props">
           {{ props.row[col.field] }}
         </q-td>
         </q-tr>
@@ -254,6 +257,7 @@
       const {t} = useI18n();
       const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
       const searchDateTimeRef = ref(null)
+      const wrapText = ref(true);
       const { searchObj, extractTimestamps } = useLogs();
       const dataToBeLoaded :any = ref([]);
       const dateTimeToBeSent = ref({
@@ -661,7 +665,8 @@
         activeTab,
         tabs,
         moreDetailsToDisplay,
-        convertTraceIdAndSqlToKey
+        convertTraceIdAndSqlToKey,
+        wrapText
       };
       // Watch the searchObj for changes
       
@@ -698,9 +703,7 @@
 
 }
 
-.custom-table .q-tr > .q-td:nth-child(3){
-  white-space: wrap;
-}
+
 
 .custom-table .q-tr > .q-td:nth-child(2){
   text-align: left;
