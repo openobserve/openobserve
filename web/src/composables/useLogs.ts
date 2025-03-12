@@ -5731,7 +5731,6 @@ const useLogs = () => {
     initializeWebSocketConnection,
     addRequestId,
     routeToSearchSchedule,
-    cancelSearchQueryBasedOnRequestId,
     sendCancelSearchMessage,
   };
 };

@@ -583,7 +583,7 @@ export default defineComponent({
       buildWebSocketPayload,
       initializeWebSocketConnection,
       addRequestId,
-      cancelSearchQueryBasedOnRequestId,
+      sendCancelSearchMessage,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
