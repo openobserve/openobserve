@@ -1010,9 +1010,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.38.0"
+version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76433c4de73442daedb3a59e991d94e85c14ebfc33db53dfcd347a21cd6ef4f8"
+checksum = "a798aab0c0203b31d67d501e5ed1f3ac6c36a329899ce47fc93c3bea53f3ae89"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -9492,11 +9492,11 @@ dependencies = [
  "httparse",
  "rand",
  "ring",
- "rustls-native-certs 0.8.1",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.1",
  "tokio-util",
+ "webpki-roots",
 ]
 
 [[package]]
