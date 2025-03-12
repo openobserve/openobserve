@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
       class="management_splitter"
       v-model="splitterModel"
+      :limits="[0, 400]"
       unit="px"
       style="min-height: calc(100vh - 104px); overflow: hidden;"
     >
