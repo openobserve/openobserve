@@ -161,10 +161,9 @@ impl Partition {
                     chunks.push(cur_batches);
                     cur_num_rows = 0;
                     cur_batches = Vec::new();
-                } else {
-                    cur_num_rows += num_rows;
-                    cur_batches.push(data);
                 }
+                cur_num_rows += num_rows;
+                cur_batches.push(data);
             }
             if !cur_batches.is_empty() {
                 chunks.push(cur_batches);
