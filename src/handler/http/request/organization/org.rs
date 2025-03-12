@@ -407,7 +407,7 @@ async fn node_list(
     }
 
     // Extract regions from query params
-    let regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
+    let _regions = query.get("regions").map_or_else(Vec::new, |regions_str| {
         regions_str
             .split(',')
             .filter(|s| !s.is_empty())
@@ -419,7 +419,7 @@ async fn node_list(
     #[cfg(feature = "enterprise")]
     let response = if get_o2_config().super_cluster.enabled {
         // Super cluster is enabled, get nodes from super cluster
-        match get_super_cluster_nodes(&regions).await {
+        match get_super_cluster_nodes(&_regions).await {
             Ok(response) => response,
             Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
         }

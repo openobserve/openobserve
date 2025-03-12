@@ -239,7 +239,7 @@ impl NodeListResponse {
         let cluster_entry = region_entry
             .clusters
             .entry(cluster_name.clone())
-            .or_insert_with(|| Vec::new());
+            .or_default();
 
         cluster_entry.push(node);
     }
@@ -256,8 +256,6 @@ impl NodeListResponse {
 impl RegionInfo {
     /// Adds a cluster to this region if it doesn't exist
     pub fn add_cluster(&mut self, cluster_name: String) -> &mut Vec<Node> {
-        self.clusters
-            .entry(cluster_name.clone())
-            .or_insert_with(|| Vec::new())
+        self.clusters.entry(cluster_name.clone()).or_default()
     }
 }
