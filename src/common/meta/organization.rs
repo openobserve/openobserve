@@ -201,23 +201,90 @@ pub struct NodeListRequest {
     pub regions: Vec<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClusterInfo {
+    pub nodes: Vec<Node>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RegionInfo {
+    pub clusters: std::collections::HashMap<String, ClusterInfo>,
+}
+
+/// Response struct for node listing with nested hierarchy
+/// 
+/// Contains a three-level hierarchy:
+/// 1. Regions at the top level
+/// 2. Clusters within each region
+/// 3. Nodes within each cluster
 #[derive(Serialize, Deserialize, Default)]
 pub struct NodeListResponse {
-    pub nodes: Vec<FederatedNode>,
+    pub regions: std::collections::HashMap<String, RegionInfo>,
 }
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct FederatedNode {
-    #[serde(flatten)]
-    pub node: Node,
-    pub region: String,
-    pub cluster_name: String,
+impl NodeListResponse {
+    pub fn new() -> Self {
+        Self {
+            regions: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Adds a node to the appropriate region and cluster
+    /// 
+    /// This method will create the region and cluster if they don't exist
+    pub fn add_node(&mut self, node: Node, region_name: String, cluster_name: String) {
+        let region_entry = self.regions.entry(region_name.clone()).or_insert_with(|| {
+            RegionInfo {
+                clusters: std::collections::HashMap::new(),
+            }
+        });
+        
+        let cluster_entry = region_entry.clusters.entry(cluster_name.clone()).or_insert_with(|| {
+            ClusterInfo {
+                nodes: Vec::new(),
+            }
+        });
+        
+        cluster_entry.nodes.push(node);
+    }
+    
+    /// Adds multiple nodes to the response structure
+    pub fn add_nodes(&mut self, nodes: Vec<(Node, String, String)>) {
+        for (node, region, cluster) in nodes {
+            self.add_node(node, region, cluster);
+        }
+    }
 }
 
-pub fn to_federated_node(node: Node, region: String, cluster_name: String) -> FederatedNode {
-    FederatedNode {
-        node,
-        region,
-        cluster_name,
+// We can also add helper functions for the region and cluster structs
+impl RegionInfo {
+    /// Creates a new RegionInfo with the given name
+    pub fn new() -> Self {
+        Self {
+            clusters: std::collections::HashMap::new(),
+        }
+    }
+    
+    /// Adds a cluster to this region if it doesn't exist
+    pub fn add_cluster(&mut self, cluster_name: String) -> &mut ClusterInfo {
+        self.clusters.entry(cluster_name.clone()).or_insert_with(|| {
+            ClusterInfo {
+                nodes: Vec::new(),
+            }
+        })
+    }
+}
+
+impl ClusterInfo {
+    /// Creates a new ClusterInfo with the given name
+    pub fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+        }
+    }
+    
+    /// Adds a node to this cluster
+    pub fn add_node(&mut self, node: Node) {
+        self.nodes.push(node);
     }
 }

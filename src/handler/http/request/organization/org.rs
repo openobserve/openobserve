@@ -20,8 +20,6 @@ use config::meta::cluster::NodeInfo;
 use infra::schema::STREAM_SCHEMAS_LATEST;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::super_cluster::kv::cluster::get_grpc_addr;
 
 use crate::{
     common::{
@@ -29,9 +27,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{
-                CUSTOM, DEFAULT_ORG, FederatedNode, NodeListRequest, NodeListResponse, OrgDetails,
-                OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-                RumIngestionResponse, THRESHOLD, to_federated_node,
+                CUSTOM, DEFAULT_ORG, NodeListRequest, NodeListResponse, OrgDetails, OrgUser,
+                Organization, OrganizationResponse, PasscodeResponse, RumIngestionResponse,
+                THRESHOLD,
             },
         },
         utils::auth::{UserEmail, is_root_user},
@@ -366,8 +364,9 @@ async fn create_org(
 
 /// GetNodeList
 ///
-/// This endpoint returns a list of all nodes in the OpenObserve cluster along with their
-/// versions and other essential information. It can be useful for:
+/// This endpoint returns a hierarchical list of all nodes in the OpenObserve cluster organized by
+/// regions and clusters, along with node details including versions and other essential
+/// information. It can be useful for:
 ///
 /// - Monitoring which nodes are online/offline in a distributed deployment
 /// - Checking version consistency across the cluster
@@ -397,85 +396,97 @@ async fn create_org(
 #[get("/{org_id}/node/list")]
 async fn node_list(org_id: web::Path<String>, payload: web::Bytes) -> Result<HttpResponse, Error> {
     let org = org_id.into_inner();
+
     // Ensure this API is only available for the "_meta" organization
-    if org != "_meta" {
+    if org != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
             "This API is only available for the _meta organization".to_string(),
         )));
     }
 
-    let req: NodeListRequest = match serde_json::from_slice(&payload) {
+    // Parse the request body
+    let req = match serde_json::from_slice::<NodeListRequest>(&payload) {
         Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // Configure and populate the response based on environment
+    #[cfg(feature = "enterprise")]
+    let response = if get_o2_config().super_cluster.enabled {
+        // Super cluster is enabled, get nodes from super cluster
+        match get_super_cluster_nodes(&req).await {
+            Ok(response) => response,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        }
+    } else {
+        // Super cluster not enabled, get local nodes
+        get_local_nodes().await
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let response = get_local_nodes().await;
+
+    // Return the nested response
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Helper function to collect nodes from the local cluster
+async fn get_local_nodes() -> NodeListResponse {
+    let mut response = NodeListResponse::new();
+
+    // Get all nodes from cache if available
+    if let Some(nodes) = cluster::get_cached_nodes(|_| true).await {
+        for node in nodes {
+            response.add_node(node.clone(), node.get_region(), node.get_cluster_name());
+        }
+    }
+
+    response
+}
+
+#[cfg(feature = "enterprise")]
+/// Helper function to collect nodes from all clusters in a super cluster
+async fn get_super_cluster_nodes(req: &NodeListRequest) -> Result<NodeListResponse, anyhow::Error> {
+    let mut response = NodeListResponse::new();
+
+    // Get all nodes in the super cluster
+    let cluster_nodes = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        "list_nodes",
+        req.regions.clone(),
+        vec![],
+    )
+    .await
+    {
+        Ok(nodes) => nodes,
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            log::error!("Failed to get super cluster nodes: {:?}", e);
+            return Ok(response); // Return empty response instead of failing
         }
     };
 
-    // Check if super cluster is enabled
-    #[cfg(feature = "enterprise")]
-    let super_cluster_enabled = get_o2_config().super_cluster.enabled;
+    // For each node in the super cluster
+    for node in cluster_nodes {
+        let region = node.get_region();
+        let cluster_name = node.get_cluster_name();
 
-    #[cfg(not(feature = "enterprise"))]
-    let super_cluster_enabled = false;
-
-    // Get all nodes from cache
-    let mut nodes: Vec<FederatedNode> = match cluster::get_cached_nodes(|_| true).await {
-        Some(nodes) => nodes
-            .iter()
-            .map(|node| to_federated_node(node.clone(), node.get_region(), node.get_cluster_name()))
-            .collect(),
-        None => Vec::new(),
-    };
-
-    #[cfg(feature = "enterprise")]
-    if super_cluster_enabled {
-        let super_cluster_nodes =
-            match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
-                "list_nodes",
-                req.regions.clone(),
-                vec![],
-            )
-            .await
-            {
-                Ok(nodes) => nodes,
-                Err(e) => {
-                    log::error!("Failed to get super cluster nodes: {:?}", e);
-                    Vec::new()
+        // Fetch child nodes from this cluster node
+        match crate::service::node::get_node_list(node).await {
+            Ok(cluster_nodes) => {
+                for node in cluster_nodes {
+                    response.add_node(node.clone(), region.clone(), cluster_name.clone());
                 }
-            };
-
-        // For each node in the super cluster
-        for node in super_cluster_nodes {
-            // Skip the current node
-            if node.get_grpc_addr() == get_grpc_addr() {
-                continue;
             }
-
-            let region = node.get_region();
-            let cluster_name = node.get_cluster_name();
-
-            match crate::service::node::get_node_list(node).await {
-                Ok(cluster_nodes) => {
-                    for node in cluster_nodes {
-                        nodes.push(to_federated_node(
-                            node.clone(),
-                            region.clone(),
-                            cluster_name.clone(),
-                        ));
-                    }
-                }
-                Err(e) => {
-                    log::error!("Failed to get node list: {:?}", e);
-                    return Ok(MetaHttpResponse::internal_error(format!(
-                        "Failed to get node list: {:?}",
-                        e
-                    )));
-                }
+            Err(e) => {
+                log::error!(
+                    "Failed to get node list from cluster {}: {:?}",
+                    cluster_name,
+                    e
+                );
+                return Err(anyhow::anyhow!("Failed to get node list: {:?}", e));
             }
         }
     }
 
-    // Return response with nodes
-    Ok(HttpResponse::Ok().json(NodeListResponse { nodes }))
+    Ok(response)
 }
