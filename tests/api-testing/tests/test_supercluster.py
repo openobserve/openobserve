@@ -941,6 +941,19 @@ def create_service_account(session, base_url, org_id, email_address):
     assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
     return response
 
+def create_role(session, base_url, org_id, role_name):
+    """Create a role."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "name": role_name,
+    }
+
+    response = session.post(f"{base_url}api/{org_id}/roles", json=payload, headers=headers) 
+    assert response.status_code == 200, f"Failed to create role: {response.content.decode()}"
+    return response         
+
+
 
 
 def test_create_workflow(create_session, base_url):
@@ -1025,15 +1038,13 @@ def test_create_workflow(create_session, base_url):
 
         email_address_user = f"user_email_user_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
         create_user_user(session, base_url, org_id, email_address_user)
-        
-         
-
-
-
-
 
         service_account_email = f"service_account_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
         create_service_account(session, base_url, org_id, service_account_email) 
+
+        role_name = f"role_{i + 1}_{random.randint(100000, 999999)}"
+        create_role(session, base_url, org_id, role_name)
+        
 
 
 
