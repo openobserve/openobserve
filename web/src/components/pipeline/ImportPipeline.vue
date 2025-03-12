@@ -355,6 +355,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>  
+                      <!-- destination stream type should be one of the valid stream types -->
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          (errorMessage.field == 'destination_stream_type')
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div>
+                          <q-select
+                            data-test="pipeline-import-destination-stream-type-input"
+                            v-model="userSelectedDestinationStreamType[index]"
+                            :options="destinationStreamTypes"
+                            :label="t('alerts.streamType') + ' *'"
+                            :popup-content-style="{ textTransform: 'lowercase' }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            @update:model-value="getDestinationStreamsList(userSelectedDestinationStreamType[index],index)"
+                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            style="width: 300px"
+                          />
+                        </div>
+                      </span>
                       <!-- destination stream name should not be empty -->
                       <span
                         class="text-red"
@@ -413,34 +442,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             filled
                             dense
                             @update:model-value="updateFunctionName(userSelectedFunctionName[index],index)"
-                            :rules="[(val: any) => !!val || 'Field is required!']"
-                            style="width: 300px"
-                          />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          (errorMessage.field == 'destination_stream_type')
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div>
-                          <q-select
-                            data-test="pipeline-import-destination-stream-type-input"
-                            v-model="userSelectedDestinationStreamType[index]"
-                            :options="destinationStreamTypes"
-                            :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{ textTransform: 'lowercase' }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            @update:model-value="getDestinationStreamsList(userSelectedDestinationStreamType[index],index)"
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
