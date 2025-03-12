@@ -161,7 +161,8 @@
     "redirect_to_logs_page": "Go back to Logs page",
     "visualize": "Visualize",
     "disableVisualizeForMultiStream": "Visualization is disabled for multi stream",
-    "transformType": "Transform Type"
+    "transformType": "Transform Type",
+    "saveActionDisabled": "Saving Action is currently unavailable"
   },
   "menu": {
     "home": "Home",

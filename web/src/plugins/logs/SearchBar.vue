@@ -473,10 +473,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mr-xs save-transform-btn q-px-sm"
             size="sm"
             icon="save"
-            :title="t('common.save')"
             :disable="searchObj.data.transformType !== 'function'"
             @click="fnSavedFunctionDialog"
-          ></q-btn>
+          >
+            <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
+              {{
+                searchObj.data.transformType === "action"
+                  ? t("search.saveActionDisabled")
+                  : t("common.save")
+              }}
+            </q-tooltip>
+          </q-btn>
         </q-btn-group>
         <q-btn-group
           v-if="config.isEnterprise == 'true'"
