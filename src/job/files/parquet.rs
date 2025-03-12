@@ -15,6 +15,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    fs::remove_file,
     path::Path,
     sync::Arc,
     time::UNIX_EPOCH,
@@ -45,7 +46,7 @@ use config::{
     utils::{
         arrow::record_batches_to_json_rows,
         async_file::get_file_meta,
-        file::scan_files_with_channel,
+        file::{get_file_size, scan_files_with_channel},
         inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
         parquet::{
@@ -86,15 +87,19 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
-static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
-    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    // add the pending delete files to processing list
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    for file in pending_delete_files {
+        PROCESSING_FILES.write().await.insert(file);
+    }
+
+    // start worker threads
     let cfg = get_config();
     let (tx, rx) =
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(cfg.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
-    // move files
     for thread_id in 0..cfg.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
@@ -124,11 +129,73 @@ pub async fn run() -> Result<(), anyhow::Error> {
             cfg.limit.file_push_interval,
         ))
         .await;
+        // check pending delete files
+        if let Err(e) = scan_pending_delete_files().await {
+            log::error!("[INGESTER:JOB] Error scan pending delete files: {}", e);
+        }
+        // scan wal files
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
+    Ok(())
+}
+
+// check if the file is still in pending delete
+async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let files_num = pending_delete_files.len();
+    for file_key in pending_delete_files {
+        if wal::lock_files_exists(&file_key) {
+            continue;
+        }
+        log::warn!(
+            "[INGESTER:JOB] the file was released, delete it: {}",
+            file_key
+        );
+        let file = wal_dir.join(&file_key);
+        let Ok(file_size) = get_file_size(&file) else {
+            continue;
+        };
+        if let Err(e) = remove_file(&file) {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
+                file_key,
+                e
+            );
+        }
+
+        // delete metadata from cache
+        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        // need release the file
+        PROCESSING_FILES.write().await.remove(&file_key);
+        // delete from pending delete list
+        if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove pending delete file: {}, {}",
+                file_key,
+                e
+            );
+        }
+        // deleted successfully then update metrics
+        let (org_id, stream_type, ..) = split_perfix(&file_key);
+        metrics::INGEST_WAL_USED_BYTES
+            .with_label_values(&[&org_id, stream_type.as_str()])
+            .sub(file_size as i64);
+    }
+
+    if files_num > 0 {
+        log::debug!(
+            "[INGESTER:JOB] scan pending delete files total: {}, took: {} ms",
+            files_num,
+            start.elapsed().as_millis()
+        );
+    }
     Ok(())
 }
 
@@ -225,26 +292,6 @@ async fn prepare_files(
         };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
-            // check if the file is still locking
-            if SKIPPED_LOCK_FILES.read().await.contains(&file_key)
-                && !wal::lock_files_exists(&file_key)
-            {
-                log::warn!(
-                    "[INGESTER:JOB] the file was released, delete it: {}",
-                    file_key
-                );
-                if tokio::fs::remove_file(&wal_dir.join(&file_key))
-                    .await
-                    .is_ok()
-                {
-                    // delete metadata from cache
-                    WAL_PARQUET_METADATA.write().await.remove(&file_key);
-                    // need release all the files
-                    PROCESSING_FILES.write().await.remove(&file_key);
-                    // delete from skip list
-                    SKIPPED_LOCK_FILES.write().await.remove(&file_key);
-                }
-            }
             continue;
         }
 
@@ -260,7 +307,7 @@ async fn prepare_files(
                 "[INGESTER:JOB] the file is empty, just delete file: {}",
                 file
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file)) {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
                     file,
@@ -280,13 +327,8 @@ async fn prepare_files(
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(file_key.clone(), parquet_meta, false));
         // mark the file as processing
-        // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
-    // log::debug!(
-    //     "[INGESTER:JOB] move files get partitions: {}",
-    //     partition_files_with_size.len()
-    // );
 
     Ok(partition_files_with_size)
 }
@@ -300,20 +342,9 @@ async fn move_files(
         return Ok(());
     }
 
-    let columns = prefix.split('/').collect::<Vec<&str>>();
-    // removed thread_id from prefix, so there is no thread_id in the path
-    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
-    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
-    // let _ = columns[0].to_string(); // files/
-    let org_id = columns[1].to_string();
-    let stream_type = StreamType::from(columns[2]);
-    let stream_name = columns[3].to_string();
-    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
-
-    // log::debug!("[INGESTER:JOB:{thread_id}] check deletion for partition: {}", prefix);
-
     let cfg = get_config();
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
+    let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
 
     // check if we are allowed to ingest or just delete the file
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
@@ -325,7 +356,7 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -369,7 +400,7 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
-            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+            if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
@@ -402,7 +433,7 @@ async fn move_files(
                     &stream_name,
                     file.key,
                 );
-                if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                         file.key,
@@ -498,7 +529,7 @@ async fn move_files(
         }
 
         // write file list to storage
-        let ret = db::file_list::local::set(&new_file_name, Some(new_file_meta), false).await;
+        let ret = db::file_list::set(&new_file_name, Some(new_file_meta), false).await;
         if let Err(e) = ret {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
@@ -514,59 +545,55 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            let mut need_skip = true;
-            // wait for 5s
-            for _ in 0..50 {
-                if wal::lock_files_exists(&file.key) {
-                    log::warn!(
-                        "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
-                        file.key
-                    );
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                } else {
-                    need_skip = false;
-                    break;
-                }
-            }
-            if need_skip {
+            if wal::lock_files_exists(&file.key) {
                 log::warn!(
-                    "[INGESTER:JOB:{thread_id}] the file is still in use, add it to the skip_list: {}",
+                    "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
                     file.key
                 );
-                SKIPPED_LOCK_FILES.write().await.insert(file.key.clone());
-                continue;
-            }
-
-            let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
-            if let Err(e) = ret {
-                log::error!(
-                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
-                    file.key,
-                    e.to_string()
-                );
-                // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
-                // need release all the files
-                for file in files_with_size.iter() {
-                    PROCESSING_FILES.write().await.remove(&file.key);
+                // add to pending delete list
+                if let Err(e) = db::file_list::local::add_pending_delete(&org_id, &file.key).await {
+                    log::error!(
+                        "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
+                        file.key,
+                        e.to_string()
+                    );
                 }
-                return Ok(());
+            } else {
+                match remove_file(wal_dir.join(&file.key)) {
+                    Err(e) => {
+                        log::warn!(
+                            "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {}, {}",
+                            file.key,
+                            e.to_string()
+                        );
+                        // add to pending delete list
+                        if let Err(e) =
+                            db::file_list::local::add_pending_delete(&org_id, &file.key).await
+                        {
+                            log::error!(
+                                "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {}, {}",
+                                file.key,
+                                e.to_string()
+                            );
+                        }
+                    }
+                    Ok(_) => {
+                        // delete metadata from cache
+                        WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                        // remove the file from processing set
+                        PROCESSING_FILES.write().await.remove(&file.key);
+                        // deleted successfully then update metrics
+                        metrics::INGEST_WAL_USED_BYTES
+                            .with_label_values(&[&org_id, stream_type.as_str()])
+                            .sub(file.meta.compressed_size);
+                    }
+                }
             }
-
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
-
-            // remove the file from processing set
-            // log::debug!("Processing files deleted: {:?}", file.key);
-            PROCESSING_FILES.write().await.remove(&file.key);
 
             // metrics
             metrics::INGEST_WAL_READ_BYTES
                 .with_label_values(&[&org_id, stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
-            metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type.as_str()])
-                .sub(file.meta.compressed_size);
         }
 
         // delete files from file list
@@ -681,6 +708,7 @@ async fn merge_files(
     // use the shared fields to create a new schema and with empty metadata
     let mut fields = shared_fields.into_iter().collect::<Vec<_>>();
     fields.sort_by(|a, b| a.name().cmp(b.name()));
+    fields.dedup_by(|a, b| a.name() == b.name());
     let schema = Arc::new(Schema::new(fields));
     let schema_key = schema.hash_key();
 
@@ -836,6 +864,19 @@ async fn merge_files(
     }
 
     Ok((new_file_key, new_file_meta, retain_file_list))
+}
+
+fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
+    let columns = prefix.split('/').collect::<Vec<&str>>();
+    // removed thread_id from prefix, so there is no thread_id in the path
+    // eg: files/default/logs/olympics/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
+    // let _ = columns[0].to_string(); // files/
+    let org_id = columns[1].to_string();
+    let stream_type = StreamType::from(columns[2]);
+    let stream_name = columns[3].to_string();
+    let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
+    (org_id, stream_type, stream_name, prefix_date)
 }
 
 /// Create an inverted index file for the given file
@@ -1158,9 +1199,9 @@ async fn prepare_index_record_batches(
         Field::new("max_ts", DataType::Int64, true),
         Field::new("field", DataType::Utf8, true),
         Field::new("term", DataType::Utf8, true),
-        Field::new("file_name", DataType::Utf8, false),
-        Field::new("_count", DataType::Int64, false),
-        Field::new("deleted", DataType::Boolean, false),
+        Field::new("file_name", DataType::Utf8, true),
+        Field::new("_count", DataType::Int64, true),
+        Field::new("deleted", DataType::Boolean, true),
         Field::new("segment_ids", DataType::Binary, true), // bitmap
     ]));
 

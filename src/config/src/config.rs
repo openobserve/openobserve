@@ -45,6 +45,11 @@ pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
+// global version variables
+pub static VERSION: &str = env!("GIT_VERSION");
+pub static COMMIT_HASH: &str = env!("GIT_COMMIT_HASH");
+pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
+
 pub const META_ORG_ID: &str = "_meta";
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
@@ -176,6 +181,35 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
         get_config()
             .common
             .bloom_filter_default_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
+});
+
+const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 5] = [
+    "k8s_cluster",
+    "k8s_namespace_name",
+    "k8s_pod_name",
+    "kubernetes_namespace_name",
+    "kubernetes_pod_name",
+];
+pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let mut fields = chain(
+        _DEFAULT_SEARCH_AROUND_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .search_around_default_fields
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
@@ -650,6 +684,14 @@ pub struct Common {
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
+    #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
+    pub parquet_compression: String,
+    #[env_config(
+        name = "ZO_TIMESTAMP_COMPRESSION_DISABLED",
+        default = false,
+        help = "Disable timestamp field compression"
+    )]
+    pub timestamp_compression_disabled: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
@@ -708,6 +750,12 @@ pub struct Common {
         help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
     )]
     pub bloom_filter_ndv_ratio: u64,
+    #[env_config(
+        name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
+        default = "",
+        help = "Comma separated list of fields to use for search around"
+    )]
+    pub search_around_default_fields: String,
     #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
     pub wal_fsync_disabled: bool,
     #[env_config(
@@ -2535,10 +2583,10 @@ fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.health_check.timeout == 0 {
-        cfg.health_check.timeout = 10;
+        cfg.health_check.timeout = 5;
     }
     if cfg.health_check.failed_times == 0 {
-        cfg.health_check.failed_times = 5;
+        cfg.health_check.failed_times = 3;
     }
     Ok(())
 }
@@ -2584,6 +2632,19 @@ fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+#[inline]
+pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
+    match compression.to_lowercase().as_str() {
+        "none" | "uncompressed" => parquet::basic::Compression::UNCOMPRESSED,
+        "snappy" => parquet::basic::Compression::SNAPPY,
+        "gzip" => parquet::basic::Compression::GZIP(Default::default()),
+        "brotli" => parquet::basic::Compression::BROTLI(Default::default()),
+        "lz4" | "lz4_raw" => parquet::basic::Compression::LZ4_RAW,
+        "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
+        _ => parquet::basic::Compression::ZSTD(Default::default()),
+    }
 }
 
 #[cfg(test)]

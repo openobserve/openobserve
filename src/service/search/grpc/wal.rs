@@ -490,11 +490,6 @@ async fn get_file_list_inner(
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
     let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
-    if files.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // lock theses files
     let files = files
         .iter()
         .map(|f| {
@@ -506,6 +501,14 @@ async fn get_file_list_inner(
                 .to_string()
         })
         .collect::<Vec<_>>();
+
+    // filter by pending delete
+    let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    if files.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // lock theses files
     wal::lock_files(&files);
 
     let stream_params = Arc::new(StreamParams::new(

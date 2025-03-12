@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
 use actix_web::web::Query;
 use async_trait::async_trait;
-use config::{TIMESTAMP_COL_NAME, meta::search};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::search};
+use hashbrown::HashMap;
 
 use crate::{
     cli::data::{Context, cli::Cli},
@@ -33,6 +34,7 @@ pub struct Export {}
 #[async_trait]
 impl Context for Export {
     async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
+        let cfg = get_config();
         let map = HashMap::from([("type".to_string(), c.stream_type)]);
         let query_map = Query(map);
         let stream_type = get_stream_type_from_request(&query_map).unwrap_or_default();
@@ -51,7 +53,7 @@ impl Context for Export {
                 table, TIMESTAMP_COL_NAME
             ),
             from: 0,
-            size: 100,
+            size: cfg.limit.query_default_limit,
             quick_mode: false,
             query_type: "".to_owned(),
             start_time: c.start_time,
@@ -74,6 +76,7 @@ impl Context for Export {
             search_type,
             search_event_context,
             use_cache: None,
+            local_mode: None,
         };
 
         match SearchService::search("", &c.org, stream_type, None, &req).await {

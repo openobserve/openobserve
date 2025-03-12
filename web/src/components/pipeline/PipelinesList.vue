@@ -38,9 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           @click="triggerExpand(props)"
         >
-        <q-tooltip position="bottom">
-                <PipelineView :pipeline="props.row" />
-              </q-tooltip>
           <q-td v-if="activeTab == 'scheduled' "  >
             
             <q-btn
@@ -98,6 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.delete')"
               @click.stop="openDeleteDialog(props.row)"
             ></q-btn>
+            <q-btn
+              :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
+              :icon="outlinedVisibility"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('alerts.view')"
+            >
+            <q-tooltip position="bottom">
+              <PipelineView :pipeline="props.row" />
+            </q-tooltip>
+          </q-btn>
           </template>
         </q-td>
 
@@ -224,7 +236,7 @@ import { useQuasar, type QTableProps  } from "quasar";
 import type { QTableColumn } from 'quasar';
 
 import NoData from "../shared/grid/NoData.vue";
-import { outlinedDelete , outlinedPause , outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete , outlinedPause , outlinedPlayArrow, outlinedVisibility } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
