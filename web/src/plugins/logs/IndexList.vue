@@ -971,10 +971,10 @@ export default defineComponent({
                   ) || "",
                 query_fn: query_fn,
                 type: searchObj.data.stream.streamType,
-                regions:
-                  Object.hasOwn(searchObj.meta, "regions") &&
-                  searchObj.meta.regions.length > 0
-                    ? searchObj.meta.regions.join(",")
+                clusters:
+                  Object.hasOwn(searchObj.meta, "clusters") &&
+                  searchObj.meta.clusters.length > 0
+                    ? searchObj.meta.clusters.join(",")
                     : "",
               })
               .then((res: any) => {
