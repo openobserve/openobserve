@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else class="text-center text-h6">Output Messages</div>
               <q-separator class="q-mx-md q-mt-md" />
               <div class="error-report-container">
-                <!-- Alert Errors Section -->
+                <!-- Pipeline Errors Section -->
                 <div class="error-section" v-if="pipelineErrorsToDisplay.length > 0">
                   <div class="error-list">
                     <!-- Iterate through the outer array -->
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
   
                 <div class="error-section" v-if="pipelineCreators.length > 0">
-                  <div class="section-title text-primary" data-test="pipeline-import-creation-title">Alert Creation</div>
+                  <div class="section-title text-primary" data-test="pipeline-import-creation-title">Pipeline Creation</div>
                   <div
                     class="error-list"
                     v-for="(val, index) in pipelineCreators"
@@ -916,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         } catch (e: any) {
           q.notify({
-            message: "Error importing Alert(s) please check the JSON",
+            message: "Error importing Pipeline(s) please check the JSON",
             color: "negative",
             position: "bottom",
             timeout: 2000,
@@ -1020,6 +1020,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if(input.source.stream_type && validStreamTypes.includes(input.source.stream_type)){
           await getSourceStreamsList(input.source.stream_type, -1);
         }
+
         const isValidScheduledPipeline = await validateScheduledPipelineNodes(input, "");
         //5. validate source node sql query
         if(
@@ -1095,7 +1096,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  
             if (node.io_type == "output" && node.data.node_type == "stream") {
               const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
+              await getDestinationStreamsList(node.data.stream_type, -1);
               if(!isValidDestinationStream){
+
               pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
             }
           }
@@ -1167,7 +1170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
           // Success
           pipelineCreators.value.push({
-            message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
+            message: `Pipeline - ${index}: "${input.name}" created successfully \nNote: please remove the created pipeline object ${input.name} from the json file`,
             success: true,
           });
   
@@ -1178,7 +1181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         } catch (error: any) {
           // Failure
           pipelineCreators.value.push({
-            message: `Alert - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+            message: `Pipeline - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
             success: false,
           });
           return false;
