@@ -148,18 +148,17 @@
               </div>
             </div>
             </div>
-            <div v-show="activeTab === 'more_details'">
               <query-editor
+              v-show="activeTab === 'more_details'"
                 style="height: 200px"
-                :ref="`QueryEditorRef${props.row.trace_id + props.row.sql + Math.random(10)}`"
-                :editor-id="`search-query-editor${props.row.trace_id}`"
+                :ref="`QueryEditorRef${props.row.trace_id + props.row.sql}`"
+                :editor-id="`search-query-editor${props.row.trace_id + props.row.sql}`"
                 class="monaco-editor"
                 :debounceTime="600"
                 v-model:query="moreDetailsToDisplay"
                 language="json"
                 read-only
               />
-            </div>
 
           </q-td>
         </q-tr>
@@ -267,7 +266,7 @@
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
       const isDateTimeChanged = ref(false);
-      const moreDetailsToDisplay = ref('hiii');
+      const moreDetailsToDisplay = ref('');
 
       const activeTab = ref('query');
       const tabs = ref([
@@ -545,7 +544,7 @@
 
       const triggerExpand = (props) =>{
         console.log(props, "props")
-        // moreDetailsToDisplay.value[props.row.trace_id] = JSON.stringify(filterRow(props.row), null, 2);
+        moreDetailsToDisplay.value = JSON.stringify(filterRow(props.row), null, 2);
         if (expandedRow.value === convertTraceIdAndSqlToKey(props.row.trace_id, props.row.sql)) {
             expandedRow.value = null;
           } else {
@@ -671,8 +670,8 @@
   </script>
  <style lang="scss" scoped >
 .expanded-content {
-  padding: 0  3rem;
-  min-width: 80vw;
+  padding: 0  0.5rem 0rem 1rem;
+  min-width: calc(95vw - 40px);
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
