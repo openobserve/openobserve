@@ -15,7 +15,7 @@ env:
   ZO_BASE_URL: http://localhost:5080/
   ZO_BASE_URL_SC: http://localhost:5080/
   WS_ZO_BASE_URL: ws://localhost:5080/
-
+  ZO_SMTP_ENABLED: true 
 
 jobs:
   api_integration_tests:
@@ -64,6 +64,8 @@ jobs:
 
       - name: Start OpenObserve
         run: ZO_WEBSOCKET_ENABLED=true target/debug/openobserve &
+        env:
+          ZO_SMTP_ENABLED: true 
 
       - name: Wait for start
         run: sleep 15
