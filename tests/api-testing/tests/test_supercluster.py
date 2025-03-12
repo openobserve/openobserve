@@ -851,8 +851,8 @@ def create_cached_report(session, base_url, org_id, cached_report_name, dashboar
     assert response.status_code == 200, f"Failed to create cached report: {response.content.decode()}"
     return response
 
-def create_user(session, base_url, org_id, email_address):
-    """Create a cached report."""
+def create_user_admin(session, base_url, org_id, email_address):
+    """Create a user as admin."""
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
     payload = {
@@ -870,6 +870,78 @@ def create_user(session, base_url, org_id, email_address):
     assert (
         response.status_code == 200
     ), f"Creating a user 200, but got {response.status_code} {response.content}"
+
+    return response
+
+def create_user_viewer(session, base_url, org_id, email_address):
+    """Create a user as viewer."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "organization": org_id,
+        "email": email_address,
+        "password": "12345678",
+        "first_name": "Shyam",
+        "last_name": "P",
+        "role": "viewer",
+    }   
+
+    response = session.post(f"{base_url}api/{org_id}/users", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create user as viewer: {response.content.decode()}"
+    return response
+
+def create_user_editor(session, base_url, org_id, email_address):
+    """Create a user as editor."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "organization": org_id,
+        "email": email_address,
+        "password": "12345678",
+        "first_name": "Shyam",
+        "last_name": "P",
+        "role": "editor",
+    }   
+
+    response = session.post(f"{base_url}api/{org_id}/users", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create user as editor: {response.content.decode()}"
+    return response
+
+def create_user_user(session, base_url, org_id, email_address):
+    """Create a user as user."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "organization": org_id,
+        "email": email_address,
+        "password": "12345678",
+        "first_name": "Shyam",
+        "last_name": "P",
+        "role": "user",
+    }   
+
+    response = session.post(f"{base_url}api/{org_id}/users", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create user as user: {response.content.decode()}"
+    return response
+
+
+
+def create_service_account(session, base_url, org_id, email_address):
+    """Create a service account."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "email":email_address,
+        "organization":org_id,
+        "first_name":"Shyam",
+        "last_name":"Panjiyar"
+        }
+
+    response = session.post(f"{base_url}api/{org_id}/service_accounts", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
+    return response
+
+
 
 def test_create_workflow(create_session, base_url):
     session = create_session
@@ -942,8 +1014,29 @@ def test_create_workflow(create_session, base_url):
         cached_report_name = f"cached_report_{i + 1}_{random.randint(100000, 999999)}"
         create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
 
-        email_address = f"user_email_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_user(session, base_url, org_id, email_address)
+        email_address_admin = f"user_email_admin_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_user_admin(session, base_url, org_id, email_address_admin)
+
+        email_address_viewer = f"user_email_viewer_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_user_viewer(session, base_url, org_id, email_address_viewer) 
+
+        email_address_editor = f"user_email_editor_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_user_editor(session, base_url, org_id, email_address_editor) 
+
+        email_address_user = f"user_email_user_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_user_user(session, base_url, org_id, email_address_user)
+        
+         
+
+
+
+
+
+        service_account_email = f"service_account_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
+        create_service_account(session, base_url, org_id, service_account_email) 
+
+
+
 
 
 
