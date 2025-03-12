@@ -2377,7 +2377,6 @@ pub fn get_cluster_name() -> String {
     }
 }
 
-
 #[inline]
 pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression {
     match compression.to_lowercase().as_str() {

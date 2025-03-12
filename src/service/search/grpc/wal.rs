@@ -501,7 +501,7 @@ async fn get_file_list_inner(
                 .to_string()
         })
         .collect::<Vec<_>>();
-    
+
     // filter by pending delete
     let files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
