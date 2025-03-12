@@ -31,6 +31,10 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 
 use crate::{common::infra::cluster, service::grpc::get_cached_channel};
 
+/// use queue to batch send broadcast to other nodes
+pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
+    Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
+
 static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 

@@ -156,7 +156,7 @@ impl FileData {
 
     async fn get_size(&self, file: &str) -> Option<usize> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        match get_file_len(&file_path) {
+        match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
         }
@@ -217,7 +217,7 @@ impl FileData {
         loop {
             let item = self.data.remove();
             if item.is_none() {
-                log::error!(
+                log::warn!(
                     "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
                 );
                 break;
@@ -633,7 +633,6 @@ async fn gc() -> Result<(), anyhow::Error> {
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.disk_cache.release_size < r.max_size {
-            drop(r);
             continue;
         }
         drop(r);

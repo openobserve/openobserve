@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{File, Metadata},
+    fs::{metadata, File, Metadata},
     io::{Read, Seek, Write},
     ops::Range,
     path::Path,
@@ -24,14 +24,12 @@ use async_recursion::async_recursion;
 
 #[inline(always)]
 pub fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
-    let file = File::open(path)?;
-    file.metadata()
+    metadata(path)
 }
 
 #[inline(always)]
-pub fn get_file_len(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
-    let file = File::open(path)?;
-    file.metadata().map(|m| m.len())
+pub fn get_file_size(path: impl AsRef<Path>) -> Result<u64, std::io::Error> {
+    metadata(path).map(|f| f.len())
 }
 
 #[inline(always)]

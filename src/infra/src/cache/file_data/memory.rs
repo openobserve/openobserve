@@ -308,7 +308,6 @@ async fn gc() -> Result<(), anyhow::Error> {
     for file in FILES.iter() {
         let r = file.read().await;
         if r.cur_size + cfg.memory_cache.release_size < r.max_size {
-            drop(r);
             continue;
         }
         drop(r);

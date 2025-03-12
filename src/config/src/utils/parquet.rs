@@ -45,7 +45,7 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(get_parquet_compression(&cfg.common.parquet_compression))
         .set_column_dictionary_enabled(
             cfg.common.column_timestamp.as_str().into(),
             false,
@@ -63,6 +63,12 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
+    if cfg.common.timestamp_compression_disabled {
+        writer_props = writer_props.set_column_compression(
+            cfg.common.column_timestamp.as_str().into(),
+            Compression::UNCOMPRESSED,
+        );
+    }
     // Bloom filter stored by row_group, set NDV to reduce the memory usage.
     // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
     // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/

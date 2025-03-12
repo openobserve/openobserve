@@ -527,6 +527,23 @@ SELECT date
             .collect())
     }
 
+    async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
+        let pool = CLIENT_RO.clone();
+        let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
+            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+        )
+        .fetch_all(&pool)
+        .await?;
+        Ok(ret
+            .iter()
+            .map(|r| FileListDeleted {
+                file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                index_file: r.index_file,
+                flattened: r.flattened,
+            })
+            .collect())
+    }
+
     async fn get_min_ts(
         &self,
         org_id: &str,
