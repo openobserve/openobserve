@@ -111,6 +111,12 @@ export default defineComponent({
         
         // Validate the dashboard JSON structure
         validationErrors.value = validateDashboardJson(parsedJson);
+        
+        // Check if dashboardId has been changed
+        if (parsedJson.dashboardId && 
+            parsedJson.dashboardId !== props.dashboardData.dashboardId) {
+          validationErrors.value.push("Dashboard ID cannot be modified");
+        }
       } catch (error) {
         isValidJson.value = false;
         validationErrors.value = ["Invalid JSON format"];
@@ -122,13 +128,6 @@ export default defineComponent({
       
       try {
         const updatedJson = JSON.parse(jsonContent.value);
-        
-        // Preserve original version
-        const originalVersion = props.dashboardData.version;
-        if (updatedJson.version !== originalVersion) {
-          updatedJson.version = originalVersion;
-        }
-        
         // Validate one more time before saving
         const errors = validateDashboardJson(updatedJson);
         
