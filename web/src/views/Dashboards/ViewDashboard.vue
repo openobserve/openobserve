@@ -311,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="right"
         full-height
         maximized
+        :persistent="true"
       >
         <DashboardJsonEditor
           :dashboard-data="currentDashboardData.data"

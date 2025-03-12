@@ -35,7 +35,10 @@
     </q-card-section>
 
     <!-- Display validation errors -->
-    <q-card-section v-if="validationErrors.length > 0" class="q-pa-md text-negative validation-errors">
+    <q-card-section
+      v-if="validationErrors.length > 0"
+      class="q-pa-md text-negative validation-errors"
+    >
       <div class="text-bold q-mb-sm">Please fix the following issues:</div>
       <ul class="q-ml-md">
         <li v-for="(error, index) in validationErrors" :key="index">
@@ -61,7 +64,9 @@
         no-caps
         :label="t('common.save')"
         :loading="saveJsonLoading"
-        :disable="!isValidJson || validationErrors.length > 0 || saveJsonLoading"
+        :disable="
+          !isValidJson || validationErrors.length > 0 || saveJsonLoading
+        "
         @click="saveChanges"
         data-test="json-editor-save"
       />
@@ -90,7 +95,7 @@ export default defineComponent({
     saveJsonDashboard: {
       type: Object,
       required: true,
-    }
+    },
   },
   emits: ["close"],
   setup(props, { emit }) {
@@ -100,22 +105,42 @@ export default defineComponent({
     const isValidJson = ref(true);
     const validationErrors = ref<string[]>([]);
     const queryEditorRef = ref();
-    
+
     // Use the loading state from the parent component
-    const saveJsonLoading = computed(() => props.saveJsonDashboard.isLoading.value);
+    const saveJsonLoading = computed(
+      () => props.saveJsonDashboard.isLoading.value,
+    );
 
     const handleEditorChange = (value: string) => {
       try {
         const parsedJson = JSON.parse(value);
         isValidJson.value = true;
-        
+
         // Validate the dashboard JSON structure
         validationErrors.value = validateDashboardJson(parsedJson);
-        
+
         // Check if dashboardId has been changed
-        if (parsedJson.dashboardId && 
-            parsedJson.dashboardId !== props.dashboardData.dashboardId) {
+        if (
+          parsedJson.dashboardId &&
+          parsedJson.dashboardId !== props.dashboardData.dashboardId
+        ) {
           validationErrors.value.push("Dashboard ID cannot be modified");
+        }
+
+        // Check if owner has been changed
+        if (
+          parsedJson.owner &&
+          parsedJson.owner !== props.dashboardData.owner
+        ) {
+          validationErrors.value.push("Owner cannot be modified");
+        }
+
+        // Check if created has been changed
+        if (
+          parsedJson.created &&
+          parsedJson.created !== props.dashboardData.created
+        ) {
+          validationErrors.value.push("Created cannot be modified");
         }
       } catch (error) {
         isValidJson.value = false;
@@ -125,18 +150,18 @@ export default defineComponent({
 
     const saveChanges = async () => {
       if (!isValidJson.value || saveJsonLoading.value) return;
-      
+
       try {
         const updatedJson = JSON.parse(jsonContent.value);
         // Validate one more time before saving
         const errors = validateDashboardJson(updatedJson);
-        
+
         if (errors.length > 0) {
           // Show validation errors
           validationErrors.value = errors;
           return;
         }
-        
+
         await props.saveJsonDashboard.execute(updatedJson);
       } catch (error) {
         console.error("Failed during JSON save:", error);
