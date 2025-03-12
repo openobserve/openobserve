@@ -84,7 +84,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role, group: O
     };
     let mut h = config::utils::hash::gxhash::new();
     for i in 0..get_config().limit.consistent_hash_vnodes {
-        let key = format!("{}:{}{}", CONSISTENT_HASH_PRIME, node.name, i);
+        let key = format!("{}:{}:{}", CONSISTENT_HASH_PRIME, node.name, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
