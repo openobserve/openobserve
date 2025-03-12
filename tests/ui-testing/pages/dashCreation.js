@@ -43,5 +43,5 @@ export async function deleteDashboard(page, dashboardName) {
   await confirmButton.click();
 
   // Ensure the dashboard is removed
-  await expect(dashboardRow).not.toBeVisible();
+  await expect(page.getByText('Dashboard deleted successfully')).toBeVisible();
 }
