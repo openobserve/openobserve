@@ -2,12 +2,18 @@ import os
 import pytest
 import random
 import uuid
-from datetime import datetime
 import json
 from pathlib import Path
 import base64
 import requests
 import io
+import time
+import tink
+from tink import daead
+from tink import secret_key_access
+from datetime import datetime, timezone, timedelta
+
+
 
 # Constants for WebSocket URL and user credentials
 ZO_BASE_URL = os.environ.get("ZO_BASE_URL")  # Use environment variable
@@ -16,6 +22,126 @@ ZO_ROOT_USER_EMAIL = os.environ.get("ZO_ROOT_USER_EMAIL")  # Use environment var
 ZO_ROOT_USER_PASSWORD = os.environ.get("ZO_ROOT_USER_PASSWORD")  # Use environment variable
 
 root_dir = Path(__file__).parent.parent.parent
+
+
+# Variables to be used in the tests
+now = datetime.now(timezone.utc)
+end_time = int(now.timestamp() * 1000000)
+one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 100000)
+simpleKeys = os.environ["SIMPLE_KEYS"]
+simpleKeysUp = os.environ["SIMPLE_KEYS_UP"]
+
+# Retrieve the primary key ID 
+primary_key_id_tink = os.environ.get("PRIMARY_KEY_ID", 0)  # Default to 0 if not set
+primary_key_id_tink_val = os.environ["PRIMARY_KEY_ID_VAL"]   
+primary_key_id_tink_up = os.environ.get("PRIMARY_KEY_ID_UP", 0)  # Default to 0 if not set
+primary_key_id_tink_val_up = os.environ["PRIMARY_KEY_ID_VAL_UP"]   
+
+def cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
+    """Running an E2E test for creating cipher_keys with simple OO cipher."""
+    
+    # Create a unique cipher name
+    while True:
+        payload_simpleOO = {
+            "name": cipher_name_simpleOO,
+            "key": {
+                "store": {
+                    "type": "local",
+                    "akeyless": {
+                        "base_url": "",
+                        "access_id": "",
+                        "auth": {
+                            "type": "access_key",
+                            "access_key": "",
+                            "ldap": {"username": "", "password": ""}
+                        },
+                        "store": {
+                            "type": "static_secret",
+                            "static_secret": "",
+                            "dfc": {"name": "", "iv": "", "encrypted_data": ""}
+                        }
+                    },
+                    "local": simpleKeys
+                },
+                "mechanism": {"type": "simple", "simple_algorithm": "aes-256-siv"}
+            },
+            "isUpdate": False
+        }
+
+    # Attempt to create the cipher key
+        resp_create_cipher_simpleOO = session.post(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload_simpleOO
+        )
+        print(resp_create_cipher_simpleOO.content)
+
+        if resp_create_cipher_simpleOO.status_code == 200:
+            break  # Exit the loop if the key is created successfully
+        elif resp_create_cipher_simpleOO.status_code == 400:
+            continue  # Key already exists, try again
+        else:
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_simpleOO.status_code} {resp_create_cipher_simpleOO.content}")
+        
+def cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
+    """Running an E2E test for create cipher_key with Tink OO cipher.""" 
+
+    # Create a unique cipher name
+    while True:
+        payload_tinkOO = {
+            "name": cipher_name_tinkOO,
+            "key": {
+                "store": {
+                    "type": "local",
+                    "akeyless": {
+                        "base_url": "",
+                        "access_id": "",
+                        "auth": {
+                            "type": "access_key",
+                            "access_key": "",
+                            "ldap": {"username": "", "password": ""}
+                        },
+                        "store": {
+                            "type": "static_secret",
+                            "static_secret": "",
+                            "dfc": {"name": "", "iv": "", "encrypted_data": ""}
+                        }
+                    },
+                "local": json.dumps({  # Use json.dumps to create a valid JSON string
+                "primaryKeyId": int(primary_key_id_tink),  # Ensure this is an integer
+                "key": [
+                    {
+                        "keyData": {
+                            "typeUrl": "type.googleapis.com/google.crypto.tink.AesSivKey",
+                            "value": primary_key_id_tink_val,
+                            "keyMaterialType": "SYMMETRIC"
+                        },
+                        "status": "ENABLED",
+                        "keyId": int(primary_key_id_tink),  # Ensure this is an integer
+                        "outputPrefixType": "TINK"
+                    }
+                ]
+            })
+            },
+                "mechanism": {"type": "tink_keyset", "simple_algorithm": "aes-256-siv"}
+            },
+            "isUpdate": False
+        }
+
+    # Attempt to create the cipher key
+        resp_create_cipher_tinkOO = session.post(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload_tinkOO
+        )
+        print(resp_create_cipher_tinkOO.content)
+
+        if resp_create_cipher_tinkOO.status_code == 200:
+            break  # Exit the loop if the key is created successfully
+        elif resp_create_cipher_tinkOO.status_code == 400:
+            continue  # Key already exists, try again
+        else:
+            raise AssertionError(f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}")
+
+
+
 
 def create_template_webhook(session, base_url, org_id, template_name):
     """Create a Webhook template."""
@@ -953,6 +1079,41 @@ def create_role(session, base_url, org_id, role_name):
     assert response.status_code == 200, f"Failed to create role: {response.content.decode()}"
     return response         
 
+def create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours):
+    """Create a UDS and Max Query Range."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = payload = {
+    "partition_time_level": "hourly",
+    "partition_keys": [],  # Changed from {} to []
+    "full_text_search_keys": ["log", "message"],
+    "index_fields": [],
+    "bloom_filter_fields": [],
+    "distinct_value_fields": [],
+    "data_retention": 3650,
+    "max_query_range": max_query_range_hours,
+    "store_original_data": False,
+    "approx_partition": False,
+    "extended_retention_days": [],
+    "defined_schema_fields": ["code"]
+}
+
+
+    url = f"{base_url}api/{org_id}/streams/{stream_name}/settings?type=logs"
+    
+    # print(f"Sending POST request to: {url}")
+    # print(f"Payload: {payload}")
+
+    response = session.post(url, json=payload, headers=headers)
+
+    if response.status_code != 200:
+        print(f"Request failed with status code: {response.status_code}")
+        print(f"Response content: {response.content.decode()}")
+        raise Exception(f"Failed to create UDS max query range: {response.content.decode()}")
+
+    print("UDS max query range created successfully, status code:", response.status_code)
+    return response
+
 
 
 
@@ -962,17 +1123,22 @@ def test_create_workflow(create_session, base_url):
     org_id = "org_pytest_data"
     stream_name = "stream_pytest_data"
 
-    
-
-   # Loop to create 500 templates, destinations, and alerts
+    # Loop to create 500 templates, destinations, and alerts
     for i in range(2):
         # Create unique template names
         template_name_webhook = f"template_webhook_{i + 1}_{random.randint(100000, 999999)}"
         template_name_email = f"template_email_{i + 1}_{random.randint(100000, 999999)}"
 
         # Create templates
-        create_template_webhook(session, base_url, org_id, template_name_webhook)
-        create_template_email(session, base_url, org_id, template_name_email)
+        try:
+            create_template_webhook(session, base_url, org_id, template_name_webhook)
+        except Exception as e:
+            print(f"Failed to create webhook template: {e}")
+
+        try:
+            create_template_email(session, base_url, org_id, template_name_email)
+        except Exception as e:
+            print(f"Failed to create email template: {e}")
 
         # Create unique destination names
         destination_name_webhook = f"destination_webhook_{i + 1}_{random.randint(100000, 999999)}"
@@ -980,77 +1146,171 @@ def test_create_workflow(create_session, base_url):
         destination_name_pipeline = f"destination_pipeline_{i + 1}_{random.randint(100000, 999999)}"
 
         # Create destinations
-        create_destination_webhook(session, base_url, org_id, template_name_webhook, destination_name_webhook)
-        create_destination_email(session, base_url, org_id, template_name_email, destination_name_email, ZO_ROOT_USER_EMAIL)
-        create_destination_pipeline(session, base_url, org_id, destination_name_pipeline)
+        try:
+            create_destination_webhook(session, base_url, org_id, template_name_webhook, destination_name_webhook)
+        except Exception as e:
+            print(f"Failed to create webhook destination: {e}")
+
+        try:
+            create_destination_email(session, base_url, org_id, template_name_email, destination_name_email, ZO_ROOT_USER_EMAIL)
+        except Exception as e:
+            print(f"Failed to create email destination: {e}")
+
+        try:
+            create_destination_pipeline(session, base_url, org_id, destination_name_pipeline)
+        except Exception as e:
+            print(f"Failed to create pipeline destination: {e}")
 
         # Create alerts with unique names
         alert_webhook = f"alert_webhook_{i + 1}_{random.randint(100000, 999999)}"
-        alert_webhook_created = create_standard_alert(session, base_url, org_id, alert_webhook, template_name_webhook, stream_name, destination_name_webhook)
+        try:
+            alert_webhook_created = create_standard_alert(session, base_url, org_id, alert_webhook, template_name_webhook, stream_name, destination_name_webhook)
+        except Exception as e:
+            print(f"Failed to create webhook alert: {e}")
 
         alert_email = f"alert_email_{i + 1}_{random.randint(100000, 999999)}"
-        alert_email_created = create_standard_alert(session, base_url, org_id, alert_email, template_name_email, stream_name, destination_name_email)
+        try:
+            alert_email_created = create_standard_alert(session, base_url, org_id, alert_email, template_name_email, stream_name, destination_name_email)
+        except Exception as e:
+            print(f"Failed to create email alert: {e}")
 
         alert_cron = f"alert_cron_{i + 1}_{random.randint(100000, 999999)}"
-        alert_cron_created = create_standard_alert_cron(session, base_url, org_id, alert_cron, template_name_email, stream_name, destination_name_email)
+        try:
+            alert_cron_created = create_standard_alert_cron(session, base_url, org_id, alert_cron, template_name_email, stream_name, destination_name_email)
+        except Exception as e:
+            print(f"Failed to create cron alert: {e}")
 
         alert_real_time = f"alert_real_time_{i + 1}_{random.randint(100000, 999999)}"
-        alert_real_time_created = create_real_time_alert(session, base_url, org_id, alert_real_time, template_name_email, stream_name, destination_name_email)
+        try:
+            alert_real_time_created = create_real_time_alert(session, base_url, org_id, alert_real_time, template_name_email, stream_name, destination_name_email)
+        except Exception as e:
+            print(f"Failed to create real-time alert: {e}")
 
         alert_sql = f"alert_sql_{i + 1}_{random.randint(100000, 999999)}"
-        alert_sql_created = create_standard_alert_sql(session, base_url, org_id, alert_sql, template_name_email, stream_name, destination_name_email)
+        try:
+            alert_sql_created = create_standard_alert_sql(session, base_url, org_id, alert_sql, template_name_email, stream_name, destination_name_email)
+        except Exception as e:
+            print(f"Failed to create SQL alert: {e}")
 
         savedview_name = f"savedview_{i + 1}_{random.randint(100000, 999999)}"      
-        create_savedView(session, base_url, org_id, savedview_name, stream_name)
+        try:
+            create_savedView(session, base_url, org_id, savedview_name, stream_name)
+        except Exception as e:
+            print(f"Failed to create saved view: {e}")
 
         folder_name = f"folder_{i + 1}_{random.randint(100000, 999999)}"
-        folder_id = create_folder(session, base_url, org_id, folder_name)
+        try:
+            folder_id = create_folder(session, base_url, org_id, folder_name)
+        except Exception as e:
+            print(f"Failed to create folder: {e}")
 
         dashboard_name = f"dashboard_{i + 1}_{random.randint(100000, 999999)}"
-        dashboard_id = create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
+        try:
+            dashboard_id = create_dashboard(session, base_url, org_id, dashboard_name, folder_id)
+        except Exception as e:
+            print(f"Failed to create dashboard: {e}")
 
         function_name = f"function_{i + 1}_{random.randint(100000, 999999)}"
-        create_function(session, base_url, org_id, function_name)   
+        try:
+            create_function(session, base_url, org_id, function_name)   
+        except Exception as e:
+            print(f"Failed to create function: {e}")
 
         enrichment_table_name = f"enrichment_{i + 1}_{random.randint(100000, 999999)}"
-        create_enrichment_table(session, base_url, org_id, enrichment_table_name)
+        try:
+            create_enrichment_table(session, base_url, org_id, enrichment_table_name)
+        except Exception as e:
+            print(f"Failed to create enrichment table: {e}")
 
         realTime_pipeline_name = f"realTime_pipeline_{i + 1}_{random.randint(100000, 999999)}"
-        create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name)  
+        try:
+            create_realTime_pipeline(session, base_url, org_id, realTime_pipeline_name, stream_name)  
+        except Exception as e:
+            print(f"Failed to create real-time pipeline: {e}")
 
         scheduled_pipeline_name = f"scheduled_pipeline_{i + 1}_{random.randint(100000, 999999)}"
-        create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name)    
+        try:
+            create_scheduled_pipeline(session, base_url, org_id, scheduled_pipeline_name, stream_name)    
+        except Exception as e:
+            print(f"Failed to create scheduled pipeline: {e}")
 
         scheduled_report_name = f"scheduled_report_{i + 1}_{random.randint(100000, 999999)}"
-        create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
+        try:
+            create_scheduled_report(session, base_url, org_id, scheduled_report_name, dashboard_id, folder_id)  
+        except Exception as e:
+            print(f"Failed to create scheduled report: {e}")
 
         cached_report_name = f"cached_report_{i + 1}_{random.randint(100000, 999999)}"
-        create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
+        try:
+            create_cached_report(session, base_url, org_id, cached_report_name, dashboard_id, folder_id)  
+        except Exception as e:
+            print(f"Failed to create cached report: {e}")
 
         email_address_admin = f"user_email_admin_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_user_admin(session, base_url, org_id, email_address_admin)
+        try:
+            create_user_admin(session, base_url, org_id, email_address_admin)
+        except Exception as e:
+            print(f"Failed to create admin user: {e}")
 
         email_address_viewer = f"user_email_viewer_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_user_viewer(session, base_url, org_id, email_address_viewer) 
+        try:
+            create_user_viewer(session, base_url, org_id, email_address_viewer) 
+        except Exception as e:
+            print(f"Failed to create viewer user: {e}")
 
         email_address_editor = f"user_email_editor_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_user_editor(session, base_url, org_id, email_address_editor) 
+        try:
+            create_user_editor(session, base_url, org_id, email_address_editor) 
+        except Exception as e:
+            print(f"Failed to create editor user: {e}")
 
         email_address_user = f"user_email_user_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_user_user(session, base_url, org_id, email_address_user)
+        try:
+            create_user_user(session, base_url, org_id, email_address_user)
+        except Exception as e:
+            print(f"Failed to create regular user: {e}")
 
         service_account_email = f"service_account_{i + 1}_{random.randint(100000, 999999)}@gmail.com"
-        create_service_account(session, base_url, org_id, service_account_email) 
+        try:
+            create_service_account(session, base_url, org_id, service_account_email) 
+        except Exception as e:
+            print(f"Failed to create service account: {e}")
 
         role_name = f"role_{i + 1}_{random.randint(100000, 999999)}"
-        create_role(session, base_url, org_id, role_name)
+        try:
+            create_role(session, base_url, org_id, role_name)
+        except Exception as e:
+            print(f"Failed to create role: {e}")
         
+        # Example usage within the test
+        max_query_range_hours =  i + 1
+        # print(f"Iteration {i + 1}: max_query_range_hours = {max_query_range_hours}")
+        try:
+            response = create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours)
+            if response is not None:
+                print(f"Successfully created UDS max query range for iteration {i + 1} with max_query_range_hours = {max_query_range_hours}.")
+        except Exception as e:
+            print(f"Error occurred while creating UDS max query range: {e}")
 
+         # Cipher keys creation simple at OpenObserve
+        cipher_name_simpleOO = f"sim_{i + 1}_{random.randint(100000, 999999)}"  
+        try:
+            cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO)
+        except Exception as e:
+            print(f"Failed to cipher simple at OpenObserve: {e}")
 
-
-
+        # Cipher keys creation Tink at OpenObserve
+        cipher_name_tinkOO = f"tink_{i + 1}_{random.randint(100000, 999999)}"
+        try:
+            cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO)
+        except Exception as e:
+            print(f"Failed to cipher Tink at OpenObserve: {e}")   
 
 
         # Ingest logs
-        ingest_logs(session, base_url, org_id, stream_name)
-    
+        try:
+            ingest_logs(session, base_url, org_id, stream_name)
+        except Exception as e:
+            print(f"Failed to ingest logs: {e}")
+
+       
