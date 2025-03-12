@@ -1035,8 +1035,6 @@ import jstransform from "@/services/jstransform";
               pipelineErrors.push({ message: `Pipeline - ${index}: Destination Stream type is required`, field: "destination_stream_type" });
             }
           });
-          console.log(pipelineErrors,'validationPromises')
-
           // Wait for all validation to complete
           await Promise.all(validationPromises);
         }
@@ -1081,31 +1079,12 @@ import jstransform from "@/services/jstransform";
       };
 
       const validateRemoteDestination = (input: any) => {
-
-
-
         return !input.nodes.some((node: any) => {
           return node.io_type == "output" && 
                 node.data.node_type == "remote_stream" && 
                 !pipelineDestinations.value.includes(node.data.destination_name);
         });
       }
-
-  
-      const checkDestinationInList = (
-        destinations: any,
-        destinationName: any,
-      ) => {
-        const destinationsList = destinations.map(
-          (destination: any) => destination.name,
-        );
-        return destinationsList.includes(destinationName);
-      };
-  
-      const checkAlertsInList = (alerts: any, alertName: any) => {
-        const alertsList = alerts.map((alert: any) => alert.name);
-        return alertsList.includes(alertName);
-      };
   
       const createPipeline = async (input: any, index: any) => {
         try {
@@ -1244,10 +1223,10 @@ import jstransform from "@/services/jstransform";
         updateUserSelectedDestinations(destinations, index);
       };
   
-        const updateTimezone = (timezone: string, index: number) => {
-          jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
-          jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-        };
+      const updateTimezone = (timezone: string, index: number) => {
+        jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
+        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      };
   
       const timezoneFilterFn = (val: string, update: Function) => {
         if (val === '') {
