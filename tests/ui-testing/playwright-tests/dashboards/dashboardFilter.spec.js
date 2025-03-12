@@ -504,7 +504,11 @@ test.describe("dashboard filter testcases", () => {
     await page
     .locator('[data-test="dashboard-variable-query-value-selector"]')
     .fill("ziox");
-  await page.getByRole("option", { name: "ziox" }).click();
+  const zioxOption = page.getByRole('option', { name: 'ziox' });
+
+await expect(zioxOption).toBeVisible();
+await zioxOption.click();
+  
 
     await page.locator('[data-test="dashboard-add-condition-add"]').click();
 
@@ -556,7 +560,7 @@ test.describe("dashboard filter testcases", () => {
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().fill('kubernetes_container_image');
       
       await page
-      .getByRole("option", { name: "kubernetes_container_image" })
+      .getByRole("option", { name: "kubernetes_container_image" }).first()
       .click();
     // await page
     //   .locator('[data-test="dashboard-add-condition-condition-0"]')
