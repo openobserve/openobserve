@@ -715,48 +715,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
-                    <div
-                      style="width: 100%"
-                      class="tw-flex tw-space-x-2 tw-mb-2"
-                      v-if="dashboardPanelData.data.type !== 'heatmap'"
-                    >
-                      <q-select
+                    <div style="width: 100%" class="tw-mb-2">
+                      <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+                      <q-btn
                         dense
-                        filled
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].havingConditions[0].operator
-                        "
-                        :options="operators"
-                        style="width: 35%"
-                      >
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            size="small"
-                            @click.stop.prevent="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.y[index].havingConditions[0].operator =
-                                null
-                            "
-                            class="cursor-pointer"
-                          />
-                        </template>
-                      </q-select>
-                      <q-input
-                        dense
-                        filled
-                        v-model.number="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].havingConditions[0].value
-                        "
-                        style="width: 65%"
-                        type="number"
-                        placeholder="Value"
+                        outline
+                        color="primary"
+                        icon="add"
+                        label="Add"
+                        @click="toggleHavingFilter(index)"
+                        v-if="!isHavingFilterVisible(index)"
                       />
+
+                      <div
+                        class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                        v-if="
+                          isHavingFilterVisible(index) &&
+                          dashboardPanelData.data.type !== 'heatmap'
+                        "
+                      >
+                        <q-select
+                          dense
+                          filled
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].havingConditions[0].operator
+                          "
+                          :options="operators"
+                          style="width: 30%"
+                        >
+                        </q-select>
+
+                        <q-input
+                          dense
+                          filled
+                          v-model.number="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.y[index].havingConditions[0].value
+                          "
+                          style="width: 50%"
+                          type="number"
+                          placeholder="Value"
+                        />
+
+                        <q-btn
+                          dense
+                          flat
+                          icon="close"
+                          @click="cancelHavingFilter(index)"
+                        />
+                      </div>
                     </div>
                     <div
                       v-if="
@@ -1153,8 +1164,6 @@ export default defineComponent({
       { label: t("dashboard.histogram"), value: "histogram" },
     ];
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
     // v-model for histogram interval
     // if no args object in the field, set it with object with interval = null
     const getHistoramIntervalField = (field: any) => {
@@ -1539,6 +1548,57 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
+    const operators = ["=", "<>", ">=", "<=", ">", "<"];
+
+    const havingFilterVisibility: any = ref({});
+
+    const isHavingFilterVisible = (index: any) => {
+      if (havingFilterVisibility.value[index] === true) {
+        return true;
+      }
+
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index];
+
+      return (
+        currentField.havingConditions &&
+        currentField.havingConditions.length > 0 &&
+        (currentField.havingConditions[0].operator !== null ||
+          currentField.havingConditions[0].value !== null)
+      );
+    };
+
+    const toggleHavingFilter = (index: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index];
+
+      if (
+        !currentField.havingConditions ||
+        !currentField.havingConditions.length
+      ) {
+        currentField.havingConditions = [
+          {
+            operator: null,
+            value: null,
+          },
+        ];
+      }
+
+      havingFilterVisibility.value[index] = true;
+    };
+
+    const cancelHavingFilter = (index: any) => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.y[index];
+
+      currentField.havingConditions = [];
+
+      havingFilterVisibility.value[index] = false;
+    };
+
     return {
       showXAxis,
       t,
@@ -1588,6 +1648,9 @@ export default defineComponent({
       getHistoramIntervalField,
       onDragEnd,
       operators,
+      isHavingFilterVisible,
+      toggleHavingFilter,
+      cancelHavingFilter,
     };
   },
 });
