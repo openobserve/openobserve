@@ -169,7 +169,7 @@ pub struct AxisItem {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct HavingConditions {
-    value: Option<String>,
+    value: Option<OrdF64>,
     operator: Option<String>,
 }
 
