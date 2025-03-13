@@ -128,6 +128,7 @@
     "shareLink": "Share Link",
     "downloadTableCsv": "Download Table (CSV)",
     "downloadTableJson": "Download Table (JSON)",
+    "downloadType": "Download Type",
     "customRange": "Custom Range",
     "initialNumber": "Initial Number",
     "range": "No of Records",

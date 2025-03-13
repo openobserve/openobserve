@@ -811,12 +811,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('search.range')"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-pt-sm showLabelOnTop"
             stack-label
             outlined
             filled
             dense
           />
+          <div class="q-mr-md font-bold mb-2 q-pt-sm" style="font-weight: bold;" :style="{ color: store.state.theme == 'dark' ? '#BABABA' : '#666666'}">{{ t('search.downloadType') }}</div>
+          <q-btn-toggle
+            v-model="customDownloadType"
+            :options="customDownloadTypeOptions"
+            class="flex justify-end w-full"
+          />
+
+           
+          
         </q-card-section>
 
         <q-card-actions align="right">
@@ -1279,7 +1288,11 @@ export default defineComponent({
         .then((res) => {
           this.customDownloadDialog = false;
           if (res.data.hits.length > 0) {
-            this.downloadLogs(res.data.hits);
+            if(this.customDownloadType == 'csv'){
+              this.downloadLogs(res.data.hits);
+            }else{
+              this.downloadLogsJson(res.data.hits);
+            }
           } else {
             this.$q.notify({
               message: "No data found to download.",
@@ -1410,6 +1423,12 @@ export default defineComponent({
     });
     const confirmUpdate = ref(false);
     const updateViewObj = ref({});
+    const customDownloadType = ref("csv");
+
+    const customDownloadTypeOptions = ref([
+      {label: 'CSV', value: 'csv'},
+      {label: 'JSON', value: 'json'}
+    ])
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -3224,6 +3243,8 @@ export default defineComponent({
       checkQuery,
       checkFnQuery,
       downloadLogsJson,
+      customDownloadTypeOptions,
+      customDownloadType,
     };
   },
   computed: {
