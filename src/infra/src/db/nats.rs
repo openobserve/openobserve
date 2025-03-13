@@ -404,7 +404,7 @@ impl super::Db for NatsDb {
             .filter(|key| {
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();
@@ -420,7 +420,7 @@ impl super::Db for NatsDb {
                 let encoded_key = key_encode(&key);
                 let start_dt = key
                     .split('/')
-                    .last()
+                    .next_back()
                     .unwrap()
                     .parse::<i64>()
                     .unwrap_or_default();
