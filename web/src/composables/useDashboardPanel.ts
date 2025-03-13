@@ -2357,7 +2357,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         const columnName = field.alias;
         havingClauses.push(
-          `"${columnName}" ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+          `${columnName} ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
         );
       }
     });
@@ -2471,7 +2471,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ) {
       const columnName = valueForMapsFields.alias;
       havingClauses.push(
-        `"${columnName}" ${valueForMapsFields.havingConditions[0].operator} ${valueForMapsFields.havingConditions[0].value}`,
+        `${columnName} ${valueForMapsFields.havingConditions[0].operator} ${valueForMapsFields.havingConditions[0].value}`,
       );
     }
 
@@ -2589,7 +2589,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ) {
       const columnName = weightFields.alias;
       havingClauses.push(
-        `"${columnName}" ${weightFields.havingConditions[0].operator} ${weightFields.havingConditions[0].value}`,
+        `${columnName} ${weightFields.havingConditions[0].operator} ${weightFields.havingConditions[0].value}`,
       );
     }
 
@@ -2716,7 +2716,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     ) {
       const columnName = valueFields.alias;
       havingClauses.push(
-        `"${columnName}" ${valueFields.havingConditions[0].operator} ${valueFields.havingConditions[0].value}`,
+        `${columnName} ${valueFields.havingConditions[0].operator} ${valueFields.havingConditions[0].value}`,
       );
     }
 
