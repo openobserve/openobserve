@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.source.column,
-              'source'
+              'source',
             )
           "
         >
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.target.column,
-              'target'
+              'target',
             )
           "
         >
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.value.column,
-              'value'
+              'value',
             )
           "
         >
@@ -413,6 +413,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val: any) => val > 0 || 'Required']"
                   />
+                  <div style="width: 100%" class="tw-flex tw-space-x-2 tw-mb-2">
+                    <q-select
+                      dense
+                      filled
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.value.havingConditions[0].operator
+                      "
+                      :options="operators"
+                      style="width: 35%"
+                    >
+                      <template v-slot:append>
+                        <q-icon
+                          name="close"
+                          size="small"
+                          @click.stop.prevent="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.value.havingConditions[0].operator = null
+                          "
+                          class="cursor-pointer"
+                        />
+                      </template>
+                    </q-select>
+                    <q-input
+                      dense
+                      filled
+                      v-model.number="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.value.havingConditions[0].value
+                      "
+                      style="width: 65%"
+                      type="number"
+                      placeholder="Value"
+                    />
+                  </div>
                   <div
                     v-if="
                       !dashboardPanelData.data.queries[
@@ -498,8 +536,11 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
+
+    const operators = ["=", "<>", ">=", "<=", ">", "<"];
+
     const {
       dashboardPanelData,
       addSource,
@@ -547,7 +588,7 @@ export default defineComponent({
           expansionItems.value = true;
           expansionItems.filter = true;
         }
-      }
+      },
     );
 
     const onDrop = (e: any, targetAxis: string) => {
@@ -580,11 +621,11 @@ export default defineComponent({
 
         const dragName =
           selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement
+            (item: any) => item?.name === dragElement,
           );
         const customDragName =
           dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement
+            (item: any) => item?.name === dragElement,
           );
 
         if (dragName || customDragName) {
@@ -723,6 +764,7 @@ export default defineComponent({
       promqlMode,
       valueLabel,
       onFieldDragStart,
+      operators,
       options: [
         "=",
         "<>",
