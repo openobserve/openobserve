@@ -1645,35 +1645,113 @@ export default defineComponent({
       } else {
         // For non-table charts
         try {
-          // Get the first dataset since that contains our chart data
-          const chartData = data?.value?.[0];
-          if (!chartData || chartData?.length === 0) {
+          // Check if data exists
+          if (!data?.value || data?.value?.length === 0) {
             showErrorNotification("No data available to download");
             return;
           }
 
-          // Collect all possible keys from all objects
-          const allKeys = new Set();
-          chartData?.forEach((row: any) => {
-            Object.keys(row).forEach((key) => allKeys.add(key));
-          });
+          let csvContent;
 
-          // Convert Set to Array and sort for consistent order
-          const headers = Array.from(allKeys).sort();
+          // Check if this is a PromQL query type panel
+          if (panelSchema.value.queryType === "promql") {
+            // Handle PromQL data format
+            const flattenedData: any[] = [];
 
-          // Create CSV content with headers and data rows
-          const content = [
-            headers?.join(","), // Headers row
-            ...chartData?.map((row: any) =>
-              headers
-                ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
-                .join(","),
-            ),
-          ].join("\r\n");
+            // Iterate through each response item (multiple queries can produce multiple responses)
+            data?.value?.forEach((promData: any, queryIndex: number) => {
+              if (!promData?.result || !Array.isArray(promData.result)) return;
+
+              // Iterate through each result (time series)
+              promData.result.forEach((series: any, seriesIndex: number) => {
+                const metricLabels = series.metric || {};
+
+                // Iterate through values array (timestamp, value pairs)
+                series.values.forEach((point: any) => {
+                  const timestamp = point[0];
+                  const value = point[1];
+
+                  // Create a row with timestamp, value, and all metric labels
+                  const row = {
+                    timestamp: timestamp,
+                    value: value,
+                    ...metricLabels,
+                  };
+
+                  flattenedData.push(row);
+                });
+              });
+            });
+
+            // Get all unique keys across all data points
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and ensure timestamp and value come first
+            const keys = Array.from(allKeys);
+            keys.sort((a: any, b: any) => {
+              if (a === "timestamp") return -1;
+              if (b === "timestamp") return 1;
+              if (a === "value") return -1;
+              if (b === "value") return 1;
+              return a.localeCompare(b);
+            });
+
+            // Create CSV content
+            csvContent = [
+              keys.join(","), // Headers row
+              ...flattenedData.map((row: any) =>
+                keys.map((key: any) => wrapCsvValue(row[key] ?? "")).join(","),
+              ),
+            ].join("\r\n");
+          } else {
+            // Handle standard SQL format - now supporting multiple arrays
+            const flattenedData: any[] = [];
+
+            // Iterate through all datasets/arrays in the response
+            data?.value?.forEach((dataset: any, datasetIndex: number) => {
+              // Skip if dataset is empty or not an array
+              if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
+                return;
+
+              dataset.forEach((row: any) => {
+                flattenedData.push({
+                  ...row,
+                });
+              });
+            });
+
+            // If after flattening we have no data, show notification and return
+            if (flattenedData.length === 0) {
+              showErrorNotification("No data available to download");
+              return;
+            }
+
+            // Collect all possible keys from all objects
+            const allKeys = new Set();
+            flattenedData.forEach((row: any) => {
+              Object.keys(row).forEach((key: any) => allKeys.add(key));
+            });
+
+            // Convert Set to Array and sort for consistent order
+            const headers = Array.from(allKeys).sort();
+
+            // Create CSV content with headers and data rows
+            csvContent = [
+              headers?.join(","), // Headers row
+              ...flattenedData?.map((row: any) =>
+                headers
+                  ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                  .join(","),
+              ),
+            ].join("\r\n");
+          }
 
           const status = exportFile(
             (title ?? "chart-export") + ".csv",
-            content,
+            csvContent,
             "text/csv",
           );
 
@@ -1718,11 +1796,12 @@ export default defineComponent({
           // Handle non-table charts
           const chartData = data.value;
 
-          if (!chartData || !chartData?.[0]?.length) {
+          if (!chartData || !chartData.length) {
             showErrorNotification("No data available to download");
             return;
           }
 
+          // Export the data as JSON
           const content = JSON.stringify(chartData, null, 2);
 
           const status = exportFile(
