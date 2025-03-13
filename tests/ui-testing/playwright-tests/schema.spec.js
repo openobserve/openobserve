@@ -102,6 +102,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
@@ -141,6 +142,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-schemaFields"]').click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
@@ -189,6 +191,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill(streamName);
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').click();
@@ -200,6 +203,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
