@@ -239,8 +239,6 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForTimeout(3000);
     await page.locator('[data-test="dashboard-settings-close-btn"]').click();
 
-    // await page.locator('[data-test="dashboard-settings-close-btn"]').waitFor({ state: 'visible' }).click();
-
     const button = page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
     );
@@ -248,8 +246,6 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(1000);
     await button.click();
-
-    // await page.waitForTimeout(2000);
 
     await page
       .locator('[data-test="index-dropdown-stream"]')
@@ -559,12 +555,15 @@ await zioxOption.click();
 
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().fill('kubernetes_container_image');
       
-      await page
-      .getByRole("option", { name: "kubernetes_container_image" }).first()
-      .click();
-    // await page
-    //   .locator('[data-test="dashboard-add-condition-condition-0"]')
-    //   .click();
+      // await page
+      // .getByRole("option", { name: "kubernetes_container_image" }).first()
+      // .click();
+
+      const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
+
+      await option.waitFor({ state: "visible", timeout: 10000 });
+      
+      await option.click();
 
     await page
   .locator('[data-test="dashboard-add-condition-condition-0"]')
@@ -1173,4 +1172,6 @@ await zioxOption.click();
 
       await deleteDashboard(page, randomDashboardName);
   });
-});
+
+
+  });
