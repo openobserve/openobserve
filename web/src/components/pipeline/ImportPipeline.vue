@@ -1094,14 +1094,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if (input.source.source_type == 'scheduled' || input.source.source_type == 'realtime') {
           const validationPromises = input.nodes.map(async (node: any) => {
  
-            if (node.io_type == "output" && node.data.node_type == "stream") {
-              const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
-              await getDestinationStreamsList(node.data.stream_type, -1);
-              if(!isValidDestinationStream){
+          //   if (node.io_type == "output" && node.data.node_type == "stream") {
+          //     const isValidDestinationStream = await validateDestinationStream(node.data.stream_type, node.data.stream_name);
+          //     await getDestinationStreamsList(node.data.stream_type, -1);
+          //     if(!isValidDestinationStream){
 
-              pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
-            }
-          }
+          //     pipelineErrors.push({ message: `Pipeline - ${index}: Destination stream name is required`, field: "destination_stream_name" });
+          //   }
+          // }
           const validDestinationStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 
             if (node.io_type == "output" && node.data.node_type == "stream" && !validDestinationStreamTypes.includes(node.data.stream_type)){
