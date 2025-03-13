@@ -413,43 +413,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :rules="[(val: any) => val > 0 || 'Required']"
                   />
-                  <div style="width: 100%" class="tw-flex tw-space-x-2 tw-mb-2">
-                    <q-select
+                  <div style="width: 100%" class="tw-mb-2">
+                    <span class="tw-block tw-mb-1 tw-font-bold">Having</span>
+
+                    <q-btn
                       dense
-                      filled
-                      v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value.havingConditions[0].operator
-                      "
-                      :options="operators"
-                      style="width: 35%"
-                    >
-                      <template v-slot:append>
-                        <q-icon
-                          name="close"
-                          size="small"
-                          @click.stop.prevent="
-                            dashboardPanelData.data.queries[
-                              dashboardPanelData.layout.currentQueryIndex
-                            ].fields.value.havingConditions[0].operator = null
-                          "
-                          class="cursor-pointer"
-                        />
-                      </template>
-                    </q-select>
-                    <q-input
-                      dense
-                      filled
-                      v-model.number="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value.havingConditions[0].value
-                      "
-                      style="width: 65%"
-                      type="number"
-                      placeholder="Value"
+                      outline
+                      color="primary"
+                      icon="add"
+                      label="Add"
+                      @click="toggleHavingFilter"
+                      v-if="!isHavingFilterVisible()"
                     />
+
+                    <div
+                      class="tw-flex tw-space-x-2 tw-mt-2 tw-items-center"
+                      v-if="isHavingFilterVisible()"
+                    >
+                      <q-select
+                        dense
+                        filled
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.value.havingConditions[0].operator
+                        "
+                        :options="operators"
+                        style="width: 30%"
+                      >
+                      </q-select>
+
+                      <q-input
+                        dense
+                        filled
+                        v-model.number="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.value.havingConditions[0].value
+                        "
+                        style="width: 50%"
+                        type="number"
+                        placeholder="Value"
+                      />
+
+                      <q-btn
+                        dense
+                        flat
+                        icon="close"
+                        @click="cancelHavingFilter"
+                      />
+                    </div>
                   </div>
                   <div
                     v-if="
@@ -538,8 +551,6 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
     const {
       dashboardPanelData,
@@ -741,6 +752,57 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
+    const operators = ["=", "<>", ">=", "<=", ">", "<"];
+
+    const havingFilterVisibility: any = ref({});
+
+    const isHavingFilterVisible = () => {
+      if (havingFilterVisibility.value === true) {
+        return true;
+      }
+
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.value;
+
+      return (
+        currentField.havingConditions &&
+        currentField.havingConditions.length > 0 &&
+        (currentField.havingConditions[0].operator !== null ||
+          currentField.havingConditions[0].value !== null)
+      );
+    };
+
+    const toggleHavingFilter = () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.value;
+
+      if (
+        !currentField.havingConditions ||
+        !currentField.havingConditions.length
+      ) {
+        currentField.havingConditions = [
+          {
+            operator: null,
+            value: null,
+          },
+        ];
+      }
+
+      havingFilterVisibility.value = true;
+    };
+
+    const cancelHavingFilter = () => {
+      const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+      const currentField =
+        dashboardPanelData.data.queries[currentQueryIndex].fields.value;
+
+      currentField.havingConditions = [];
+
+      havingFilterVisibility.value = false;
+    };
+
     return {
       t,
       dashboardPanelData,
@@ -765,6 +827,9 @@ export default defineComponent({
       valueLabel,
       onFieldDragStart,
       operators,
+      isHavingFilterVisible,
+      toggleHavingFilter,
+      cancelHavingFilter,
       options: [
         "=",
         "<>",
