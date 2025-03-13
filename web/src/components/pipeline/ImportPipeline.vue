@@ -588,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const alertDestinations = ref<any>([]);
       const userSelectedSqlQuery = ref<string[]>([]);
       const userSelectedFunctionName = ref<string[]>([]);
+      const scheduledPipelines = ref<any>([]);
       const getFormattedDestinations: any = computed(() => {
         return props.destinations.map((destination: any) => {
           return destination.name;
@@ -778,6 +779,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         await getFunctions();
         await getAlertDestinations();
         await getPipelineDestinations();
+        await getScheduledPipelines();
       });
 
       const getFunctions = async () => {
@@ -960,6 +962,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if(!input.name.trim() || input.name.trim() === ""){
           pipelineErrors.push({ message: `Pipeline - ${index}: Name is required`, field: "pipeline_name" });
         }
+        if(scheduledPipelines.value.includes(input.name)){
+          pipelineErrors.push({ message: `Pipeline - ${index}: Name is already taken for scheduled pipelines`, field: "pipeline_name" });
+        }
         //2. validate source stream type it should be one of the valid stream types
         const validStreamTypes = ["logs", "metrics", "traces"];
           if (!input.source.stream_type || !validStreamTypes.includes(input.source.stream_type) || !validStreamTypes.includes(input.stream_type)) {
@@ -1135,6 +1140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
           // Emit update after each successful creation
           emit("update:pipelines");
+          await getScheduledPipelines();
           
           return true;
         } catch (error: any) {
@@ -1291,7 +1297,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           });
         jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
         }
+      }
 
+      const getScheduledPipelines  = async () => {
+        const response: any = await pipelinesService.getPipelines(store.state.selectedOrganization.identifier);
+        const list = response.data.list;
+        scheduledPipelines.value = list.filter((pipeline: any) => pipeline.source.source_type == 'scheduled').map((pipeline: any) => pipeline.name);
       }
   
       return {
@@ -1351,7 +1362,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         updateRemoteDestination,
         destinationStreamTypes,
         timezoneOptions,
-        handleDynamicStreamName
+        handleDynamicStreamName,
+        scheduledPipelines
       };
     },
     components: {
