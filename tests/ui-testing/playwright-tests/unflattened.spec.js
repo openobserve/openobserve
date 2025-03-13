@@ -188,9 +188,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
 
     // Toggle 'Store Original Data' and update schema
     await unflattenedPage.storeOriginalDataToggle.waitFor();
@@ -283,9 +285,11 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.searchStreamInput.waitFor();
     await unflattenedPage.searchStreamInput.click();
     await unflattenedPage.searchStreamInput.fill("e2e_automate");
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.streamDetailButton.waitFor();
     await unflattenedPage.streamDetailButton.click();
+    await page.waitForTimeout(1000);
     
     await unflattenedPage.storeOriginalDataToggle.waitFor();
     await unflattenedPage.storeOriginalDataToggle.click();
