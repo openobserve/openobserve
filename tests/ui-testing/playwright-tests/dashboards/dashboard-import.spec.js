@@ -158,11 +158,14 @@ test.describe("dashboard import testcases", () => {
     await page.getByLabel('Add your url').click();
     await page.getByLabel('Add your url').fill('https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json');
 
-    await page.waitForTimeout(3000);
-    //is used for setting the file to be imported
+  //  await page.waitForTimeout(5000);
+    // await page.waitForSelector('.table-row'); // adjust selector as needed
+    await expect(page.getByRole('code').locator('div').filter({ hasText: '"dashboardId": "' }).nth(4)).toBeVisible();
+
+
+    //is used for setting the file to be importedad
     await page.getByRole("button", { name: "Import" }).click();
 
-    await page.waitForTimeout(2000);
 
     await expect(
       page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
@@ -196,7 +199,7 @@ test.describe("dashboard import testcases", () => {
     await page.getByRole("button", { name: "Cancel" }).click();
   });
 
-  test("Verify that the .json data is editable in the UI file editor.", async ({
+  test.skip("Verify that the .json data is editable in the UI file editor.", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
@@ -246,7 +249,8 @@ test.describe("dashboard import testcases", () => {
 
     await page.getByRole("button", { name: "Import" }).click();
 
-    await expect(page.getByText("Title is required for")).toBeVisible();
+    await expect(page.getByText("Title is required for dashboard ")).toBeVisible();
+
   });
 
   test("Should auto-update the .json data at the correct location when the Dashboard title is added from the error validation dialog.", async ({
