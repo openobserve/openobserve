@@ -1901,7 +1901,7 @@ const useLogs = () => {
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
               },
-              "UI",
+              "ui",
             ).then((res: any) => {
               $q.notify({
                 type: "positive",
@@ -2091,7 +2091,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res) => {
             // check for total records update for the partition and update pagination accordingly
@@ -2261,7 +2261,7 @@ const useLogs = () => {
             page_type: searchObj.data.stream.streamType,
             traceparent,
           },
-          "UI",
+          "ui",
         )
         .then(async (res) => {
           if (
@@ -2583,7 +2583,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           )
           .then(async (res: any) => {
             removeTraceId(traceId);

@@ -417,7 +417,7 @@ export default {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "ui",
           );
           unflattendData.value = res.data.hits[0]._original;
         } catch (err: any) {
