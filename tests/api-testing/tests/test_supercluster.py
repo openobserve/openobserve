@@ -28,7 +28,6 @@ root_dir = Path(__file__).parent.parent.parent
 now = datetime.now(timezone.utc)
 end_time = int(now.timestamp() * 1000000)
 one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
-one_hour_ago = int((now - timedelta(hours=1)).timestamp() * 100000)
 simpleKeys = os.environ["SIMPLE_KEYS"]
 simpleKeysUp = os.environ["SIMPLE_KEYS_UP"]
 
@@ -141,6 +140,13 @@ def cipher_tinkOO(session, base_url, org_id, cipher_name_tinkOO):
             raise AssertionError(f"Unexpected error: {resp_create_cipher_tinkOO.status_code} {resp_create_cipher_tinkOO.content}")
 
 
+def validate_cipher_keys(session, base_url, org_id):
+    """Validate a cipher key."""
+    response = session.get(f"{base_url}api/{org_id}/cipher_keys")
+    assert response.status_code == 200, f"Failed to validate cipher key: {response.content}"
+    cipher_keys = response.json()
+    assert len(cipher_keys) > 0, "No cipher keys found"
+    return cipher_keys  
 
 
 def create_template_webhook(session, base_url, org_id, template_name):
@@ -171,16 +177,55 @@ def create_template_email(session, base_url, org_id, template_name):
     assert response.status_code == 200, f"Failed to create template: {response.content}"
     return response 
 
-def validate_template(session, base_url, org_id, template_name):
-    """Validate a template."""
+def validate_templates_email(session, base_url, org_id, expected_title):
+    """Validate templates and extract the first template name containing 'template_email' with title 'email_title'."""
     response = session.get(f"{base_url}api/{org_id}/alerts/templates")
-    assert response.status_code == 200, f"Failed to validate template: {response.content}"
-    templates = response.json()     
+    assert response.status_code == 200, f"Failed to validate templates: {response.content}"
+    
+    templates = response.json()
     assert len(templates) > 0, "No templates found"
+    
+    # Variable to store the first matching template name
+    first_template_name = None
+    
     for template in templates:
-        assert template["name"] == template_name, f"Template name {template['name']} does not match {template_name}"
-    return templates
+        # Check if the template name contains 'template_email' and the title is 'email_title'
+        if "template_email" in template["name"] and template["title"] == expected_title:
+            first_template_name = template["name"]
+            break  # Exit loop after finding the first matching template
+    
+    assert first_template_name is not None, f"No template name contains 'template_email' with title '{expected_title}'"
+    
+    return first_template_name, templates
 
+
+def validate_template_email(session, base_url, org_id, template_name, expected_title):
+    """Validate the template email and assert the title."""
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+    assert response.status_code == 200, f"Failed to validate template: {response.content}"
+    
+    template = response.json()  # Assuming the response is a single template, not a list.
+    assert isinstance(template, dict), "Response is not a valid template object"
+    
+    # Assert the title
+    assert "title" in template, "Title key is missing in the response"
+    assert template["title"] == expected_title, f"Expected title '{expected_title}' but got '{template['title']}'"
+    
+    return template
+
+def update_template_email(session, base_url, org_id, template_name):
+    """Update an Email template."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "name": template_name,
+        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
+        "type": "email",
+        "title": "email_title_updated"
+    }      
+    response = session.put(f"{base_url}api/{org_id}/alerts/templates/{template_name}", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to update template: {response.content}"
+    return response
 
 
 def delete_template(session, base_url, org_id, template_name):
@@ -189,7 +234,11 @@ def delete_template(session, base_url, org_id, template_name):
     assert response.status_code == 200, f"Failed to delete template: {response.content}"
     return response
 
-
+def validate_deleted_template(session, base_url, org_id, template_name):
+    """Validate the deleted template."""
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+    assert response.status_code == 404, f"Template {template_name} should not exist"
+    return response
 
 def create_destination_webhook(session, base_url, org_id, template_name, destination_name):
     """Create a destination."""
@@ -1083,7 +1132,7 @@ def create_uds_mqr(session, base_url, org_id, stream_name, max_query_range_hours
     """Create a UDS and Max Query Range."""
     headers = {"Content-Type": "application/json", "Custom-Header": "value"}
 
-    payload = payload = {
+    payload = {
     "partition_time_level": "hourly",
     "partition_keys": [],  # Changed from {} to []
     "full_text_search_keys": ["log", "message"],
@@ -1312,5 +1361,74 @@ def test_create_workflow(create_session, base_url):
             ingest_logs(session, base_url, org_id, stream_name)
         except Exception as e:
             print(f"Failed to ingest logs: {e}")
+
+def test_validate_SC(create_session, base_url):
+    session = create_session
+    base_url = ZO_BASE_URL_SC
+    org_id = "org_pytest_data"
+    stream_name = "stream_pytest_data"
+
+    # Validate templates and extract the first template name containing 'template_email'
+    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
+    print(f"First template name containing 'template_email': {first_template_name}")
+    validate_template_email(session, base_url, org_id, first_template_name, "email_title")
+
+    # Validate destinations and extract the first destination name containing 'destination_email'
+
+def test_update_workflow(create_session, base_url):
+    session = create_session
+    base_url = ZO_BASE_URL
+    org_id = "org_pytest_data"
+    stream_name = "stream_pytest_data"
+
+    # Validate templates and extract the first template name containing 'template_email'
+    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title")
+    print(f"First template name containing 'template_email' and title 'email_title' before update: {first_template_name}")
+    # Update the template
+    update_template_email(session, base_url, org_id, first_template_name)
+    # Validate the template after update
+    validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+
+def test_validate_updated_SC(create_session, base_url):
+    session = create_session
+    base_url = ZO_BASE_URL_SC
+    org_id = "org_pytest_data"
+    stream_name = "stream_pytest_data"
+
+    # Validate templates and extract the first template name containing 'template_email'
+    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+    print(f"First template name containing 'template_email' and title 'email_title_updated' after update: {first_template_name}")
+    validate_template_email(session, base_url, org_id, first_template_name, "email_title_updated")
+
+def test_delete_workflow(create_session, base_url):
+    session = create_session
+    base_url = ZO_BASE_URL
+    org_id = "org_pytest_data"
+    stream_name = "stream_pytest_data"
+
+    # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
+    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+    print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
+    delete_template(session, base_url, org_id, first_template_name)
+    # Validate the template after deletion
+    validate_deleted_template(session, base_url, org_id, first_template_name) 
+
+def test_deleted_SC(create_session, base_url):
+    session = create_session
+    base_url = ZO_BASE_URL_SC
+    org_id = "org_pytest_data"
+    stream_name = "stream_pytest_data"
+
+    # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
+    first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
+    print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
+
+    validate_deleted_template(session, base_url, org_id, first_template_name) 
+   
+
+    
+
+
+
 
        
