@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-ml-auto q-mb-xs no-border"
                 :placeholder="t('logStream.search')"
+                debounce="300"
               >
                 <template #prepend>
                   <q-icon name="search" />
