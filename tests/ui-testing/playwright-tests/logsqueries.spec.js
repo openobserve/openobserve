@@ -217,6 +217,7 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForTimeout(3000);
     await page.click('[data-test="streams-search-stream-input"]')
     await page.keyboard.type("e2e_automate");
+    await page.waitForTimeout(2000);
     await page.locator("[title=\"Stream Detail\"]").first().click({ force: true });
     await page.locator(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     const scope = page.locator(".q-virtual-scroll__content");
