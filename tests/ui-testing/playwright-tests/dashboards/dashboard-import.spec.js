@@ -150,6 +150,29 @@ test.describe("dashboard import testcases", () => {
       .click();
     await page.locator('[data-test="confirm-button"]').click();
   });
+  test("should import the dashbaord using URL import", async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+    await page.locator('[data-test="tab-import_json_url"]').click();
+    await page.getByLabel('Add your url').click();
+    await page.getByLabel('Add your url').fill('https://raw.githubusercontent.com/openobserve/dashboards/refs/heads/main/AWS%20Cloudfront%20Access%20Logs/Cloudfront_to_OpenObserve.dashboard.json');
+
+    await page.waitForTimeout(3000);
+    //is used for setting the file to be imported
+    await page.getByRole("button", { name: "Import" }).click();
+
+    await page.waitForTimeout(2000);
+
+    await expect(
+      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
+    ).toBeVisible();
+    await page
+      .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
+      .locator('[data-test="dashboard-delete"]')
+      .click();
+    await page.locator('[data-test="confirm-button"]').click();
+  });
 
   test("Should cancel the file upload action when clicking the Cancel button in the 'Drop your file' dialog", async ({
     page,
