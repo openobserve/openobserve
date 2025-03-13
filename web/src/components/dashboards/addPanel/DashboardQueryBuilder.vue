@@ -718,6 +718,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="width: 100%"
                       class="tw-flex tw-space-x-2 tw-mb-2"
+                      v-if="dashboardPanelData.data.type !== 'heatmap'"
                     >
                       <q-select
                         dense
@@ -953,47 +954,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :rules="[(val: any) => val.length > 0 || 'Required']"
                       />
                       <div
-                      style="width: 100%"
-                      class="tw-flex tw-space-x-2 tw-mb-2"
-                    >
-                      <q-select
-                        dense
-                        filled
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].havingConditions[0].operator
-                        "
-                        :options="operators"
-                        style="width: 35%"
+                        style="width: 100%"
+                        class="tw-flex tw-space-x-2 tw-mb-2"
                       >
-                        <template v-slot:append>
-                          <q-icon
-                            name="close"
-                            size="small"
-                            @click.stop.prevent="
-                              dashboardPanelData.data.queries[
-                                dashboardPanelData.layout.currentQueryIndex
-                              ].fields.z[index].havingConditions[0].operator =
-                                null
-                            "
-                            class="cursor-pointer"
-                          />
-                        </template>
-                      </q-select>
-                      <q-input
-                        dense
-                        filled
-                        v-model.number="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.z[index].havingConditions[0].value
-                        "
-                        style="width: 65%"
-                        type="number"
-                        placeholder="Value"
-                      />
-                    </div>
+                        <q-select
+                          dense
+                          filled
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z[index].havingConditions[0].operator
+                          "
+                          :options="operators"
+                          style="width: 35%"
+                        >
+                          <template v-slot:append>
+                            <q-icon
+                              name="close"
+                              size="small"
+                              @click.stop.prevent="
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields.z[index].havingConditions[0].operator =
+                                  null
+                              "
+                              class="cursor-pointer"
+                            />
+                          </template>
+                        </q-select>
+                        <q-input
+                          dense
+                          filled
+                          v-model.number="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z[index].havingConditions[0].value
+                          "
+                          style="width: 65%"
+                          type="number"
+                          placeholder="Value"
+                        />
+                      </div>
                       <div
                         v-if="
                           !dashboardPanelData.data.queries[
