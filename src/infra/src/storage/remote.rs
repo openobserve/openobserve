@@ -157,7 +157,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc_by(time);
         }
 
@@ -184,7 +184,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
                 .inc_by(time);
         }
 

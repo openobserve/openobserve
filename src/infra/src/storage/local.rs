@@ -168,7 +168,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc_by(time);
         }
 
@@ -195,7 +195,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
                 .inc_by(time);
         }
 
