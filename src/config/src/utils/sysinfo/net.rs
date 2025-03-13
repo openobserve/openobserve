@@ -109,22 +109,6 @@ pub fn get_tcp_connections(_state: Option<TcpConnState>) -> usize {
 }
 
 #[cfg(target_os = "linux")]
-pub fn get_open_fds() -> usize {
-    match std::fs::read_dir("/proc/self/fd") {
-        Ok(entries) => entries.count(),
-        Err(e) => {
-            log::warn!("Failed to read open file descriptors: {}", e);
-            0
-        }
-    }
-}
-
-#[cfg(not(target_os = "linux"))]
-pub fn get_open_fds() -> usize {
-    0
-}
-
-#[cfg(target_os = "linux")]
 pub fn get_tcp_conn_resets() -> usize {
     match std::fs::read_to_string("/proc/net/netstat") {
         Ok(contents) => {

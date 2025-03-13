@@ -48,7 +48,7 @@ pub fn get_node_metrics() -> NodeMetrics {
     let tcp_conns_established = net::get_tcp_connections(Some(TcpConnState::Established));
     let tcp_conns_close_wait = net::get_tcp_connections(Some(TcpConnState::CloseWait));
     let tcp_conns_time_wait = net::get_tcp_connections(Some(TcpConnState::TimeWait));
-    let open_fds = net::get_open_fds();
+    let open_fds = os::get_open_fds();
     let tcp_conn_resets = net::get_tcp_conn_resets();
 
     NodeMetrics {
