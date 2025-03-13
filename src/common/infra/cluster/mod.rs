@@ -281,7 +281,10 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     })?;
 
     for item in items {
-        let node: Node = json::from_slice(&item)?;
+        let node: Node = json::from_slice(&item).map_err(|e| {
+            log::error!("[CLUSTER] error parsing node: {}", e);
+            e
+        })?;
         nodes.push(node.to_owned());
     }
 
