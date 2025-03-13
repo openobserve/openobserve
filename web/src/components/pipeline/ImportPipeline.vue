@@ -250,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :input-debounce="400"
                             @update:model-value="updateStreamFields(userSelectedStreamName[index], index)"
                             behavior="menu"
+                            @input-value="handleDynamicStreamName($event, index)"
                           >
                             <template v-slot:option="scope">
                               <q-item v-bind="scope.itemProps">
@@ -290,48 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
-                        </div>
-                      </span>
-                      <span
-                        class="text-red"
-                        v-else-if="
-                          typeof errorMessage === 'object' &&
-                          errorMessage.field == 'source_stream_name'
-                        "
-                      >
-                        {{ errorMessage.message }}
-                        <div style="width: 300px">
-                          <q-select
-                            data-test="pipeline-import-source-stream-name-input"
-                            v-model="userSelectedStreamName[index]"
-                            :options="streamList"
-                            :label="t('alerts.stream_name') + ' *'"
-                            :popup-content-style="{
-                              textTransform: 'lowercase',
-                            }"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="q-py-sm showLabelOnTop no-case"
-                            filled
-                            stack-label
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
-                            :input-debounce="400"
-                            @update:model-value="updateStreamFields(userSelectedStreamName[index], index)"
-                            behavior="menu"
-                          >
-                            <template v-slot:option="scope">
-                              <q-item v-bind="scope.itemProps">
-                                <q-item-section>
-                                  <q-item-label :class="{ 'text-grey-6': scope.opt.disable }">
-                                    {{ scope.opt.label }}
-                                  </q-item-label>
-                                </q-item-section>
-                              </q-item>
-                            </template>
-                          </q-select>
                         </div>
                       </span>
                       <!-- sql query should be same across all nodes as well try to match the query in the nodes -->
@@ -1013,7 +972,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         //3. validate source stream name it should not be empty 
         if((input.source.source_type == "realtime" && !input.source.stream_name.trim()) || input.source.source_type == "realtime" && await validateSourceStream(input.source.stream_name,[]) ){
-          pipelineErrors.push({ message: `Pipeline - ${index}: Source stream name is required`, field: "source_stream_name" });
+          pipelineErrors.push({ message: `Pipeline - ${index}: Source stream name is required `, field: "source_stream_name" });
         }
 
         //call getStreamsList to update the stream list //not neded as we are updating the stream list while selecting the stream type
@@ -1321,6 +1280,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           );
         });
       };
+      const handleDynamicStreamName = (streamName: string, index: number) => {
+        if(streamName?.trim() != ""){
+          jsonArrayOfObj.value[index].source.stream_name = streamName;
+          jsonArrayOfObj.value[index].stream_name = streamName;
+          jsonArrayOfObj.value[index].nodes.forEach((node: any) => {
+            if(node.io_type == "input"){
+              node.data.stream_name = streamName;
+            }
+          });
+        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+        }
+
+      }
   
       return {
         t,
@@ -1379,6 +1351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         updateRemoteDestination,
         destinationStreamTypes,
         timezoneOptions,
+        handleDynamicStreamName
       };
     },
     components: {
