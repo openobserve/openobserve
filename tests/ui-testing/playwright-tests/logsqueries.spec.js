@@ -138,6 +138,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e');
+    await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Explore' }).first().click({ force: true });
     await page.waitForTimeout(5000);
     await page.waitForSelector('[data-test="logs-search-saved-views-btn"]');
