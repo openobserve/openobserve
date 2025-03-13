@@ -163,6 +163,14 @@ pub struct AxisItem {
     pub args: Option<Vec<AxisArg>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub having_conditions: Option<Vec<HavingConditions>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+pub struct HavingConditions {
+    value: Option<String>,
+    operator: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

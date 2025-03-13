@@ -468,6 +468,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       });
     }
 
@@ -528,6 +534,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : "ASC"
             : null,
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       });
     }
 
@@ -581,6 +593,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             ? null
             : "count",
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       });
     }
     updateArrayAlias();
@@ -630,6 +648,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count",
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       });
     }
     updateArrayAlias();
@@ -651,6 +675,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -671,6 +701,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -691,6 +727,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -747,6 +789,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -767,6 +815,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -787,6 +841,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
         isDerived,
+        havingConditions: [
+          {
+            value: null,
+            operator: null,
+          }
+        ],
       };
     }
   };
@@ -2240,6 +2300,31 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       } else {
         query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
       }
+    }
+
+    // Add HAVING clause if y-axis has operator and value
+    const yAxisFields =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y;
+
+    const havingClauses: any = [];
+
+    yAxisFields.forEach((field: any) => {
+      if (
+        field?.havingConditions[0].operator &&
+        field?.havingConditions[0].value !== undefined &&
+        field?.havingConditions[0].value !== null
+      ) {
+        const columnName = field.alias;
+        havingClauses.push(
+          `"${columnName}" ${field.havingConditions[0].operator} ${field.havingConditions[0].value}`,
+        );
+      }
+    });
+
+    if (havingClauses.length > 0) {
+      query += " HAVING " + havingClauses.join(" AND ");
     }
 
     // array of sorting fields with followed by asc or desc
