@@ -550,20 +550,19 @@ await zioxOption.click();
       .locator(`[data-test="dashboard-add-condition-label-0-${textContent}"]`)
       .click();
       // await page.waitForTimeout(3000);
-      // await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').click();
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().click();
 
       await page.locator('[data-test="dashboard-add-condition-column-0\\}"]').first().fill('kubernetes_container_image');
       
-      // await page
-      // .getByRole("option", { name: "kubernetes_container_image" }).first()
-      // .click();
+      await page
+      .getByRole("option", { name: "kubernetes_container_image" })
+      .first()
+      .click({ force: true });
+      // const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
 
-      const option = page.getByRole("option", { name: "kubernetes_container_image" }).first();
-
-      await option.waitFor({ state: "visible", timeout: 10000 });
+      // await option.waitFor({ state: "visible", timeout: 10000 });
       
-      await option.click();
+      // await option.click();
 
     await page
   .locator('[data-test="dashboard-add-condition-condition-0"]')
