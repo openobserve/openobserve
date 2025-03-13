@@ -467,7 +467,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="downloadLogs(searchObj.data.queryResults.hits)"
                   v-close-popup
                 >
-                  <q-item-label>{{ t("search.downloadTable") }}</q-item-label>
+                  <q-item-label>{{ t("search.downloadTableCsv") }}</q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                v-bind:disable="
+                  searchObj.data.queryResults &&
+                  searchObj.data.queryResults.hasOwnProperty('hits') &&
+                  !searchObj.data.queryResults.hits.length
+                "
+              >
+                <q-item-section
+                  @click.stop="downloadLogsJson(searchObj.data.queryResults.hits)"
+                  v-close-popup
+                >
+                  <q-item-label>{{ t("search.downloadTableJson") }}</q-item-label>
                 </q-item-section>
               </q-item>
               <q-separator />
@@ -1764,6 +1782,21 @@ export default defineComponent({
       const dataobj = jsonToCsv(data);
       const file = new File([dataobj], filename, {
         type: "text/csv",
+      });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+    const downloadLogsJson = (data) => {
+      const filename = "logs-data.json";
+      const dataobj = JSON.stringify(data,null,2);
+      const file = new File([dataobj], filename, {
+        type: "application/json",
       });
       const url = URL.createObjectURL(file);
       const link = document.createElement("a");
@@ -3190,6 +3223,7 @@ export default defineComponent({
       updateSavedViews,
       checkQuery,
       checkFnQuery,
+      downloadLogsJson,
     };
   },
   computed: {
