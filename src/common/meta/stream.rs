@@ -63,6 +63,7 @@ pub struct StreamSchema {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ListStream {
     pub list: Vec<Stream>,
+    pub total: usize,
 }
 
 pub struct SchemaEvolution {

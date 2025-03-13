@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     io::{Error, ErrorKind},
 };
@@ -285,6 +286,10 @@ async fn delete(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("type" = String, Query, description = "Stream type"),
+        ("keyword" = String, Query, description = "Keyword"),
+        ("offset" = u32, Query, description = "Offset"),
+        ("limit" = u32, Query, description = "Limit"),
+        ("sort" = String, Query, description = "Sort"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = ListStream),
@@ -348,8 +353,86 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         _stream_list_from_rbac,
     )
     .await;
-    indices.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(HttpResponse::Ok().json(ListStream { list: indices }))
+    // filter by keyword
+    if let Some(keyword) = query.get("keyword") {
+        if !keyword.is_empty() {
+            indices.retain(|s| s.name.contains(keyword));
+        }
+    }
+
+    // sort by
+    let mut sort = "name".to_string();
+    if let Some(s) = query.get("sort") {
+        let s = s.to_lowercase();
+        if !s.is_empty() {
+            sort = s;
+        }
+    }
+    let asc = if let Some(asc) = query.get("asc") {
+        asc.to_lowercase() == "true" || asc.to_lowercase() == "1"
+    } else {
+        true
+    };
+    indices.sort_by(|a, b| match (sort.as_str(), asc) {
+        ("name", true) => a.name.cmp(&b.name),
+        ("name", false) => b.name.cmp(&a.name),
+        ("doc_num", true) => a.stats.doc_num.cmp(&b.stats.doc_num),
+        ("doc_num", false) => b.stats.doc_num.cmp(&a.stats.doc_num),
+        ("storage_size", true) => a
+            .stats
+            .storage_size
+            .partial_cmp(&b.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("storage_size", false) => b
+            .stats
+            .storage_size
+            .partial_cmp(&a.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", true) => a
+            .stats
+            .compressed_size
+            .partial_cmp(&b.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("compressed_size", false) => b
+            .stats
+            .compressed_size
+            .partial_cmp(&a.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", true) => a
+            .stats
+            .index_size
+            .partial_cmp(&b.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        ("index_size", false) => b
+            .stats
+            .index_size
+            .partial_cmp(&a.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        _ => a.name.cmp(&b.name),
+    });
+
+    // set total streams
+    let total = indices.len();
+
+    // Pagination
+    let offset = query
+        .get("offset")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    let limit = query
+        .get("limit")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0);
+    if offset >= indices.len() {
+        indices = vec![];
+    } else if limit > 0 {
+        let end = std::cmp::min(offset + limit, indices.len());
+        indices = indices[offset..end].to_vec();
+    }
+    Ok(HttpResponse::Ok().json(ListStream {
+        list: indices,
+        total,
+    }))
 }
 
 #[utoipa::path(
