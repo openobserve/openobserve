@@ -92,7 +92,7 @@ export const usePanelDataLoader = (
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
-    closeSocketBasedOnRequestId,
+    cleanUpListeners,
   } = useSearchWebSocket();
 
   const { refreshAnnotations } = useAnnotations(
@@ -636,9 +636,11 @@ export const usePanelDataLoader = (
   const sendSearchMessage = async (payload: any) => {
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
-      //TODO: need to cancel the query based on traceId without closing the socket
-      // closeSocketBasedOnRequestId(payload.traceId);
       state.isOperationCancelled = false;
+
+      // clean up the listeners
+      cleanUpListeners(payload.traceId);
+
       return;
     }
 

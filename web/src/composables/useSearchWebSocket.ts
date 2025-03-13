@@ -175,6 +175,7 @@ const useSearchWebSocket = () => {
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
     closeSocketBasedOnRequestId,
+    cleanUpListeners,
   };
 };
 
