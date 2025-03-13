@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
       class="management_splitter"
       v-model="splitterModel"
+      :limits="[0, 400]"
       unit="px"
       style="min-height: calc(100vh - 104px); overflow: hidden;"
     >
@@ -210,17 +211,6 @@ export default defineComponent({
     onUpdated(() => {
       handleSettingsRouting();
     });
-    watch(()=> splitterModel.value,
-    (val) => {
-      if(val == 50 || val == 0){
-        splitterModel.value = 0;
-        showManagementTabs.value = false
-      }
-      else{
-        showManagementTabs.value = true
-      }
-    }
-  )
     const showManagementTabs = ref(true);
     const controlManagementTabs = () => {
       if(showManagementTabs.value){
