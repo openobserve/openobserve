@@ -201,6 +201,7 @@ await page.waitForTimeout(1000);
       .getByRole("button", { name: "Explore" })
       .first()
       .click({ force: true });
+    await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 
