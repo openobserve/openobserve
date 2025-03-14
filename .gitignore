@@ -37,6 +37,7 @@ flamegraph.html
 
 /tmp/
 /data/
+/data2/
 /.idea/
 /.vscode
 /.env
