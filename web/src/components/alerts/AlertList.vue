@@ -530,7 +530,7 @@ export default defineComponent({
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
-    const expandedRow = ref("");
+    const expandedRow = ref<any>("");
     const getAlerts = () => {
       const dismiss = $q.notify({
         spinner: true,
