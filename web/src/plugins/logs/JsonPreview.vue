@@ -100,8 +100,8 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner v-if="loading" size="lg" color="primary" />
-
+      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <div v-if="!loading">
       <query-editor
         v-model:query="unflattendData"
         ref="queryEditorRef"
@@ -110,6 +110,7 @@
         :class="mode"
         language="json"
       />
+      </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
       {
@@ -382,9 +383,7 @@ export default {
 
     onMounted(async () => {});
 
-    watch(
-      () => props.value,
-      async () => {
+    const getOriginalData = async () => {
         setViewTraceBtn();
 
         if (
@@ -392,6 +391,12 @@ export default {
           searchAggData.hasAggregation ||
           searchObj.data.stream.selectedStream.length > 1
         ) {
+          return;
+        }
+        // Check if data exists in searchObj cache
+        const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
+        if (searchObj.data.originalDataCache?.has(cacheKey)) {
+          unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
           return;
         }
 
@@ -419,7 +424,10 @@ export default {
             },
             "ui",
           );
-          unflattendData.value = res.data.hits[0]._original;
+          const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
+          unflattendData.value = formattedData;
+          //store the data in cache of searchObj
+          searchObj.data.originalDataCache.set(cacheKey, formattedData);
         } catch (err: any) {
           loading.value = false;
           $q.notify({
@@ -432,9 +440,14 @@ export default {
         } finally {
           loading.value = false;
         }
-      },
-      { immediate: true, deep: true },
-    );
+      };
+
+      watch(activeTab, async () => {
+        if (activeTab.value === "unflattened") {
+          unflattendData.value = "";
+          await getOriginalData();
+        }
+      });
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -451,7 +464,9 @@ export default {
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
-        queryEditorRef.value.formatDocument();
+        if(!loading.value) {
+          queryEditorRef.value.formatDocument();
+        }
       }
     };
 
@@ -494,6 +509,7 @@ export default {
       isTracesStreamsLoading,
       tracesStreams,
       setViewTraceBtn,
+      getOriginalData,
     };
   },
 };

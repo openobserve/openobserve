@@ -169,6 +169,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,
+    originalDataCache: new Map(),
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -1500,6 +1501,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      //remove any data that has been cached 
+      if(searchObj.data.originalDataCache.size > 0){
+        searchObj.data.originalDataCache.clear();
+      }
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
       searchObj.data.searchRequestTraceIds = [];
