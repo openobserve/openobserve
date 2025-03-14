@@ -1941,12 +1941,7 @@ def test_deleted_SC(create_session, base_url):
     
 
 
-#     # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
-#     first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
-#     print(f"First template name containing 'template_email' and title 'email_title_updated' before deletion: {first_template_name}")
 
-#     validate_deleted_template(session, base_url, org_id, first_template_name) 
-   
 
     
 
