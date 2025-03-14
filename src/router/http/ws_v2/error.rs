@@ -13,11 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use actix_http::ws::ProtocolError;
 use actix_web::{error::ResponseError, http::StatusCode};
+use serde_json::error::Error as SerdeError;
 use thiserror::Error;
+
+use crate::service::websocket_events::WsServerEvents;
 
 #[derive(Error, Debug)]
 pub enum WsError {
+    #[error("ProtocolError# {0}")]
+    ProtocolError(#[from] ProtocolError),
+
+    #[error("SerdeError# {0}")]
+    SerdeError(#[from] SerdeError),
+
     #[error("Connection error: {0}")]
     ConnectionError(String),
 
@@ -61,6 +71,8 @@ pub enum WsError {
 impl ResponseError for WsError {
     fn status_code(&self) -> StatusCode {
         match self {
+            WsError::ProtocolError(_) => StatusCode::BAD_REQUEST,
+            WsError::SerdeError(_) => StatusCode::BAD_REQUEST,
             WsError::ConnectionError(_) => StatusCode::SERVICE_UNAVAILABLE,
             WsError::ConnectionDisconnected => StatusCode::INTERNAL_SERVER_ERROR,
             WsError::SessionError(_) => StatusCode::BAD_REQUEST,
@@ -79,3 +91,44 @@ impl ResponseError for WsError {
 }
 
 pub type WsResult<T> = Result<T, WsError>;
+
+#[derive(Debug)]
+pub struct ErrorMessage {
+    pub ws_server_events: WsServerEvents,
+    pub should_disconnect: bool,
+}
+
+impl ErrorMessage {
+    // TODO: confirm what request_id is?
+    pub fn new(ws_error: WsError, trace_id: Option<String>, request_id: Option<String>) -> Self {
+        Self {
+            ws_server_events: ws_error.into_ws_server_events(trace_id, request_id),
+            should_disconnect: ws_error.should_disconnect(),
+        }
+    }
+}
+
+impl WsError {
+    /// Disconnect the ws conn to client from router
+    pub fn should_disconnect(&self) -> bool {
+        match self {
+            WsError::ProtocolError(_) => true,
+            // TODO: fill out with the rest
+            _ => false,
+        }
+    }
+
+    pub fn into_ws_server_events(
+        &self,
+        trace_id: Option<String>,
+        request_id: Option<String>,
+    ) -> WsServerEvents {
+        WsServerEvents::Error {
+            code: self.status_code().as_u16(),
+            message: self.to_string(),
+            error_detail: None,
+            trace_id,
+            request_id,
+        }
+    }
+}

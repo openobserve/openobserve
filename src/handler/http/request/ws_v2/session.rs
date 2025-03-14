@@ -210,11 +210,6 @@ pub async fn handle_text_message(
     msg: String,
     path: String,
 ) {
-    let is_v2 = if path.contains("/ws/v2/") {
-        true
-    } else {
-        false
-    };
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             // Validate the events
@@ -319,12 +314,7 @@ pub async fn handle_text_message(
                 e
             );
             let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
-            let res = if is_v2 {
-                err_res.to_json()
-            } else {
-                err_res.to_json()
-            };
-            let _ = send_message(req_id, res).await;
+            let _ = send_message(req_id, err_res.to_json()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: None,
