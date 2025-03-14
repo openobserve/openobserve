@@ -169,8 +169,17 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file, true).into()), range)
-            .await?;
+            .get_range(&(format_key(&file, true).into()), range.clone())
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[STORAGE] get_range remote file: {}, range: {:?}, error: {:?}",
+                    file,
+                    range,
+                    e
+                );
+                e
+            })?;
 
         // metrics
         let data_len = data.len();
