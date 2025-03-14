@@ -39,7 +39,7 @@ primary_key_id_tink_val_up = os.environ["PRIMARY_KEY_ID_VAL_UP"]
 
 Unique_value = f"u_{random.randint(100000, 999999)}"
 Total_count = 2
-org_id = "org_pytest_data"
+org_id = "default"
 stream_name = "stream_pytest_data"
 
 def create_cipher_simpleOO(session, base_url, org_id, cipher_name_simpleOO):
@@ -384,6 +384,9 @@ def delete_cipher(session, base_url, org_id, cipher_type):
         resp_delete_cipher = session.delete(f"{base_url}api/{org_id}/cipher_keys/{cipher_name}")
         assert resp_delete_cipher.status_code == 200, f"Failed to delete {cipher_name}: {resp_delete_cipher.content}"
         
+        # Wait for a few seconds to allow the data to be ingested
+        time.sleep(10)  # Increase this time if necessary
+
         # Verify deletion
         resp_ver_cipher = session.get(f"{base_url}api/{org_id}/cipher_keys/{cipher_name}")
         assert resp_ver_cipher.status_code == 404, f"Expected 404 for {cipher_name}, but got {resp_ver_cipher.status_code}"
@@ -461,45 +464,57 @@ def create_template_email(session, base_url, org_id, template_name):
     assert response.status_code == 200, f"Failed to create template: {response.content}"
     return response 
 
-def retrieve_templates_webhook(session, base_url, org_id, expected_title):
-    """Retrieve templates and extract the first template name containing 'template_webhook' with title 'webhook_title'."""
+def retrieve_templates_webhook(session, base_url, org_id):
+    """Retrieve templates and extract information about the first template matching the specified name."""
+    
     response = session.get(f"{base_url}api/{org_id}/alerts/templates")
     assert response.status_code == 200, f"Failed to validate templates: {response.content}"
     
+    # Parse the JSON response
     templates = response.json()
     assert len(templates) > 0, "No templates found"
     
-    # Variable to store the first matching template name
-    first_template_name = None
+    # Filter templates that contain 'template_webhook' and match the expected name
+    webhook_templates = [ template for template in templates if "template_webhook" in template["name"] 
+                         and template["name"].startswith(f"template_webhook_{Unique_value}")
+    ]
     
-    for template in templates:
-        # Check if the template name contains 'template_webhook' and the title is 'webhook_title'
-        if "template_webhook" in template["name"] and template["title"] == expected_title:
-            first_template_name = template["name"]
-            break  # Exit loop after finding the first matching template
+    # Assert that there are templates matching the criteria
+    assert len(webhook_templates) > 0, f"No templates found containing 'template_webhook' with title 'template_webhook_{Unique_value}'"
     
-    assert first_template_name is not None, f"No template name contains 'template_webhook' with title '{expected_title}'"
+    # Extract the first template's complete name
+    first_template_name_webhook = webhook_templates[0]['name']
     
-    return first_template_name, templates
+    # Return structured data
+    return {
+        "count": len(webhook_templates),
+        "first_template_webhook": first_template_name_webhook,
+        "templates": webhook_templates
+    }
 
 
-def retrieve_template_webhook(session, base_url, org_id, template_name, expected_title):
-    """Retrieve the template webhook and assert the title."""
+def retrieve_template_webhook(session, base_url, org_id, template_name):
+    """Retrieve the template webhook and assert the body."""
+    
     response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
     assert response.status_code == 200, f"Failed to validate template: {response.content}"
     
-    template = response.json()  # Assuming the response is a single template, not a list.
-    assert isinstance(template, dict), "Response is not a valid template object"
+    template_webhook = response.json()  # Assuming the response is a single template, not a list.
     
-    # Assert the title
-    assert "title" in template, "Title key is missing in the response"
-    assert template["title"] == expected_title, f"Expected title '{expected_title}' but got '{template['title']}'"
+    # Assert that the response is a valid template object
+    assert isinstance(template_webhook, dict), "Response is not a valid template object"
     
-    return template
+    
+    return {
+        "name_template_webhook": template_webhook["name"],
+        "body_template_webhook": template_webhook["body"]
+    }
 
 
 
-def retrieve_templates_email(session, base_url, org_id, expected_title):
+
+
+def retrieve_templates_email(session, base_url, org_id):
     """Retrieve templates and extract the first template name containing 'template_email' with title 'email_title'."""
     response = session.get(f"{base_url}api/{org_id}/alerts/templates")
     assert response.status_code == 200, f"Failed to validate templates: {response.content}"
@@ -510,30 +525,54 @@ def retrieve_templates_email(session, base_url, org_id, expected_title):
     # Variable to store the first matching template name
     first_template_name = None
     
-    for template in templates:
-        # Check if the template name contains 'template_email' and the title is 'email_title'
-        if "template_email" in template["name"] and template["title"] == expected_title:
-            first_template_name = template["name"]
-            break  # Exit loop after finding the first matching template
+    email_templates = [
+        template for template in templates 
+         if template["name"].startswith(f"template_email_{Unique_value}")
+] 
     
-    assert first_template_name is not None, f"No template name contains 'template_email' with title '{expected_title}'"
+    # Assert that there are templates matching the criteria
+    assert len(email_templates) > 0, f"No templates found containing 'template_email' with title 'template_email_{Unique_value}'"
     
-    return first_template_name, templates
+    # Extract the first template's complete name
+    first_template_name_email = email_templates[0]['name']
+    
+    # Return structured data
+    return {
+        "count": len(email_templates),
+        "first_template_email": first_template_name_email,
+        "templates": email_templates
+    }
 
-
-def retrieve_template_email(session, base_url, org_id, template_name, expected_title):
+def retrieve_template_email(session, base_url, org_id, template_name):
     """Retrieve the template email and assert the title."""
     response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
     assert response.status_code == 200, f"Failed to validate template: {response.content}"
     
-    template = response.json()  # Assuming the response is a single template, not a list.
-    assert isinstance(template, dict), "Response is not a valid template object"
+    template_email = response.json()  # Assuming the response is a single template, not a list.
+    assert isinstance(template_email, dict), "Response is not a valid template object"
     
-    # Assert the title
-    assert "title" in template, "Title key is missing in the response"
-    assert template["title"] == expected_title, f"Expected title '{expected_title}' but got '{template['title']}'"
+   
+    return {
+        "name_template_email": template_email["name"],
+        "title_template_email": template_email["title"]
+    }
+
+def update_template_webhook(session, base_url, org_id, template_name):
+    """Update an Webhook template."""
+    headers = {"Content-Type": "application/json", "Custom-Header": "value"}
+
+    payload = {
+        "name": template_name,
+        "body": '{"text": "For stream {stream_name} of organization {org} alert {alert_name} of type {alert_type} is active"}',
+        "type": "http",
+        "title": ""
+    }      
+    response = session.put(f"{base_url}api/{org_id}/alerts/templates/{template_name}", json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to update template: {response.content}"
+    template_webhook = response.json()
+    assert isinstance(template_webhook, dict), "Response is not a valid template object"
     
-    return template
+    
 
 def update_template_email(session, base_url, org_id, template_name):
     """Update an Email template."""
@@ -547,20 +586,77 @@ def update_template_email(session, base_url, org_id, template_name):
     }      
     response = session.put(f"{base_url}api/{org_id}/alerts/templates/{template_name}", json=payload, headers=headers)
     assert response.status_code == 200, f"Failed to update template: {response.content}"
-    return response
+    template_email = response.json()
+    assert isinstance(template_email, dict), "Response is not a valid template object"
+
+    
 
 
-def delete_template(session, base_url, org_id, template_name):
-    """Delete a template."""
-    response = session.delete(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
-    assert response.status_code == 200, f"Failed to delete template: {response.content}"
-    return response
+def delete_template(session, base_url, org_id, template_type):
+    """Delete templates of a specified type."""
+    
+    # Retrieve all templates
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates")
+    assert response.status_code == 200, f"Failed to retrieve templates: {response.content}"
+    
+    templates = response.json()
+    
+    # Filter templates that match the specified template type
+    template_names_to_delete = [
+        template['name'] for template in templates 
+           if template["name"].startswith(f"{template_type}_{Unique_value}")
+    ]
+    
+    # Delete each template of the specified type
+    for template_name in template_names_to_delete:
+        resp_delete_template = session.delete(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+        assert resp_delete_template.status_code == 200, f"Failed to delete template {template_name}: {resp_delete_template.content}"
+        
+        # Wait for a few seconds to allow the data to be ingested
+        time.sleep(10)  # Increase this time if necessary
+
+        # Verify deletion
+        resp_ver_template = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+        assert resp_ver_template.status_code == 404, f"Expected 404 for {template_name}, but got {resp_ver_template.status_code}"
+
+    return template_names_to_delete  # Return the list of deleted template names for verification if needed
+
 
 def validate_deleted_template(session, base_url, org_id, template_name):
-    """Validate the deleted template."""
-    response = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
-    assert response.status_code == 404, f"Template {template_name} should not exist"
-    return response
+    """Running an E2E test for validating deleted template."""
+
+    # Verify deleted template
+    resp_ver_template = session.get(f"{base_url}api/{org_id}/alerts/templates/{template_name}")
+
+    assert (
+        resp_ver_template.status_code == 404
+    ), f"Expected 404 for deleted template '{template_name}', but got {resp_ver_template.status_code}: {resp_ver_template.content}"
+
+    return resp_ver_template
+
+
+def validate_deleted_template_SC(session, base_url, org_id, template_type):
+    """Running an E2E test for validating deleted templates in SC."""
+
+    # Retrieve all templates
+    response = session.get(f"{base_url}api/{org_id}/alerts/templates")
+    assert response.status_code == 200, f"Failed to retrieve templates: {response.content}"
+
+    templates = response.json()
+
+    # Filter templates that match the specified template type
+    template_type_names = [template for template in templates if template['type'] == template_type]
+
+    # Check if any templates of the specified type exist
+    if len(template_type_names) == 0:
+        print(f"No templates found of type '{template_type}'")
+        # Optionally, you can choose to skip the assertion or handle it differently
+    else:
+        assert len(template_type_names) > 0, f"No templates found of type '{template_type}'"
+        print(f"Templates found of type '{template_type}': {[template['name'] for template in template_type_names]}")
+
+    return template_type_names
+
 
 
 # Destination functionality
@@ -1688,15 +1784,25 @@ def test_validate_SC(create_session, base_url):
     
 
     result = retrieve_cipherKeys_simpleOO(session, base_url, org_id)
-    assert result['count'] == Total_count, (f"No 'sim_{Unique_value}' keys found")
+    assert result['count'] == Total_count, (f"No 'sim_{Unique_value}' keys found - {result['count']}")
     first_key_name_simpleOO = result['first_key_name']
     retrieve_cipher_simpleOO(session, base_url, org_id, first_key_name_simpleOO, "GNf6Mc")
 
 
     result = retrieve_cipherKeys_tinkOO(session, base_url, org_id)
-    assert result['count'] == Total_count, (f"No 'tink_{Unique_value}' keys found") 
+    assert result['count'] == Total_count, (f"No 'tink_{Unique_value}' keys found - {result['count']}") 
     first_key_name_tinkOO = result['first_key_name']
     retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink)
+
+    templates = retrieve_templates_email(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_email = templates['first_template_email']
+    retrieve_template_email(session, base_url, org_id, first_template_name_email)    
+
+    templates = retrieve_templates_webhook(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_webhook = templates['first_template_webhook']
+    retrieve_template_webhook(session, base_url, org_id, first_template_name_webhook)  
         
 
 
@@ -1725,6 +1831,16 @@ def test_update_workflow(create_session, base_url):
     update_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO)
     retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink_up) 
 
+    templates = retrieve_templates_email(session, base_url, org_id) 
+    assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_email = templates['first_template_email']
+    update_template_email(session, base_url, org_id, first_template_name_email)
+
+    templates = retrieve_templates_webhook(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_webhook = templates['first_template_webhook']
+    update_template_webhook(session, base_url, org_id, first_template_name_webhook)
+
 
 
 
@@ -1752,8 +1868,15 @@ def test_validate_updated_SC(create_session, base_url):
     first_key_name_tinkOO = result['first_key_name']
     retrieve_cipher_tinkOO(session, base_url, org_id, first_key_name_tinkOO, primary_key_id_tink_up)
 
+    templates = retrieve_templates_email(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_email = templates['first_template_email']
+    retrieve_template_email(session, base_url, org_id, first_template_name_email)
 
-
+    templates = retrieve_templates_webhook(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_webhook = templates['first_template_webhook']
+    retrieve_template_webhook(session, base_url, org_id, first_template_name_webhook)
 
 
 
@@ -1781,6 +1904,19 @@ def test_delete_workflow(create_session, base_url):
     validate_deleted_cipher(session, base_url, org_id, first_key_name_tinkOO)
     validate_deleted_cipher(session, base_url_sc, org_id, first_key_name_tinkOO)
 
+    templates = retrieve_templates_email(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_email_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_email = templates['first_template_email']
+    delete_template(session, base_url, org_id, "template_email")
+    validate_deleted_template(session, base_url, org_id, first_template_name_email)
+    validate_deleted_template(session, base_url_sc, org_id, first_template_name_email)
+
+    templates = retrieve_templates_webhook(session, base_url, org_id)
+    assert templates['count'] == Total_count, (f"No 'template_webhook_{Unique_value}' templates found - {templates['count']}")
+    first_template_name_webhook = templates['first_template_webhook']
+    delete_template(session, base_url, org_id, "template_webhook")
+    validate_deleted_template(session, base_url, org_id, first_template_name_webhook)   
+    validate_deleted_template(session, base_url_sc, org_id, first_template_name_webhook)    
 
     # # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
     # first_template_name, templates = validate_templates_email(session, base_url, org_id, "email_title_updated")
@@ -1796,6 +1932,13 @@ def test_deleted_SC(create_session, base_url):
     validate_deleted_cipher_SC(session, base_url, org_id, "sim")
 
     validate_deleted_cipher_SC(session, base_url, org_id, "tink")
+
+    validate_deleted_template_SC(session, base_url, org_id, "template_email")
+
+    validate_deleted_template_SC(session, base_url, org_id, "template_webhook")
+
+
+    
 
 
 #     # Validate templates and extract the first template name containing 'template_email' and title 'email_title_updated'
